@@ -1,0 +1,35 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perf-platform
+  labels:
+    perfeng.io/component: platform
+    perfeng.io/managed-by: perfeng
+    purpose: orchestration
+  annotations:
+    description: 'Performance platform orchestration components'
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perf-generators
+  labels:
+    perfeng.io/component: generator
+    perfeng.io/managed-by: perfeng
+    purpose: test-execution
+  annotations:
+    description: 'Performance test generator pods (k6, Playwright)'
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perf-sut
+  labels:
+    perfeng.io/component: sut
+    perfeng.io/managed-by: perfeng
+    purpose: system-under-test
+  annotations:
+    description: 'System under test components'

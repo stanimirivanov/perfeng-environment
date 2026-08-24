@@ -1,0 +1,160 @@
+---
+# Default deny all ingress in perf-platform namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: perf-platform
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Default deny all ingress in perf-generators namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: perf-generators
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Default deny all ingress in perf-sut namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: perf-sut
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Allow generators to communicate with SUT
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-generators-to-sut
+  namespace: perf-sut
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              perfeng.io/component: generator
+      ports:
+        - protocol: TCP
+
+---
+# Allow platform to communicate with generators
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-to-generators
+  namespace: perf-generators
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              perfeng.io/component: platform
+      ports:
+        - protocol: TCP
+
+---
+# Allow platform to read SUT metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-to-sut
+  namespace: perf-sut
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              perfeng.io/component: platform
+      ports:
+        - protocol: TCP
+
+---
+# Allow DNS resolution in perf-generators
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: perf-generators
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Allow DNS resolution in perf-sut
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: perf-sut
+  labels:
+    perfeng.io/component: network-policy
+    perfeng.io/managed-by: perfeng
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

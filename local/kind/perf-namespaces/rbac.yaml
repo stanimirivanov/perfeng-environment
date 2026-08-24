@@ -1,0 +1,142 @@
+---
+# ServiceAccount for the performance platform orchestrator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: perf-orchestrator
+  namespace: perf-platform
+  labels:
+    perfeng.io/component: orchestrator
+    perfeng.io/managed-by: perfeng
+
+---
+# ServiceAccount for test generators
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: perf-generator
+  namespace: perf-generators
+  labels:
+    perfeng.io/component: generator
+    perfeng.io/managed-by: perfeng
+
+---
+# Role: Manage pods in generator namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: perf-generator-manager
+  namespace: perf-generators
+  labels:
+    perfeng.io/component: rbac
+    perfeng.io/managed-by: perfeng
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'pods/log', 'pods/status']
+    verbs: ['create', 'get', 'list', 'watch', 'delete', 'patch', 'update']
+  - apiGroups: ['']
+    resources: ['configmaps', 'secrets']
+    verbs: ['get', 'list', 'watch', 'create', 'delete']
+  - apiGroups: ['batch']
+    resources: ['jobs', 'jobs/status']
+    verbs: ['create', 'get', 'list', 'watch', 'delete', 'patch', 'update']
+  - apiGroups: ['']
+    resources: ['services']
+    verbs: ['create', 'get', 'list', 'watch', 'delete']
+
+---
+# Role: Read metrics from SUT namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: perf-sut-reader
+  namespace: perf-sut
+  labels:
+    perfeng.io/component: rbac
+    perfeng.io/managed-by: perfeng
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'pods/status', 'services', 'endpoints']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['metrics.k8s.io']
+    resources: ['pods', 'nodes']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['apps']
+    resources: ['deployments', 'replicasets']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch']
+
+---
+# RoleBinding: Bind orchestrator SA to generator manager role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: perf-orchestrator-generator-binding
+  namespace: perf-generators
+  labels:
+    perfeng.io/component: rbac
+    perfeng.io/managed-by: perfeng
+subjects:
+  - kind: ServiceAccount
+    name: perf-orchestrator
+    namespace: perf-platform
+roleRef:
+  kind: Role
+  name: perf-generator-manager
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding: Bind orchestrator SA to SUT reader role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: perf-orchestrator-sut-reader-binding
+  namespace: perf-sut
+  labels:
+    perfeng.io/component: rbac
+    perfeng.io/managed-by: perfeng
+subjects:
+  - kind: ServiceAccount
+    name: perf-orchestrator
+    namespace: perf-platform
+roleRef:
+  kind: Role
+  name: perf-sut-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRole: Read node metrics for capacity analysis
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: perf-node-reader
+  labels:
+    perfeng.io/component: rbac
+    perfeng.io/managed-by: perfeng
+rules:
+  - apiGroups: ['']
+    resources: ['nodes', 'nodes/status', 'nodes/metrics']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['metrics.k8s.io']
+    resources: ['nodes']
+    verbs: ['get', 'list', 'watch']
+
+---
+# ClusterRoleBinding: Bind orchestrator SA to node reader
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: perf-orchestrator-node-reader-binding
+  labels:
+    perfeng.io/component: rbac
+    perfeng.io/managed-by: perfeng
+subjects:
+  - kind: ServiceAccount
+    name: perf-orchestrator
+    namespace: perf-platform
+roleRef:
+  kind: ClusterRole
+  name: perf-node-reader
+  apiGroup: rbac.authorization.k8s.io

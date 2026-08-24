@@ -104,9 +104,7 @@ Write-Host ""
 Write-Host "Checking node labels..." -ForegroundColor Yellow
 
 $generatorResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "-l", "workload=performance-generator", "--no-headers")
-$generatorNodes = $generatorResult.Output
-
-if ($generatorNodes -and $generatorResult.ExitCode -eq 0) {
+if ($generatorResult.ExitCode -eq 0 -and $generatorResult.Output) {
     Write-Host "[OK] Generator node label present" -ForegroundColor Green
 }
 else {
@@ -115,9 +113,7 @@ else {
 }
 
 $sutResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "-l", "workload=sut", "--no-headers")
-$sutNodes = $sutResult.Output
-
-if ($sutNodes -and $sutResult.ExitCode -eq 0) {
+if ($sutResult.ExitCode -eq 0 -and $sutResult.Output) {
     Write-Host "[OK] SUT node label present" -ForegroundColor Green
 }
 else {
@@ -130,9 +126,7 @@ Write-Host ""
 Write-Host "Checking control plane..." -ForegroundColor Yellow
 
 $controlPlaneResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "-l", "node-role.kubernetes.io/control-plane", "--no-headers")
-$controlPlane = $controlPlaneResult.Output
-
-if ($controlPlane -match " Ready " -and $controlPlaneResult.ExitCode -eq 0) {
+if ($controlPlaneResult.ExitCode -eq 0 -and $controlPlaneResult.Output -match " Ready ") {
     Write-Host "[OK] Control plane is ready" -ForegroundColor Green
 }
 else {
@@ -145,9 +139,7 @@ Write-Host ""
 Write-Host "Checking CoreDNS..." -ForegroundColor Yellow
 
 $corednsResult = Invoke-KubectlCommand -Arguments @("get", "pods", "-n", "kube-system", "-l", "k8s-app=kube-dns", "--no-headers")
-$coredns = $corednsResult.Output
-
-if ($coredns -match "Running" -and $corednsResult.ExitCode -eq 0) {
+if ($corednsResult.ExitCode -eq 0 -and $corednsResult.Output -match "Running") {
     Write-Host "[OK] CoreDNS is running" -ForegroundColor Green
 }
 else {
@@ -160,9 +152,7 @@ Write-Host ""
 Write-Host "Checking API server..." -ForegroundColor Yellow
 
 $healthzResult = Invoke-KubectlCommand -Arguments @("get", "--raw", "/healthz")
-$healthz = $healthzResult.Output
-
-if ($healthz -eq "ok" -and $healthzResult.ExitCode -eq 0) {
+if ($healthzResult.ExitCode -eq 0 -and $healthzResult.Output -eq "ok") {
     Write-Host "[OK] API server is healthy" -ForegroundColor Green
 }
 else {
@@ -175,20 +165,95 @@ Write-Host ""
 Write-Host "Checking metrics-server..." -ForegroundColor Yellow
 
 $metricsResult = Invoke-KubectlCommand -Arguments @("get", "pods", "-n", "kube-system", "-l", "k8s-app=metrics-server", "--no-headers")
-$metricsServer = $metricsResult.Output
-
-if ($metricsServer -match "Running" -and $metricsResult.ExitCode -eq 0) {
+if ($metricsResult.ExitCode -eq 0 -and $metricsResult.Output -match "Running") {
     Write-Host "[OK] metrics-server is running" -ForegroundColor Green
 }
 else {
     Write-Host "[WARN] metrics-server not installed (optional)" -ForegroundColor Yellow
 }
 
+# Check 8: PerfEng namespaces
+Write-Host ""
+Write-Host "Checking PerfEng namespaces..." -ForegroundColor Yellow
+
+$nsResult = Invoke-KubectlCommand -Arguments @("get", "namespace", "perf-platform")
+if ($nsResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-platform namespace exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-platform namespace not created (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+$nsResult = Invoke-KubectlCommand -Arguments @("get", "namespace", "perf-generators")
+if ($nsResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-generators namespace exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-generators namespace not created (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+$nsResult = Invoke-KubectlCommand -Arguments @("get", "namespace", "perf-sut")
+if ($nsResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-sut namespace exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-sut namespace not created (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+# Check 9: ServiceAccounts
+Write-Host ""
+Write-Host "Checking ServiceAccounts..." -ForegroundColor Yellow
+
+$saResult = Invoke-KubectlCommand -Arguments @("get", "serviceaccount", "perf-orchestrator", "-n", "perf-platform")
+if ($saResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-orchestrator ServiceAccount exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-orchestrator ServiceAccount missing (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+$saResult = Invoke-KubectlCommand -Arguments @("get", "serviceaccount", "perf-generator", "-n", "perf-generators")
+if ($saResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-generator ServiceAccount exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-generator ServiceAccount missing (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+# Check 10: Resource Quotas
+Write-Host ""
+Write-Host "Checking Resource Quotas..." -ForegroundColor Yellow
+
+$quotaResult = Invoke-KubectlCommand -Arguments @("get", "resourcequota", "perf-platform-quota", "-n", "perf-platform")
+if ($quotaResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-platform ResourceQuota exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-platform ResourceQuota missing (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+$quotaResult = Invoke-KubectlCommand -Arguments @("get", "resourcequota", "perf-generators-quota", "-n", "perf-generators")
+if ($quotaResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-generators ResourceQuota exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-generators ResourceQuota missing (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
+$quotaResult = Invoke-KubectlCommand -Arguments @("get", "resourcequota", "perf-sut-quota", "-n", "perf-sut")
+if ($quotaResult.ExitCode -eq 0) {
+    Write-Host "[OK] perf-sut ResourceQuota exists" -ForegroundColor Green
+}
+else {
+    Write-Host "[WARN] perf-sut ResourceQuota missing (run 'make install-namespaces')" -ForegroundColor Yellow
+}
+
 # Summary
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
 if ($Failed -eq 0) {
-    Write-Host "All health checks passed!" -ForegroundColor Green
+    Write-Host "All required health checks passed!" -ForegroundColor Green
+    Write-Host "Review [WARN] items for optional components." -ForegroundColor Yellow
 }
 else {
     Write-Host "Some health checks failed" -ForegroundColor Red

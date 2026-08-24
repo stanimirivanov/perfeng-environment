@@ -96,11 +96,102 @@ else
     echo "[WARN] metrics-server not installed (optional)"
 fi
 
+# Check 8: PerfEng namespaces
+echo ""
+echo "Checking PerfEng namespaces..."
+
+if kubectl get namespace perf-platform --no-headers 2>/dev/null | grep -q .; then
+    echo "[OK] perf-platform namespace exists"
+else
+    echo "[WARN] perf-platform namespace not created (run 'make install-namespaces')"
+fi
+
+if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; then
+    echo "[OK] perf-generators namespace exists"
+else
+    echo "[WARN] perf-generators namespace not created (run 'make install-namespaces')"
+fi
+
+if kubectl get namespace perf-sut --no-headers 2>/dev/null | grep -q .; then
+    echo "[OK] perf-sut namespace exists"
+else
+    echo "[WARN] perf-sut namespace not created (run 'make install-namespaces')"
+fi
+
+# Check 9: ServiceAccounts (if namespaces exist)
+echo ""
+echo "Checking ServiceAccounts..."
+
+if kubectl get namespace perf-platform --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get serviceaccount perf-orchestrator -n perf-platform --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-orchestrator ServiceAccount exists"
+    else
+        echo "[WARN] perf-orchestrator ServiceAccount missing (run 'make install-namespaces')"
+    fi
+fi
+
+if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get serviceaccount perf-generator -n perf-generators --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-generator ServiceAccount exists"
+    else
+        echo "[WARN] perf-generator ServiceAccount missing (run 'make install-namespaces')"
+    fi
+fi
+
+# Check 10: Resource Quotas (if namespaces exist)
+echo ""
+echo "Checking Resource Quotas..."
+
+if kubectl get namespace perf-platform --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get resourcequota perf-platform-quota -n perf-platform --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-platform ResourceQuota exists"
+    else
+        echo "[WARN] perf-platform ResourceQuota missing (run 'make install-namespaces')"
+    fi
+fi
+
+if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get resourcequota perf-generators-quota -n perf-generators --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-generators ResourceQuota exists"
+    else
+        echo "[WARN] perf-generators ResourceQuota missing (run 'make install-namespaces')"
+    fi
+fi
+
+if kubectl get namespace perf-sut --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get resourcequota perf-sut-quota -n perf-sut --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-sut ResourceQuota exists"
+    else
+        echo "[WARN] perf-sut ResourceQuota missing (run 'make install-namespaces')"
+    fi
+fi
+
+# Check 11: Network Policies (if namespaces exist)
+echo ""
+echo "Checking Network Policies..."
+
+if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get networkpolicy default-deny-ingress -n perf-generators --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-generators NetworkPolicy exists"
+    else
+        echo "[WARN] perf-generators NetworkPolicy missing (run 'make install-namespaces')"
+    fi
+fi
+
+if kubectl get namespace perf-sut --no-headers 2>/dev/null | grep -q .; then
+    if kubectl get networkpolicy default-deny-ingress -n perf-sut --no-headers 2>/dev/null | grep -q .; then
+        echo "[OK] perf-sut NetworkPolicy exists"
+    else
+        echo "[WARN] perf-sut NetworkPolicy missing (run 'make install-namespaces')"
+    fi
+fi
+
 # Summary
 echo ""
 echo "========================================="
 if [ "$FAILED" -eq 0 ]; then
-    echo "All health checks passed!"
+    echo "All required health checks passed!"
+    echo "Review [WARN] items for optional components."
 else
     echo "Some health checks failed"
 fi
