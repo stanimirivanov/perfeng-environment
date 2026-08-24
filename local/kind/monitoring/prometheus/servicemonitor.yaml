@@ -1,0 +1,3 @@
+# ServiceMonitor requires Prometheus Operator CRD
+# For minimal setup, we use Prometheus config directly
+# This file is a placeholder for future Prometheus Operator migration

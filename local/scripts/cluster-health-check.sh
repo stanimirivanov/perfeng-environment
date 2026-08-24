@@ -118,7 +118,7 @@ else
     echo "[WARN] perf-sut namespace not created (run 'make install-namespaces')"
 fi
 
-# Check 9: ServiceAccounts (if namespaces exist)
+# Check 9: ServiceAccounts
 echo ""
 echo "Checking ServiceAccounts..."
 
@@ -126,7 +126,7 @@ if kubectl get namespace perf-platform --no-headers 2>/dev/null | grep -q .; the
     if kubectl get serviceaccount perf-orchestrator -n perf-platform --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-orchestrator ServiceAccount exists"
     else
-        echo "[WARN] perf-orchestrator ServiceAccount missing (run 'make install-namespaces')"
+        echo "[WARN] perf-orchestrator ServiceAccount missing"
     fi
 fi
 
@@ -134,11 +134,11 @@ if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; t
     if kubectl get serviceaccount perf-generator -n perf-generators --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-generator ServiceAccount exists"
     else
-        echo "[WARN] perf-generator ServiceAccount missing (run 'make install-namespaces')"
+        echo "[WARN] perf-generator ServiceAccount missing"
     fi
 fi
 
-# Check 10: Resource Quotas (if namespaces exist)
+# Check 10: Resource Quotas
 echo ""
 echo "Checking Resource Quotas..."
 
@@ -146,7 +146,7 @@ if kubectl get namespace perf-platform --no-headers 2>/dev/null | grep -q .; the
     if kubectl get resourcequota perf-platform-quota -n perf-platform --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-platform ResourceQuota exists"
     else
-        echo "[WARN] perf-platform ResourceQuota missing (run 'make install-namespaces')"
+        echo "[WARN] perf-platform ResourceQuota missing"
     fi
 fi
 
@@ -154,7 +154,7 @@ if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; t
     if kubectl get resourcequota perf-generators-quota -n perf-generators --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-generators ResourceQuota exists"
     else
-        echo "[WARN] perf-generators ResourceQuota missing (run 'make install-namespaces')"
+        echo "[WARN] perf-generators ResourceQuota missing"
     fi
 fi
 
@@ -162,11 +162,11 @@ if kubectl get namespace perf-sut --no-headers 2>/dev/null | grep -q .; then
     if kubectl get resourcequota perf-sut-quota -n perf-sut --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-sut ResourceQuota exists"
     else
-        echo "[WARN] perf-sut ResourceQuota missing (run 'make install-namespaces')"
+        echo "[WARN] perf-sut ResourceQuota missing"
     fi
 fi
 
-# Check 11: Network Policies (if namespaces exist)
+# Check 11: Network Policies
 echo ""
 echo "Checking Network Policies..."
 
@@ -174,7 +174,7 @@ if kubectl get namespace perf-generators --no-headers 2>/dev/null | grep -q .; t
     if kubectl get networkpolicy default-deny-ingress -n perf-generators --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-generators NetworkPolicy exists"
     else
-        echo "[WARN] perf-generators NetworkPolicy missing (run 'make install-namespaces')"
+        echo "[WARN] perf-generators NetworkPolicy missing"
     fi
 fi
 
@@ -182,7 +182,51 @@ if kubectl get namespace perf-sut --no-headers 2>/dev/null | grep -q .; then
     if kubectl get networkpolicy default-deny-ingress -n perf-sut --no-headers 2>/dev/null | grep -q .; then
         echo "[OK] perf-sut NetworkPolicy exists"
     else
-        echo "[WARN] perf-sut NetworkPolicy missing (run 'make install-namespaces')"
+        echo "[WARN] perf-sut NetworkPolicy missing"
+    fi
+fi
+
+# Check 12: Monitoring namespace
+echo ""
+echo "Checking monitoring namespace..."
+
+if kubectl get namespace monitoring --no-headers 2>/dev/null | grep -q .; then
+    echo "[OK] monitoring namespace exists"
+else
+    echo "[WARN] monitoring namespace not created (run 'make monitoring-up')"
+fi
+
+# Check 13: Monitoring components (if namespace exists)
+if kubectl get namespace monitoring --no-headers 2>/dev/null | grep -q .; then
+    echo ""
+    echo "Checking monitoring components..."
+    
+    # Prometheus
+    if kubectl get pods -n monitoring -l app=prometheus --no-headers 2>/dev/null | grep -q "Running"; then
+        echo "[OK] Prometheus is running"
+    else
+        echo "[WARN] Prometheus not running (run 'make monitoring-up')"
+    fi
+    
+    # Grafana
+    if kubectl get pods -n monitoring -l app=grafana --no-headers 2>/dev/null | grep -q "Running"; then
+        echo "[OK] Grafana is running"
+    else
+        echo "[WARN] Grafana not running (run 'make monitoring-up')"
+    fi
+    
+    # kube-state-metrics
+    if kubectl get pods -n monitoring -l app=kube-state-metrics --no-headers 2>/dev/null | grep -q "Running"; then
+        echo "[OK] kube-state-metrics is running"
+    else
+        echo "[WARN] kube-state-metrics not running (run 'make monitoring-up')"
+    fi
+    
+    # node-exporter
+    if kubectl get pods -n monitoring -l app=node-exporter --no-headers 2>/dev/null | grep -q "Running"; then
+        echo "[OK] node-exporter is running"
+    else
+        echo "[WARN] node-exporter not running (run 'make monitoring-up')"
     fi
 fi
 

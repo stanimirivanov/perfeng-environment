@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    perfeng.io/component: monitoring
+    perfeng.io/managed-by: perfeng
+    purpose: observability
+  annotations:
+    description: 'Prometheus and Grafana monitoring stack'
