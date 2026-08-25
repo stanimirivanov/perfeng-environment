@@ -1,0 +1,28 @@
+apiVersion: v2
+name: perfeng-infra
+description: PerfEng infrastructure - complete platform components
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+
+dependencies:
+  - name: namespaces
+    version: 0.1.0
+  - name: rbac
+    version: 0.1.0
+  - name: network-policies
+    version: 0.1.0
+  - name: resource-quotas
+    version: 0.1.0
+  - name: metrics-server
+    version: 0.1.0
+  - name: minio
+    version: 0.1.0
+  - name: prometheus
+    version: 0.1.0
+  - name: grafana
+    version: 0.1.0
+  - name: kube-state-metrics
+    version: 0.1.0
+  - name: node-exporter
+    version: 0.1.0

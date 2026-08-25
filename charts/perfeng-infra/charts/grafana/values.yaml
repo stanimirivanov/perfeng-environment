@@ -1,0 +1,78 @@
+namespace: monitoring
+
+image:
+  repository: grafana/grafana
+  tag: 11.1.0
+  pullPolicy: IfNotPresent
+
+storage:
+  size: 5Gi
+  className: standard
+
+credentials:
+  user: admin
+  password: admin
+
+service:
+  type: NodePort
+  port: 3000
+  targetPort: 3000
+  nodePort: 30300
+
+securityContext:
+  fsGroup: 472
+
+probes:
+  readiness:
+    path: /api/health
+    port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  liveness:
+    path: /api/health
+    port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 15
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 512Mi
+
+config:
+  grafanaIni: |
+    [server]
+    http_port = 3000
+    root_url = http://localhost:3000
+
+    [auth]
+    disable_login_form = false
+
+    [auth.anonymous]
+    enabled = true
+    org_role = Viewer
+
+  datasources: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring:9090
+        isDefault: true
+        editable: false
+
+  dashboardProvider: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards

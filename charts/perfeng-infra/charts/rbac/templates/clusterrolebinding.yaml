@@ -1,0 +1,33 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.clusterRoles.nodeReader.name }}-binding
+  labels:
+    perfeng.io/component: rbac
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccounts.orchestrator.name }}
+    namespace: {{ .Values.serviceAccounts.orchestrator.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Values.clusterRoles.nodeReader.name }}
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.clusterRoles.prometheus.name }}-binding
+  labels:
+    perfeng.io/component: rbac
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccounts.orchestrator.name }}
+    namespace: {{ .Values.serviceAccounts.orchestrator.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Values.clusterRoles.prometheus.name }}
+  apiGroup: rbac.authorization.k8s.io

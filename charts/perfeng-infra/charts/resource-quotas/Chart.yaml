@@ -1,0 +1,6 @@
+apiVersion: v2
+name: resource-quotas
+description: Resource quotas and limit ranges for PerfEng namespaces
+type: application
+version: 0.1.0
+appVersion: '0.1.0'

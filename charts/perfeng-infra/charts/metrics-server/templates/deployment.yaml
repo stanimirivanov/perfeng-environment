@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: {{ .Values.namespace }}
+  labels:
+    k8s-app: metrics-server
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      priorityClassName: {{ .Values.priorityClassName }}
+      serviceAccountName: metrics-server
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: metrics-server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --cert-dir={{ .Values.args.certDir }}
+            - --secure-port={{ .Values.args.securePort }}
+            - --kubelet-preferred-address-types={{ .Values.args.kubeletPreferredAddressTypes }}
+            - --kubelet-use-node-status-port
+            - --kubelet-insecure-tls
+            - --metric-resolution={{ .Values.args.metricResolution }}
+          ports:
+            - containerPort: {{ .Values.args.securePort }}
+              name: https
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: {{ .Values.probes.readiness.port }}
+              scheme: {{ .Values.probes.readiness.scheme }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: {{ .Values.probes.liveness.port }}
+              scheme: {{ .Values.probes.liveness.scheme }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            seccompProfile:
+              type: {{ .Values.securityContext.seccompProfile.type }}
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-dir
+      volumes:
+        - emptyDir: {}
+          name: tmp-dir

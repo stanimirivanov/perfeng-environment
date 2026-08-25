@@ -1,0 +1,17 @@
+namespaces:
+  - name: perf-platform
+    component: platform
+    purpose: orchestration
+    description: 'Performance platform orchestration components'
+  - name: perf-generators
+    component: generator
+    purpose: test-execution
+    description: 'Performance test generator pods (k6, Playwright)'
+  - name: perf-sut
+    component: sut
+    purpose: system-under-test
+    description: 'System under test components'
+  - name: monitoring
+    component: monitoring
+    purpose: observability
+    description: 'Prometheus and Grafana monitoring stack'

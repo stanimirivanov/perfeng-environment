@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: grafana
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+data:
+  grafana.ini: |
+{{ .Values.config.grafanaIni | indent 4 }}
+  datasources.yaml: |
+{{ .Values.config.datasources | indent 4 }}
+  dashboard-provider.yaml: |
+{{ .Values.config.dashboardProvider | indent 4 }}

@@ -1,0 +1,114 @@
+{{- if .Values.policies.defaultDenyIngress.enabled }}
+{{- range .Values.policies.defaultDenyIngress.namespaces }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ . }}
+  labels:
+    perfeng.io/component: network-policy
+    {{- include "perfeng-infra.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+{{- end }}
+{{- end }}
+
+{{- if .Values.policies.allowGeneratorsToSut.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-generators-to-sut
+  namespace: {{ .Values.sutNamespace }}
+  labels:
+    perfeng.io/component: network-policy
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              perfeng.io/component: generator
+      ports:
+        - protocol: TCP
+{{- end }}
+
+{{- if .Values.policies.allowPlatformToGenerators.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-to-generators
+  namespace: {{ .Values.generatorsNamespace }}
+  labels:
+    perfeng.io/component: network-policy
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              perfeng.io/component: platform
+      ports:
+        - protocol: TCP
+{{- end }}
+
+{{- if .Values.policies.allowPlatformToSut.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform-to-sut
+  namespace: {{ .Values.sutNamespace }}
+  labels:
+    perfeng.io/component: network-policy
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              perfeng.io/component: platform
+      ports:
+        - protocol: TCP
+{{- end }}
+
+{{- if .Values.policies.allowDns.enabled }}
+{{- range .Values.policies.allowDns.namespaces }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: {{ . }}
+  labels:
+    perfeng.io/component: network-policy
+    {{- include "perfeng-infra.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}
+{{- end }}

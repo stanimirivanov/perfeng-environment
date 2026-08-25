@@ -1,0 +1,6 @@
+apiVersion: v2
+name: node-exporter
+description: node-exporter for node system metrics
+type: application
+version: 0.1.0
+appVersion: '1.8.2'

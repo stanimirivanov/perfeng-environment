@@ -1,0 +1,57 @@
+namespace: monitoring
+
+image:
+  repository: prom/prometheus
+  tag: v2.53.0
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: prometheus
+
+clusterRole:
+  name: prometheus
+
+storage:
+  size: 10Gi
+  className: standard
+
+retention:
+  time: 7d
+  size: 8GB
+
+securityContext:
+  fsGroup: 65534
+
+probes:
+  readiness:
+    path: /-/ready
+    port: 9090
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  liveness:
+    path: /-/healthy
+    port: 9090
+    initialDelaySeconds: 30
+    periodSeconds: 15
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+recordingRules:
+  clusterNodeCpuAvg: |
+    groups:
+      - name: cluster-metrics
+        rules:
+          - record: cluster:node_cpu:avg
+            expr: avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) * 100
+          - record: cluster:pod_cpu:sum
+            expr: sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (namespace, pod)
+          - record: cluster:node_memory:avg
+            expr: avg(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / avg(node_memory_MemTotal_bytes) * 100
+          - record: cluster:pod_count:sum
+            expr: sum(kube_pod_info) by (namespace)

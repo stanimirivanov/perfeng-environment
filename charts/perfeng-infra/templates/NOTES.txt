@@ -1,0 +1,18 @@
+PerfEng Infrastructure has been installed!
+
+Components:
+  - Namespaces: perf-platform, perf-generators, perf-sut, monitoring
+  - RBAC: ServiceAccounts, Roles, RoleBindings, ClusterRoles, ClusterRoleBindings
+  - Network Policies: Default deny, allow-rules, DNS egress
+  - Resource Quotas: ResourceQuotas and LimitRanges
+  - Metrics Server
+  - MinIO (Object Storage)
+  - Prometheus
+  - Grafana
+  - kube-state-metrics
+  - node-exporter
+
+Access:
+  - Grafana: http://localhost:30300 (admin/admin)
+  - MinIO Console: kubectl port-forward -n perf-platform svc/minio 9001:9001
+  - Prometheus: kubectl port-forward -n monitoring svc/prometheus 9090:9090

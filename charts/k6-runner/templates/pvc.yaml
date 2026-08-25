@@ -1,0 +1,17 @@
+{{- if .Values.results.persistentVolumeClaim.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.results.persistentVolumeClaim.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    perfeng.io/component: results
+    perfeng.io/managed-by: perfeng
+spec:
+  accessModes:
+    {{- toYaml .Values.results.persistentVolumeClaim.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.results.persistentVolumeClaim.storage }}
+  storageClassName: {{ .Values.results.persistentVolumeClaim.storageClassName }}
+{{- end }}

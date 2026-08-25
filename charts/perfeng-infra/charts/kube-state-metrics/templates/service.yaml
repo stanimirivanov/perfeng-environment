@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-state-metrics
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: kube-state-metrics
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.ports.httpMetrics }}
+      targetPort: {{ .Values.service.ports.httpMetrics }}
+      protocol: TCP
+      name: http-metrics
+    - port: {{ .Values.service.ports.telemetry }}
+      targetPort: {{ .Values.service.ports.telemetry }}
+      protocol: TCP
+      name: telemetry
+  selector:
+    app: kube-state-metrics

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: node-exporter
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: node-exporter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --path.procfs={{ .Values.args.procfs }}
+            - --path.sysfs={{ .Values.args.sysfs }}
+            - --path.rootfs={{ .Values.args.rootfs }}
+            - --collector.filesystem.mount-points-exclude={{ .Values.args.filesystemMountPointsExclude }}
+          ports:
+            - containerPort: 9100
+              name: metrics
+          volumeMounts:
+            - name: proc
+              mountPath: {{ .Values.args.procfs }}
+              readOnly: true
+            - name: sys
+              mountPath: {{ .Values.args.sysfs }}
+              readOnly: true
+            - name: root
+              mountPath: {{ .Values.args.rootfs }}
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: proc
+          hostPath:
+            path: {{ .Values.hostPaths.proc }}
+        - name: sys
+          hostPath:
+            path: {{ .Values.hostPaths.sys }}
+        - name: root
+          hostPath:
+            path: {{ .Values.hostPaths.root }}

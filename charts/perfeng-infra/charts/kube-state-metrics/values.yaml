@@ -1,0 +1,37 @@
+namespace: monitoring
+
+image:
+  repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
+  tag: v2.13.0
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: kube-state-metrics
+
+clusterRole:
+  name: kube-state-metrics
+
+service:
+  ports:
+    httpMetrics: 8080
+    telemetry: 8081
+
+probes:
+  readiness:
+    path: /healthz
+    port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  liveness:
+    path: /healthz
+    port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

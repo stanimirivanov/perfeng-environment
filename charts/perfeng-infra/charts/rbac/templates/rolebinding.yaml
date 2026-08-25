@@ -1,0 +1,35 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.roles.generatorManager.name }}-orchestrator-binding
+  namespace: {{ .Values.roles.generatorManager.namespace }}
+  labels:
+    perfeng.io/component: rbac
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccounts.orchestrator.name }}
+    namespace: {{ .Values.serviceAccounts.orchestrator.namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Values.roles.generatorManager.name }}
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.roles.sutReader.name }}-orchestrator-binding
+  namespace: {{ .Values.roles.sutReader.namespace }}
+  labels:
+    perfeng.io/component: rbac
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccounts.orchestrator.name }}
+    namespace: {{ .Values.serviceAccounts.orchestrator.namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Values.roles.sutReader.name }}
+  apiGroup: rbac.authorization.k8s.io

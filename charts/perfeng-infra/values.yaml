@@ -1,0 +1,4 @@
+global:
+  clusterName: perfeng-local
+  environment: local
+  managedBy: perfeng

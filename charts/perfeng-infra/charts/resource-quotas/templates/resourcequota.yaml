@@ -1,0 +1,62 @@
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: perf-platform-quota
+  namespace: {{ .Values.platformNamespace }}
+  labels:
+    perfeng.io/component: quota
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: "{{ .Values.resourceQuotas.platform.requestsCpu }}"
+    requests.memory: "{{ .Values.resourceQuotas.platform.requestsMemory }}"
+    limits.cpu: "{{ .Values.resourceQuotas.platform.limitsCpu }}"
+    limits.memory: "{{ .Values.resourceQuotas.platform.limitsMemory }}"
+    pods: "{{ .Values.resourceQuotas.platform.pods }}"
+    services: "{{ .Values.resourceQuotas.platform.services }}"
+    configmaps: "{{ .Values.resourceQuotas.platform.configmaps }}"
+    secrets: "{{ .Values.resourceQuotas.platform.secrets }}"
+    persistentvolumeclaims: "{{ .Values.resourceQuotas.platform.persistentvolumeclaims }}"
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: perf-generators-quota
+  namespace: {{ .Values.generatorsNamespace }}
+  labels:
+    perfeng.io/component: quota
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: "{{ .Values.resourceQuotas.generators.requestsCpu }}"
+    requests.memory: "{{ .Values.resourceQuotas.generators.requestsMemory }}"
+    limits.cpu: "{{ .Values.resourceQuotas.generators.limitsCpu }}"
+    limits.memory: "{{ .Values.resourceQuotas.generators.limitsMemory }}"
+    pods: "{{ .Values.resourceQuotas.generators.pods }}"
+    services: "{{ .Values.resourceQuotas.generators.services }}"
+    configmaps: "{{ .Values.resourceQuotas.generators.configmaps }}"
+    secrets: "{{ .Values.resourceQuotas.generators.secrets }}"
+    persistentvolumeclaims: "{{ .Values.resourceQuotas.generators.persistentvolumeclaims }}"
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: perf-sut-quota
+  namespace: {{ .Values.sutNamespace }}
+  labels:
+    perfeng.io/component: quota
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: "{{ .Values.resourceQuotas.sut.requestsCpu }}"
+    requests.memory: "{{ .Values.resourceQuotas.sut.requestsMemory }}"
+    limits.cpu: "{{ .Values.resourceQuotas.sut.limitsCpu }}"
+    limits.memory: "{{ .Values.resourceQuotas.sut.limitsMemory }}"
+    pods: "{{ .Values.resourceQuotas.sut.pods }}"
+    services: "{{ .Values.resourceQuotas.sut.services }}"
+    configmaps: "{{ .Values.resourceQuotas.sut.configmaps }}"
+    secrets: "{{ .Values.resourceQuotas.sut.secrets }}"
+    persistentvolumeclaims: "{{ .Values.resourceQuotas.sut.persistentvolumeclaims }}"

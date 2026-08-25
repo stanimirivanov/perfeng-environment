@@ -1,0 +1,49 @@
+test:
+  name: checkout
+  profile: smoke
+
+sut:
+  baseUrl: 'http://perf-sut-service.perf-sut:8080'
+  authToken: ''
+
+run:
+  id: ''
+
+image:
+  repository: perfeng-k6-tests
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: '100m'
+    memory: '256Mi'
+  limits:
+    cpu: '1000m'
+    memory: '1Gi'
+
+job:
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 3600
+
+serviceAccount:
+  name: perf-generator
+
+results:
+  mountPath: /results
+  persistentVolumeClaim:
+    enabled: false # Set to true to enable PVC
+    name: k6-results-pvc
+    accessModes:
+      - ReadWriteOnce
+    storage: 5Gi
+    storageClassName: standard
+
+scheduling:
+  nodeSelector:
+    workload: performance-generator
+  tolerations:
+    - key: workload
+      value: performance-generator
+      effect: NoSchedule

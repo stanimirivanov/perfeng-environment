@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "k6-runner.jobName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: k6-test
+    perfeng.io/component: test-runner
+    perfeng.io/test: {{ .Values.test.name }}
+    perfeng.io/profile: {{ .Values.test.profile }}
+    perfeng.io/run-id: {{ include "k6-runner.runId" . }}
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        app: k6-test
+        perfeng.io/test: {{ .Values.test.name }}
+        perfeng.io/run-id: {{ include "k6-runner.runId" . }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      nodeSelector:
+        {{- toYaml .Values.scheduling.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.scheduling.tolerations | nindent 8 }}
+      containers:
+        - name: k6
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - run
+            - --config
+            - workloads/{{ .Values.test.profile }}/{{ .Values.test.name }}.json
+            - tests/{{ .Values.test.name }}/scenario.js
+            - --out
+            - json=/results/results.json
+            - --summary-export
+            - /results/summary.json
+          env:
+            - name: BASE_URL
+              value: "{{ .Values.sut.baseUrl }}"
+            - name: AUTH_TOKEN
+              value: "{{ .Values.sut.authToken }}"
+            - name: PERF_RUN_ID
+              value: "{{ include "k6-runner.runId" . }}"
+            - name: PERF_PROFILE
+              value: "{{ .Values.test.profile }}"
+            - name: PERF_TEST_NAME
+              value: "{{ .Values.test.name }}"
+          volumeMounts:
+            - name: results
+              mountPath: {{ .Values.results.mountPath }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: results
+          emptyDir: {}

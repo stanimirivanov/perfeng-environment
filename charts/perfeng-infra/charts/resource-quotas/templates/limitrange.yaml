@@ -1,0 +1,95 @@
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: perf-platform-limits
+  namespace: {{ .Values.platformNamespace }}
+  labels:
+    perfeng.io/component: limits
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.limitRanges.platform.container.defaultCpu }}
+        memory: {{ .Values.limitRanges.platform.container.defaultMemory }}
+      defaultRequest:
+        cpu: {{ .Values.limitRanges.platform.container.defaultRequestCpu }}
+        memory: {{ .Values.limitRanges.platform.container.defaultRequestMemory }}
+      max:
+        cpu: {{ .Values.limitRanges.platform.container.maxCpu }}
+        memory: {{ .Values.limitRanges.platform.container.maxMemory }}
+      min:
+        cpu: {{ .Values.limitRanges.platform.container.minCpu }}
+        memory: {{ .Values.limitRanges.platform.container.minMemory }}
+    - type: Pod
+      max:
+        cpu: {{ .Values.limitRanges.platform.pod.maxCpu }}
+        memory: {{ .Values.limitRanges.platform.pod.maxMemory }}
+      min:
+        cpu: {{ .Values.limitRanges.platform.pod.minCpu }}
+        memory: {{ .Values.limitRanges.platform.pod.minMemory }}
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: perf-generators-limits
+  namespace: {{ .Values.generatorsNamespace }}
+  labels:
+    perfeng.io/component: limits
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.limitRanges.generators.container.defaultCpu }}
+        memory: {{ .Values.limitRanges.generators.container.defaultMemory }}
+      defaultRequest:
+        cpu: {{ .Values.limitRanges.generators.container.defaultRequestCpu }}
+        memory: {{ .Values.limitRanges.generators.container.defaultRequestMemory }}
+      max:
+        cpu: {{ .Values.limitRanges.generators.container.maxCpu }}
+        memory: {{ .Values.limitRanges.generators.container.maxMemory }}
+      min:
+        cpu: {{ .Values.limitRanges.generators.container.minCpu }}
+        memory: {{ .Values.limitRanges.generators.container.minMemory }}
+    - type: Pod
+      max:
+        cpu: {{ .Values.limitRanges.generators.pod.maxCpu }}
+        memory: {{ .Values.limitRanges.generators.pod.maxMemory }}
+      min:
+        cpu: {{ .Values.limitRanges.generators.pod.minCpu }}
+        memory: {{ .Values.limitRanges.generators.pod.minMemory }}
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: perf-sut-limits
+  namespace: {{ .Values.sutNamespace }}
+  labels:
+    perfeng.io/component: limits
+    {{- include "perfeng-infra.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.limitRanges.sut.container.defaultCpu }}
+        memory: {{ .Values.limitRanges.sut.container.defaultMemory }}
+      defaultRequest:
+        cpu: {{ .Values.limitRanges.sut.container.defaultRequestCpu }}
+        memory: {{ .Values.limitRanges.sut.container.defaultRequestMemory }}
+      max:
+        cpu: {{ .Values.limitRanges.sut.container.maxCpu }}
+        memory: {{ .Values.limitRanges.sut.container.maxMemory }}
+      min:
+        cpu: {{ .Values.limitRanges.sut.container.minCpu }}
+        memory: {{ .Values.limitRanges.sut.container.minMemory }}
+    - type: Pod
+      max:
+        cpu: {{ .Values.limitRanges.sut.pod.maxCpu }}
+        memory: {{ .Values.limitRanges.sut.pod.maxMemory }}
+      min:
+        cpu: {{ .Values.limitRanges.sut.pod.minCpu }}
+        memory: {{ .Values.limitRanges.sut.pod.minMemory }}

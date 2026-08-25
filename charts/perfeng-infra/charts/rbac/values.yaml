@@ -1,0 +1,21 @@
+serviceAccounts:
+  orchestrator:
+    name: perf-orchestrator
+    namespace: perf-platform
+  generator:
+    name: perf-generator
+    namespace: perf-generators
+
+roles:
+  generatorManager:
+    name: perf-generator-manager
+    namespace: perf-generators
+  sutReader:
+    name: perf-sut-reader
+    namespace: perf-sut
+
+clusterRoles:
+  nodeReader:
+    name: perf-node-reader
+  prometheus:
+    name: prometheus

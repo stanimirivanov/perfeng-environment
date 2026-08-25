@@ -1,0 +1,29 @@
+namespace: perf-sut
+
+image:
+  repository: hashicorp/http-echo
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+service:
+  name: perf-sut-service
+  port: 8080
+  targetPort: 8080
+
+nodeSelector:
+  workload: sut
+
+tolerations:
+  - key: workload
+    value: sut
+    effect: NoSchedule
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

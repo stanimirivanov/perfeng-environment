@@ -1,0 +1,25 @@
+namespace: monitoring
+
+image:
+  repository: prom/node-exporter
+  tag: v1.8.2
+  pullPolicy: IfNotPresent
+
+args:
+  procfs: /host/proc
+  sysfs: /host/sys
+  rootfs: /host/root
+  filesystemMountPointsExclude: '^/(sys|proc|dev|host|etc)($$|/)'
+
+hostPaths:
+  proc: /proc
+  sys: /sys
+  root: /
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

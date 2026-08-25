@@ -1,0 +1,31 @@
+platformNamespace: perf-platform
+generatorsNamespace: perf-generators
+sutNamespace: perf-sut
+
+policies:
+  # Default deny ingress
+  defaultDenyIngress:
+    enabled: true
+    namespaces:
+      - perf-platform
+      - perf-generators
+      - perf-sut
+
+  # Allow generators to reach SUT
+  allowGeneratorsToSut:
+    enabled: true
+
+  # Allow platform to reach generators
+  allowPlatformToGenerators:
+    enabled: true
+
+  # Allow platform to reach SUT
+  allowPlatformToSut:
+    enabled: true
+
+  # Allow DNS resolution
+  allowDns:
+    enabled: true
+    namespaces:
+      - perf-generators
+      - perf-sut
