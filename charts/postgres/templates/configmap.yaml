@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: metadata-db
+data:
+  init.sql: |
+    -- This script runs once when the database is first created.
+    -- It creates the schemas and roles needed for the application.
+
+    CREATE SCHEMA IF NOT EXISTS metadata;
+    CREATE SCHEMA IF NOT EXISTS audit;
+
+    -- Create user if not exists
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{ .Values.postgres.user }}') THEN
+            CREATE ROLE {{ .Values.postgres.user }} WITH LOGIN PASSWORD '{{ .Values.postgres.password }}';
+        END IF;
+    END
+    $$;
+
+    GRANT ALL PRIVILEGES ON DATABASE {{ .Values.postgres.database }} TO {{ .Values.postgres.user }};

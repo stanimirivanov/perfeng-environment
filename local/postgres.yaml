@@ -1,0 +1,156 @@
+piVersion: v1
+kind: Namespace
+metadata:
+  name: metadata-db
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: metadata-db
+type: Opaque
+data:
+  postgres-password: dGVzdF9wYXNzd29yZA== # test_password
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: metadata-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: metadata-db
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_DB
+              value: metadata
+            - name: POSTGRES_USER
+              value: test_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: postgres-password
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              memory: '512Mi'
+              cpu: '500m'
+            limits:
+              memory: '1Gi'
+              cpu: '1000m'
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - test_user
+                - -d
+                - metadata
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - test_user
+                - -d
+                - metadata
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: metadata-db
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: metadata-db
+data:
+  init.sql: |
+    -- Initialize database
+    CREATE SCHEMA IF NOT EXISTS metadata;
+    CREATE SCHEMA IF NOT EXISTS audit;
+
+    -- Create user if not exists
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'test_user') THEN
+            CREATE ROLE test_user WITH LOGIN PASSWORD 'test_password';
+        END IF;
+    END
+    $$;
+
+    -- Grant permissions
+    GRANT ALL PRIVILEGES ON DATABASE metadata TO test_user;
+
+    -- Create extension
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: metadata-db
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432
+  policyTypes:
+    - Ingress
