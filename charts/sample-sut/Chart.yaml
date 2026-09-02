@@ -1,6 +1,6 @@
 apiVersion: v2
 name: sample-sut
-description: Local-only HTTP echo connectivity fixture
+description: Local-only deterministic API fixture for k6 scenarios
 type: application
-version: 0.1.0
-appVersion: "1.0.0"
+version: 0.2.0
+appVersion: "0.2.0"

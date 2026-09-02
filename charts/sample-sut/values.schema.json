@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "fixtureMode", "replicas", "resources"],
+  "properties": {
+    "image": {"type": "string", "pattern": "^python:3\\.12\\.[0-9]+-slim-bookworm@sha256:[0-9a-f]{64}$"},
+    "fixtureMode": {"enum": ["ok", "cart-failure", "missing-order", "malformed-order", "search-failure", "preferences-failure"]},
+    "replicas": {"type": "integer", "minimum": 1, "maximum": 3},
+    "resources": {"type": "object"}
+  }
+}

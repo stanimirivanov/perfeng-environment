@@ -10,6 +10,8 @@ spec:
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
+      annotations:
+        checksum/api: {{ .Files.Get "files/server.py" | sha256sum }}
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
@@ -23,22 +25,24 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: http-echo
+        - name: sample-api
           image: {{ .Values.image | quote }}
           imagePullPolicy: IfNotPresent
-          args:
-            - "-text=PerfEng SUT"
-            - "-listen=:8080"
+          command: [python, -B, -u, /app/server.py]
+          env:
+            - {name: FIXTURE_HOST, value: "0.0.0.0"}
+            - name: FIXTURE_MODE
+              value: {{ .Values.fixtureMode | quote }}
           ports:
             - containerPort: 8080
               name: http
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: http
           livenessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: http
           securityContext:
             allowPrivilegeEscalation: false
@@ -47,3 +51,9 @@ spec:
               drop: ["ALL"]
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - {name: api, mountPath: /app, readOnly: true}
+      volumes:
+        - name: api
+          configMap:
+            name: {{ .Release.Name }}-api

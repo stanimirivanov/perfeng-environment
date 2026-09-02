@@ -1,5 +1,6 @@
 """Offline local chart/config checks; does not contact Kubernetes."""
 
+import hashlib
 import re
 import subprocess
 from pathlib import Path
@@ -172,7 +173,7 @@ def validate() -> None:
         text=True,
     ).stdout
     objects = list(yaml.safe_load_all(rendered))
-    assert {obj["kind"] for obj in objects} == {"Deployment", "Service"}
+    assert {obj["kind"] for obj in objects} == {"Deployment", "Service", "ConfigMap"}
     assert all(obj["metadata"]["namespace"] == "perf-sut" for obj in objects)
     deployment = next(obj for obj in objects if obj["kind"] == "Deployment")
     service = next(obj for obj in objects if obj["kind"] == "Service")
@@ -182,8 +183,34 @@ def validate() -> None:
     assert pod["spec"]["automountServiceAccountToken"] is False
     assert pod["spec"]["securityContext"]["runAsNonRoot"] is True
     container = pod["spec"]["containers"][0]
-    assert container["image"] == "hashicorp/http-echo:1.0.0"
-    assert container["args"] == ["-text=PerfEng SUT", "-listen=:8080"]
+    assert re.fullmatch(
+        r"python:3\.12\.[0-9]+-slim-bookworm@sha256:[0-9a-f]{64}", container["image"]
+    )
+    assert container["command"] == ["python", "-B", "-u", "/app/server.py"]
+    source = (ROOT / "charts/sample-sut/files/server.py").read_bytes()
+    assert pod["metadata"]["annotations"]["checksum/api"] == hashlib.sha256(source).hexdigest()
+    configmap = next(obj for obj in objects if obj["kind"] == "ConfigMap")
+    assert configmap["data"]["server.py"].strip() == source.decode("utf-8").strip()
+    assert container["readinessProbe"]["httpGet"]["path"] == "/healthz"
+    assert container["livenessProbe"]["httpGet"]["path"] == "/healthz"
+    assert {entry["name"]: entry["value"] for entry in container["env"]} == {
+        "FIXTURE_HOST": "0.0.0.0",
+        "FIXTURE_MODE": "ok",
+    }
+    for override in ["image=python:latest", "fixtureMode=typo"]:
+        rejected = subprocess.run(
+            [
+                "helm",
+                "template",
+                "sample-sut",
+                str(ROOT / "charts/sample-sut"),
+                "--set-string",
+                override,
+            ],
+            capture_output=True,
+            check=False,
+        )
+        assert rejected.returncode != 0
     assert container["securityContext"]["readOnlyRootFilesystem"] is True
     assert container["securityContext"]["allowPrivilegeEscalation"] is False
     assert container["readinessProbe"]["httpGet"]["port"] == "http"

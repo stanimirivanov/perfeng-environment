@@ -68,8 +68,9 @@ kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-loca
 ```
 
 Then request http://127.0.0.1:8080 from another terminal. The response should be
-PerfEng SUT. This is HTTP echo only: it does not implement checkout/search/account
-APIs and cannot be used to claim that the business-flow k6 tests pass.
+a JSON fixture description. The [sample API](sample-api.md) implements the local
+checkout/search/account flows; /healthz is the readiness endpoint. These fixed
+responses support functional integration checks, not realistic performance claims.
 
 ## Teardown
 
@@ -103,10 +104,9 @@ The sample pod has no
 service-account token, runs non-root, drops capabilities, and uses a read-only
 root filesystem with resource requests/limits and readiness/liveness probes.
 
-The sample image is version-tagged hashicorp/http-echo:1.0.0 for local use.
-Unlike the kind node image, it is not digest-pinned; production promotion
-requires an independently verified digest. No claim of production image
-immutability is made.
+The sample API uses a digest-pinned Python runtime and a read-only source
+ConfigMap with a rollout checksum. It remains local development composition,
+not a production application image or calibrated SUT.
 
 Local kind node filesystems are ephemeral. Later storage work must define
 credentials, access boundaries, retention, and export before any raw artifacts
@@ -120,7 +120,8 @@ Adapted from performance-platform commit
 infra/local/kind/cluster-config.yaml, infra/local/scripts/, the sample-sut chart,
 and the namespace definitions under infra/charts/perfeng-infra/charts/namespaces/.
 
-The three-node layout, labels, and HTTP-echo fixture intent are retained.
+The three-node layout and labels are retained; the original echo fixture has
+been replaced by the owned local sample API.
 Lifecycle scripts are replaced by one portable Python implementation: no cmd
 string construction, current-context reliance, or pre-creation cleanup.
 The source remains intact; historical ancestry import is owner-operated.
@@ -128,5 +129,6 @@ The source remains intact; historical ancestry import is owner-operated.
 Offline Helm lint/template and unit checks are not a successful deployment.
 Run up/deploy/health and verify the endpoint on a Docker-capable host before
 considering live acceptance complete. PostgreSQL is available as an optional
-backing service; SeaweedFS now provides optional local S3 storage. The owned
-business API fixture and durable k6 Job integration remain subsequent slices.
+backing service; SeaweedFS provides optional local S3 storage, and the sample API
+supports the existing business-flow scenarios. Durable k6 Job integration remains
+a subsequent slice.
