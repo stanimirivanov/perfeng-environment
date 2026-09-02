@@ -1,0 +1,9 @@
+{
+  "scenarios": {
+    "fixture": {"executor": "shared-iterations", "vus": 1, "iterations": 1, "maxDuration": "10s"}
+  },
+  "thresholds": {
+    "checks": ["rate==1"],
+    "biz_transaction_error_rate": ["rate==0"]
+  }
+}
