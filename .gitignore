@@ -1,4 +1,5 @@
 /.idea/
+/.local/
 /.venv/
 /.ruff_cache/
 __pycache__/

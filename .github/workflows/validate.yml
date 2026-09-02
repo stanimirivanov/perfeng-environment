@@ -31,3 +31,17 @@ jobs:
         working-directory: perfeng-environment
       - run: uv run --locked python scripts/workspace.py validate
         working-directory: perfeng-environment
+      - name: Install Helm for offline rendering
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz --output "$RUNNER_TEMP/helm.tar.gz"
+          curl --fail --location https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz.sha256 --output "$RUNNER_TEMP/helm.sha256"
+          echo "$(cat "$RUNNER_TEMP/helm.sha256")  $RUNNER_TEMP/helm.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/helm.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/linux-amd64" >> "$GITHUB_PATH"
+      - name: Validate local Kubernetes manifests offline
+        if: runner.os == 'Linux'
+        run: uv run --locked python scripts/validate_cluster.py
+        working-directory: perfeng-environment
