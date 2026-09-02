@@ -43,6 +43,14 @@ pipe). TCP/SSH Docker contexts are rejected, even if a TCP endpoint is loopback.
 Inherited Helm Kubernetes overrides and the global KUBECONFIG variable are not
 used by child commands.
 
+Each executed command prints start/completion messages, with an elapsed-time
+update every 10 seconds while waiting. These updates indicate waiting, not
+proof that the child is making progress; there is no overall wrapper deadline.
+Initial creation may take several minutes to download the node image. Child
+stdout/stderr remain private because they can contain cluster credentials.
+Output is captured as bytes and returned data decoded explicitly as UTF-8,
+independent of the Windows console encoding.
+
 Startup refuses existing clusters or kubeconfig files and never performs
 automatic deletion or adoption. Failed creation retains nodes and local state
 for diagnosis. Inspect them before choosing explicit cleanup; do not rerun
