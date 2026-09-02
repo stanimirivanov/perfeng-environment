@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "repositories": [
+    {
+      "name": "perfeng-contracts",
+      "path": "../perfeng-contracts",
+      "url": "https://github.com/stanimirivanov/perfeng-contracts.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "perfeng-control-plane",
+      "path": "../perfeng-control-plane",
+      "url": "https://github.com/stanimirivanov/perfeng-control-plane.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "perfeng-analysis",
+      "path": "../perfeng-analysis",
+      "url": "https://github.com/stanimirivanov/perfeng-analysis.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "perfeng-k6",
+      "path": "../perfeng-k6",
+      "url": "https://github.com/stanimirivanov/perfeng-k6.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "perfeng-playwright",
+      "path": "../perfeng-playwright",
+      "url": "https://github.com/stanimirivanov/perfeng-playwright.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "perfeng-k8s",
+      "path": "../perfeng-k8s",
+      "url": "https://github.com/stanimirivanov/perfeng-k8s.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "perfeng-environment",
+      "path": ".",
+      "url": "https://github.com/stanimirivanov/perfeng-environment.git",
+      "source": {
+        "branch": "main"
+      }
+    }
+  ]
+}

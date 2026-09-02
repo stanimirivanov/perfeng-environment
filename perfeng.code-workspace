@@ -1,0 +1,33 @@
+{
+  "folders": [
+    {
+      "name": "perfeng-contracts",
+      "path": "../perfeng-contracts"
+    },
+    {
+      "name": "perfeng-control-plane",
+      "path": "../perfeng-control-plane"
+    },
+    {
+      "name": "perfeng-analysis",
+      "path": "../perfeng-analysis"
+    },
+    {
+      "name": "perfeng-k6",
+      "path": "../perfeng-k6"
+    },
+    {
+      "name": "perfeng-playwright",
+      "path": "../perfeng-playwright"
+    },
+    {
+      "name": "perfeng-k8s",
+      "path": "../perfeng-k8s"
+    },
+    {
+      "name": "perfeng-environment",
+      "path": "."
+    }
+  ],
+  "settings": {}
+}
