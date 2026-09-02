@@ -74,6 +74,8 @@ class K6RunTests(unittest.TestCase):
         self.assertNotIn("secretKeyRef", json.dumps(k6))
         self.assertNotIn("AWS_", json.dumps(k6))
         self.assertIn("secretKeyRef", json.dumps(upload))
+        self.assertNotIn('"perfeng-s3-auth"', json.dumps(job))
+        self.assertIn('"perfeng-s3-uploader-auth"', json.dumps(upload))
         self.assertTrue(upload["volumeMounts"][1]["readOnly"])
         self.assertEqual(pod["securityContext"]["runAsUser"], 12345)
         for container in [k6, upload]:
@@ -140,7 +142,7 @@ class K6RunTests(unittest.TestCase):
             with (
                 patch.object(runner.cluster, "verify_local_docker"),
                 patch.object(runner.cluster, "verify_context"),
-                patch.object(runner.object_store, "ensure_secret") as secret,
+                patch.object(runner.storage_access, "ensure_credentials") as secret,
                 patch.object(
                     runner.cluster,
                     "run",
@@ -170,7 +172,7 @@ class K6RunTests(unittest.TestCase):
         with (
             patch.object(runner.cluster, "verify_local_docker"),
             patch.object(runner.cluster, "verify_context"),
-            patch.object(runner.object_store, "ensure_secret"),
+            patch.object(runner.storage_access, "ensure_credentials"),
             patch.object(
                 runner.cluster,
                 "run",
@@ -190,7 +192,7 @@ class K6RunTests(unittest.TestCase):
         with (
             patch.object(runner.cluster, "verify_local_docker"),
             patch.object(runner.cluster, "verify_context"),
-            patch.object(runner.object_store, "ensure_secret"),
+            patch.object(runner.storage_access, "ensure_credentials"),
             patch.object(
                 runner.cluster,
                 "run",
@@ -213,7 +215,7 @@ class K6RunTests(unittest.TestCase):
         with (
             patch.object(runner.cluster, "verify_local_docker"),
             patch.object(runner.cluster, "verify_context"),
-            patch.object(runner.object_store, "ensure_secret"),
+            patch.object(runner.storage_access, "ensure_credentials"),
             patch.object(
                 runner.cluster,
                 "run",

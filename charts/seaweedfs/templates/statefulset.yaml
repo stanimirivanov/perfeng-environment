@@ -110,7 +110,7 @@ spec:
           emptyDir: {}
         - name: auth
           secret:
-            secretName: perfeng-s3-auth
+            secretName: perfeng-s3-server-auth-v2
             defaultMode: 0440
             items:
               - {key: s3.json, path: s3.json}

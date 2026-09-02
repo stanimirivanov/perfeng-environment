@@ -13,10 +13,11 @@ from typing import Any
 import yaml
 
 if __package__:
-    from . import cluster, object_store
+    from . import cluster, object_store, storage_access
 else:
     import cluster
     import object_store
+    import storage_access
 
 IMAGE = (
     "ghcr.io/stanimirivanov/perfeng-k6@sha256:"
@@ -98,6 +99,7 @@ def job(run_id: str, root: Path = cluster.ROOT) -> dict[str, Any]:
     validate_run_id(run_id)
     # Reuse the pinned AWS client and credential handling, not its smoke payload.
     document = object_store.client_job("health", "0" * 32, run_id, root)
+    storage_access.restrict_job(document)
     spec = document["spec"]
     spec.pop("ttlSecondsAfterFinished")
     spec["activeDeadlineSeconds"] = 900
@@ -177,7 +179,7 @@ def execute(run_id: str, root: Path = cluster.ROOT) -> int:
     cluster.verify_context(root)
     kube = object_store.kubectl(root)
     # All preflights are read-only. Never deploy/repair services as a side effect.
-    object_store.ensure_secret(root, create=False)
+    storage_access.ensure_credentials(root, create=False)
     cluster.run([*kube, "rollout", "status", "statefulset/seaweedfs", "--timeout=60s"])
     cluster.run(
         [

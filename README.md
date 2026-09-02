@@ -10,6 +10,8 @@ An optional [SeaweedFS object store](docs/local-object-store.md) adds S3 storage
 with upload/download and restart-persistence checks.
 The [local k6 capture workflow](docs/local-k6-run.md) runs the digest-pinned
 checkout smoke workload and uploads checksum-verified raw artifacts to SeaweedFS.
+The uploader uses [restricted storage credentials](docs/storage-access.md);
+existing installations require the documented object-store upgrade.
 
 ## Layout
 
