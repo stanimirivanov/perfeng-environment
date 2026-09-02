@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "existingSecret", "storage", "resources"],
+  "properties": {
+    "image": {
+      "type": "string",
+      "pattern": "^postgres:17\\.[0-9]+-bookworm@sha256:[0-9a-f]{64}$"
+    },
+    "existingSecret": {"type": "string", "const": "perfeng-postgres-auth"},
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["className", "size"],
+      "properties": {
+        "className": {"type": "string", "const": "standard"},
+        "size": {"type": "string", "pattern": "^[1-9][0-9]*Gi$"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {"$ref": "#/definitions/resources"},
+        "limits": {"$ref": "#/definitions/resources"}
+      }
+    }
+  },
+  "definitions": {
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": {"type": "string", "minLength": 1},
+        "memory": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

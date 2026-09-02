@@ -94,8 +94,10 @@ attempted.
 - perf-sut: local SUT workloads, selecting workload: sut.
 - monitoring: reserved for later observability installation.
 
-This slice installs no privileged platform RBAC, default passwords, Secrets,
-PVCs, PostgreSQL, MinIO, or observability components. The sample pod has no
+The base cluster commands install no privileged platform RBAC, default passwords,
+Secrets, PVCs, PostgreSQL, object store, or observability components. The optional
+[PostgreSQL deployment](local-postgres.md) adds its own Secret and PVC separately.
+The sample pod has no
 service-account token, runs non-root, drops capabilities, and uses a read-only
 root filesystem with resource requests/limits and readiness/liveness probes.
 
@@ -123,5 +125,6 @@ The source remains intact; historical ancestry import is owner-operated.
 
 Offline Helm lint/template and unit checks are not a successful deployment.
 Run up/deploy/health and verify the endpoint on a Docker-capable host before
-considering live acceptance complete. Stateful backing services and the owned
-business API fixture are subsequent PR-sized slices before durable k6 Jobs.
+considering live acceptance complete. PostgreSQL is available as an optional
+backing service; object storage and the owned business API fixture remain
+subsequent PR-sized slices before durable k6 Jobs.
