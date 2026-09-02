@@ -6,6 +6,8 @@ The workspace commands manage source checkouts only. Separate, preview-first
 HTTP-echo foundation; production composition is not implemented.
 An optional [local PostgreSQL deployment](docs/local-postgres.md) adds persistent
 metadata storage with generated credentials; it is deployed and checked separately.
+An optional [SeaweedFS object store](docs/local-object-store.md) adds S3 storage
+with upload/download and restart-persistence checks.
 
 ## Layout
 

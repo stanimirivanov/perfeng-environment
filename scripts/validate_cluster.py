@@ -9,6 +9,80 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def validate_object_store() -> None:
+    chart = ROOT / "charts/seaweedfs"
+    subprocess.run(["helm", "lint", str(chart), "--strict"], check=True)
+    rendered = subprocess.run(
+        ["helm", "template", "seaweedfs", str(chart), "--namespace", "perf-platform"],
+        check=True,
+        capture_output=True,
+    ).stdout.decode("utf-8")
+    objects = list(yaml.safe_load_all(rendered))
+    assert len(objects) == 3
+    assert {obj["kind"] for obj in objects} == {"StatefulSet", "Service", "ConfigMap"}
+    assert all(obj["metadata"]["namespace"] == "perf-platform" for obj in objects)
+    sts = next(obj for obj in objects if obj["kind"] == "StatefulSet")
+    service = next(obj for obj in objects if obj["kind"] == "Service")
+    assert sts["spec"]["replicas"] == 1
+    assert sts["spec"]["persistentVolumeClaimRetentionPolicy"] == {
+        "whenDeleted": "Retain",
+        "whenScaled": "Retain",
+    }
+    pod = sts["spec"]["template"]
+    assert service["spec"]["selector"] == pod["metadata"]["labels"]
+    assert service["spec"]["type"] == "ClusterIP"
+    assert service["spec"]["ports"] == [{"name": "s3", "port": 8333, "targetPort": "s3"}]
+    assert pod["spec"]["nodeSelector"] == {"workload": "control-plane"}
+    assert pod["spec"]["securityContext"]["runAsNonRoot"] is True
+    assert pod["spec"]["automountServiceAccountToken"] is False
+    container = pod["spec"]["containers"][0]
+    assert re.fullmatch(r"chrislusf/seaweedfs:4\.45@sha256:[0-9a-f]{64}", container["image"])
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert container["securityContext"]["allowPrivilegeEscalation"] is False
+    script = container["args"][0]
+    for flag in [
+        "-ip=127.0.0.1",
+        "-ip.bind=127.0.0.1",
+        "-s3.ip.bind=127.0.0.1",
+        "-s3.port=9000",
+        "-master.dir=/data/master",
+        "-dir=/data/volumes",
+        "-s3.config=/run/s3-auth/s3.json",
+        "-master.telemetry=false",
+        "-s3.iam=false",
+        "-s3.autoCreateBucket=false",
+        "-s3.allowDeleteBucketNotEmpty=false",
+        "-s3.port.iceberg=0",
+        "-s3.port.lance=0",
+    ]:
+        assert flag in script
+    secret = next(volume["secret"] for volume in pod["spec"]["volumes"] if "secret" in volume)
+    proxy = pod["spec"]["containers"][1]
+    assert re.fullmatch(r"haproxy:[0-9.]+-alpine@sha256:[0-9a-f]{64}", proxy["image"])
+    assert proxy["ports"] == [{"name": "s3", "containerPort": 8333}]
+    proxy_config = next(obj for obj in objects if obj["kind"] == "ConfigMap")
+    assert "server local 127.0.0.1:9000 check" in proxy_config["data"]["haproxy.cfg"]
+    assert secret["secretName"] == "perfeng-s3-auth"
+    claim = sts["spec"]["volumeClaimTemplates"][0]
+    assert claim["spec"]["storageClassName"] == "standard"
+    assert claim["spec"]["resources"]["requests"]["storage"] == "5Gi"
+    for override in [
+        "image=chrislusf/seaweedfs:latest",
+        "clientImage=amazon/aws-cli:latest",
+        "proxyImage=haproxy:latest",
+        "password=forbidden",
+    ]:
+        result = subprocess.run(
+            ["helm", "template", "seaweedfs", str(chart), "--set-string", override],
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode != 0
+    print(
+        "Validated SeaweedFS storage, authentication references, and private listeners (offline)."
+    )
+
+
 def validate_postgres() -> None:
     chart = ROOT / "charts/postgres"
     subprocess.run(["helm", "lint", str(chart), "--strict"], check=True)
@@ -117,6 +191,7 @@ def validate() -> None:
     assert service["spec"]["ports"][0]["targetPort"] == "http"
     print("Validated kind layout, four namespaces, and rendered sample SUT chart (offline).")
     validate_postgres()
+    validate_object_store()
 
 
 if __name__ == "__main__":
