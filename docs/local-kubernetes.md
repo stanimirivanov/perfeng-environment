@@ -97,6 +97,8 @@ attempted.
 The base cluster commands install no privileged platform RBAC, default passwords,
 Secrets, PVCs, PostgreSQL, object store, or observability components. The optional
 [PostgreSQL deployment](local-postgres.md) adds its own Secret and PVC separately.
+The optional [SeaweedFS deployment](local-object-store.md) adds S3 storage with
+separate credentials and checks.
 The sample pod has no
 service-account token, runs non-root, drops capabilities, and uses a read-only
 root filesystem with resource requests/limits and readiness/liveness probes.
@@ -126,5 +128,5 @@ The source remains intact; historical ancestry import is owner-operated.
 Offline Helm lint/template and unit checks are not a successful deployment.
 Run up/deploy/health and verify the endpoint on a Docker-capable host before
 considering live acceptance complete. PostgreSQL is available as an optional
-backing service; object storage and the owned business API fixture remain
-subsequent PR-sized slices before durable k6 Jobs.
+backing service; SeaweedFS now provides optional local S3 storage. The owned
+business API fixture and durable k6 Job integration remain subsequent slices.

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: seaweedfs
+description: Local-only S3 artifact storage
+type: application
+version: 0.1.0
+appVersion: "4.45"

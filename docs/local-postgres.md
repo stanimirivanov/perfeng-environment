@@ -122,8 +122,8 @@ Retains the StatefulSet/PVC intent of `performance-platform` commit
 credentials, prototype application SQL, duplicate PVC definitions, and the old
 namespace are not copied.
 
-The next storage slice adds S3-compatible raw-artifact storage before durable
-k6 Jobs. This PostgreSQL deployment does not satisfy raw-artifact durability.
+The separate [SeaweedFS deployment](local-object-store.md) adds S3-compatible
+raw-artifact storage before durable k6 Jobs. PostgreSQL does not store raw blobs.
 
 References: [official PostgreSQL image](https://hub.docker.com/_/postgres),
 [PostgreSQL 17.11 release](https://www.postgresql.org/docs/release/17.11/),

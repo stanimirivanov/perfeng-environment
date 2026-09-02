@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "clientImage", "proxyImage", "storageSize"],
+  "properties": {
+    "proxyImage": {"type": "string", "pattern": "^haproxy:[0-9.]+-alpine@sha256:[0-9a-f]{64}$"},
+    "image": {"type": "string", "pattern": "^chrislusf/seaweedfs:[0-9.]+@sha256:[0-9a-f]{64}$"},
+    "clientImage": {"type": "string", "pattern": "^amazon/aws-cli:[0-9.]+@sha256:[0-9a-f]{64}$"},
+    "storageSize": {"type": "string", "pattern": "^[1-9][0-9]*Gi$"}
+  }
+}
