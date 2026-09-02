@@ -1,0 +1,10 @@
+# Local smoke fixture only; production requires a verified immutable image digest.
+image: hashicorp/http-echo:1.0.0
+replicas: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

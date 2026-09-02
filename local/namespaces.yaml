@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perf-platform
+  labels:
+    perfeng.io/environment: local
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perf-generators
+  labels:
+    perfeng.io/environment: local
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perf-sut
+  labels:
+    perfeng.io/environment: local
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    perfeng.io/environment: local

@@ -1,8 +1,9 @@
 # perfeng-environment
 
-Workspace bootstrap and, in later steps, development/production environment
-composition. This first slice manages source checkouts only. It does not deploy
-Kubernetes, install application dependencies, start workloads, or publish images.
+Workspace bootstrap and development/production environment composition.
+The workspace commands manage source checkouts only. Separate, preview-first
+[local Kubernetes commands](docs/local-kubernetes.md) now provide the kind and
+HTTP-echo foundation; production composition is not implemented.
 
 ## Layout
 
@@ -49,8 +50,9 @@ If the repositories already exist, skip the git clone step. Do not clone over
 an existing directory. VS Code can also open the workspace through File > Open
 Workspace from File. IntelliJ's root .idea directory is ignored.
 
-The script itself uses only the Python standard library. A preinstalled
+The workspace script itself uses only the Python standard library. A preinstalled
 Python 3.12 can run it directly without uv; uv pins the development tools.
+The separate cluster tooling also requires the locked PyYAML dependency.
 
 ## Safety and status
 
