@@ -1,0 +1,13 @@
+# Official multi-platform index, resolved from 17.11-bookworm on 2026-09-02.
+image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+existingSecret: perfeng-postgres-auth
+storage:
+  size: 2Gi
+  className: standard
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

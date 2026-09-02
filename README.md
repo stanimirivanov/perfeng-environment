@@ -4,6 +4,8 @@ Workspace bootstrap and development/production environment composition.
 The workspace commands manage source checkouts only. Separate, preview-first
 [local Kubernetes commands](docs/local-kubernetes.md) now provide the kind and
 HTTP-echo foundation; production composition is not implemented.
+An optional [local PostgreSQL deployment](docs/local-postgres.md) adds persistent
+metadata storage with generated credentials; it is deployed and checked separately.
 
 ## Layout
 
