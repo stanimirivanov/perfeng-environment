@@ -265,6 +265,11 @@ def execute(action: str, probe_id: str, root: Path = cluster.ROOT) -> None:
             )
     ensure_secret(root, create=action == "deploy")
     if action == "deploy":
+        if __package__:
+            from . import storage_access
+        else:
+            import storage_access
+        storage_access.ensure_credentials(root, create=True)
         print("Deploying SeaweedFS (first image download may take several minutes)...", flush=True)
         cluster.run(
             [
@@ -325,7 +330,7 @@ def main() -> int:
             print("Preview: verify local cluster, namespace, credentials, rollout and PVC.")
             if args.action == "deploy":
                 print(
-                    "Then create/reuse private credentials, install the chart and ensure the bucket."
+                    "Then create/reuse bootstrap and restricted credentials, install the chart and ensure the bucket."
                 )
             print(json.dumps(plan, indent=2))
             print(

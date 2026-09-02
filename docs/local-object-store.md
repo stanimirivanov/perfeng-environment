@@ -83,8 +83,10 @@ uses a read-only Secret file; clients use Secret-backed environment variables.
 Redeploy reuses credentials. Missing credentials alongside an existing PVC or
 StatefulSet cause refusal rather than silent regeneration.
 
-The bootstrap identity has administrative access. Future runners need separate,
-least-privilege identities; do not give them these bootstrap credentials. TLS,
+The bootstrap identity has administrative access. The local k6 uploader now uses
+a [separate restricted identity](storage-access.md). Chart 0.2.0 mounts the
+additive server configuration Secret; the original bootstrap Secret is retained.
+Deploy creates/reuses the restricted Secret pair before upgrading the chart. TLS,
 encryption at rest, and NetworkPolicy enforcement are not configured. Kubernetes
 Secret-read/pod-exec privileges confer storage-admin access. Do not expose this
 service externally or store production data. The smoke check is not a complete
@@ -108,7 +110,7 @@ replication, versioning policy, Object Lock, and compliance retention are not
 implemented. A conditional probe upload is not general artifact immutability.
 
 The environment owns deployment and local checks. Runner/control-plane integration
-must add least-privilege access and record artifact URI, checksum, size, measurement
+must record artifact URI, checksum, size, measurement
 window, and producer identity using perfeng-contracts. This step does not run k6
 or upload real run artifacts. The prototype MinIO chart/data remains untouched;
 existing data requires explicit export/import, not a filesystem move.

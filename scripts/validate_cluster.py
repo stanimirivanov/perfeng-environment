@@ -63,7 +63,7 @@ def validate_object_store() -> None:
     assert proxy["ports"] == [{"name": "s3", "containerPort": 8333}]
     proxy_config = next(obj for obj in objects if obj["kind"] == "ConfigMap")
     assert "server local 127.0.0.1:9000 check" in proxy_config["data"]["haproxy.cfg"]
-    assert secret["secretName"] == "perfeng-s3-auth"
+    assert secret["secretName"] == "perfeng-s3-server-auth-v2"
     claim = sts["spec"]["volumeClaimTemplates"][0]
     assert claim["spec"]["storageClassName"] == "standard"
     assert claim["spec"]["resources"]["requests"]["storage"] == "5Gi"

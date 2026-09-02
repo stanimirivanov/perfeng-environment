@@ -58,12 +58,11 @@ subsequent integration work; no measurement window is inferred here.
 
 ## Security, retention and failure handling
 
-Only the trusted upload container gets the existing local bootstrap S3 Secret;
-the k6 container has no storage credentials. This bootstrap identity has broad
-storage permissions: it is not a production or multi-tenant least-privilege
-design. The Job temporarily lives in perf-platform to reference that Secret,
-but runs on the performance-generator node. A dedicated upload identity and
-namespace isolation are prerequisites for widening this beyond the fixed fixture.
+Only the trusted upload container gets the separate restricted uploader Secret;
+the k6 container has no storage credentials. See [storage access](storage-access.md)
+for migration and live permission checks. The Job remains in perf-platform and
+runs on the performance-generator node. The identity is shared across local runs;
+per-run credentials and namespace isolation remain prerequisites for multi-tenant use.
 
 Jobs have no retry and a 15-minute active deadline. No TTL cleanup is configured,
 and the command never deletes Jobs, artifacts, credentials or PVCs. Inspect the
