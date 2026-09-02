@@ -1,0 +1,14 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "python.testing.unittestEnabled": true,
+  "python.testing.unittestArgs": [
+    "-s",
+    "tests",
+    "-v"
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+  "files.eol": "\n"
+}
