@@ -20,6 +20,11 @@ else:
 
 RUN_ID_PATTERN = re.compile(r"perf-[0-9]{8}-[0-9]{6}-[a-f0-9]{8}")
 ROLE_DETAILS = {
+    "diagnostics": (
+        "browser-diagnostics.json",
+        "application/json",
+        "browser-diagnostics/v1",
+    ),
     "environment": ("browser-environment.json", "application/json", "browser-environment/v1"),
     "measurements": (
         "playwright-measurements.json",
@@ -129,6 +134,36 @@ def browser_inputs(
     if len(set(paths)) != len(paths):
         raise ValueError("Browser artifact input paths must be distinct")
     return run_id, inputs
+
+
+def diagnostic_input(path: Path) -> tuple[str, list[tuple[str, Path]]]:
+    path = input_file(path, "diagnostics")
+    manifest = read_json(path, "diagnostics")
+    run_id = manifest.get("runId")
+    if not isinstance(run_id, str) or RUN_ID_PATTERN.fullmatch(run_id) is None:
+        raise ValueError("Browser diagnostics contain an invalid run ID")
+    if manifest.get("schemaVersion") != 1 or manifest.get("kind") != "BrowserDiagnostics":
+        raise ValueError("Expected BrowserDiagnostics v1")
+
+    environment = manifest.get("environment")
+    captures = manifest.get("captures")
+    if (
+        not isinstance(environment, dict)
+        or not isinstance(captures, list)
+        or not captures
+        or any(not isinstance(capture, dict) for capture in captures)
+    ):
+        raise ValueError("Browser diagnostics do not declare their evidence")
+    references = [environment.get("artifact")]
+    references.extend(capture.get("artifact") for capture in captures)
+    if any(
+        not isinstance(reference, dict)
+        or reference.get("runId") != run_id
+        or reference.get("kind") != "raw"
+        for reference in references
+    ):
+        raise ValueError("Browser diagnostic evidence does not belong to the manifest run")
+    return run_id, [("diagnostics", path)]
 
 
 def artifact_reference(run_id: str, role: str, path: Path) -> dict[str, Any]:
@@ -291,9 +326,10 @@ def execute(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["upload"])
-    parser.add_argument("--measurements", type=Path, required=True)
-    parser.add_argument("--environment", type=Path, required=True)
+    parser.add_argument("action", choices=["upload", "upload-diagnostics"])
+    parser.add_argument("--measurements", type=Path)
+    parser.add_argument("--environment", type=Path)
+    parser.add_argument("--diagnostics", type=Path)
     parser.add_argument("--observations", type=Path)
     parser.add_argument("--trace", type=Path)
     parser.add_argument("--heap-snapshot-before", type=Path)
@@ -302,14 +338,38 @@ def main() -> int:
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     try:
-        run_id, inputs = browser_inputs(
-            args.measurements,
-            args.environment,
-            args.observations,
-            args.trace,
-            args.heap_snapshot_before,
-            args.heap_snapshot_after,
-        )
+        if args.action == "upload":
+            if (
+                args.measurements is None
+                or args.environment is None
+                or args.diagnostics is not None
+            ):
+                raise ValueError("upload requires measurements and environment only")
+            run_id, inputs = browser_inputs(
+                args.measurements,
+                args.environment,
+                args.observations,
+                args.trace,
+                args.heap_snapshot_before,
+                args.heap_snapshot_after,
+            )
+        else:
+            if (
+                args.diagnostics is None
+                or args.measurements is not None
+                or args.environment is not None
+                or any(
+                    path is not None
+                    for path in (
+                        args.observations,
+                        args.trace,
+                        args.heap_snapshot_before,
+                        args.heap_snapshot_after,
+                    )
+                )
+            ):
+                raise ValueError("upload-diagnostics requires only a diagnostics manifest")
+            run_id, inputs = diagnostic_input(args.diagnostics)
         if args.execute:
             result = execute(run_id, inputs, args.receipt)
             print(json.dumps(result))
