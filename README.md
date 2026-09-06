@@ -16,6 +16,8 @@ A [native Windows browser-host profile](docs/windows-browser-host.md) defines
 and checks the controlled machine conditions used by Playwright measurements.
 The browser-environment assembler binds an accepted qualification to the actual
 Playwright runtime without inventing missing host or browser values.
+The local browser uploader publishes those exact bytes through the restricted
+storage identity and returns verified immutable artifact references.
 
 ## Layout
 
