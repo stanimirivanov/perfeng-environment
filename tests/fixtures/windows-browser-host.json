@@ -10,6 +10,8 @@
   "cpu": {
     "model": "Reference 6-core mobile CPU",
     "logicalCores": 12,
+    "physicalCores": 6,
+    "availableLogicalCores": 12,
     "idleCpuPercent": 3.2
   },
   "memory": {
