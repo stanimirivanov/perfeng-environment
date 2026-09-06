@@ -12,6 +12,8 @@ The [local k6 capture workflow](docs/local-k6-run.md) runs the digest-pinned
 checkout smoke workload and uploads checksum-verified raw artifacts to SeaweedFS.
 The uploader uses [restricted storage credentials](docs/storage-access.md);
 existing installations require the documented object-store upgrade.
+A [native Windows browser-host profile](docs/windows-browser-host.md) defines
+and checks the controlled machine conditions used by Playwright measurements.
 
 ## Layout
 
@@ -35,6 +37,7 @@ git clone https://github.com/stanimirivanov/perfeng-environment.git
 Set-Location perfeng-environment
 uv sync --locked
 uv run --locked python scripts/workspace.py validate
+uv run --locked python scripts/browser_host.py validate
 uv run --locked python scripts/workspace.py bootstrap --dry-run
 uv run --locked python scripts/workspace.py bootstrap
 uv run --locked python scripts/workspace.py status

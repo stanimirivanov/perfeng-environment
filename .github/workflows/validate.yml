@@ -31,6 +31,8 @@ jobs:
         working-directory: perfeng-environment
       - run: uv run --locked python scripts/workspace.py validate
         working-directory: perfeng-environment
+      - run: uv run --locked python scripts/browser_host.py validate
+        working-directory: perfeng-environment
       - name: Install Helm for offline rendering
         if: runner.os == 'Linux'
         shell: bash
