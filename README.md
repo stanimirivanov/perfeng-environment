@@ -18,6 +18,8 @@ The browser-environment assembler binds an accepted qualification to the actual
 Playwright runtime without inventing missing host or browser values.
 The local browser uploader publishes those exact bytes through the restricted
 storage identity and returns verified immutable artifact references.
+The browser-diagnostics assembler binds those references to the runner's
+versioned capture receipt without inferring missing evidence.
 
 ## Layout
 

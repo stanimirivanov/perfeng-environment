@@ -81,6 +81,32 @@ If publication fails, successfully written objects are retained and no receipt
 is produced. The named uploader Pod is retained for inspection. Object deletion
 and retry recovery are intentionally outside this step.
 
+## Assemble diagnostic provenance
+
+For a diagnostic run, combine the exact local outputs with both immutable
+receipts after publication succeeds:
+
+```powershell
+uv run --locked python scripts/browser_diagnostics.py assemble `
+  --measurements results/playwright-measurements.json `
+  --environment results/browser-environment.json `
+  --runner-receipt results/playwright-receipt.json `
+  --upload-receipt results/browser-upload.json `
+  --trace results/chrome-trace.json.gz `
+  --output results/browser-diagnostics.json
+```
+
+Replace `--trace` with `--observations`, or with the paired heap-snapshot
+options, according to the measurement mode. The assembler verifies the local
+bytes against the runner and upload receipts, checks Run, test, workload,
+environment, browser-lifetime, iteration, and timestamp relationships, and
+writes `browser-diagnostics/v1` without replacing an existing file. Baseline
+runs do not produce a diagnostic manifest.
+
+The manifest records trace data loss as `INCOMPLETE`; it never converts a lossy
+trace into complete evidence. Diagnostic manifest upload, raw-result assembly,
+and control-plane registration remain later boundaries.
+
 Recorded snapshots are accepted only through an explicit option for tests and
 offline troubleshooting:
 
