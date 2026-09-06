@@ -1,8 +1,10 @@
 import copy
 import io
 import json
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from scripts import browser_host
@@ -27,6 +29,7 @@ class BrowserHostTests(unittest.TestCase):
         snapshot = copy.deepcopy(self.snapshot)
         snapshot["virtualization"] = "virtual"
         snapshot["memory"]["availableBytes"] = 1
+        snapshot["cpu"]["availableLogicalCores"] = 4
         snapshot["cpu"]["idleCpuPercent"] = 20
         snapshot["power"]["source"] = "battery"
         snapshot["clockSynchronized"] = False
@@ -36,6 +39,7 @@ class BrowserHostTests(unittest.TestCase):
             result["reasons"],
             [
                 "virtualization differs",
+                "available CPU capacity is too low",
                 "available memory is too low",
                 "power source differs",
                 "background CPU is too high",
@@ -84,6 +88,27 @@ class BrowserHostTests(unittest.TestCase):
         with patch.object(browser_host.platform, "system", return_value="Linux"):
             with self.assertRaisesRegex(ValueError, "requires Windows"):
                 browser_host.live_snapshot()
+
+    def test_check_can_write_an_immutable_utf8_qualification(self):
+        fixture = browser_host.ROOT / "tests/fixtures/windows-browser-host.json"
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "qualification.json"
+            arguments = [
+                "browser_host.py",
+                "check",
+                "--snapshot",
+                str(fixture),
+                "--output",
+                str(output_path),
+            ]
+            with patch("sys.argv", arguments), redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(browser_host.main(), 0)
+            receipt = json.loads(output.getvalue())
+            self.assertEqual(receipt["status"], "ACCEPTED")
+            self.assertEqual(json.loads(output_path.read_bytes())["status"], "ACCEPTED")
+
+            with patch("sys.argv", arguments), redirect_stdout(io.StringIO()):
+                self.assertEqual(browser_host.main(), 1)
 
 
 if __name__ == "__main__":

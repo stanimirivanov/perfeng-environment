@@ -62,6 +62,8 @@ $scaleFactor = [Math]::Round([PerfengNative]::GetDpiForSystem() / 96.0, 2)
   cpu = [ordered]@{
     model = [string]$processors[0].Name
     logicalCores = [int](($processors | Measure-Object NumberOfLogicalProcessors -Sum).Sum)
+    physicalCores = [int](($processors | Measure-Object NumberOfCores -Sum).Sum)
+    availableLogicalCores = [int][Environment]::ProcessorCount
     idleCpuPercent = [double]$cpu.PercentProcessorTime
   }
   memory = [ordered]@{
@@ -183,6 +185,9 @@ def load_profile(path: Path = PROFILE) -> dict[str, Any]:
     )
     if maximum_cpu > 100:
         raise ValueError("maximumIdleCpuPercent must not exceed 100")
+    text(spec["browser"]["name"], "spec.browser.name")
+    text(spec["browser"]["channel"], "spec.browser.channel")
+    boolean(spec["browser"]["headless"], "spec.browser.headless")
     return document
 
 
@@ -227,7 +232,13 @@ def validate_snapshot(snapshot: dict[str, Any]) -> None:
     )
     sections = {
         "os": {"family", "edition", "version", "build", "architecture"},
-        "cpu": {"model", "logicalCores", "idleCpuPercent"},
+        "cpu": {
+            "model",
+            "logicalCores",
+            "physicalCores",
+            "availableLogicalCores",
+            "idleCpuPercent",
+        },
         "memory": {"totalBytes", "availableBytes"},
         "gpu": {
             "model",
@@ -246,7 +257,19 @@ def validate_snapshot(snapshot: dict[str, Any]) -> None:
         text(values["os"][name], f"snapshot.os.{name}")
     integer(values["os"]["build"], "snapshot.os.build")
     text(values["cpu"]["model"], "snapshot.cpu.model")
-    integer(values["cpu"]["logicalCores"], "snapshot.cpu.logicalCores")
+    logical_cores = integer(values["cpu"]["logicalCores"], "snapshot.cpu.logicalCores")
+    physical_cores = integer(values["cpu"]["physicalCores"], "snapshot.cpu.physicalCores")
+    available_cores = integer(
+        values["cpu"]["availableLogicalCores"], "snapshot.cpu.availableLogicalCores"
+    )
+    if (
+        logical_cores < 1
+        or physical_cores < 1
+        or physical_cores > logical_cores
+        or available_cores < 1
+        or available_cores > logical_cores
+    ):
+        raise ValueError("snapshot CPU core counts are inconsistent")
     idle_cpu = nonnegative_number(values["cpu"]["idleCpuPercent"], "snapshot.cpu.idleCpuPercent")
     if idle_cpu > 100:
         raise ValueError("snapshot.cpu.idleCpuPercent must not exceed 100")
@@ -284,7 +307,10 @@ def evaluate(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any
     require(os_data.get("family") == spec["os"]["family"], "operating system differs")
     require(os_data.get("architecture") == spec["os"]["architecture"], "architecture differs")
     require(os_data["build"] >= spec["os"]["minimumBuild"], "OS build is too old")
-    require(cpu["logicalCores"] >= spec["cpu"]["minimumLogicalCores"], "CPU capacity is too low")
+    require(
+        cpu["availableLogicalCores"] >= spec["cpu"]["minimumLogicalCores"],
+        "available CPU capacity is too low",
+    )
     require(
         memory["totalBytes"] >= spec["memory"]["minimumTotalBytes"],
         "installed memory is too low",
@@ -325,10 +351,13 @@ def main() -> int:
     parser.add_argument("action", choices=["validate", "check"])
     parser.add_argument("--profile", type=Path, default=PROFILE)
     parser.add_argument("--snapshot", type=Path)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
         profile = load_profile(args.profile)
         if args.action == "validate":
+            if args.output is not None:
+                raise ValueError("--output is only supported for host qualification")
             print(json.dumps({"profile": profile["metadata"], "fingerprint": fingerprint(profile)}))
             return 0
         snapshot = (
@@ -337,7 +366,23 @@ def main() -> int:
             else live_snapshot()
         )
         result = evaluate(profile, snapshot)
-        print(json.dumps(result, indent=2))
+        if args.output is None:
+            print(json.dumps(result, indent=2))
+        else:
+            content = (json.dumps(result, indent=2) + "\n").encode("utf-8")
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            with args.output.open("xb") as output:
+                output.write(content)
+            print(
+                json.dumps(
+                    {
+                        "path": str(args.output),
+                        "sha256": hashlib.sha256(content).hexdigest(),
+                        "sizeBytes": len(content),
+                        "status": result["status"],
+                    }
+                )
+            )
         return 0 if result["status"] == "ACCEPTED" else 1
     except (
         OSError,
