@@ -52,7 +52,34 @@ byte count. Existing outputs are never replaced.
 
 This step produces `browser-environment/v1` bytes only. Upload, artifact
 references, diagnostic-manifest construction, and control-plane registration
-remain later integration boundaries.
+remain separate integration boundaries.
+
+## Publish local browser artifacts
+
+After the runner and environment assembler succeed, preview the storage bridge:
+
+```powershell
+uv run --locked python scripts/browser_upload.py upload `
+  --measurements results/playwright-measurements.json `
+  --environment results/browser-environment.json `
+  --receipt results/browser-upload.json
+```
+
+Add the output required by the selected diagnostic mode: `--observations`,
+`--trace`, or both `--heap-snapshot-before` and `--heap-snapshot-after`. Add
+`--execute` only after reviewing the Pod preview.
+
+Execution uses a short-lived locked-down AWS CLI Pod and the restricted uploader
+Secret already installed in the local cluster. Artifact bytes are streamed from
+the Windows host without copying credentials out of Kubernetes. Every PUT is
+conditional, every object is read back and checksum-verified, and a successful
+run writes `local-browser-upload/v1` as an immutable local receipt. The receipt
+contains raw `artifact/v1` references for later manifest construction; it is not
+itself a platform contract or proof that a diagnostic capture was complete.
+
+If publication fails, successfully written objects are retained and no receipt
+is produced. The named uploader Pod is retained for inspection. Object deletion
+and retry recovery are intentionally outside this step.
 
 Recorded snapshots are accepted only through an explicit option for tests and
 offline troubleshooting:
