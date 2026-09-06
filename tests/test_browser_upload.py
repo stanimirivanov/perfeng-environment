@@ -90,6 +90,58 @@ class BrowserUploadTests(unittest.TestCase):
             )
             self.assertEqual(reference["format"], "playwright-measurements/v2")
 
+    def test_accepts_diagnostic_manifest_with_run_scoped_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "browser-diagnostics.json"
+            evidence = {"runId": RUN_ID, "kind": "raw"}
+            path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "kind": "BrowserDiagnostics",
+                        "runId": RUN_ID,
+                        "environment": {"artifact": evidence},
+                        "captures": [{"artifact": evidence}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            run_id, inputs = browser_upload.diagnostic_input(path)
+            reference = browser_upload.artifact_reference(run_id, *inputs[0])
+
+            self.assertEqual(run_id, RUN_ID)
+            self.assertEqual(inputs, [("diagnostics", path.resolve())])
+            self.assertEqual(
+                reference["uri"],
+                f"s3://perfeng-artifacts/runs/{RUN_ID}/raw/browser/browser-diagnostics.json",
+            )
+            self.assertEqual(reference["format"], "browser-diagnostics/v1")
+
+    def test_rejects_diagnostic_manifest_with_foreign_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "browser-diagnostics.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "kind": "BrowserDiagnostics",
+                        "runId": RUN_ID,
+                        "environment": {
+                            "artifact": {
+                                "runId": "perf-20260902-130000-deadbeef",
+                                "kind": "raw",
+                            }
+                        },
+                        "captures": [{"artifact": {"runId": RUN_ID, "kind": "raw"}}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "does not belong"):
+                browser_upload.diagnostic_input(path)
+
     def test_upload_pod_uses_only_restricted_credentials(self):
         pod = browser_upload.upload_pod("browser-upload-preview", browser_upload.cluster.ROOT)
         container = pod["spec"]["containers"][0]

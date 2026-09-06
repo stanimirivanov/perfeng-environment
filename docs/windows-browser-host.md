@@ -104,8 +104,25 @@ writes `browser-diagnostics/v1` without replacing an existing file. Baseline
 runs do not produce a diagnostic manifest.
 
 The manifest records trace data loss as `INCOMPLETE`; it never converts a lossy
-trace into complete evidence. Diagnostic manifest upload, raw-result assembly,
-and control-plane registration remain later boundaries.
+trace into complete evidence.
+
+Publish the assembled manifest only after all of the evidence it names has been
+uploaded and verified:
+
+```powershell
+uv run --locked python scripts/browser_upload.py upload-diagnostics `
+  --diagnostics results/browser-diagnostics.json `
+  --receipt results/browser-diagnostics-upload.json
+```
+
+Review the Pod preview, then repeat with `--execute`. Publication uses the same
+restricted uploader identity, conditional write, and remote checksum verification
+as the evidence upload. It writes a separate immutable receipt and never changes
+the original evidence receipt.
+
+Raw-result assembly and control-plane registration remain later boundaries. The
+current raw-result contract models an OCI image as the execution artifact; it
+must not be populated with a container image for this native Windows execution.
 
 Recorded snapshots are accepted only through an explicit option for tests and
 offline troubleshooting:
