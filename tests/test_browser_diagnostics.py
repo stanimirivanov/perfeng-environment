@@ -48,6 +48,7 @@ class BrowserDiagnosticsTests(unittest.TestCase):
                 "start": "2026-09-02T13:00:00Z",
                 "end": "2026-09-02T13:01:00Z",
             },
+            "runtime": {"playwrightVersion": "1.62.1"},
             "createdAt": "2026-09-02T13:01:01Z",
         }
         environment = {
@@ -135,9 +136,19 @@ class BrowserDiagnosticsTests(unittest.TestCase):
                 },
             }
         runner_receipt = {
-            "schema": "playwright-runner-receipt/v1",
+            "schema": "playwright-runner-receipt/v2",
             "runId": RUN_ID,
             "testId": TEST_ID,
+            "producer": {
+                "name": "playwright",
+                "version": "1.62.1",
+                "artifact": {
+                    "kind": "source-checkout",
+                    "repository": "https://github.com/stanimirivanov/perfeng-playwright",
+                    "gitSha": "a" * 40,
+                    "dependencyLock": {"path": "pnpm-lock.yaml", "sha256": "b" * 64},
+                },
+            },
             "artifacts": runner_artifacts,
         }
         ordered_inputs = [(role, path) for role, path in paths.items()]

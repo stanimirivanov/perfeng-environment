@@ -31,6 +31,7 @@ ROLE_DETAILS = {
         "application/json",
         "playwright-measurements/v2",
     ),
+    "raw-result": ("raw-result.json", "application/json", "raw-result/v2"),
     "observations": (
         "browser-observations.json",
         "application/json",
@@ -48,6 +49,13 @@ ROLE_DETAILS = {
         "chrome-heap-snapshot-json-gzip",
     ),
 }
+
+
+def object_uri(run_id: str, role: str) -> str:
+    filename = ROLE_DETAILS[role][0]
+    if role == "raw-result":
+        return f"s3://{store.BUCKET}/runs/{run_id}/{filename}"
+    return f"s3://{store.BUCKET}/runs/{run_id}/raw/browser/{filename}"
 
 
 def read_json(path: Path, name: str) -> dict[str, Any]:
@@ -166,6 +174,33 @@ def diagnostic_input(path: Path) -> tuple[str, list[tuple[str, Path]]]:
     return run_id, [("diagnostics", path)]
 
 
+def raw_result_input(path: Path) -> tuple[str, list[tuple[str, Path]]]:
+    path = input_file(path, "raw result")
+    manifest = read_json(path, "raw result")
+    run_id = manifest.get("runId")
+    if not isinstance(run_id, str) or RUN_ID_PATTERN.fullmatch(run_id) is None:
+        raise ValueError("Raw result contains an invalid run ID")
+    if (
+        manifest.get("schemaVersion") != 2
+        or manifest.get("kind") != "RawResult"
+        or manifest.get("contractsVersion") != "0.12.0"
+    ):
+        raise ValueError("Expected RawResult v2")
+    artifacts = manifest.get("artifacts")
+    if (
+        not isinstance(artifacts, list)
+        or not artifacts
+        or any(
+            not isinstance(artifact, dict)
+            or artifact.get("runId") != run_id
+            or artifact.get("kind") != "raw"
+            for artifact in artifacts
+        )
+    ):
+        raise ValueError("Raw result does not declare run-scoped raw evidence")
+    return run_id, [("raw-result", path)]
+
+
 def artifact_reference(run_id: str, role: str, path: Path) -> dict[str, Any]:
     filename, media_type, artifact_format = ROLE_DETAILS[role]
     content = path.read_bytes()
@@ -173,7 +208,7 @@ def artifact_reference(run_id: str, role: str, path: Path) -> dict[str, Any]:
         "id": str(uuid.uuid4()),
         "runId": run_id,
         "kind": "raw",
-        "uri": f"s3://{store.BUCKET}/runs/{run_id}/raw/browser/{filename}",
+        "uri": object_uri(run_id, role),
         "sha256": hashlib.sha256(content).hexdigest(),
         "sizeBytes": len(content),
         "mediaType": media_type,
@@ -326,10 +361,11 @@ def execute(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["upload", "upload-diagnostics"])
+    parser.add_argument("action", choices=["upload", "upload-diagnostics", "upload-raw-result"])
     parser.add_argument("--measurements", type=Path)
     parser.add_argument("--environment", type=Path)
     parser.add_argument("--diagnostics", type=Path)
+    parser.add_argument("--raw-result", type=Path)
     parser.add_argument("--observations", type=Path)
     parser.add_argument("--trace", type=Path)
     parser.add_argument("--heap-snapshot-before", type=Path)
@@ -343,6 +379,7 @@ def main() -> int:
                 args.measurements is None
                 or args.environment is None
                 or args.diagnostics is not None
+                or args.raw_result is not None
             ):
                 raise ValueError("upload requires measurements and environment only")
             run_id, inputs = browser_inputs(
@@ -353,9 +390,10 @@ def main() -> int:
                 args.heap_snapshot_before,
                 args.heap_snapshot_after,
             )
-        else:
+        elif args.action == "upload-diagnostics":
             if (
                 args.diagnostics is None
+                or args.raw_result is not None
                 or args.measurements is not None
                 or args.environment is not None
                 or any(
@@ -370,6 +408,24 @@ def main() -> int:
             ):
                 raise ValueError("upload-diagnostics requires only a diagnostics manifest")
             run_id, inputs = diagnostic_input(args.diagnostics)
+        else:
+            if (
+                args.raw_result is None
+                or args.measurements is not None
+                or args.environment is not None
+                or args.diagnostics is not None
+                or any(
+                    path is not None
+                    for path in (
+                        args.observations,
+                        args.trace,
+                        args.heap_snapshot_before,
+                        args.heap_snapshot_after,
+                    )
+                )
+            ):
+                raise ValueError("upload-raw-result requires only a raw-result manifest")
+            run_id, inputs = raw_result_input(args.raw_result)
         if args.execute:
             result = execute(run_id, inputs, args.receipt)
             print(json.dumps(result))

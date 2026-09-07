@@ -118,6 +118,30 @@ class BrowserUploadTests(unittest.TestCase):
             )
             self.assertEqual(reference["format"], "browser-diagnostics/v1")
 
+    def test_raw_result_uses_the_control_plane_discovery_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "raw-result.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 2,
+                        "kind": "RawResult",
+                        "contractsVersion": "0.12.0",
+                        "runId": RUN_ID,
+                        "artifacts": [{"runId": RUN_ID, "kind": "raw"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            run_id, inputs = browser_upload.raw_result_input(path)
+            reference = browser_upload.artifact_reference(run_id, *inputs[0])
+
+            self.assertEqual(
+                reference["uri"], f"s3://perfeng-artifacts/runs/{RUN_ID}/raw-result.json"
+            )
+            self.assertEqual(reference["format"], "raw-result/v2")
+
     def test_rejects_diagnostic_manifest_with_foreign_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "browser-diagnostics.json"

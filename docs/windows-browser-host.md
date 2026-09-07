@@ -120,9 +120,43 @@ restricted uploader identity, conditional write, and remote checksum verificatio
 as the evidence upload. It writes a separate immutable receipt and never changes
 the original evidence receipt.
 
-Raw-result assembly and control-plane registration remain later boundaries. The
-current raw-result contract models an OCI image as the execution artifact; it
-must not be populated with a container image for this native Windows execution.
+## Publish the raw-result discovery manifest
+
+After all evidence and the optional diagnostic manifest are published, assemble
+the transport manifest from their verified receipts:
+
+```powershell
+uv run --locked python scripts/browser_raw_result.py assemble `
+  --measurements results/playwright-measurements.json `
+  --environment results/browser-environment.json `
+  --runner-receipt results/playwright-receipt.json `
+  --upload-receipt results/browser-upload.json `
+  --trace results/chrome-trace.json.gz `
+  --diagnostics results/browser-diagnostics.json `
+  --diagnostics-upload-receipt results/browser-diagnostics-upload.json `
+  --output results/raw-result.json
+```
+
+For a baseline run, omit the trace, diagnostics, and diagnostics-receipt options.
+Other diagnostic modes use the same mode-specific options as the earlier steps.
+The assembler accepts `playwright-runner-receipt/v2`, derives the native source
+provenance from it, verifies every local byte claim and upload reference, and
+writes an immutable `raw-result/v2` for contracts bundle 0.12.0.
+
+Preview publication of the raw manifest only after assembly succeeds:
+
+```powershell
+uv run --locked python scripts/browser_upload.py upload-raw-result `
+  --raw-result results/raw-result.json `
+  --receipt results/raw-result-upload.json
+```
+
+Review the preview and repeat with `--execute`. This final conditional upload
+writes `runs/<run-id>/raw-result.json`, the stable discovery object expected by
+orchestration. The raw manifest is deliberately published last: a reader can
+only discover a run after every object it declares has already been uploaded and
+read-back verified. Control-plane v2 parsing, approval, and native dispatch
+remain separate integration boundaries.
 
 Recorded snapshots are accepted only through an explicit option for tests and
 offline troubleshooting:
