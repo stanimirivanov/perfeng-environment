@@ -155,7 +155,12 @@ Review the preview and repeat with `--execute`. This final conditional upload
 writes `runs/<run-id>/raw-result.json`, the stable discovery object expected by
 orchestration. The raw manifest is deliberately published last: a reader can
 only discover a run after every object it declares has already been uploaded and
-read-back verified. Control-plane v2 parsing, approval, and native dispatch
+read-back verified. Every uploaded object preserves its declared content type and
+immutable reference metadata (`artifact-id`, `sha256`, and `format`); publication
+verifies that metadata through a separate object read before writing the local
+receipt. The stable raw-result object therefore exposes the complete reference
+fields needed by a trusted control-plane discovery adapter without requiring a
+bucket listing or invented identity. Control-plane discovery and native dispatch
 remain separate integration boundaries.
 
 Recorded snapshots are accepted only through an explicit option for tests and

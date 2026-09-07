@@ -180,6 +180,27 @@ class BrowserUploadTests(unittest.TestCase):
         self.assertTrue(container["securityContext"]["readOnlyRootFilesystem"])
         self.assertEqual(container["securityContext"]["capabilities"], {"drop": ["ALL"]})
 
+    def test_upload_script_persists_and_verifies_reference_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "raw-result.json"
+            path.write_bytes(b"exact raw result bytes\n")
+            reference = browser_upload.artifact_reference(RUN_ID, "raw-result", path)
+
+            script = browser_upload.upload_script(reference)
+
+            self.assertIn('--content-type "application/json"', script)
+            self.assertIn(
+                '--metadata "artifact-id='
+                f'{reference["id"]},sha256={reference["sha256"]},format=raw-result/v2"',
+                script,
+            )
+            self.assertIn("--query ContentLength", script)
+            self.assertIn("--query ContentType", script)
+            self.assertIn("--query 'Metadata.\"artifact-id\"'", script)
+            self.assertIn("--query Metadata.sha256", script)
+            self.assertIn("--query Metadata.format", script)
+            self.assertEqual(script.count("head-object"), 5)
+
     def test_execute_uploads_conditionally_verifies_and_writes_once(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -204,6 +225,9 @@ class BrowserUploadTests(unittest.TestCase):
             scripts = [command[-1] for command, _ in commands if command[-2:-1] == ["-c"]]
             self.assertEqual(sum("--if-none-match" in script for script in scripts), 2)
             self.assertEqual(sum("sha256sum -c" in script for script in scripts), 2)
+            self.assertEqual(sum("--content-type" in script for script in scripts), 2)
+            self.assertEqual(sum("--metadata" in script for script in scripts), 2)
+            self.assertEqual(sum(script.count("head-object") for script in scripts), 10)
             self.assertTrue(
                 any(
                     any(

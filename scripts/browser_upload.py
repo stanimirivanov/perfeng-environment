@@ -304,9 +304,14 @@ def upload_script(reference: dict[str, Any]) -> str:
     return f"""set -eu
 printf '[default]\\ns3 =\\n    addressing_style = path\\n' > /tmp/awsconfig
 aws_s3() {{ aws --endpoint-url "{store.ENDPOINT}" --cli-connect-timeout 10 --cli-read-timeout 60 s3api "$@"; }}
-aws_s3 put-object --bucket "{store.BUCKET}" --key "{key}" --body /tmp/source --if-none-match "*" >/dev/null
+aws_s3 put-object --bucket "{store.BUCKET}" --key "{key}" --body /tmp/source --if-none-match "*" --content-type "{reference["mediaType"]}" --metadata "artifact-id={reference["id"]},sha256={reference["sha256"]},format={reference["format"]}" >/dev/null
 aws_s3 get-object --bucket "{store.BUCKET}" --key "{key}" /tmp/download >/dev/null
 printf '{reference["sha256"]}  /tmp/download\\n' | sha256sum -c - >/dev/null
+test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query ContentLength --output text)" = "{reference["sizeBytes"]}"
+test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query ContentType --output text)" = "{reference["mediaType"]}"
+test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query 'Metadata.\"artifact-id\"' --output text)" = "{reference["id"]}"
+test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query Metadata.sha256 --output text)" = "{reference["sha256"]}"
+test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query Metadata.format --output text)" = "{reference["format"]}"
 rm -f /tmp/source /tmp/download
 """
 
