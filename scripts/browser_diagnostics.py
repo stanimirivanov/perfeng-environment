@@ -62,12 +62,12 @@ def validate_reference(
         artifact_id = str(uuid.UUID(str(reference["id"])))
     except (ValueError, AttributeError, TypeError):
         raise ValueError(f"upload artifact {role} has an invalid ID") from None
-    filename, media_type, artifact_format = browser_upload.ROLE_DETAILS[role]
+    _, media_type, artifact_format = browser_upload.ROLE_DETAILS[role]
     expected = {
         "id": artifact_id,
         "runId": run_id,
         "kind": "raw",
-        "uri": (f"s3://{browser_upload.store.BUCKET}/runs/{run_id}/raw/browser/{filename}"),
+        "uri": browser_upload.object_uri(run_id, role),
         **file_integrity(path),
         "mediaType": media_type,
         "format": artifact_format,
@@ -98,8 +98,7 @@ def upload_references(
         by_uri[uri] = candidate
     result = {}
     for role, path in inputs:
-        filename = browser_upload.ROLE_DETAILS[role][0]
-        uri = f"s3://{browser_upload.store.BUCKET}/runs/{run_id}/raw/browser/{filename}"
+        uri = browser_upload.object_uri(run_id, role)
         if uri not in by_uri:
             raise ValueError(f"Upload receipt is missing the {role} artifact")
         result[role] = validate_reference(by_uri[uri], run_id, role, path)
@@ -115,9 +114,9 @@ def runner_artifacts(
     paths: dict[str, Path],
 ) -> dict[str, Any]:
     receipt = mapping(value, "runner receipt")
-    exact_keys(receipt, "runner receipt", {"schema", "runId", "testId", "artifacts"})
+    exact_keys(receipt, "runner receipt", {"schema", "runId", "testId", "producer", "artifacts"})
     if (
-        receipt["schema"] != "playwright-runner-receipt/v1"
+        receipt["schema"] != "playwright-runner-receipt/v2"
         or receipt["runId"] != measurements["runId"]
         or receipt["testId"] != measurements["testId"]
     ):
@@ -125,6 +124,7 @@ def runner_artifacts(
     artifacts = mapping(receipt["artifacts"], "runner receipt artifacts")
     mode = measurements["diagnosticMode"]
     expected_keys = {
+        "baseline": {"measurements"},
         "lightweight": {"measurements", "observations"},
         "trace": {"measurements", "trace"},
         "smoothness": {"measurements", "trace"},
@@ -153,7 +153,7 @@ def runner_artifacts(
         _, end = timestamp(trace["finishedAt"], "runner trace end")
         if start >= end:
             raise ValueError("Runner trace start must precede its end")
-    else:
+    elif mode == "memory":
         memory = mapping(artifacts["memory"], "runner memory")
         exact_keys(memory, "runner memory", {"captureIterations", "before", "after"})
         iterations = memory["captureIterations"]
