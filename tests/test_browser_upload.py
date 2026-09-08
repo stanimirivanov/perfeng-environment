@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import browser_upload
+from scripts import artifact_upload, browser_upload
 
 RUN_ID = "perf-20260902-130000-a1b2c3d5"
 
@@ -89,6 +89,15 @@ class BrowserUploadTests(unittest.TestCase):
                 f"s3://perfeng-artifacts/runs/{RUN_ID}/raw/browser/playwright-measurements.json",
             )
             self.assertEqual(reference["format"], "playwright-measurements/v2")
+
+            with self.assertRaisesRegex(ValueError, "unsafe or outside"):
+                artifact_upload.artifact_reference(
+                    RUN_ID,
+                    path,
+                    f"s3://perfeng-artifacts/outside/{RUN_ID}/measurements.json",
+                    "application/json",
+                    "playwright-measurements/v2",
+                )
 
     def test_accepts_diagnostic_manifest_with_run_scoped_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -214,10 +223,10 @@ class BrowserUploadTests(unittest.TestCase):
                 return ""
 
             with (
-                patch.object(browser_upload.cluster, "verify_local_docker"),
-                patch.object(browser_upload.cluster, "verify_context"),
-                patch.object(browser_upload.storage_access, "ensure_credentials"),
-                patch.object(browser_upload.cluster, "run", side_effect=run),
+                patch.object(artifact_upload.cluster, "verify_local_docker"),
+                patch.object(artifact_upload.cluster, "verify_context"),
+                patch.object(artifact_upload.storage_access, "ensure_credentials"),
+                patch.object(artifact_upload.cluster, "run", side_effect=run),
             ):
                 result = browser_upload.execute(run_id, inputs, receipt)
 
@@ -249,7 +258,9 @@ class BrowserUploadTests(unittest.TestCase):
 
             with (
                 patch.object(
-                    browser_upload.cluster, "verify_local_docker", side_effect=ValueError("offline")
+                    artifact_upload.cluster,
+                    "verify_local_docker",
+                    side_effect=ValueError("offline"),
                 ),
                 self.assertRaisesRegex(ValueError, "offline"),
             ):
