@@ -1,22 +1,20 @@
 """Publish native browser artifacts through the restricted local S3 identity."""
 
 import argparse
-import hashlib
 import json
 import re
-import uuid
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 if __package__:
-    from . import cluster, storage_access
+    from . import artifact_upload, cluster
     from . import object_store as store
 else:
+    import artifact_upload
     import cluster
     import object_store as store
-    import storage_access
 
 RUN_ID_PATTERN = re.compile(r"perf-[0-9]{8}-[0-9]{6}-[a-f0-9]{8}")
 ROLE_DETAILS = {
@@ -203,117 +201,17 @@ def raw_result_input(path: Path) -> tuple[str, list[tuple[str, Path]]]:
 
 def artifact_reference(run_id: str, role: str, path: Path) -> dict[str, Any]:
     filename, media_type, artifact_format = ROLE_DETAILS[role]
-    content = path.read_bytes()
-    return {
-        "id": str(uuid.uuid4()),
-        "runId": run_id,
-        "kind": "raw",
-        "uri": object_uri(run_id, role),
-        "sha256": hashlib.sha256(content).hexdigest(),
-        "sizeBytes": len(content),
-        "mediaType": media_type,
-        "format": artifact_format,
-    }
+    return artifact_upload.artifact_reference(
+        run_id, path, object_uri(run_id, role), media_type, artifact_format
+    )
 
 
 def upload_pod(name: str, root: Path) -> dict[str, Any]:
-    values = yaml.safe_load((root / "charts/seaweedfs/values.yaml").read_text(encoding="utf-8"))
-    image = values["clientImage"]
-    if (
-        not isinstance(image, str)
-        or re.fullmatch(r"amazon/aws-cli:[0-9.]+@sha256:[0-9a-f]{64}", image) is None
-    ):
-        raise ValueError("S3 client image must use the pinned official AWS CLI repository")
-    return {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": name,
-            "namespace": store.NAMESPACE,
-            "labels": {"app.kubernetes.io/managed-by": store.OWNER},
-        },
-        "spec": {
-            "restartPolicy": "Never",
-            "automountServiceAccountToken": False,
-            "activeDeadlineSeconds": 600,
-            "nodeSelector": {"workload": "control-plane"},
-            "tolerations": [
-                {
-                    "key": "node-role.kubernetes.io/control-plane",
-                    "operator": "Exists",
-                    "effect": "NoSchedule",
-                }
-            ],
-            "securityContext": {
-                "runAsNonRoot": True,
-                "runAsUser": 1000,
-                "runAsGroup": 1000,
-                "fsGroup": 1000,
-                "seccompProfile": {"type": "RuntimeDefault"},
-            },
-            "containers": [
-                {
-                    "name": "upload",
-                    "image": image,
-                    "command": ["/bin/sh", "-c", "sleep 600"],
-                    "env": [
-                        {
-                            "name": "AWS_ACCESS_KEY_ID",
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": storage_access.UPLOADER_SECRET,
-                                    "key": "access-key",
-                                }
-                            },
-                        },
-                        {
-                            "name": "AWS_SECRET_ACCESS_KEY",
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": storage_access.UPLOADER_SECRET,
-                                    "key": "secret-key",
-                                }
-                            },
-                        },
-                        {"name": "HOME", "value": "/tmp"},
-                        {"name": "AWS_CONFIG_FILE", "value": "/tmp/awsconfig"},
-                        {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
-                        {"name": "AWS_EC2_METADATA_DISABLED", "value": "true"},
-                        {"name": "AWS_PAGER", "value": ""},
-                        {"name": "AWS_MAX_ATTEMPTS", "value": "2"},
-                    ],
-                    "securityContext": {
-                        "readOnlyRootFilesystem": True,
-                        "allowPrivilegeEscalation": False,
-                        "capabilities": {"drop": ["ALL"]},
-                    },
-                    "resources": {
-                        "requests": {"cpu": "100m", "memory": "128Mi"},
-                        "limits": {"cpu": "500m", "memory": "256Mi"},
-                    },
-                    "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}],
-                }
-            ],
-            "volumes": [{"name": "tmp", "emptyDir": {}}],
-        },
-    }
+    return artifact_upload.upload_pod(name, root)
 
 
 def upload_script(reference: dict[str, Any]) -> str:
-    key = reference["uri"].split(f"s3://{store.BUCKET}/", 1)[1]
-    return f"""set -eu
-printf '[default]\\ns3 =\\n    addressing_style = path\\n' > /tmp/awsconfig
-aws_s3() {{ aws --endpoint-url "{store.ENDPOINT}" --cli-connect-timeout 10 --cli-read-timeout 60 s3api "$@"; }}
-aws_s3 put-object --bucket "{store.BUCKET}" --key "{key}" --body /tmp/source --if-none-match "*" --content-type "{reference["mediaType"]}" --metadata "artifact-id={reference["id"]},sha256={reference["sha256"]},format={reference["format"]}" >/dev/null
-aws_s3 get-object --bucket "{store.BUCKET}" --key "{key}" /tmp/download >/dev/null
-printf '{reference["sha256"]}  /tmp/download\\n' | sha256sum -c - >/dev/null
-test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query ContentLength --output text)" = "{reference["sizeBytes"]}"
-test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query ContentType --output text)" = "{reference["mediaType"]}"
-test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query 'Metadata.\"artifact-id\"' --output text)" = "{reference["id"]}"
-test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query Metadata.sha256 --output text)" = "{reference["sha256"]}"
-test "$(aws_s3 head-object --bucket "{store.BUCKET}" --key "{key}" --query Metadata.format --output text)" = "{reference["format"]}"
-rm -f /tmp/source /tmp/download
-"""
+    return artifact_upload.upload_script(reference)
 
 
 def execute(
@@ -322,46 +220,23 @@ def execute(
     receipt_path: Path,
     root: Path = cluster.ROOT,
 ) -> dict[str, Any]:
-    if receipt_path.is_symlink():
-        raise ValueError("Receipt path must not be a symbolic link")
-    receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    receipt = receipt_path.open("xb")
-    completed = False
-    pod_name = f"browser-upload-{uuid.uuid4().hex[:16]}"
-    try:
-        document = upload_pod(pod_name, root)
-        references = [artifact_reference(run_id, role, path) for role, path in inputs]
-        cluster.verify_local_docker()
-        cluster.verify_context(root)
-        storage_access.ensure_credentials(root, create=False)
-        kube = store.kubectl(root)
-        cluster.run([*kube, "rollout", "status", "statefulset/seaweedfs", "--timeout=300s"])
-        cluster.run([*kube, "create", "-f", "-"], input_data=json.dumps(document).encode("utf-8"))
-        cluster.run([*kube, "wait", "--for=condition=Ready", f"pod/{pod_name}", "--timeout=120s"])
-        print(f"Publishing {len(inputs)} browser artifacts with Pod {pod_name}...", flush=True)
-        for (role, path), reference in zip(inputs, references, strict=True):
-            print(f"Uploading {role} ({reference['sizeBytes']} bytes)...", flush=True)
-            cluster.run(
-                [*kube, "exec", "-i", pod_name, "--", "sh", "-c", "umask 077; cat > /tmp/source"],
-                input_data=path.read_bytes(),
-            )
-            cluster.run([*kube, "exec", pod_name, "--", "sh", "-c", upload_script(reference)])
-        result = {"schema": "local-browser-upload/v1", "runId": run_id, "artifacts": references}
-        receipt.write((json.dumps(result, indent=2) + "\n").encode("utf-8"))
-        receipt.close()
-        completed = True
-        try:
-            cluster.run([*kube, "delete", "pod", pod_name, "--wait=true", "--timeout=60s"])
-        except ValueError:
-            print(f"Artifacts are verified; remove retained Pod {pod_name} manually.", flush=True)
-        print(f"Published and verified {len(references)} browser artifacts.", flush=True)
-        return result
-    finally:
-        if not receipt.closed:
-            receipt.close()
-        if not completed:
-            receipt_path.unlink(missing_ok=True)
-            print(f"Upload did not complete; inspect Pod {pod_name} if it was created.", flush=True)
+    sources = [
+        artifact_upload.Source(role, path, artifact_reference(run_id, role, path))
+        for role, path in inputs
+    ]
+    return artifact_upload.publish(
+        run_id,
+        sources,
+        receipt_path,
+        lambda items: {
+            "schema": "local-browser-upload/v1",
+            "runId": run_id,
+            "artifacts": [item.reference for item in items],
+        },
+        pod_prefix="browser-upload",
+        subject="browser",
+        root=root,
+    )
 
 
 def main() -> int:

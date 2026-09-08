@@ -20,6 +20,9 @@ The local browser uploader publishes those exact bytes through the restricted
 storage identity and returns verified immutable artifact references.
 The browser-diagnostics assembler binds those references to the runner's
 versioned capture receipt without inferring missing evidence.
+The [local kube-burner publisher](docs/local-kube-burner.md) validates a completed
+pod-startup capture, stores its three immutable evidence files, and writes the
+exact receipt request consumed by the `perfeng-k8s` raw-manifest assembler.
 
 ## Layout
 
