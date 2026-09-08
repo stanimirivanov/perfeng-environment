@@ -9,12 +9,13 @@ from typing import Any
 import yaml
 
 if __package__:
-    from . import artifact_upload, cluster
+    from . import artifact_upload, cluster, raw_result_upload
     from . import object_store as store
 else:
     import artifact_upload
     import cluster
     import object_store as store
+    import raw_result_upload
 
 RUN_ID_PATTERN = re.compile(r"perf-[0-9]{8}-[0-9]{6}-[a-f0-9]{8}")
 ROLE_DETAILS = {
@@ -173,30 +174,8 @@ def diagnostic_input(path: Path) -> tuple[str, list[tuple[str, Path]]]:
 
 
 def raw_result_input(path: Path) -> tuple[str, list[tuple[str, Path]]]:
-    path = input_file(path, "raw result")
-    manifest = read_json(path, "raw result")
-    run_id = manifest.get("runId")
-    if not isinstance(run_id, str) or RUN_ID_PATTERN.fullmatch(run_id) is None:
-        raise ValueError("Raw result contains an invalid run ID")
-    if (
-        manifest.get("schemaVersion") != 2
-        or manifest.get("kind") != "RawResult"
-        or manifest.get("contractsVersion") != "0.12.0"
-    ):
-        raise ValueError("Expected RawResult v2")
-    artifacts = manifest.get("artifacts")
-    if (
-        not isinstance(artifacts, list)
-        or not artifacts
-        or any(
-            not isinstance(artifact, dict)
-            or artifact.get("runId") != run_id
-            or artifact.get("kind") != "raw"
-            for artifact in artifacts
-        )
-    ):
-        raise ValueError("Raw result does not declare run-scoped raw evidence")
-    return run_id, [("raw-result", path)]
+    run_id, resolved = raw_result_upload.manifest_input(path, {"0.12.0"})
+    return run_id, [("raw-result", resolved)]
 
 
 def artifact_reference(run_id: str, role: str, path: Path) -> dict[str, Any]:

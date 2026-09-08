@@ -52,6 +52,23 @@ uv run --locked python -m scripts.manifest `
 
 The local receipt proves that the uploader verified what it wrote at publication
 time. The assembler independently rechecks the frozen local bytes and contract
-semantics. Durable production storage, object locking, per-run credentials, raw
-manifest publication, registration, normalization, and retention remain later
-boundaries.
+semantics.
+
+Publish the assembled manifest last at the stable discovery key:
+
+```powershell
+Set-Location ..\perfeng-environment
+uv run --locked python scripts/raw_result_upload.py `
+  ..\perfeng-k8s\.local\raw-result.json `
+  --receipt .local\kube-burner-raw-result-upload.json
+```
+
+Review the preview and repeat with `--execute`. The publisher accepts only the
+reviewed contracts 0.12 and 0.13 raw-result/v2 envelopes, requires unique
+run-scoped raw artifact identities and locations, and writes
+`runs/<run-id>/raw-result.json` only after all declared evidence is durable.
+Publication is conditional and the object is read back before its local receipt
+is committed.
+
+Durable production storage, object locking, per-run credentials, registration,
+normalization, and retention remain later boundaries.

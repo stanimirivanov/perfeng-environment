@@ -137,7 +137,18 @@ class BrowserUploadTests(unittest.TestCase):
                         "kind": "RawResult",
                         "contractsVersion": "0.12.0",
                         "runId": RUN_ID,
-                        "artifacts": [{"runId": RUN_ID, "kind": "raw"}],
+                        "artifacts": [
+                            {
+                                "id": "11111111-1111-4111-8111-111111111111",
+                                "runId": RUN_ID,
+                                "kind": "raw",
+                                "uri": f"s3://perfeng-artifacts/runs/{RUN_ID}/raw/browser/input.json",
+                                "sha256": "a" * 64,
+                                "sizeBytes": 123,
+                                "mediaType": "application/json",
+                                "format": "playwright-measurements/v2",
+                            }
+                        ],
                     }
                 ),
                 encoding="utf-8",
