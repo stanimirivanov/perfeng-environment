@@ -84,8 +84,9 @@ Redeploy reuses credentials. Missing credentials alongside an existing PVC or
 StatefulSet cause refusal rather than silent regeneration.
 
 The bootstrap identity has administrative access. The local k6 uploader now uses
-a [separate restricted identity](storage-access.md). Chart 0.2.0 mounts the
-additive server configuration Secret; the original bootstrap Secret is retained.
+a [separate restricted identity](storage-access.md). Chart 0.3.0 mounts the v3
+additive server configuration Secret with read-only policy-object access; the
+original bootstrap Secret and superseded v2 server Secret are retained.
 Deploy creates/reuses the restricted Secret pair before upgrading the chart. TLS,
 encryption at rest, and NetworkPolicy enforcement are not configured. Kubernetes
 Secret-read/pod-exec privileges confer storage-admin access. Do not expose this
