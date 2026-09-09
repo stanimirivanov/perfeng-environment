@@ -60,8 +60,15 @@ def artifact_reference(
     }
 
 
-def upload_pod(name: str, root: Path) -> dict[str, Any]:
-    """Build the bounded uploader Pod using only the restricted credentials."""
+def upload_pod(
+    name: str,
+    root: Path,
+    *,
+    credential_secret: str = storage_access.UPLOADER_SECRET,
+) -> dict[str, Any]:
+    """Build a bounded transfer Pod using the selected S3 credentials."""
+    if re.fullmatch(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?", credential_secret) is None:
+        raise ValueError("S3 credential Secret name is invalid")
     values = yaml.safe_load((root / "charts/seaweedfs/values.yaml").read_text(encoding="utf-8"))
     image = values["clientImage"]
     if (
@@ -106,7 +113,7 @@ def upload_pod(name: str, root: Path) -> dict[str, Any]:
                             "name": "AWS_ACCESS_KEY_ID",
                             "valueFrom": {
                                 "secretKeyRef": {
-                                    "name": storage_access.UPLOADER_SECRET,
+                                    "name": credential_secret,
                                     "key": "access-key",
                                 }
                             },
@@ -115,7 +122,7 @@ def upload_pod(name: str, root: Path) -> dict[str, Any]:
                             "name": "AWS_SECRET_ACCESS_KEY",
                             "valueFrom": {
                                 "secretKeyRef": {
-                                    "name": storage_access.UPLOADER_SECRET,
+                                    "name": credential_secret,
                                     "key": "secret-key",
                                 }
                             },
