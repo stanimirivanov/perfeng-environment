@@ -50,7 +50,7 @@ ACTIVE = json.dumps(
 
 
 class StorageAccessTests(unittest.TestCase):
-    def test_policy_is_object_get_put_only_under_runs(self):
+    def test_policy_allows_run_uploads_and_read_only_policy_access(self):
         statement = access.policy()["Statement"]
         self.assertEqual(
             statement,
@@ -59,7 +59,12 @@ class StorageAccessTests(unittest.TestCase):
                     "Effect": "Allow",
                     "Action": ["s3:GetObject", "s3:PutObject"],
                     "Resource": ["arn:aws:s3:::perfeng-artifacts/runs/*"],
-                }
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": ["s3:GetObject"],
+                    "Resource": ["arn:aws:s3:::perfeng-artifacts/policies/*"],
+                },
             ],
         )
         config = access.server_config(BOOT, UPLOAD)
@@ -163,6 +168,10 @@ class StorageAccessTests(unittest.TestCase):
             script,
         )
         self.assertIn("AccessDenied|Forbidden|403", script)
+        self.assertIn(
+            'denied put-object --bucket "perfeng-artifacts" --key "policies/access-check/',
+            script,
+        )
         self.assertNotIn("delete-bucket", script)
         self.assertNotIn("put-bucket-policy", script)
         with self.assertRaises(ValueError):

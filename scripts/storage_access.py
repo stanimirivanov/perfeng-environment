@@ -19,7 +19,7 @@ else:
     import object_store as store
 
 UPLOADER_SECRET = "perfeng-s3-uploader-auth"
-SERVER_SECRET = "perfeng-s3-server-auth-v2"
+SERVER_SECRET = "perfeng-s3-server-auth-v3"
 POLICY = "local-artifact-upload"
 
 
@@ -31,7 +31,12 @@ def policy() -> dict[str, Any]:
                 "Effect": "Allow",
                 "Action": ["s3:GetObject", "s3:PutObject"],
                 "Resource": [f"arn:aws:s3:::{store.BUCKET}/runs/*"],
-            }
+            },
+            {
+                "Effect": "Allow",
+                "Action": ["s3:GetObject"],
+                "Resource": [f"arn:aws:s3:::{store.BUCKET}/policies/*"],
+            },
         ],
     }
 
@@ -193,6 +198,7 @@ expected=$1
 set -- $(sha256sum /tmp/download)
 test "$1" = "$expected"
 denied delete-object --bucket "{store.BUCKET}" --key "runs/access-check/{probe}.bin"
+denied put-object --bucket "{store.BUCKET}" --key "policies/access-check/{probe}.bin" --body /tmp/source --if-none-match "*"
 denied put-object --bucket "{store.BUCKET}" --key "outside-runs/{probe}.bin" --body /tmp/source --if-none-match "*"
 denied get-object --bucket "{store.BUCKET}" --key "outside-runs/{probe}.bin" /tmp/forbidden
 denied list-objects-v2 --bucket "{store.BUCKET}" --max-keys 1
@@ -201,7 +207,7 @@ denied get-object --bucket "perfeng-access-denied" --key "runs/{probe}.bin" /tmp
 s3 get-object --bucket "{store.BUCKET}" --key "runs/access-check/{probe}.bin" /tmp/after >/dev/null
 set -- $(sha256sum /tmp/after)
 test "$1" = "$expected"
-echo "Allowed PUT/GET verified; DELETE, outside-prefix PUT/GET, listing and bucket-policy access denied."
+echo "Allowed run PUT/GET verified; policy PUT, DELETE, outside-prefix PUT/GET, listing and bucket-policy access denied."
 """
     job["spec"]["template"]["spec"]["containers"][0]["command"] = ["/bin/sh", "-c", script]
     return job

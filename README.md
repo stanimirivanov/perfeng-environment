@@ -11,7 +11,8 @@ with upload/download and restart-persistence checks.
 The [local k6 capture workflow](docs/local-k6-run.md) runs the digest-pinned
 checkout smoke workload and uploads checksum-verified raw artifacts to SeaweedFS.
 The uploader uses [restricted storage credentials](docs/storage-access.md);
-existing installations require the documented object-store upgrade.
+existing installations require the documented object-store upgrade. The same
+identity can read, but cannot publish, reviewed policy objects for reporting.
 A [native Windows browser-host profile](docs/windows-browser-host.md) defines
 and checks the controlled machine conditions used by Playwright measurements.
 The browser-environment assembler binds an accepted qualification to the actual

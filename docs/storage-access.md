@@ -1,11 +1,13 @@
 # Restricted local artifact uploader
 
-The k6 upload container uses perfeng-s3-uploader-auth, not the bootstrap
-administrator. Its static IAM policy permits only s3:GetObject and s3:PutObject
-for arn:aws:s3:::perfeng-artifacts/runs/*. There are no legacy Read/Write grants:
+Runtime transfer containers use perfeng-s3-uploader-auth, not the bootstrap
+administrator. Its static IAM policy permits s3:GetObject and s3:PutObject for
+arn:aws:s3:::perfeng-artifacts/runs/* and read-only s3:GetObject for
+arn:aws:s3:::perfeng-artifacts/policies/*. There are no legacy Read/Write grants:
 SeaweedFS's legacy Write action also covers deletion. Object listing, deletion,
-bucket administration and objects outside this resource scope are not granted.
-The k6 container itself still receives no storage credentials.
+policy writes, bucket administration and objects outside these resource scopes
+are not granted. Workload and analysis containers still receive no storage
+credentials.
 
 ## Upgrade an existing local installation
 
@@ -24,10 +26,14 @@ Deployment is additive:
 1. Validate and retain the existing immutable perfeng-s3-auth bootstrap Secret.
 2. Create a separate immutable perfeng-s3-uploader-auth Secret containing only
    the new uploader access key and secret key.
-3. Create immutable perfeng-s3-server-auth-v2 containing s3.json, which combines
+3. Create immutable perfeng-s3-server-auth-v3 containing s3.json, which combines
    the unchanged bootstrap identity with the uploader and its attached policy.
-4. Upgrade chart 0.2.0 to mount that server Secret. This restarts SeaweedFS;
+4. Upgrade chart 0.3.0 to mount that server Secret. This restarts SeaweedFS;
    schedule the upgrade when no captures are running. Its PVC is reused.
+
+An existing v2 server Secret is intentionally retained for rollback inspection;
+it is no longer mounted after the chart upgrade. The uploader access key and
+secret key are reused rather than rotated.
 
 Credentials are sent through private stdin, not command arguments, host files,
 Git, chart values or Helm release data. Helm owns neither Secret. Redeployment
@@ -46,9 +52,11 @@ The preview makes no cluster calls. Execution creates a bounded client Job
 using only the uploader Secret. It writes a unique runs/access-check/ probe,
 reads it back and verifies its SHA-256. It requires explicit access-denied
 responses for deletion of that same disposable probe, PUT/GET outside runs/,
-object listing, bucket-policy reads and a GET in another bucket. It rereads the
-probe to check it remains intact. Network errors and missing-object responses
-do not count as successful denial tests.
+PUT under policies/, object listing, bucket-policy reads and a GET in another
+bucket. It rereads the probe to check it remains intact. Network errors and
+missing-object responses do not count as successful denial tests. A later policy
+publication step verifies the corresponding allowed policy GET against real,
+checksum-pinned bytes.
 
 The deletion attempt targets only the newly created probe, never a run artifact
 or bucket. If authorization is broken, the probe might be deleted or an
@@ -63,7 +71,7 @@ the static server file.
 
 ## Boundaries and recovery
 
-This is a shared local uploader identity, not per-run or per-tenant isolation.
+This is a shared local runtime-transfer identity, not per-run or per-tenant isolation.
 It can read every run and can replace an existing run object if used without
 the uploader's conditional PUT. IAM PutObject is not append-only storage;
 Object Lock, versioning and stronger overwrite prevention remain future work.
