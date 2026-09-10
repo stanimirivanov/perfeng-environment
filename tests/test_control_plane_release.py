@@ -1,0 +1,128 @@
+from __future__ import annotations
+
+import copy
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from scripts.control_plane_release import load_lock, validate_deployment_source
+
+
+class ControlPlaneReleaseTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.path = Path(self.temporary.name) / "control-plane.json"
+        self.value: dict[str, Any] = {
+            "schemaVersion": 1,
+            "controlPlane": {
+                "sourceRepository": ("https://github.com/stanimirivanov/perfeng-control-plane.git"),
+                "sourceRevision": "1" * 40,
+                "image": ("ghcr.io/stanimirivanov/perfeng-control-plane@sha256:" + "2" * 64),
+            },
+            "deployment": {
+                "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
+                "revision": "3" * 40,
+                "chart": {"path": "charts/control-plane", "version": "0.2.0"},
+                "runtimeBundle": {
+                    "path": "bundles/local-kind-windows/1.1.0",
+                    "version": "1.1.0",
+                    "contractsVersion": "0.13.0",
+                },
+            },
+        }
+
+    def load(self):
+        self.path.write_text(json.dumps(self.value), encoding="utf-8")
+        return load_lock(self.path)
+
+    def test_loads_complete_immutable_selection(self) -> None:
+        lock = self.load()
+        self.assertEqual(lock.chart_version, "0.2.0")
+        self.assertIn("@sha256:", lock.image)
+
+    def test_rejects_mutable_or_ambiguous_identity(self) -> None:
+        cases = [
+            ("image", "ghcr.io/stanimirivanov/perfeng-control-plane:latest"),
+            ("sourceRevision", "main"),
+            ("chartPath", "../control-plane"),
+            ("bundleVersion", "1.2.0"),
+        ]
+        for field, value in cases:
+            with self.subTest(field=field):
+                candidate = copy.deepcopy(self.value)
+                if field in {"image", "sourceRevision"}:
+                    candidate["controlPlane"][field] = value
+                elif field == "chartPath":
+                    candidate["deployment"]["chart"]["path"] = value
+                else:
+                    candidate["deployment"]["runtimeBundle"]["version"] = value
+                self.path.write_text(json.dumps(candidate), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    load_lock(self.path)
+
+    def test_validates_chart_bundle_and_referenced_files(self) -> None:
+        lock = self.load()
+        files = {
+            "charts/control-plane/Chart.yaml": yaml.safe_dump(
+                {"name": "perfeng-control-plane", "version": "0.2.0"}
+            ).encode(),
+            "bundles/local-kind-windows/1.1.0/registry.json": json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "entries": [
+                        {
+                            "contractsVersion": "0.13.0",
+                            "policy": "policies/checkout.json",
+                            "executionTemplate": "jobs/execution.json",
+                        }
+                    ],
+                }
+            ).encode(),
+        }
+        for relative in [
+            "jobs/analysis.yaml",
+            "jobs/reporting.yaml",
+            "jobs/execution.json",
+            "policies/checkout.json",
+        ]:
+            files[f"bundles/local-kind-windows/1.1.0/{relative}"] = b"present"
+
+        def read(path: str) -> bytes:
+            try:
+                return files[path]
+            except KeyError as error:
+                raise ValueError("missing revision file") from error
+
+        validate_deployment_source(lock, read)
+
+        del files["bundles/local-kind-windows/1.1.0/jobs/analysis.yaml"]
+        with self.assertRaises(ValueError):
+            validate_deployment_source(lock, read)
+
+    def test_rejects_contract_drift_and_traversing_entry_paths(self) -> None:
+        lock = self.load()
+        chart = yaml.safe_dump({"name": "perfeng-control-plane", "version": "0.2.0"}).encode()
+        for entry in [
+            {"contractsVersion": "0.14.0", "policy": "policies/checkout.json"},
+            {"contractsVersion": "0.13.0", "policy": "../outside.json"},
+        ]:
+            manifest = json.dumps({"schemaVersion": 1, "entries": [entry]}).encode()
+
+            def read(path: str, registry: bytes = manifest) -> bytes:
+                if path.endswith("Chart.yaml"):
+                    return chart
+                if path.endswith("registry.json"):
+                    return registry
+                return b"present"
+
+            with self.assertRaises(ValueError):
+                validate_deployment_source(lock, read)
+
+
+if __name__ == "__main__":
+    unittest.main()
