@@ -29,6 +29,9 @@ pod-startup capture, stores its three immutable evidence files, and writes the
 exact receipt request consumed by the `perfeng-k8s` raw-manifest assembler. The
 shared raw-result publisher then writes the assembled manifest at the stable
 control-plane discovery key.
+The [local control-plane deployment lock](docs/local-control-plane.md) pins the
+published service image, reviewed Helm chart and runtime-registry bundle before
+cluster credentials or resources are introduced.
 
 ## Layout
 
@@ -114,10 +117,10 @@ cross-repository compatibility guarantee, or instruction to update existing
 checkouts. Current defaults are main. Only branch refs are supported in this
 manifest version; source snapshot/tag pinning can be introduced separately.
 
-Future environment composition must select immutable image digests, chart
-versions, and contract artifacts in separate deployment configuration. Do not
-put image tags or production versions in workspace.json. No such deployment
-lock or production environment is claimed by this change.
+Environment composition selects immutable image digests, chart versions, and
+contract artifacts in separate deployment configuration. Do not put image tags
+or production versions in workspace.json. The initial local control-plane lock
+does not claim a production environment or a successful deployment.
 
 ## Development
 

@@ -15,6 +15,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: perfeng-environment
+          persist-credentials: false
+      - name: Check out pinned control-plane deployment source
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+        with:
+          repository: stanimirivanov/perfeng-k8s
+          ref: c348e4ba66d13e6a7c73c6e9cb532f39431ad76a
+          token: ${{ secrets.PERFENG_REPOSITORIES_READ_TOKEN }}
+          path: perfeng-k8s
+          persist-credentials: false
+      - name: Check out pinned control-plane source
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v4
+        with:
+          repository: stanimirivanov/perfeng-control-plane
+          ref: 68d16756f1b29b60ae586e4281c489015fd8639b
+          token: ${{ secrets.PERFENG_REPOSITORIES_READ_TOKEN }}
+          path: perfeng-control-plane
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version-file: perfeng-environment/.python-version
@@ -32,6 +51,13 @@ jobs:
       - run: uv run --locked python scripts/workspace.py validate
         working-directory: perfeng-environment
       - run: uv run --locked python scripts/browser_host.py validate
+        working-directory: perfeng-environment
+      - name: Validate immutable control-plane deployment selection
+        if: runner.os == 'Linux'
+        run: >-
+          uv run --locked python scripts/control_plane_release.py validate
+          --k8s-root ../perfeng-k8s
+          --control-plane-root ../perfeng-control-plane
         working-directory: perfeng-environment
       - name: Install Helm for offline rendering
         if: runner.os == 'Linux'
