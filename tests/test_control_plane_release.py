@@ -6,17 +6,24 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import yaml
 
-from scripts.control_plane_release import load_lock, validate_deployment_source
+from scripts.control_plane_release import (
+    DEPLOYMENT_REPOSITORY,
+    load_lock,
+    revision_reader,
+    validate_deployment_source,
+)
 
 
 class ControlPlaneReleaseTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.path = Path(self.temporary.name) / "control-plane.json"
+        self.root = Path(self.temporary.name)
+        self.path = self.root / "control-plane.json"
         self.value: dict[str, Any] = {
             "schemaVersion": 1,
             "controlPlane": {
@@ -103,6 +110,22 @@ class ControlPlaneReleaseTests(unittest.TestCase):
         del files["bundles/local-kind-windows/1.1.0/jobs/analysis.yaml"]
         with self.assertRaises(ValueError):
             validate_deployment_source(lock, read)
+
+    def test_revision_reader_accepts_parent_relative_checkout_path(self) -> None:
+        environment = self.root / "perfeng-environment"
+        repository = self.root / "perfeng-k8s"
+        environment.mkdir()
+        repository.mkdir()
+        sibling_path = environment / ".." / "perfeng-k8s"
+
+        with patch(
+            "scripts.control_plane_release.git",
+            side_effect=[DEPLOYMENT_REPOSITORY.encode(), b"commit\n"],
+        ) as git:
+            read = revision_reader(sibling_path, DEPLOYMENT_REPOSITORY, "3" * 40)
+
+        self.assertTrue(callable(read))
+        self.assertEqual(git.call_args_list[0].args[0], repository.resolve())
 
     def test_rejects_contract_drift_and_traversing_entry_paths(self) -> None:
         lock = self.load()

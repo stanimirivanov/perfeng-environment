@@ -147,9 +147,10 @@ def git(root: Path, *arguments: str) -> bytes:
 
 def revision_reader(root: Path, repository: str, revision: str) -> Callable[[str], bytes]:
     """Return a reader for tracked files at one verified repository revision."""
-    root = root.absolute()
-    resolved = root.resolve(strict=True)
-    if not root.is_dir() or root.is_symlink() or resolved != root:
+    if root.is_symlink() or root.is_junction():
+        raise ValueError("Deployment source must be an ordinary repository directory")
+    root = root.resolve(strict=True)
+    if not root.is_dir():
         raise ValueError("Deployment source must be an ordinary repository directory")
     origin = git(root, "remote", "get-url", "origin").decode("utf-8").strip()
     if canonical_origin(origin) != canonical_origin(repository):
