@@ -38,6 +38,21 @@ class ControlPlaneRuntimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runtime.validate_resource(stored, expected)
 
+    def test_unchanged_resource_retains_its_creation_revision(self) -> None:
+        expected = runtime.object_document("ConfigMap", "example", {"key": "value"}, RELEASE)
+        stored = {
+            **expected,
+            "metadata": {
+                **expected["metadata"],
+                "annotations": {"perfeng.io/deployment-revision": "c" * 40},
+            },
+        }
+
+        runtime.validate_resource(stored, expected)
+        stored["metadata"]["annotations"]["perfeng.io/deployment-revision"] = "main"
+        with self.assertRaises(ValueError):
+            runtime.validate_resource(stored, expected)
+
     def test_registry_files_come_from_locked_revision(self) -> None:
         documents = {
             "bundle/1.0.0/registry.json": json.dumps(

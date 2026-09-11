@@ -15,6 +15,7 @@ if __package__:
     from .control_plane_release import (
         DEFAULT_K8S_ROOT,
         DEPLOYMENT_REPOSITORY,
+        REVISION,
         DeploymentLock,
         revision_reader,
     )
@@ -29,6 +30,7 @@ else:
     from control_plane_release import (
         DEFAULT_K8S_ROOT,
         DEPLOYMENT_REPOSITORY,
+        REVISION,
         DeploymentLock,
         revision_reader,
     )
@@ -190,17 +192,20 @@ def stored_data(value: dict[str, Any], kind: str) -> dict[str, str]:
 
 
 def validate_resource(value: dict[str, Any], expected: dict[str, Any]) -> None:
-    """Require an existing immutable resource to match all environment-owned bytes."""
+    """Require an immutable resource with owned bytes and recorded Git provenance."""
     kind = expected["kind"]
     source = "data" if kind == "ConfigMap" else "stringData"
+    provenance = (
+        value.get("metadata", {}).get("annotations", {}).get("perfeng.io/deployment-revision")
+    )
     if (
         value.get("kind") != kind
         or value.get("immutable") is not True
         or value.get("metadata", {}).get("name") != expected["metadata"]["name"]
         or value.get("metadata", {}).get("namespace") != postgres.NAMESPACE
         or value.get("metadata", {}).get("labels") != expected["metadata"]["labels"]
-        or value.get("metadata", {}).get("annotations", {}).get("perfeng.io/deployment-revision")
-        != expected["metadata"]["annotations"]["perfeng.io/deployment-revision"]
+        or not isinstance(provenance, str)
+        or REVISION.fullmatch(provenance) is None
         or stored_data(value, kind) != expected[source]
     ):
         raise ValueError(

@@ -137,7 +137,9 @@ S3 credentials are copied from their validated environment-owned Secrets. The
 mounted authentication document contains only a SHA-256 token digest; the raw
 local-operator token is retained as a separate, non-mounted Secret key for the
 later smoke client. Existing resources must match every owned byte and are never
-updated or rotated implicitly.
+updated or rotated implicitly. Their creation-revision annotation remains
+historical provenance when a later chart-only deployment commit selects the
+same runtime bytes; advancing the chart does not rotate credentials.
 
 ## Service deployment and operational acceptance
 
