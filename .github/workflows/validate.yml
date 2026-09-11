@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: stanimirivanov/perfeng-k8s
-          ref: c348e4ba66d13e6a7c73c6e9cb532f39431ad76a
+          ref: 7a1c23bb150ddb44ed7610ed6ed47f2caa6c2430
           token: ${{ secrets.PERFENG_REPOSITORIES_READ_TOKEN }}
           path: perfeng-k8s
           persist-credentials: false

@@ -7,10 +7,10 @@
   },
   "deployment": {
     "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
-    "revision": "c348e4ba66d13e6a7c73c6e9cb532f39431ad76a",
+    "revision": "7a1c23bb150ddb44ed7610ed6ed47f2caa6c2430",
     "chart": {
       "path": "charts/control-plane",
-      "version": "0.2.0"
+      "version": "0.3.0"
     },
     "runtimeBundle": {
       "path": "bundles/local-kind-windows/1.1.0",
