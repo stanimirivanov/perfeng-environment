@@ -47,7 +47,7 @@ class ControlPlaneRegistryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
 
     def test_secret_round_trip_is_single_registry_and_immutable(self) -> None:
         value = stored_secret()
