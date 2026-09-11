@@ -137,6 +137,16 @@ def validate_job(value: dict[str, Any], release: DeploymentLock) -> None:
         pod = spec["template"]["spec"]
         expected_pod = expected_spec["template"]["spec"]
         expected_labels = expected_spec["template"]["metadata"]["labels"]
+        containers = pod["containers"]
+        expected_containers = expected_pod["containers"]
+        if len(containers) != 1 or len(expected_containers) != 1:
+            raise ValueError()
+        container = containers[0]
+        expected_container = expected_containers[0]
+        defaulted_container_fields = {
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+        }
         if (
             value["metadata"]["name"] != expected["metadata"]["name"]
             or value["metadata"]["namespace"] != expected["metadata"]["namespace"]
@@ -148,7 +158,21 @@ def validate_job(value: dict[str, Any], release: DeploymentLock) -> None:
                 spec["template"]["metadata"]["labels"].get(key) != expected_value
                 for key, expected_value in expected_labels.items()
             )
-            or any(pod.get(key) != expected_value for key, expected_value in expected_pod.items())
+            or any(
+                pod.get(key) != expected_value
+                for key, expected_value in expected_pod.items()
+                if key != "containers"
+            )
+            or any(
+                container.get(key) != expected_value
+                for key, expected_value in expected_container.items()
+            )
+            or not set(container) - set(expected_container) <= set(defaulted_container_fields)
+            or any(
+                container.get(key) != expected_value
+                for key, expected_value in defaulted_container_fields.items()
+                if key in container
+            )
         ):
             raise ValueError()
     except (KeyError, TypeError, ValueError):

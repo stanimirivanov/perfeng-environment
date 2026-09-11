@@ -45,6 +45,19 @@ class ControlPlaneMigrationTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 migration.validate_job(job, RELEASE)
 
+    def test_known_kubernetes_container_defaults_are_accepted(self) -> None:
+        job = migration.job_document(RELEASE)
+        container = job["spec"]["template"]["spec"]["containers"][0]
+        container["terminationMessagePath"] = "/dev/termination-log"
+        container["terminationMessagePolicy"] = "File"
+        migration.validate_job(job, RELEASE)
+
+    def test_unowned_container_arguments_are_rejected(self) -> None:
+        job = migration.job_document(RELEASE)
+        job["spec"]["template"]["spec"]["containers"][0]["args"] = ["unexpected"]
+        with self.assertRaises(ValueError):
+            migration.validate_job(job, RELEASE)
+
     def test_runtime_grants_are_exact_and_transactional(self) -> None:
         with patch("scripts.control_plane_migration.control_plane_database.psql") as psql:
             migration.grant_runtime(cluster.ROOT)
