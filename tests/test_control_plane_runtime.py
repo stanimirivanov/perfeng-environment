@@ -77,6 +77,34 @@ class ControlPlaneRuntimeTests(unittest.TestCase):
             },
         )
 
+    def test_registry_paths_preserve_mount_layout(self) -> None:
+        manifest = json.dumps(
+            {
+                "entries": [
+                    {
+                        "policy": "policies/example.json",
+                        "executionTemplate": "jobs/execution.json",
+                    }
+                ]
+            }
+        ).encode()
+        with patch(
+            "scripts.control_plane_runtime.revision_reader",
+            return_value=lambda _path: manifest,
+        ):
+            paths = runtime.registry_paths(RELEASE)
+
+        self.assertEqual(
+            paths,
+            [
+                "jobs/analysis.yaml",
+                "jobs/execution.json",
+                "jobs/reporting.yaml",
+                "policies/example.json",
+                "registry.json",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

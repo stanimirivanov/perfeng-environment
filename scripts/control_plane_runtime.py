@@ -90,18 +90,29 @@ def runtime_configuration(release: DeploymentLock) -> dict[str, str]:
     }
 
 
-def registry_files(release: DeploymentLock, k8s_root: Path = DEFAULT_K8S_ROOT) -> dict[str, str]:
-    """Read every runtime file from the exact locked deployment commit."""
-    read = revision_reader(k8s_root, DEPLOYMENT_REPOSITORY, release.deployment_revision)
-    prefix = f"{release.bundle_path}/"
-    manifest_bytes = read(prefix + "registry.json")
+def selected_registry_paths(manifest_bytes: bytes) -> list[str]:
+    """Return every mounted path selected by one registry manifest."""
     manifest = json.loads(manifest_bytes)
     paths = {"registry.json", "jobs/analysis.yaml", "jobs/reporting.yaml"}
     for entry in manifest["entries"]:
         paths.add(entry["policy"])
         if entry.get("executionTemplate"):
             paths.add(entry["executionTemplate"])
-    return {path.replace("/", "--"): read(prefix + path).decode("utf-8") for path in sorted(paths)}
+    return sorted(paths)
+
+
+def registry_paths(release: DeploymentLock, k8s_root: Path = DEFAULT_K8S_ROOT) -> list[str]:
+    """Return every mounted runtime path selected by the locked registry manifest."""
+    read = revision_reader(k8s_root, DEPLOYMENT_REPOSITORY, release.deployment_revision)
+    return selected_registry_paths(read(f"{release.bundle_path}/registry.json"))
+
+
+def registry_files(release: DeploymentLock, k8s_root: Path = DEFAULT_K8S_ROOT) -> dict[str, str]:
+    """Read every runtime file from the exact locked deployment commit."""
+    read = revision_reader(k8s_root, DEPLOYMENT_REPOSITORY, release.deployment_revision)
+    prefix = f"{release.bundle_path}/"
+    paths = selected_registry_paths(read(prefix + "registry.json"))
+    return {path.replace("/", "--"): read(prefix + path).decode("utf-8") for path in paths}
 
 
 def object_document(
