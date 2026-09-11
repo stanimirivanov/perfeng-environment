@@ -73,7 +73,17 @@ used by CI is a separate credential. See [Working with the Container registry](h
 
 ## Database identities
 
-After deploying PostgreSQL, provision the two control-plane database identities:
+The identity command requires the base PostgreSQL service and its bootstrap
+Secret. Deploy and verify that foundation first, as described in
+[local PostgreSQL](local-postgres.md):
+
+```sh
+uv run --locked python scripts/postgres.py deploy
+uv run --locked python scripts/postgres.py deploy --execute
+uv run --locked python scripts/postgres.py health --execute
+```
+
+Then provision and verify the two control-plane database identities:
 
 ```sh
 uv run --locked python scripts/control_plane_database.py deploy

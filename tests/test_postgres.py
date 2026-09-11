@@ -101,7 +101,7 @@ class PostgresTests(unittest.TestCase):
 
     def test_missing_secret_health_never_creates(self):
         with patch("scripts.postgres.cluster.run", return_value="") as run:
-            with self.assertRaisesRegex(ValueError, "missing"):
+            with self.assertRaisesRegex(ValueError, r"scripts/postgres\.py deploy --execute first"):
                 postgres.ensure_secret(cluster.ROOT, create=False)
             self.assertEqual(run.call_count, 1)
 

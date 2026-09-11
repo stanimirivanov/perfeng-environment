@@ -102,7 +102,9 @@ def ensure_secret(root: Path, *, create: bool) -> None:
         print("Reusing existing PostgreSQL credentials (not rotated).", flush=True)
         return
     if not create:
-        raise ValueError("PostgreSQL credentials are missing; run deploy first")
+        raise ValueError(
+            "PostgreSQL credentials are missing; run scripts/postgres.py deploy --execute first"
+        )
     # A retained volume may contain an initialized database. A new password would
     # not reset it. Also refuse to race a previous/foreign StatefulSet deployment.
     for kind, name in [("pvc", CLAIM), ("statefulset", RELEASE)]:
