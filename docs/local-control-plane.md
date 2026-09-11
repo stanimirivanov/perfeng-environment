@@ -119,8 +119,28 @@ After migration, the environment revokes public/runtime defaults and grants the
 runtime login only the table operations required by the API and trusted worker.
 Health verifies the Job and every required/forbidden privilege without writing.
 
-Service runtime configuration, deployment, live endpoint checks and an
-API-to-analysis smoke run remain subsequent steps.
+## Runtime inputs
+
+After migration health passes, assemble the external inputs required by the
+control-plane chart:
+
+```sh
+uv run --locked python scripts/control_plane_runtime.py deploy
+uv run --locked python scripts/control_plane_runtime.py deploy --execute
+uv run --locked python scripts/control_plane_runtime.py health --execute
+```
+
+This creates immutable runtime configuration, runtime credentials, static API
+authentication and reviewed-registry resources. Registry bytes are read from the
+exact locked `perfeng-k8s` commit, not its working tree. Database and restricted
+S3 credentials are copied from their validated environment-owned Secrets. The
+mounted authentication document contains only a SHA-256 token digest; the raw
+local-operator token is retained as a separate, non-mounted Secret key for the
+later smoke client. Existing resources must match every owned byte and are never
+updated or rotated implicitly.
+
+Service deployment, live endpoint checks and an API-to-analysis smoke run remain
+subsequent steps.
 
 Changing an image, source revision, chart, bundle or contracts version requires
 reviewing a new lock change. Never replace a digest with a tag or a Git commit
