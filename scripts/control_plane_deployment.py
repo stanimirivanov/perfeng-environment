@@ -75,17 +75,18 @@ def helm_command(chart: Path, release: DeploymentLock, root: Path) -> list[str]:
 
 
 def helm_status_command(root: Path) -> list[str]:
-    """Build the read-only Helm release-status query."""
+    """Build the read-only Helm release-identity query."""
     return [
         "helm",
-        "status",
-        RELEASE,
+        "list",
         "--kubeconfig",
         str(cluster.kubeconfig(root)),
         "--kube-context",
         cluster.CONTEXT,
         "--namespace",
         postgres.NAMESPACE,
+        "--filter",
+        f"^{RELEASE}$",
         "--output",
         "json",
     ]
@@ -148,6 +149,14 @@ def validate_deployment(value: dict[str, Any], release: DeploymentLock) -> None:
         or env_from != expected_env_from
         or template.get("imagePullSecrets") != [{"name": IMAGE_PULL_SECRET}]
         or template.get("nodeSelector") != {"workload": "control-plane"}
+        or template.get("tolerations")
+        != [
+            {
+                "key": "node-role.kubernetes.io/control-plane",
+                "operator": "Exists",
+                "effect": "NoSchedule",
+            }
+        ]
         or volumes.get("authentication", {}).get("secret", {}).get("secretName")
         != control_plane_runtime.AUTHENTICATION_SECRET
         or volumes.get("registry", {}).get("configMap", {}).get("name")
@@ -165,15 +174,16 @@ def validate_deployment(value: dict[str, Any], release: DeploymentLock) -> None:
         raise ValueError("Control-plane Deployment is not fully available")
 
 
-def validate_helm_status(value: dict[str, Any], release: DeploymentLock) -> None:
+def validate_helm_status(value: list[dict[str, Any]], release: DeploymentLock) -> None:
     """Require Helm to report the selected chart release as deployed."""
-    metadata = value.get("chart", {}).get("metadata", {})
+    if len(value) != 1:
+        raise ValueError("Expected exactly one Helm control-plane release")
+    status = value[0]
     if (
-        value.get("name") != RELEASE
-        or value.get("namespace") != postgres.NAMESPACE
-        or value.get("info", {}).get("status") != "deployed"
-        or metadata.get("name") != "perfeng-control-plane"
-        or metadata.get("version") != release.chart_version
+        status.get("name") != RELEASE
+        or status.get("namespace") != postgres.NAMESPACE
+        or status.get("status") != "deployed"
+        or status.get("chart") != f"perfeng-control-plane-{release.chart_version}"
     ):
         raise ValueError("Helm release identity or status differs from the deployment lock")
 

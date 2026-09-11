@@ -79,12 +79,14 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
 
     @patch("scripts.control_plane_deployment.registry_items", return_value=ITEMS)
     def test_live_resources_require_exact_identity_and_readiness(self, _items) -> None:
-        helm_status = {
-            "name": "control-plane",
-            "namespace": "perf-platform",
-            "info": {"status": "deployed"},
-            "chart": {"metadata": {"name": "perfeng-control-plane", "version": "1.0.0"}},
-        }
+        helm_status = [
+            {
+                "name": "control-plane",
+                "namespace": "perf-platform",
+                "status": "deployed",
+                "chart": "perfeng-control-plane-1.0.0",
+            }
+        ]
         live_deployment = {
             "metadata": {"name": "control-plane", "namespace": "perf-platform", "generation": 2},
             "spec": {
@@ -103,6 +105,13 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
                         ],
                         "imagePullSecrets": [{"name": "perfeng-control-plane-registry"}],
                         "nodeSelector": {"workload": "control-plane"},
+                        "tolerations": [
+                            {
+                                "key": "node-role.kubernetes.io/control-plane",
+                                "operator": "Exists",
+                                "effect": "NoSchedule",
+                            }
+                        ],
                         "volumes": [
                             {
                                 "name": "authentication",
@@ -159,7 +168,7 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             deployment.validate_deployment(live_deployment, RELEASE)
 
-        helm_status["chart"]["metadata"]["version"] = "2.0.0"
+        helm_status[0]["chart"] = "perfeng-control-plane-2.0.0"
         with self.assertRaises(ValueError):
             deployment.validate_helm_status(helm_status, RELEASE)
 
