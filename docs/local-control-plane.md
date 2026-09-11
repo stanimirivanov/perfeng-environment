@@ -71,7 +71,36 @@ GitHub documents that private Container registry downloads require a personal
 access token (classic) with `read:packages`; the contents-only repository token
 used by CI is a separate credential. See [Working with the Container registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 
-Database identity provisioning, migrations, service deployment, live endpoint
+## Database identities
+
+The identity command requires the base PostgreSQL service and its bootstrap
+Secret. Deploy and verify that foundation first, as described in
+[local PostgreSQL](local-postgres.md):
+
+```sh
+uv run --locked python scripts/postgres.py deploy
+uv run --locked python scripts/postgres.py deploy --execute
+uv run --locked python scripts/postgres.py health --execute
+```
+
+Then provision and verify the two control-plane database identities:
+
+```sh
+uv run --locked python scripts/control_plane_database.py deploy
+uv run --locked python scripts/control_plane_database.py deploy --execute
+uv run --locked python scripts/control_plane_database.py health --execute
+```
+
+The environment creates distinct `perfeng_migration` and `perfeng_runtime`
+logins. Neither is a superuser and neither can create databases or roles. Only
+the migration login receives `CREATE` on the local `perfeng` database; public
+database creation is revoked. Their separate URLs are stored in the immutable
+`perfeng-control-plane-database` Secret and never written to arguments, files,
+Helm values or output. Secret creation precedes role creation so an interrupted
+first deployment is recoverable without inventing replacement credentials.
+Existing credentials are validated and are never rotated implicitly.
+
+Schema migrations, runtime table grants, service deployment, live endpoint
 checks and an API-to-analysis smoke run remain subsequent steps.
 
 Changing an image, source revision, chart, bundle or contracts version requires
