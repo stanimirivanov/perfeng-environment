@@ -31,7 +31,8 @@ shared raw-result publisher then writes the assembled manifest at the stable
 control-plane discovery key.
 The [local control-plane deployment lock](docs/local-control-plane.md) pins the
 published service image, reviewed Helm chart and runtime-registry bundle before
-cluster credentials or resources are introduced.
+deployment. Its preview-first registry command validates private GHCR access and
+creates only the externally managed image-pull Secret required by the chart.
 
 ## Layout
 
