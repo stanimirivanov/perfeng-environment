@@ -42,7 +42,7 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
     def test_helm_uses_only_locked_resource_identities(self, paths) -> None:
         paths.return_value = ["jobs/analysis.yaml", "registry.json"]
         with TemporaryDirectory() as temporary:
-            command = deployment.helm_command(Path(temporary), RELEASE, Path(temporary))
+            command = deployment.helm_command(Path(temporary), RELEASE, deployment.cluster.ROOT)
 
         arguments = "\n".join(command)
         self.assertIn(f"image={RELEASE.image}", arguments)
