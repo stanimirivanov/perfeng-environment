@@ -57,6 +57,9 @@ class ControlPlaneRegistryTests(unittest.TestCase):
 
     def test_existing_owned_secret_is_verified_without_rotation(self) -> None:
         read_token = Mock(side_effect=AssertionError("credential prompt was unexpected"))
+        read_environment = Mock(
+            side_effect=AssertionError("environment credential read was unexpected")
+        )
         with (
             patch(
                 "scripts.control_plane_registry.cluster.run",
@@ -69,18 +72,49 @@ class ControlPlaneRegistryTests(unittest.TestCase):
                 IMAGE,
                 create=True,
                 read_token=read_token,
+                read_environment=read_environment,
             )
 
         self.assertEqual(credentials, (registry.USERNAME, TOKEN))
         read_token.assert_not_called()
+        read_environment.assert_not_called()
         verify.assert_called_once_with(registry.USERNAME, TOKEN, IMAGE)
+
+    def test_new_secret_prefers_environment_token_without_prompting(self) -> None:
+        read_token = Mock(side_effect=AssertionError("credential prompt was unexpected"))
+        with (
+            patch("scripts.control_plane_registry.cluster.run", side_effect=["", ""]),
+            patch("scripts.control_plane_registry.verify_registry_credentials") as verify,
+            patch("builtins.print") as output,
+        ):
+            registry.ensure_secret(
+                self.root,
+                IMAGE,
+                create=True,
+                read_token=read_token,
+                read_environment=lambda name: (
+                    TOKEN if name == registry.TOKEN_ENVIRONMENT_VARIABLE else None
+                ),
+            )
+
+        read_token.assert_not_called()
+        verify.assert_called_once_with(registry.USERNAME, TOKEN, IMAGE)
+        messages = " ".join(str(call.args[0]) for call in output.call_args_list)
+        self.assertIn(registry.TOKEN_ENVIRONMENT_VARIABLE, messages)
+        self.assertNotIn(TOKEN, messages)
 
     def test_new_secret_is_verified_then_created_through_private_stdin(self) -> None:
         with (
             patch("scripts.control_plane_registry.cluster.run", side_effect=["", ""]) as run,
             patch("scripts.control_plane_registry.verify_registry_credentials") as verify,
         ):
-            registry.ensure_secret(self.root, IMAGE, create=True, read_token=lambda _: TOKEN)
+            registry.ensure_secret(
+                self.root,
+                IMAGE,
+                create=True,
+                read_token=lambda _: TOKEN,
+                read_environment=lambda _: None,
+            )
 
         verify.assert_called_once_with(registry.USERNAME, TOKEN, IMAGE)
         create = run.call_args_list[1]

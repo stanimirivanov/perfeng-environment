@@ -6,6 +6,7 @@ import argparse
 import base64
 import getpass
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -29,6 +30,7 @@ REGISTRY = "ghcr.io"
 USERNAME = "stanimirivanov"
 TOKEN_ENDPOINT = "https://ghcr.io/token"
 IMAGE_REPOSITORY = "stanimirivanov/perfeng-control-plane"
+TOKEN_ENVIRONMENT_VARIABLE = "PERFENG_REPOSITORIES_READ_TOKEN"
 TOKEN_LIMIT = 16 * 1024
 MANIFEST_LIMIT = 1024 * 1024
 
@@ -193,6 +195,7 @@ def ensure_secret(
     *,
     create: bool,
     read_token: Callable[[str], str] = getpass.getpass,
+    read_environment: Callable[[str], str | None] = os.environ.get,
 ) -> tuple[str, str]:
     """Validate and reuse credentials, or create them after registry verification."""
     kube = kubectl(root)
@@ -205,7 +208,15 @@ def ensure_secret(
     if not create:
         raise ValueError("Control-plane registry credentials are missing; run deploy first")
 
-    token = read_token("GHCR package-read token: ")
+    token = read_environment(TOKEN_ENVIRONMENT_VARIABLE)
+    if token is None:
+        print(
+            f"{TOKEN_ENVIRONMENT_VARIABLE} is not set; enter the token below (input is hidden).",
+            flush=True,
+        )
+        token = read_token("GHCR package-read token: ")
+    else:
+        print(f"Using {TOKEN_ENVIRONMENT_VARIABLE} from the environment.", flush=True)
     verify_registry_credentials(USERNAME, token, image)
     document = secret_document(USERNAME, token)
     cluster.run([*kube, "create", "-f", "-"], input_data=json.dumps(document).encode())
@@ -235,7 +246,10 @@ def main() -> int:
         else:
             print("Preview: verify the local cluster, namespace, locked image and pull Secret.")
             if args.action == "deploy":
-                print("Missing credentials will be prompted for and verified before creation.")
+                print(
+                    "Missing credentials use PERFENG_REPOSITORIES_READ_TOKEN, "
+                    "or a hidden prompt when it is unset."
+                )
             print("Preview only. Add --execute to access GHCR or Kubernetes.")
     except (OSError, ValueError, TypeError, yaml.YAMLError, json.JSONDecodeError) as error:
         print(f"Control-plane registry error: {error}")
