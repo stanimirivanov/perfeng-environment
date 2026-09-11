@@ -58,12 +58,12 @@ run PostgreSQL health separately when using this optional component.
   the physical host and competes with Kubernetes. This is not a calibrated lab.
 - PVC: `data-postgres-0`, 2 GiB, `ReadWriteOnce`, kind local-path storage.
 
-The environment owns the server deployment, bootstrap credentials, and storage
-configuration. `perfeng-control-plane` will own application roles, tables,
-migrations, and their upgrade tests. No prototype SQL, test users, application
-schema, or automatic extensions are installed here. Do not give a future runtime
-service the bootstrap superuser credentials; least-privilege roles come with the
-control-plane persistence step.
+The environment owns the server deployment, bootstrap credentials, storage
+configuration, and application-login provisioning. `perfeng-control-plane` owns
+its tables, migrations, runtime privilege contract, and upgrade tests. This base
+database command installs no application roles or schema; the separate
+[control-plane release workflow](local-control-plane.md#database-identities)
+provisions least-privilege logins without giving the service bootstrap access.
 
 ## Security boundaries
 
