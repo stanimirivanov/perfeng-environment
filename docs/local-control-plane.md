@@ -100,8 +100,27 @@ Helm values or output. Secret creation precedes role creation so an interrupted
 first deployment is recoverable without inventing replacement credentials.
 Existing credentials are validated and are never rotated implicitly.
 
-Schema migrations, runtime table grants, service deployment, live endpoint
-checks and an API-to-analysis smoke run remain subsequent steps.
+## Schema migration and runtime grants
+
+After database identities and registry access pass health checks, run the pinned
+control-plane migration image and establish the runtime grants:
+
+```sh
+uv run --locked python scripts/control_plane_migration.py deploy
+uv run --locked python scripts/control_plane_migration.py deploy --execute
+uv run --locked python scripts/control_plane_migration.py health --execute
+```
+
+The retained Job is bound to the locked image digest and source revision and can
+only read the `migration-url` Secret key. It runs without a service-account token
+and with a restricted security context. A repeated deploy adopts only an exact
+matching successful Job; it never replaces a failed or foreign Job implicitly.
+After migration, the environment revokes public/runtime defaults and grants the
+runtime login only the table operations required by the API and trusted worker.
+Health verifies the Job and every required/forbidden privilege without writing.
+
+Service runtime configuration, deployment, live endpoint checks and an
+API-to-analysis smoke run remain subsequent steps.
 
 Changing an image, source revision, chart, bundle or contracts version requires
 reviewing a new lock change. Never replace a digest with a tag or a Git commit
