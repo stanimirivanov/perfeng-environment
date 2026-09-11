@@ -139,8 +139,31 @@ local-operator token is retained as a separate, non-mounted Secret key for the
 later smoke client. Existing resources must match every owned byte and are never
 updated or rotated implicitly.
 
-Service deployment, live endpoint checks and an API-to-analysis smoke run remain
-subsequent steps.
+## Service deployment and operational acceptance
+
+After all immutable runtime inputs pass health checks, deploy the control plane:
+
+```sh
+uv run --locked python scripts/control_plane_deployment.py deploy
+uv run --locked python scripts/control_plane_deployment.py deploy --execute
+uv run --locked python scripts/control_plane_deployment.py health --execute
+```
+
+The deploy command reconstructs the chart from the exact locked `perfeng-k8s`
+commit in a temporary directory. It does not use chart files from the sibling
+working tree. Helm receives only non-secret resource names and immutable image
+identity; credentials remain in Kubernetes Secrets and do not enter Helm values
+or release history.
+
+Acceptance requires a deployed Helm release with the locked chart version, one
+fully available Deployment and one ready Pod using the locked image reference,
+the exact runtime resource mounts and the dedicated control-plane node. It also
+validates the ClusterIP Service and requests
+`/livez`, `/readyz` and `/metrics` through the authenticated Kubernetes API
+service proxy, without exposing a host port. Health is read-only and does not
+repair or replace a divergent release.
+
+An authenticated API-to-analysis smoke run remains the next step.
 
 Changing an image, source revision, chart, bundle or contracts version requires
 reviewing a new lock change. Never replace a digest with a tag or a Git commit
