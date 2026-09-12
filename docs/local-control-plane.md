@@ -26,6 +26,18 @@ This lock is deployment input, not proof that an image is registry-addressable
 or that a cluster is healthy. It contains no credentials and does not create
 Kubernetes resources.
 
+## Local infrastructure prerequisites
+
+The source-workspace bootstrap does not create runtime infrastructure. Before
+starting this workflow, create and verify the local kind cluster, sample API,
+SeaweedFS and its restricted storage identities using
+[local Kubernetes](local-kubernetes.md),
+[local object storage](local-object-store.md), and
+[storage access](storage-access.md). Publish the checkout reporting policy from
+the exact locked runtime bundle using [policy publication](policy-publication.md).
+Removing Docker containers or volumes removes this entire local environment;
+recreate these prerequisites before deploying the control plane.
+
 ## Private image access
 
 The control-plane package is private. Create a personal access token (classic)
@@ -165,7 +177,27 @@ validates the ClusterIP Service and requests
 service proxy, without exposing a host port. Health is read-only and does not
 repair or replace a divergent release.
 
-An authenticated API-to-analysis smoke run remains the next step.
+## Authenticated k6-to-analysis smoke run
+
+After deployment health passes, submit one complete checkout smoke Run:
+
+```sh
+uv run --locked python scripts/control_plane_smoke.py
+uv run --locked python scripts/control_plane_smoke.py --execute
+```
+
+The command validates the control plane and sample API without repairing them,
+then creates a restricted client Pod. The raw operator token is supplied only by
+Secret reference and never enters Pod arguments, files or output. The submitted
+request is assembled from the exact locked registry and policy bytes and binds
+the sample API to clean tracked source at the current environment commit.
+
+The client follows the Run through execution, raw collection, normalization and
+reporting. Success requires `COMPLETED`, a zero tool exit code and the exact five
+registered raw, k6, normalized and report artifact formats. The client Pod,
+execution Job, analysis Job, reporting Job, database record and S3 objects are
+retained for diagnosis. A retry creates a new Run and does not overwrite prior
+evidence.
 
 Changing an image, source revision, chart, bundle or contracts version requires
 reviewing a new lock change. Never replace a digest with a tag or a Git commit
