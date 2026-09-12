@@ -5,11 +5,38 @@ Reporting Jobs fetch the exact policy selected by the control plane from
 by a reviewed `perfeng-k8s` runtime bundle. This repository only provides the
 local publication mechanism; it does not copy, edit, approve or select policies.
 
+## Checkout smoke policy
+
+The control-plane checkout smoke run requires the policy selected by the locked
+runtime bundle. Preview its exact destination and digest:
+
+```powershell
+uv run --locked python scripts/policy_publish.py `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
+  --policy-id checkout-smoke-observe `
+  --version 1.0.0 `
+  --receipt .local/checkout-smoke-policy-publication.json
+```
+
+After comparing the printed digest with the reviewed bundle, publish it:
+
+```powershell
+uv run --locked python scripts/policy_publish.py `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
+  --policy-id checkout-smoke-observe `
+  --version 1.0.0 `
+  --expected-sha256 a6d4d89a666e26485501c5d67f4a15d9bccb5260fa6134cb22e341ac068b1a1b `
+  --receipt .local/checkout-smoke-policy-publication.json `
+  --execute
+```
+
+## Pod-startup policy
+
 Preview the bundle-owned policy first:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.0.0 `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
   --policy-id pod-startup-observe `
   --version 1.0.0 `
   --receipt .local/pod-startup-policy-publication.json
@@ -28,7 +55,7 @@ bundle change:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.0.0 `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
   --policy-id pod-startup-observe `
   --version 1.0.0 `
   --expected-sha256 1e76a39cab06eead6940dc82946b2ec6446d8345c4561cd2393e20b4dcb74b34 `
