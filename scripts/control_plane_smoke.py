@@ -125,14 +125,20 @@ def call(method, path, body=None):
 
 def run():
     submitted = json.loads(os.environ["PERFENG_SMOKE_REQUEST"])
-    status, current = call("POST", "/v1/runs", submitted)
-    run_id = current.get("id") if isinstance(current, dict) else None
-    if status != 201 or not isinstance(run_id, str) or re.fullmatch(
-        r"perf-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}", run_id
-    ) is None:
-        raise RuntimeError("Run acceptance response was invalid")
-    if current.get("request") != submitted or current.get("state") != "CREATED":
-        raise RuntimeError("Accepted Run differs from the submitted request")
+    run_id = os.environ.get("PERFENG_EXISTING_RUN_ID")
+    if run_id:
+        status, current = call("GET", "/v1/runs/" + run_id)
+        if status != 200 or current.get("id") != run_id:
+            raise RuntimeError("Persisted Run response was invalid")
+    else:
+        status, current = call("POST", "/v1/runs", submitted)
+        run_id = current.get("id") if isinstance(current, dict) else None
+        if status != 201 or not isinstance(run_id, str) or re.fullmatch(
+            r"perf-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}", run_id
+        ) is None:
+            raise RuntimeError("Run acceptance response was invalid")
+        if current.get("request") != submitted or current.get("state") != "CREATED":
+            raise RuntimeError("Accepted Run differs from the submitted request")
     revision = current.get("revision")
     deadline = time.monotonic() + 1100
     while current.get("state") not in TERMINAL and time.monotonic() < deadline:
@@ -150,8 +156,22 @@ def run():
             raise RuntimeError("Run observation response was invalid")
         current = observed
         revision = next_revision
-    if current.get("state") != "COMPLETED" or current.get("toolExitCode") != 0:
-        raise RuntimeError("Run did not complete successfully: " + str(current.get("state")))
+    tool_exit_code = current.get("toolExitCode")
+    if current.get("state") != "COMPLETED" or (
+        tool_exit_code is not None
+        and (
+            type(tool_exit_code) is not int
+            or tool_exit_code < 0
+            or tool_exit_code > 255
+        )
+    ):
+        raise RuntimeError(
+            "Run did not complete successfully: "
+            + str(current.get("state"))
+            + " (tool exit "
+            + str(tool_exit_code)
+            + ")"
+        )
     status, collection = call("GET", "/v1/runs/" + run_id + "/artifacts")
     artifacts = collection.get("artifacts") if isinstance(collection, dict) else None
     if status != 200 or not isinstance(artifacts, list):
@@ -164,7 +184,7 @@ def run():
         "runId": run_id,
         "state": current["state"],
         "revision": revision,
-        "toolExitCode": current["toolExitCode"],
+        "toolExitCode": tool_exit_code,
         "artifactFormats": formats,
     }, separators=(",", ":")))
 
@@ -222,13 +242,49 @@ def smoke_request(
     }
 
 
-def client_pod(name: str, request: dict[str, Any], idempotency_key: str) -> dict[str, Any]:
+def client_pod(
+    name: str,
+    request: dict[str, Any],
+    idempotency_key: str,
+    existing_run_id: str | None = None,
+) -> dict[str, Any]:
     """Build a restricted one-use API client with Secret-referenced authentication."""
     if (
         POD_PATTERN.fullmatch(name) is None
         or re.fullmatch(r"smoke-[0-9a-f]{32}", idempotency_key) is None
     ):
         raise ValueError("Invalid smoke client identity")
+    if existing_run_id is not None and re.fullmatch(k6_run.RUN_PATTERN, existing_run_id) is None:
+        raise ValueError("Invalid existing Run identity")
+    environment = [
+        {
+            "name": "PERFENG_OPERATOR_TOKEN",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": control_plane_runtime.AUTHENTICATION_SECRET,
+                    "key": "operator-token",
+                }
+            },
+        },
+        {
+            "name": "PERFENG_API",
+            "value": "http://control-plane.perf-platform.svc.cluster.local:8080",
+        },
+        {"name": "PERFENG_IDEMPOTENCY_KEY", "value": idempotency_key},
+        {
+            "name": "PERFENG_SMOKE_REQUEST",
+            "value": json.dumps(request, separators=(",", ":")),
+        },
+        {
+            "name": "PERFENG_EXPECTED_FORMATS",
+            "value": json.dumps(EXPECTED_FORMATS, separators=(",", ":")),
+        },
+        {"name": "HOME", "value": "/tmp"},
+        {"name": "PYTHONDONTWRITEBYTECODE", "value": "1"},
+        {"name": "PYTHONUNBUFFERED", "value": "1"},
+    ]
+    if existing_run_id is not None:
+        environment.append({"name": "PERFENG_EXISTING_RUN_ID", "value": existing_run_id})
     return {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -266,33 +322,7 @@ def client_pod(name: str, request: dict[str, Any], idempotency_key: str) -> dict
                     "image": CLIENT_IMAGE,
                     "imagePullPolicy": "IfNotPresent",
                     "command": ["python", "-c", CLIENT_PROGRAM],
-                    "env": [
-                        {
-                            "name": "PERFENG_OPERATOR_TOKEN",
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": control_plane_runtime.AUTHENTICATION_SECRET,
-                                    "key": "operator-token",
-                                }
-                            },
-                        },
-                        {
-                            "name": "PERFENG_API",
-                            "value": "http://control-plane.perf-platform.svc.cluster.local:8080",
-                        },
-                        {"name": "PERFENG_IDEMPOTENCY_KEY", "value": idempotency_key},
-                        {
-                            "name": "PERFENG_SMOKE_REQUEST",
-                            "value": json.dumps(request, separators=(",", ":")),
-                        },
-                        {
-                            "name": "PERFENG_EXPECTED_FORMATS",
-                            "value": json.dumps(EXPECTED_FORMATS, separators=(",", ":")),
-                        },
-                        {"name": "HOME", "value": "/tmp"},
-                        {"name": "PYTHONDONTWRITEBYTECODE", "value": "1"},
-                        {"name": "PYTHONUNBUFFERED", "value": "1"},
-                    ],
+                    "env": environment,
                     "securityContext": {
                         "allowPrivilegeEscalation": False,
                         "readOnlyRootFilesystem": True,
@@ -378,11 +408,71 @@ def validate_result(text: str) -> dict[str, Any]:
         or value.get("state") != "COMPLETED"
         or type(value.get("revision")) is not int
         or value["revision"] < 1
-        or value.get("toolExitCode") != 0
+        or (
+            value.get("toolExitCode") is not None
+            and (
+                type(value["toolExitCode"]) is not int
+                or value["toolExitCode"] < 0
+                or value["toolExitCode"] > 255
+            )
+        )
         or value.get("artifactFormats") != EXPECTED_FORMATS
     ):
         raise ValueError("Control-plane smoke receipt is invalid")
     return value
+
+
+def client_logs_command(kube: list[str], name: str) -> list[str]:
+    """Build a bounded log stream that can span the complete smoke Pod deadline."""
+    if POD_PATTERN.fullmatch(name) is None:
+        raise ValueError("Invalid smoke client identity")
+    command = [argument for argument in kube if not argument.startswith("--request-timeout=")]
+    return [
+        *command,
+        "--request-timeout=1200s",
+        "logs",
+        "--follow",
+        f"pod/{name}",
+        "-c",
+        "api-client",
+    ]
+
+
+def client_succeeded_command(kube: list[str], name: str) -> list[str]:
+    """Wait for Kubernetes to publish the final successful Pod phase."""
+    if POD_PATTERN.fullmatch(name) is None:
+        raise ValueError("Invalid smoke client identity")
+    return [
+        *kube,
+        "wait",
+        "--for=jsonpath={.status.phase}=Succeeded",
+        f"pod/{name}",
+        "--timeout=30s",
+    ]
+
+
+def run_client(
+    root: Path,
+    request: dict[str, Any],
+    existing_run_id: str | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Run one restricted API client and return its validated receipt and Pod name."""
+    suffix = uuid.uuid4().hex
+    name = f"control-plane-smoke-{suffix[:16]}"
+    document = client_pod(name, request, f"smoke-{suffix}", existing_run_id)
+    kube = postgres.kubectl(root)
+    print(f"Creating authenticated smoke client Pod {name}...", flush=True)
+    cluster.run([*kube, "create", "-f", "-"], input_data=json.dumps(document).encode())
+    try:
+        cluster.run([*kube, "wait", "--for=condition=Ready", f"pod/{name}", "--timeout=300s"])
+        output = cluster.run(client_logs_command(kube, name))
+        cluster.run(client_succeeded_command(kube, name))
+        pod = json.loads(cluster.run([*kube, "get", "pod", name, "-o", "json"]))
+        validate_client_pod(pod, document)
+        result = validate_result(output)
+    except ValueError:
+        raise ValueError(f"Control-plane smoke failed; inspect retained Pod {name}") from None
+    return result, name
 
 
 def execute(root: Path = cluster.ROOT) -> None:
@@ -390,11 +480,7 @@ def execute(root: Path = cluster.ROOT) -> None:
     release = validate_release()
     revision = candidate_revision(root)
     request = smoke_request(release, revision)
-    suffix = uuid.uuid4().hex
-    name = f"control-plane-smoke-{suffix[:16]}"
-    document = client_pod(name, request, f"smoke-{suffix}")
     control_plane_deployment.execute("health", root)
-    kube = postgres.kubectl(root)
     sut_kube = [
         "kubectl",
         "--kubeconfig",
@@ -409,29 +495,48 @@ def execute(root: Path = cluster.ROOT) -> None:
     k6_run.validate_sample(
         cluster.run([*sut_kube, "get", "deployment", "sample-sut", "-o", "json"]), root
     )
-    print(f"Creating authenticated smoke client Pod {name}...", flush=True)
-    cluster.run([*kube, "create", "-f", "-"], input_data=json.dumps(document).encode())
-    try:
-        cluster.run([*kube, "wait", "--for=condition=Ready", f"pod/{name}", "--timeout=300s"])
-        output = cluster.run([*kube, "logs", "--follow", f"pod/{name}", "-c", "api-client"])
-        pod = json.loads(cluster.run([*kube, "get", "pod", name, "-o", "json"]))
-        validate_client_pod(pod, document)
-        result = validate_result(output)
-    except ValueError:
-        raise ValueError(f"Control-plane smoke failed; inspect retained Pod {name}") from None
+    result, name = run_client(root, request)
     print(
         f"Completed Run {result['runId']} with {len(result['artifactFormats'])} verified artifacts."
     )
     print(f"Smoke client retained for inspection: {name}")
 
 
+def verify_after_restart(run_id: str, root: Path = cluster.ROOT) -> None:
+    """Restart the control plane and retrieve one completed Run and its artifacts."""
+    if re.fullmatch(k6_run.RUN_PATTERN, run_id) is None:
+        raise ValueError("Invalid existing Run identity")
+    control_plane_deployment.execute("health", root)
+    kube = postgres.kubectl(root)
+    selector = "app.kubernetes.io/name=perfeng-control-plane"
+    print("Restarting the control-plane Pod without changing its reviewed template...", flush=True)
+    cluster.run([*kube, "scale", "deployment/control-plane", "--replicas=0"])
+    cluster.run([*kube, "wait", "--for=delete", "pod", "-l", selector, "--timeout=120s"])
+    cluster.run([*kube, "scale", "deployment/control-plane", "--replicas=1"])
+    cluster.run([*kube, "rollout", "status", "deployment/control-plane", "--timeout=300s"])
+    control_plane_deployment.execute("health", root)
+    result, name = run_client(root, {}, run_id)
+    print(
+        f"Retrieved Run {result['runId']} after restart with "
+        f"{len(result['artifactFormats'])} verified artifacts."
+    )
+    print(f"Persistence client retained for inspection: {name}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--verify-run")
     args = parser.parse_args()
     try:
         if args.execute:
-            execute()
+            if args.verify_run:
+                verify_after_restart(args.verify_run)
+            else:
+                execute()
+        elif args.verify_run:
+            print(f"Preview: restart the control plane and retrieve Run {args.verify_run}.")
+            print("Preview only. Add --execute to perform the restart and verification.")
         else:
             print("Preview: submit one locked checkout-api Run through a restricted client Pod.")
             print(

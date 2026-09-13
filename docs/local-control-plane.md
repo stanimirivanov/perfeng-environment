@@ -193,11 +193,26 @@ request is assembled from the exact locked registry and policy bytes and binds
 the sample API to clean tracked source at the current environment commit.
 
 The client follows the Run through execution, raw collection, normalization and
-reporting. Success requires `COMPLETED`, a zero tool exit code and the exact five
-registered raw, k6, normalized and report artifact formats. The client Pod,
+reporting. Success requires `COMPLETED` and the exact five registered raw, k6,
+normalized and report artifact formats. An optional tool exit code is retained
+as diagnostic data and does not replace the lifecycle verdict. The client Pod,
 execution Job, analysis Job, reporting Job, database record and S3 objects are
 retained for diagnosis. A retry creates a new Run and does not overwrite prior
 evidence.
+
+Use the printed Run ID to prove that API metadata and artifact registrations
+survive a control-plane restart:
+
+```sh
+uv run --locked python scripts/control_plane_smoke.py --verify-run <run-id>
+uv run --locked python scripts/control_plane_smoke.py --verify-run <run-id> --execute
+```
+
+The executable form first validates the deployment, scales it to zero and back
+to one without changing its reviewed Pod template, validates the replacement,
+then retrieves the selected completed Run and its exact artifact set through a
+new restricted client Pod. PostgreSQL and SeaweedFS are not restarted by this
+check.
 
 Changing an image, source revision, chart, bundle or contracts version requires
 reviewing a new lock change. Never replace a digest with a tag or a Git commit

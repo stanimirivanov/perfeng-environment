@@ -12,21 +12,21 @@ runtime bundle. Preview its exact destination and digest:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
-  --policy-id checkout-smoke-observe `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  --policy-id checkout-api `
   --version 1.0.0 `
-  --receipt .local/checkout-smoke-policy-publication.json
+  --receipt .local/checkout-api-policy-publication.json
 ```
 
 After comparing the printed digest with the reviewed bundle, publish it:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
-  --policy-id checkout-smoke-observe `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  --policy-id checkout-api `
   --version 1.0.0 `
-  --expected-sha256 a6d4d89a666e26485501c5d67f4a15d9bccb5260fa6134cb22e341ac068b1a1b `
-  --receipt .local/checkout-smoke-policy-publication.json `
+  --expected-sha256 e64925fbc0c95880be672687c123a182917d129bc472edff07cac3e1f699abf1 `
+  --receipt .local/checkout-api-policy-publication.json `
   --execute
 ```
 
@@ -36,10 +36,10 @@ Preview the bundle-owned policy first:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
-  --policy-id pod-startup-observe `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  --policy-id pod-startup-k8s `
   --version 1.0.0 `
-  --receipt .local/pod-startup-policy-publication.json
+  --receipt .local/pod-startup-k8s-policy-publication.json
 ```
 
 The preview resolves the policy only through `registry.json`, rejects unsafe or
@@ -49,17 +49,17 @@ Validate the complete bundle using the pinned control-plane validator described
 in `perfeng-k8s/CONTRIBUTING.md` before accepting that digest.
 
 For the current local bundle, the reviewed policy SHA-256 is
-`1e76a39cab06eead6940dc82946b2ec6446d8345c4561cd2393e20b4dcb74b34`.
+`45c9011b50b340fe00664a833235bf884c3656b3d5708eb07bf4701b94aa1008`.
 Publish only after comparing that value with both the preview and the reviewed
 bundle change:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.1 `
-  --policy-id pod-startup-observe `
+  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  --policy-id pod-startup-k8s `
   --version 1.0.0 `
-  --expected-sha256 1e76a39cab06eead6940dc82946b2ec6446d8345c4561cd2393e20b4dcb74b34 `
-  --receipt .local/pod-startup-policy-publication.json `
+  --expected-sha256 45c9011b50b340fe00664a833235bf884c3656b3d5708eb07bf4701b94aa1008 `
+  --receipt .local/pod-startup-k8s-policy-publication.json `
   --execute
 ```
 
