@@ -7,6 +7,8 @@
 - The current preview-first Python tools remain the working Milestone 1 path.
 - [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selects an
   Argo CD-centred target architecture, subject to a reversible local spike.
+- The parallel [local GitOps foundation](docs/local-gitops.md) installs a pinned
+  Argo CD control plane without replacing existing deployments.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
 - Never commit credentials or replace immutable release pins with branches or
@@ -45,6 +47,9 @@ The [local control-plane deployment lock](docs/local-control-plane.md) pins the
 published service image, reviewed Helm chart and runtime-registry bundle before
 deployment. Its preview-first registry command validates private GHCR access and
 creates only the externally managed image-pull Secret required by the chart.
+The [local GitOps foundation](docs/local-gitops.md) is a parallel, reversible
+Argo CD spike. It currently manages only its AppProject and does not replace the
+working Milestone 1 deployment path.
 
 ## Layout
 
