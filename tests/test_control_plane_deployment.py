@@ -1,4 +1,5 @@
 import io
+import json
 import tarfile
 import unittest
 from pathlib import Path
@@ -164,6 +165,19 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
         deployment.validate_deployment(live_deployment, RELEASE)
         deployment.validate_service(service)
         deployment.validate_pods(pods, RELEASE)
+        responses = [
+            "",
+            json.dumps(live_deployment),
+            json.dumps(service),
+            json.dumps(pods),
+            "ok\n",
+            "ok\n",
+            "perfeng_control_plane_ready 1\n",
+        ]
+        with patch("scripts.control_plane_deployment.cluster.run", side_effect=responses) as run:
+            deployment.verify_resources(["kubectl"], RELEASE)
+        self.assertNotIn("helm", " ".join(str(call) for call in run.call_args_list))
+
         live_deployment["spec"]["template"]["spec"]["containers"][0]["image"] = "tagged"
         with self.assertRaises(ValueError):
             deployment.validate_deployment(live_deployment, RELEASE)
@@ -178,6 +192,33 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
         deployment.validate_endpoint("metrics", "perfeng_control_plane_ready 1\n")
         with self.assertRaises(ValueError):
             deployment.validate_endpoint("readyz", '{"status":"ok"}')
+
+    @patch("scripts.control_plane_deployment.verify_resources")
+    @patch("scripts.control_plane_deployment.postgres.kubectl", return_value=["kubectl"])
+    @patch("scripts.control_plane_deployment.control_plane_runtime.execute")
+    @patch("scripts.control_plane_deployment.control_plane_migration.execute")
+    @patch("scripts.control_plane_deployment.validate_release", return_value=RELEASE)
+    def test_managed_workload_verification_does_not_require_helm_history(
+        self,
+        validate_release,
+        migration_execute,
+        runtime_execute,
+        kubectl,
+        verify_resources,
+    ) -> None:
+        root = Path("workspace/perfeng-environment")
+
+        deployment.verify_managed_workload(root)
+
+        validate_release.assert_called_once_with(
+            root / "deployments/local-control-plane.json",
+            root.parent / "perfeng-k8s",
+            root.parent / "perfeng-control-plane",
+        )
+        migration_execute.assert_called_once_with("health", root)
+        runtime_execute.assert_called_once_with("health", root)
+        kubectl.assert_called_once_with(root)
+        verify_resources.assert_called_once_with(["kubectl"], RELEASE)
 
 
 if __name__ == "__main__":

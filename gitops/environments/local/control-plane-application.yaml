@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-local-control-plane
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+    perfeng.io/workload: control-plane
+spec:
+  project: perfeng-local
+  source:
+    repoURL: https://github.com/stanimirivanov/perfeng-k8s.git
+    targetRevision: 0ef84d55af3bd69a6a58eb14f2dbb1cf21a2531c
+    path: charts/control-plane
+    helm:
+      releaseName: control-plane
+      valuesObject:
+        image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:ec073372f7a27620f7322fc74eb722dca6754ef8133888e79971c1514186f278
+        imagePullSecret: perfeng-control-plane-registry
+        executionNamespace: perf-generators
+        runtimeConfigMap: perfeng-control-plane-runtime
+        runtimeSecret: perfeng-control-plane-runtime
+        authenticationSecret: perfeng-control-plane-authentication
+        registryConfigMap: perfeng-runtime-registry
+        registryItems:
+          - key: jobs--analysis.yaml
+            path: jobs/analysis.yaml
+          - key: jobs--execution.json
+            path: jobs/execution.json
+          - key: jobs--reporting.yaml
+            path: jobs/reporting.yaml
+          - key: policies--checkout-smoke.json
+            path: policies/checkout-smoke.json
+          - key: policies--pod-startup.json
+            path: policies/pod-startup.json
+          - key: registry.json
+            path: registry.json
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: perf-platform
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=false

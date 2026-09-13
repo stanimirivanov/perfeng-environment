@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - project.yaml
   - sample-sut-application.yaml
+  - control-plane-application.yaml

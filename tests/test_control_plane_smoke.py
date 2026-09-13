@@ -163,10 +163,10 @@ class ControlPlaneSmokeTests(unittest.TestCase):
     @patch("scripts.control_plane_smoke.run_client")
     @patch("scripts.control_plane_smoke.cluster.run")
     @patch("scripts.control_plane_smoke.postgres.kubectl", return_value=["kubectl", "base"])
-    @patch("scripts.control_plane_smoke.control_plane_deployment.execute")
+    @patch("scripts.control_plane_smoke.control_plane_deployment.verify_managed_workload")
     def test_persistence_check_restarts_then_retrieves(
         self,
-        deployment_execute,
+        verify_workload,
         kubectl,
         run,
         run_client,
@@ -185,7 +185,7 @@ class ControlPlaneSmokeTests(unittest.TestCase):
 
         smoke.verify_after_restart(run_id)
 
-        self.assertEqual(deployment_execute.call_count, 2)
+        self.assertEqual(verify_workload.call_count, 2)
         kubectl.assert_called_once()
         self.assertEqual(run.call_count, 4)
         self.assertEqual(

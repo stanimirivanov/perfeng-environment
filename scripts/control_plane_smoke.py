@@ -480,7 +480,7 @@ def execute(root: Path = cluster.ROOT) -> None:
     release = validate_release()
     revision = candidate_revision(root)
     request = smoke_request(release, revision)
-    control_plane_deployment.execute("health", root)
+    control_plane_deployment.verify_managed_workload(root)
     sut_kube = [
         "kubectl",
         "--kubeconfig",
@@ -506,7 +506,7 @@ def verify_after_restart(run_id: str, root: Path = cluster.ROOT) -> None:
     """Restart the control plane and retrieve one completed Run and its artifacts."""
     if re.fullmatch(k6_run.RUN_PATTERN, run_id) is None:
         raise ValueError("Invalid existing Run identity")
-    control_plane_deployment.execute("health", root)
+    control_plane_deployment.verify_managed_workload(root)
     kube = postgres.kubectl(root)
     selector = "app.kubernetes.io/name=perfeng-control-plane"
     print("Restarting the control-plane Pod without changing its reviewed template...", flush=True)
@@ -514,7 +514,7 @@ def verify_after_restart(run_id: str, root: Path = cluster.ROOT) -> None:
     cluster.run([*kube, "wait", "--for=delete", "pod", "-l", selector, "--timeout=120s"])
     cluster.run([*kube, "scale", "deployment/control-plane", "--replicas=1"])
     cluster.run([*kube, "rollout", "status", "deployment/control-plane", "--timeout=300s"])
-    control_plane_deployment.execute("health", root)
+    control_plane_deployment.verify_managed_workload(root)
     result, name = run_client(root, {}, run_id)
     print(
         f"Retrieved Run {result['runId']} after restart with "
