@@ -48,8 +48,8 @@ published service image, reviewed Helm chart and runtime-registry bundle before
 deployment. Its preview-first registry command validates private GHCR access and
 creates only the externally managed image-pull Secret required by the chart.
 The [local GitOps foundation](docs/local-gitops.md) is a parallel, reversible
-Argo CD spike. It currently manages only its AppProject and does not replace the
-working Milestone 1 deployment path.
+Argo CD spike. It manages its AppProject and the sample SUT as the first child
+Application without replacing the remaining Milestone 1 deployment path.
 
 ## Layout
 

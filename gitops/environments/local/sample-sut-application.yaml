@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-local-sample-sut
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+    perfeng.io/workload: sample-sut
+spec:
+  project: perfeng-local
+  source:
+    repoURL: https://github.com/stanimirivanov/perfeng-environment.git
+    targetRevision: main
+    path: charts/sample-sut
+    helm:
+      releaseName: sample-sut
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: perf-sut
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
