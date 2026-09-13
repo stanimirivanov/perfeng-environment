@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: perfeng-local
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+spec:
+  description: Local performance-platform GitOps applications
+  sourceRepos:
+    - https://github.com/stanimirivanov/perfeng-analysis.git
+    - https://github.com/stanimirivanov/perfeng-contracts.git
+    - https://github.com/stanimirivanov/perfeng-control-plane.git
+    - https://github.com/stanimirivanov/perfeng-environment.git
+    - https://github.com/stanimirivanov/perfeng-k6.git
+    - https://github.com/stanimirivanov/perfeng-k8s.git
+    - https://github.com/stanimirivanov/perfeng-playwright.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+    - server: https://kubernetes.default.svc
+      namespace: perf-generators
+    - server: https://kubernetes.default.svc
+      namespace: perf-platform
+    - server: https://kubernetes.default.svc
+      namespace: perf-sut
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

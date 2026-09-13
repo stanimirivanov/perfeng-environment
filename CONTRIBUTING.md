@@ -13,6 +13,7 @@ uv run --locked ruff check .
 uv run --locked ty check
 uv run --locked python -m unittest discover -s tests -v
 uv run --locked python scripts/workspace.py validate
+uv run --locked python scripts/gitops.py validate
 ```
 
 Tests must use temporary paths and mocked external operations unless the pull
