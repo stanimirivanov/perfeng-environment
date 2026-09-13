@@ -11,8 +11,8 @@
   Argo CD control plane without replacing existing deployments.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
-- Never commit credentials or replace immutable release pins with branches or
-  image tags.
+- Never commit credentials or replace explicit release versions with `stable`,
+  `latest`, or branches.
 
 Workspace bootstrap and development/production environment composition.
 The workspace commands manage source checkouts only. Separate, preview-first

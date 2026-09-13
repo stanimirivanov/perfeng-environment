@@ -4,8 +4,8 @@
 
 - This is a parallel architecture spike; it does not replace or modify the
   working Milestone 1 deployment path.
-- Argo CD v3.5.2, the full upstream source commit, and all referenced container
-  image digests are locked in `gitops/argocd/release.json`.
+- Argo CD is selected through the official, human-readable `v3.5.2` install
+  manifest; the upstream manifest supplies its tested dependency image tags.
 - Run `gitops.py validate` offline before review, then merge the GitOps files to
   `main` before executing bootstrap because the root Application reads `main`.
 - Set `PERFENG_REPOSITORIES_READ_TOKEN` to a GitHub token with read-only Contents
@@ -35,7 +35,7 @@ solution without rewriting the composition.
 
 ## Review the pinned inputs
 
-Validate the release lock and local objects without accessing the network,
+Validate the explicit release and local objects without accessing the network,
 Docker or Kubernetes:
 
 ```powershell
@@ -45,9 +45,7 @@ uv run --locked python scripts/gitops.py deploy
 
 The first command verifies:
 
-- the exact Argo CD version, full upstream commit and manifest path;
-- every Kustomize image substitution and immutable manifest-list digest;
-- compatibility with the pinned kind Kubernetes minor version;
+- the official Argo CD source and explicit semantic release tag;
 - root Application source, destination and non-destructive sync policy;
 - agreement between the AppProject source repositories and `workspace.json`.
 
@@ -55,10 +53,10 @@ The second command is only a deployment preview. Preview never downloads the
 install manifest, reads a credential or contacts the cluster.
 
 The official upstream manifest is not copied into this repository. The
-Kustomize bootstrap references it at the locked full Git commit and replaces
-its reviewed image names with the locked digests. This keeps the installation
-declarative and reviewable without introducing another manifest-generation
-script.
+Kustomize bootstrap references the explicit `v3.5.2` release tag and trusts the
+component image versions tested in that release. This keeps the selected
+version visible and upgrades small enough to review without introducing another
+manifest-generation script.
 
 Render the exact bootstrap for review without applying it:
 
@@ -66,9 +64,9 @@ Render the exact bootstrap for review without applying it:
 kubectl kustomize gitops/bootstrap/argocd
 ```
 
-The rendered Argo CD, Dex and Redis image references must all end in a
-`sha256` digest. Rendering needs network access to fetch the immutable upstream
-manifest; the repository validation above remains offline.
+Review the rendered Argo CD, Dex and Redis image tags as part of an upgrade.
+Rendering needs network access to fetch the versioned upstream manifest; the
+repository validation above remains offline.
 
 ## Deploy after merge
 
@@ -92,9 +90,9 @@ The command:
 
 1. verifies the local Docker endpoint, kind identity and dedicated kubeconfig;
 2. creates the owned `argocd` namespace or validates its existing ownership;
-3. lets Kustomize fetch the install manifest at the locked full Git commit;
-4. applies the digest-pinned rendering using server-side apply, as required for
-   the Argo CD CRDs;
+3. lets Kustomize fetch the official versioned install manifest;
+4. applies the rendering using server-side apply, as required for the Argo CD
+   CRDs;
 5. waits for all six Deployments and the application-controller StatefulSet;
 6. creates or validates an immutable Argo CD repository-credential template;
 7. ownership-checks and applies the local root Application;
@@ -147,14 +145,12 @@ The next migration task adds the sample SUT as the first low-risk child
 Application. Drift correction and immutable promotion are tested only after that
 child exists.
 
-## Upgrading the lock
+## Upgrading Argo CD
 
-An Argo CD upgrade is a reviewed lock change, not an edit from `v3.5.2` to
-`stable`. Review the official release and upgrade notes, resolve the release tag
-to its full Git commit, enumerate every image in the selected install manifest,
-and resolve each tag to the reviewed multi-platform digest. Update the release
-lock and Kustomize overlay together, render the overlay for review, and run
-offline validation before executing the upgrade.
+An Argo CD upgrade changes the explicit release tag, never the resource URL to
+`stable`, `latest`, or a branch. Review the official release and upgrade notes,
+update the version in the Kustomize resource URL, and inspect the rendered
+component image tags. Run offline validation before executing the upgrade.
 
 References:
 
