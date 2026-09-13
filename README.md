@@ -1,5 +1,17 @@
 # perfeng-environment
 
+## TL;DR
+
+- This repository composes the local performance-platform workspace and its
+  Kubernetes environment; it does not own component source code.
+- The current preview-first Python tools remain the working Milestone 1 path.
+- [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selects an
+  Argo CD-centred target architecture, subject to a reversible local spike.
+- Clone sibling repositories with the workspace command, then use the focused
+  guides under `docs` for the environment capability you need.
+- Never commit credentials or replace immutable release pins with branches or
+  image tags.
+
 Workspace bootstrap and development/production environment composition.
 The workspace commands manage source checkouts only. Separate, preview-first
 [local Kubernetes commands](docs/local-kubernetes.md) now provide the kind and
@@ -124,6 +136,10 @@ or production versions in workspace.json. The initial local control-plane lock
 does not claim a production environment or a successful deployment.
 
 ## Development
+
+Contribution and documentation conventions, including the required TL;DR for
+long documents, are defined in [CONTRIBUTING.md](CONTRIBUTING.md). Architecture
+decisions are indexed in [docs/decisions](docs/decisions/README.md).
 
 ```sh
 uv run --locked ruff check .
