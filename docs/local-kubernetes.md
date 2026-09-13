@@ -1,5 +1,15 @@
 # Local Kubernetes foundation
 
+## TL;DR
+
+- This creates a disposable three-node kind cluster for local development, not
+  a production environment or calibrated performance lab.
+- Commands are previews unless `--execute` is supplied and always use the
+  dedicated `.local/perfeng-local.kubeconfig`.
+- After cluster creation, use either the [GitOps path](local-gitops.md) or the
+  legacy Helm deployment path for the sample SUT, never both concurrently.
+- Teardown permanently destroys all cluster-local state.
+
 This is a disposable development environment, not a production configuration or
 a calibrated performance lab. No cluster is created by validation or CI.
 
@@ -25,6 +35,14 @@ uv sync --locked
 uv run --locked python scripts/validate_cluster.py
 uv run --locked python scripts/cluster.py up
 uv run --locked python scripts/cluster.py up --execute
+```
+
+After cluster creation, continue with the [local GitOps guide](local-gitops.md).
+The following commands remain the legacy sample-SUT deployment and rollback
+path. Do not execute the deployment while its Argo CD child Application is
+active:
+
+```sh
 uv run --locked python scripts/cluster.py deploy
 uv run --locked python scripts/cluster.py deploy --execute
 uv run --locked python scripts/cluster.py health --execute
@@ -56,10 +74,12 @@ automatic deletion or adoption. Failed creation retains nodes and local state
 for diagnosis. Inspect them before choosing explicit cleanup; do not rerun
 startup expecting it to erase a partial environment.
 
-Deployment applies four namespaces and installs the sample-sut Helm release in
-perf-sut. Health checks require three Ready, uncordoned nodes, correct placement
-labels, no memory/disk/PID pressure, and successful CoreDNS/sample-SUT rollouts.
-These checks do not measure CPU saturation or network performance.
+The legacy deployment applies four namespaces and installs the sample-sut Helm
+release in perf-sut. The GitOps child creates its destination namespace and
+renders the same chart. Health checks require three Ready, uncordoned nodes,
+correct placement labels, no memory/disk/PID pressure, and successful
+CoreDNS/sample-SUT rollouts. These checks do not measure CPU saturation or
+network performance.
 
 To access the local fixture after deployment:
 
@@ -127,8 +147,8 @@ string construction, current-context reliance, or pre-creation cleanup.
 The source remains intact; historical ancestry import is owner-operated.
 
 Offline Helm lint/template and unit checks are not a successful deployment.
-Run up/deploy/health and verify the endpoint on a Docker-capable host before
-considering live acceptance complete. PostgreSQL is available as an optional
-backing service; SeaweedFS provides optional local S3 storage, and the sample API
-supports the existing business-flow scenarios. Durable k6 Job integration remains
-a subsequent slice.
+Run cluster creation, the selected deployment path and its health checks, then
+verify the endpoint on a Docker-capable host before considering live acceptance
+complete. PostgreSQL is available as an optional backing service; SeaweedFS
+provides optional local S3 storage, and the sample API supports the existing
+business-flow scenarios. Durable k6 Job integration remains a subsequent slice.

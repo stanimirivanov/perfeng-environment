@@ -30,6 +30,17 @@ fixture; this is not a production server or performance reference.
 
 ## Validate and deploy
 
+The GitOps-managed local environment deploys this chart through the
+`perfeng-local-sample-sut` Application. After the GitOps change is merged, wait
+for the child and workload health:
+
+~~~sh
+uv run --locked python scripts/gitops.py health --execute
+~~~
+
+The commands below remain the legacy deployment and rollback path. Do not run
+`cluster.py deploy --execute` while the Argo CD child Application is active.
+
 ~~~sh
 uv run --locked python -m unittest discover -s tests
 uv run --locked python scripts/validate_cluster.py
