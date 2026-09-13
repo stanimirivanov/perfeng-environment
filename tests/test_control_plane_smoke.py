@@ -71,6 +71,25 @@ class ControlPlaneSmokeTests(unittest.TestCase):
         )
         self.assertNotIn("delete", smoke.CLIENT_PROGRAM.lower())
 
+    def test_persistence_client_reads_only_the_selected_run(self) -> None:
+        run_id = "perf-20260912-120000-abcdef12"
+        document = smoke.client_pod(
+            "control-plane-smoke-0123456789abcdef",
+            {},
+            "smoke-" + "a" * 32,
+            run_id,
+        )
+
+        environment = document["spec"]["containers"][0]["env"]
+        self.assertIn({"name": "PERFENG_EXISTING_RUN_ID", "value": run_id}, environment)
+        with self.assertRaises(ValueError):
+            smoke.client_pod(
+                "control-plane-smoke-0123456789abcdef",
+                {},
+                "smoke-" + "a" * 32,
+                "foreign-run",
+            )
+
     def test_receipt_requires_complete_terminal_artifact_set(self) -> None:
         receipt = {
             "runId": "perf-20260912-120000-abcdef12",
@@ -83,6 +102,99 @@ class ControlPlaneSmokeTests(unittest.TestCase):
         receipt["artifactFormats"] = receipt["artifactFormats"][:-1]
         with self.assertRaises(ValueError):
             smoke.validate_result(json.dumps(receipt))
+
+    def test_receipt_preserves_nonzero_tool_exit_as_diagnostic_data(self) -> None:
+        receipt = {
+            "runId": "perf-20260912-120000-abcdef12",
+            "state": "COMPLETED",
+            "revision": 9,
+            "toolExitCode": 99,
+            "artifactFormats": smoke.EXPECTED_FORMATS,
+        }
+
+        self.assertEqual(smoke.validate_result(json.dumps(receipt)), receipt)
+
+    def test_receipt_accepts_an_unobserved_tool_exit(self) -> None:
+        receipt = {
+            "runId": "perf-20260912-120000-abcdef12",
+            "state": "COMPLETED",
+            "revision": 9,
+            "toolExitCode": None,
+            "artifactFormats": smoke.EXPECTED_FORMATS,
+        }
+
+        self.assertEqual(smoke.validate_result(json.dumps(receipt)), receipt)
+
+    def test_client_log_stream_spans_the_pod_deadline(self) -> None:
+        command = smoke.client_logs_command(
+            ["kubectl", "--request-timeout=30s", "--namespace", "perf-platform"],
+            "control-plane-smoke-0123456789abcdef",
+        )
+
+        self.assertNotIn("--request-timeout=30s", command)
+        self.assertIn("--request-timeout=1200s", command)
+        self.assertEqual(
+            command[-5:],
+            [
+                "logs",
+                "--follow",
+                "pod/control-plane-smoke-0123456789abcdef",
+                "-c",
+                "api-client",
+            ],
+        )
+
+    def test_client_completion_wait_closes_the_pod_phase_race(self) -> None:
+        command = smoke.client_succeeded_command(
+            ["kubectl", "--namespace", "perf-platform"],
+            "control-plane-smoke-0123456789abcdef",
+        )
+
+        self.assertEqual(
+            command[-4:],
+            [
+                "wait",
+                "--for=jsonpath={.status.phase}=Succeeded",
+                "pod/control-plane-smoke-0123456789abcdef",
+                "--timeout=30s",
+            ],
+        )
+
+    @patch("scripts.control_plane_smoke.run_client")
+    @patch("scripts.control_plane_smoke.cluster.run")
+    @patch("scripts.control_plane_smoke.postgres.kubectl", return_value=["kubectl", "base"])
+    @patch("scripts.control_plane_smoke.control_plane_deployment.execute")
+    def test_persistence_check_restarts_then_retrieves(
+        self,
+        deployment_execute,
+        kubectl,
+        run,
+        run_client,
+    ) -> None:
+        run_id = "perf-20260912-120000-abcdef12"
+        run_client.return_value = (
+            {
+                "runId": run_id,
+                "state": "COMPLETED",
+                "revision": 9,
+                "toolExitCode": None,
+                "artifactFormats": smoke.EXPECTED_FORMATS,
+            },
+            "control-plane-smoke-0123456789abcdef",
+        )
+
+        smoke.verify_after_restart(run_id)
+
+        self.assertEqual(deployment_execute.call_count, 2)
+        kubectl.assert_called_once()
+        self.assertEqual(run.call_count, 4)
+        self.assertEqual(
+            run.call_args_list[0].args[0][-2:], ["deployment/control-plane", "--replicas=0"]
+        )
+        self.assertEqual(
+            run.call_args_list[2].args[0][-2:], ["deployment/control-plane", "--replicas=1"]
+        )
+        run_client.assert_called_once_with(smoke.cluster.ROOT, {}, run_id)
 
     def test_failed_or_foreign_client_pod_is_rejected(self) -> None:
         expected = smoke.client_pod(

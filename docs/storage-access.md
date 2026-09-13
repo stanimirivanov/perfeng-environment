@@ -1,7 +1,11 @@
 # Restricted local artifact uploader
 
 Runtime transfer containers use perfeng-s3-uploader-auth, not the bootstrap
-administrator. Its static IAM policy permits s3:GetObject and s3:PutObject for
+administrator. The same immutable uploader identity is provisioned in both
+perf-platform, for infrastructure verification Jobs, and perf-generators, for
+run execution, analysis and report Jobs. Kubernetes Secrets are namespace-scoped;
+both copies are validated as an inseparable pair and must contain identical
+credentials. Its static IAM policy permits s3:GetObject and s3:PutObject for
 arn:aws:s3:::perfeng-artifacts/runs/* and read-only s3:GetObject for
 arn:aws:s3:::perfeng-artifacts/policies/*. There are no legacy Read/Write grants:
 SeaweedFS's legacy Write action also covers deletion. Object listing, deletion,
@@ -24,8 +28,9 @@ uv run --locked python scripts/k6_run.py --execute
 Deployment is additive:
 
 1. Validate and retain the existing immutable perfeng-s3-auth bootstrap Secret.
-2. Create a separate immutable perfeng-s3-uploader-auth Secret containing only
-   the new uploader access key and secret key.
+2. Create matching immutable perfeng-s3-uploader-auth Secrets in perf-platform
+   and perf-generators, containing only the new uploader access key and secret
+   key.
 3. Create immutable perfeng-s3-server-auth-v3 containing s3.json, which combines
    the unchanged bootstrap identity with the uploader and its attached policy.
 4. Upgrade chart 0.3.0 to mount that server Secret. This restarts SeaweedFS;
@@ -38,7 +43,7 @@ secret key are reused rather than rotated.
 Credentials are sent through private stdin, not command arguments, host files,
 Git, chart values or Helm release data. Helm owns neither Secret. Redeployment
 reuses both identities; it does not rotate them. A partial migration with an
-existing uploader but no server Secret can be retried. Unknown, mutable,
+existing uploader or only one namespace copy can be retried. Unknown, mutable,
 inconsistent or orphaned credentials are refused. Restore matching Secrets
 instead of deleting them to force regeneration.
 

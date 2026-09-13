@@ -11,8 +11,8 @@ BOOT = {"access-key": "a" * 32, "secret-key": "b" * 64}
 UPLOAD = {"access-key": "c" * 32, "secret-key": "d" * 64}
 
 
-def secret(name, data):
-    value = access.secret_document(name, data)
+def secret(name, data, namespace=access.store.NAMESPACE):
+    value = access.secret_document(name, data, namespace)
     value.pop("stringData")
     value["data"] = {key: base64.b64encode(text.encode()).decode() for key, text in data.items()}
     return json.dumps(value)
@@ -31,6 +31,7 @@ def existing():
         ),
         secret(access.UPLOADER_SECRET, UPLOAD),
         secret(access.SERVER_SECRET, {"s3.json": json.dumps(access.server_config(BOOT, UPLOAD))}),
+        secret(access.UPLOADER_SECRET, UPLOAD, access.EXECUTION_NAMESPACE),
     ]
 
 
@@ -77,7 +78,9 @@ class StorageAccessTests(unittest.TestCase):
     def test_migration_creates_pair_on_private_stdin_without_rotation(self):
         with (
             patch.object(
-                access.cluster, "run", side_effect=[existing()[0], "", "", "", "", ""]
+                access.cluster,
+                "run",
+                side_effect=[existing()[0], "", "", "", "", "", "", ""],
             ) as run,
             patch.object(access.secrets, "token_hex", side_effect=list(UPLOAD.values())),
             redirect_stdout(io.StringIO()) as output,
@@ -90,8 +93,13 @@ class StorageAccessTests(unittest.TestCase):
             ]
             self.assertEqual(
                 [v["metadata"]["name"] for v in created],
-                [access.UPLOADER_SECRET, access.SERVER_SECRET],
+                [access.UPLOADER_SECRET, access.SERVER_SECRET, access.UPLOADER_SECRET],
             )
+            self.assertEqual(
+                [v["metadata"]["namespace"] for v in created],
+                [access.store.NAMESPACE, access.store.NAMESPACE, access.EXECUTION_NAMESPACE],
+            )
+            self.assertEqual(created[0]["stringData"], created[2]["stringData"])
             self.assertTrue(all(v["immutable"] for v in created))
             self.assertNotIn(BOOT["secret-key"], output.getvalue())
             self.assertNotIn(UPLOAD["secret-key"], output.getvalue())
@@ -109,7 +117,11 @@ class StorageAccessTests(unittest.TestCase):
 
     def test_partial_creation_reuses_uploader(self):
         with (
-            patch.object(access.cluster, "run", side_effect=[*existing()[:2], "", ""]) as run,
+            patch.object(
+                access.cluster,
+                "run",
+                side_effect=[*existing()[:2], "", existing()[3], ""],
+            ) as run,
             patch.object(access.secrets, "token_hex") as random,
             redirect_stdout(io.StringIO()),
         ):
@@ -118,14 +130,49 @@ class StorageAccessTests(unittest.TestCase):
             created = json.loads(run.call_args.kwargs["input_data"])
             self.assertEqual(created["metadata"]["name"], access.SERVER_SECRET)
 
+    def test_missing_execution_copy_is_repaired_without_rotation(self):
+        with (
+            patch.object(
+                access.cluster,
+                "run",
+                side_effect=[*existing()[:3], "", ""],
+            ) as run,
+            patch.object(access.secrets, "token_hex") as random,
+            redirect_stdout(io.StringIO()),
+        ):
+            access.ensure_credentials(access.cluster.ROOT, create=True)
+            random.assert_not_called()
+            created = json.loads(run.call_args.kwargs["input_data"])
+            self.assertEqual(created["metadata"]["namespace"], access.EXECUTION_NAMESPACE)
+            self.assertEqual(created["stringData"], UPLOAD)
+
+    def test_different_execution_copy_is_rejected_before_writes(self):
+        other = secret(
+            access.UPLOADER_SECRET,
+            {"access-key": "e" * 32, "secret-key": "f" * 64},
+            access.EXECUTION_NAMESPACE,
+        )
+        with (
+            patch.object(
+                access.cluster,
+                "run",
+                side_effect=[*existing()[:3], other],
+            ) as run,
+            patch.object(access.secrets, "token_hex") as random,
+        ):
+            with self.assertRaisesRegex(ValueError, "differ"):
+                access.ensure_credentials(access.cluster.ROOT, create=True)
+            random.assert_not_called()
+            self.assertFalse(any("create" in c.args[0] for c in run.call_args_list))
+
     def test_mismatches_and_missing_credentials_fail_before_writes(self):
         altered = json.loads(existing()[2])
         altered["data"]["s3.json"] = base64.b64encode(b'{"identities":[]}').decode()
         for responses, create in [
-            ([existing()[0], "", existing()[2]], True),
-            ([existing()[0], "", "", ACTIVE], True),
-            ([existing()[0], "", ""], False),
-            ([*existing()[:2], json.dumps(altered)], True),
+            ([existing()[0], "", existing()[2], ""], True),
+            ([existing()[0], "", "", "", ACTIVE], True),
+            ([existing()[0], "", "", ""], False),
+            ([*existing()[:2], json.dumps(altered), existing()[3]], True),
             ([*existing(), "{}"], False),
         ]:
             with (

@@ -21,6 +21,7 @@ else:
 UPLOADER_SECRET = "perfeng-s3-uploader-auth"
 SERVER_SECRET = "perfeng-s3-server-auth-v3"
 POLICY = "local-artifact-upload"
+EXECUTION_NAMESPACE = "perf-generators"
 
 
 def policy() -> dict[str, Any]:
@@ -59,13 +60,18 @@ def server_config(bootstrap: dict[str, str], uploader: dict[str, str]) -> dict[s
     return result
 
 
-def decode(value: dict[str, Any], name: str, keys: set[str]) -> dict[str, str]:
+def decode(
+    value: dict[str, Any],
+    name: str,
+    keys: set[str],
+    namespace: str = store.NAMESPACE,
+) -> dict[str, str]:
     try:
         if (
             value["type"] != "Opaque"
             or value["immutable"] is not True
             or value["metadata"]["name"] != name
-            or value["metadata"]["namespace"] != store.NAMESPACE
+            or value["metadata"]["namespace"] != namespace
             or value["metadata"]["labels"]["app.kubernetes.io/managed-by"] != store.OWNER
             or set(value["data"]) != keys
         ):
@@ -83,13 +89,17 @@ def decode(value: dict[str, Any], name: str, keys: set[str]) -> dict[str, str]:
         ) from None
 
 
-def secret_document(name: str, data: dict[str, str]) -> dict[str, Any]:
+def secret_document(
+    name: str,
+    data: dict[str, str],
+    namespace: str = store.NAMESPACE,
+) -> dict[str, Any]:
     return {
         "apiVersion": "v1",
         "kind": "Secret",
         "metadata": {
             "name": name,
-            "namespace": store.NAMESPACE,
+            "namespace": namespace,
             "labels": {"app.kubernetes.io/managed-by": store.OWNER},
         },
         "type": "Opaque",
@@ -106,10 +116,24 @@ def uses_server_secret(text: str) -> bool:
 
 def ensure_credentials(root: Path, *, create: bool) -> None:
     kube = store.kubectl(root)
+    execution_kube = [
+        "kubectl",
+        "--kubeconfig",
+        str(cluster.kubeconfig(root)),
+        "--context",
+        cluster.CONTEXT,
+        "-n",
+        EXECUTION_NAMESPACE,
+        "--request-timeout=30s",
+    ]
     current = {}
     for name in [store.SECRET, UPLOADER_SECRET, SERVER_SECRET]:
         text = cluster.run([*kube, "get", "secret", name, "--ignore-not-found", "-o", "json"])
         current[name] = json.loads(text) if text.strip() else None
+    execution_text = cluster.run(
+        [*execution_kube, "get", "secret", UPLOADER_SECRET, "--ignore-not-found", "-o", "json"]
+    )
+    execution_uploader = json.loads(execution_text) if execution_text.strip() else None
     bootstrap_secret = current[store.SECRET]
     if bootstrap_secret is None:
         raise ValueError("Bootstrap S3 credentials missing; deploy object storage first")
@@ -117,6 +141,10 @@ def ensure_credentials(root: Path, *, create: bool) -> None:
     bootstrap = decode(bootstrap_secret, store.SECRET, {"access-key", "secret-key", "s3.json"})
     uploader = current[UPLOADER_SECRET]
     server = current[SERVER_SECRET]
+    if uploader is None and execution_uploader is not None:
+        raise ValueError(
+            "Execution uploader credentials exist without the platform Secret; restore the pair"
+        )
     if uploader is None and server is not None:
         raise ValueError(
             "Server credentials exist without uploader Secret; restore the matching Secret"
@@ -136,6 +164,17 @@ def ensure_credentials(root: Path, *, create: bool) -> None:
         credentials = {"access-key": secrets.token_hex(16), "secret-key": secrets.token_hex(32)}
     else:
         credentials = decode(uploader, UPLOADER_SECRET, {"access-key", "secret-key"})
+    if (
+        execution_uploader is not None
+        and decode(
+            execution_uploader,
+            UPLOADER_SECRET,
+            {"access-key", "secret-key"},
+            EXECUTION_NAMESPACE,
+        )
+        != credentials
+    ):
+        raise ValueError("Execution uploader credentials differ from the platform identity")
     if any(credentials[key] == bootstrap[key] for key in credentials):
         raise ValueError("Uploader credentials must differ from bootstrap credentials")
     expected = server_config(bootstrap, credentials)
@@ -157,6 +196,17 @@ def ensure_credentials(root: Path, *, create: bool) -> None:
                 [*kube, "create", "-f", "-"],
                 input_data=json.dumps(secret_document(name, data)).encode(),
             )
+    if execution_uploader is None:
+        if not create:
+            raise ValueError(
+                "Execution uploader credentials missing; run object_store.py deploy --execute"
+            )
+        cluster.run(
+            [*execution_kube, "create", "-f", "-"],
+            input_data=json.dumps(
+                secret_document(UPLOADER_SECRET, credentials, EXECUTION_NAMESPACE)
+            ).encode(),
+        )
     if not create:
         active = cluster.run([*kube, "get", "statefulset", "seaweedfs", "-o", "json"])
         if not uses_server_secret(active):
