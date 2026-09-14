@@ -298,9 +298,15 @@ The standard non-HA installation is appropriate for the disposable local spike,
 not production. Production topology, SSO, external secrets, network exposure,
 backups, high availability and controller resource sizing remain undecided.
 
-The next migration task exercises a real immutable runtime selection change,
-including pre-staging, Argo CD rollout, smoke acceptance and Git rollback,
-before more stateful services move to GitOps.
+The first immutable promotion moves the required HTTP listener policy from a
+chart-level override into the complete runtime ConfigMap. The deployment lock
+selects chart `0.4.0` and the new content-addressed ConfigMap together. Operators
+pre-stage that ConfigMap before merge; Argo CD then rolls out the new selection
+without mutating or deleting the previous one. Reverting the Git selection
+restores the prior chart and ConfigMap identity.
+
+The next migration work defines retention and rollback tests for PostgreSQL and
+SeaweedFS before either stateful service moves under Argo CD ownership.
 
 ## Upgrading Argo CD
 

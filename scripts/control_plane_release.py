@@ -32,6 +32,7 @@ VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 REPOSITORY_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
 RUNTIME_CONFIG_MAP = re.compile(r"perfeng-control-plane-runtime-[0-9a-f]{12}")
 REGISTRY_CONFIG_MAP = re.compile(r"perfeng-runtime-registry-[0-9a-f]{12}")
+CONTROL_PLANE_HTTP_PORT = 8080
 
 
 @dataclass(frozen=True)
@@ -191,6 +192,9 @@ def validate_deployment_source(lock: DeploymentLock, read: Callable[[str], bytes
         raise ValueError("Pinned chart has the wrong identity")
     if chart.get("version") != lock.chart_version:
         raise ValueError("Pinned chart version differs from the deployment lock")
+    values = yaml.safe_load(read(f"{lock.chart_path}/values.yaml"))
+    if not isinstance(values, Mapping) or values.get("httpPort") != CONTROL_PLANE_HTTP_PORT:
+        raise ValueError("Pinned chart HTTP port differs from the environment contract")
 
     manifest_path = f"{lock.bundle_path}/registry.json"
     manifest = json.loads(read(manifest_path), object_pairs_hook=unique_object)

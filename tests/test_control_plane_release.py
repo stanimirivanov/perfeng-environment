@@ -11,6 +11,7 @@ from unittest.mock import patch
 import yaml
 
 from scripts.control_plane_release import (
+    CONTROL_PLANE_HTTP_PORT,
     DEPLOYMENT_REPOSITORY,
     load_lock,
     revision_reader,
@@ -87,6 +88,9 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             "charts/control-plane/Chart.yaml": yaml.safe_dump(
                 {"name": "perfeng-control-plane", "version": "0.2.0"}
             ).encode(),
+            "charts/control-plane/values.yaml": yaml.safe_dump(
+                {"httpPort": CONTROL_PLANE_HTTP_PORT}
+            ).encode(),
             "bundles/local-kind-windows/1.1.0/registry.json": json.dumps(
                 {
                     "schemaVersion": 1,
@@ -116,6 +120,13 @@ class ControlPlaneReleaseTests(unittest.TestCase):
 
         validate_deployment_source(lock, read)
 
+        files["charts/control-plane/values.yaml"] = yaml.safe_dump({"httpPort": 8081}).encode()
+        with self.assertRaisesRegex(ValueError, "HTTP port"):
+            validate_deployment_source(lock, read)
+        files["charts/control-plane/values.yaml"] = yaml.safe_dump(
+            {"httpPort": CONTROL_PLANE_HTTP_PORT}
+        ).encode()
+
         del files["bundles/local-kind-windows/1.1.0/jobs/analysis.yaml"]
         with self.assertRaises(ValueError):
             validate_deployment_source(lock, read)
@@ -139,6 +150,7 @@ class ControlPlaneReleaseTests(unittest.TestCase):
     def test_rejects_contract_drift_and_traversing_entry_paths(self) -> None:
         lock = self.load()
         chart = yaml.safe_dump({"name": "perfeng-control-plane", "version": "0.2.0"}).encode()
+        chart_values = yaml.safe_dump({"httpPort": CONTROL_PLANE_HTTP_PORT}).encode()
         for entry in [
             {"contractsVersion": "0.14.0", "policy": "policies/checkout.json"},
             {"contractsVersion": "0.13.0", "policy": "../outside.json"},
@@ -148,6 +160,8 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             def read(path: str, registry: bytes = manifest) -> bytes:
                 if path.endswith("Chart.yaml"):
                     return chart
+                if path.endswith("values.yaml"):
+                    return chart_values
                 if path.endswith("registry.json"):
                     return registry
                 return b"present"
