@@ -53,7 +53,8 @@ class ControlPlaneRuntimeTests(unittest.TestCase):
 
     def test_configuration_is_complete_and_contains_no_credentials(self) -> None:
         values = runtime.runtime_configuration(RELEASE)
-        self.assertEqual(len(values), 33)
+        self.assertEqual(len(values), 34)
+        self.assertEqual(values["PERFENG_HTTP_ADDRESS"], ":8080")
         self.assertEqual(values["PERFENG_CONTRACTS_VERSION"], "0.13.0")
         self.assertFalse(any("PASSWORD" in key or "DATABASE_URL" in key for key in values))
 

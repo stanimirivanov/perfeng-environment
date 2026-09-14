@@ -13,6 +13,7 @@ import yaml
 if __package__:
     from . import cluster, control_plane_database, postgres, storage_access
     from .control_plane_release import (
+        CONTROL_PLANE_HTTP_PORT,
         DEFAULT_K8S_ROOT,
         DEPLOYMENT_REPOSITORY,
         REVISION,
@@ -28,6 +29,7 @@ else:
     import postgres
     import storage_access
     from control_plane_release import (
+        CONTROL_PLANE_HTTP_PORT,
         DEFAULT_K8S_ROOT,
         DEPLOYMENT_REPOSITORY,
         REVISION,
@@ -56,6 +58,7 @@ PERMISSIONS = [
 def runtime_configuration(release: DeploymentLock) -> dict[str, str]:
     """Return the complete non-secret local process policy supplied by envFrom."""
     return {
+        "PERFENG_HTTP_ADDRESS": f":{CONTROL_PLANE_HTTP_PORT}",
         "PERFENG_HTTP_READ_HEADER_TIMEOUT": "5s",
         "PERFENG_HTTP_READ_TIMEOUT": "15s",
         "PERFENG_HTTP_WRITE_TIMEOUT": "30s",

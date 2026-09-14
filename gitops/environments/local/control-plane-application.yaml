@@ -11,7 +11,7 @@ spec:
   project: perfeng-local
   source:
     repoURL: https://github.com/stanimirivanov/perfeng-k8s.git
-    targetRevision: 0ef84d55af3bd69a6a58eb14f2dbb1cf21a2531c
+    targetRevision: 87837d49a4d90071b3fc47484f236e8de07d92d3
     path: charts/control-plane
     helm:
       releaseName: control-plane
@@ -19,7 +19,8 @@ spec:
         image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:ec073372f7a27620f7322fc74eb722dca6754ef8133888e79971c1514186f278
         imagePullSecret: perfeng-control-plane-registry
         executionNamespace: perf-generators
-        runtimeConfigMap: perfeng-control-plane-runtime-35b4be7ee294
+        httpPort: 8080
+        runtimeConfigMap: perfeng-control-plane-runtime-229648fd65d0
         runtimeSecret: perfeng-control-plane-runtime
         authenticationSecret: perfeng-control-plane-authentication
         registryConfigMap: perfeng-runtime-registry-ab0e16d589c4

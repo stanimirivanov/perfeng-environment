@@ -11,6 +11,7 @@ from unittest.mock import patch
 import yaml
 
 from scripts.control_plane_release import (
+    CONTROL_PLANE_HTTP_PORT,
     DEPLOYMENT_REPOSITORY,
     load_lock,
     revision_reader,
@@ -57,6 +58,35 @@ class ControlPlaneReleaseTests(unittest.TestCase):
         self.assertIn("@sha256:", lock.image)
         self.assertEqual(lock.runtime_config_map, "perfeng-control-plane-runtime-" + "4" * 12)
 
+    def test_ci_checkouts_match_the_deployment_lock(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        lock = load_lock(root / "deployments/local-control-plane.json")
+        workflow = yaml.safe_load((root / ".github/workflows/validate.yml").read_text())
+        steps = workflow["jobs"]["validate"]["steps"]
+        checkouts = {step.get("name"): step.get("with") for step in steps if "name" in step}
+        token = "${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}"
+
+        self.assertEqual(
+            checkouts["Check out pinned control-plane deployment source"],
+            {
+                "repository": "stanimirivanov/perfeng-k8s",
+                "ref": lock.deployment_revision,
+                "token": token,
+                "path": "perfeng-k8s",
+                "persist-credentials": False,
+            },
+        )
+        self.assertEqual(
+            checkouts["Check out pinned control-plane source"],
+            {
+                "repository": "stanimirivanov/perfeng-control-plane",
+                "ref": lock.source_revision,
+                "token": token,
+                "path": "perfeng-control-plane",
+                "persist-credentials": False,
+            },
+        )
+
     def test_rejects_mutable_or_ambiguous_identity(self) -> None:
         cases = [
             ("image", "ghcr.io/stanimirivanov/perfeng-control-plane:latest"),
@@ -87,6 +117,9 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             "charts/control-plane/Chart.yaml": yaml.safe_dump(
                 {"name": "perfeng-control-plane", "version": "0.2.0"}
             ).encode(),
+            "charts/control-plane/values.yaml": yaml.safe_dump(
+                {"httpPort": CONTROL_PLANE_HTTP_PORT}
+            ).encode(),
             "bundles/local-kind-windows/1.1.0/registry.json": json.dumps(
                 {
                     "schemaVersion": 1,
@@ -116,6 +149,13 @@ class ControlPlaneReleaseTests(unittest.TestCase):
 
         validate_deployment_source(lock, read)
 
+        files["charts/control-plane/values.yaml"] = yaml.safe_dump({"httpPort": 8081}).encode()
+        with self.assertRaisesRegex(ValueError, "HTTP port"):
+            validate_deployment_source(lock, read)
+        files["charts/control-plane/values.yaml"] = yaml.safe_dump(
+            {"httpPort": CONTROL_PLANE_HTTP_PORT}
+        ).encode()
+
         del files["bundles/local-kind-windows/1.1.0/jobs/analysis.yaml"]
         with self.assertRaises(ValueError):
             validate_deployment_source(lock, read)
@@ -139,6 +179,7 @@ class ControlPlaneReleaseTests(unittest.TestCase):
     def test_rejects_contract_drift_and_traversing_entry_paths(self) -> None:
         lock = self.load()
         chart = yaml.safe_dump({"name": "perfeng-control-plane", "version": "0.2.0"}).encode()
+        chart_values = yaml.safe_dump({"httpPort": CONTROL_PLANE_HTTP_PORT}).encode()
         for entry in [
             {"contractsVersion": "0.14.0", "policy": "policies/checkout.json"},
             {"contractsVersion": "0.13.0", "policy": "../outside.json"},
@@ -148,6 +189,8 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             def read(path: str, registry: bytes = manifest) -> bytes:
                 if path.endswith("Chart.yaml"):
                     return chart
+                if path.endswith("values.yaml"):
+                    return chart_values
                 if path.endswith("registry.json"):
                     return registry
                 return b"present"
