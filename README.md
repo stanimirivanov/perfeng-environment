@@ -47,9 +47,10 @@ The [local control-plane deployment lock](docs/local-control-plane.md) pins the
 published service image, reviewed Helm chart and runtime-registry bundle before
 deployment. Its preview-first registry command validates private GHCR access and
 creates only the externally managed image-pull Secret required by the chart.
-The [local GitOps foundation](docs/local-gitops.md) is a parallel, reversible
-Argo CD spike. It manages its AppProject and the sample SUT as the first child
-Application without replacing the remaining Milestone 1 deployment path.
+The [local GitOps foundation](docs/local-gitops.md) is a reversible Argo CD
+spike. It manages its AppProject, sample SUT and control-plane workloads while
+the existing commands continue to provision stateful services, migrations,
+credentials and immutable runtime inputs.
 
 ## Layout
 

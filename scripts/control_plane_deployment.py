@@ -243,20 +243,37 @@ def validate_endpoint(path: str, response: str) -> None:
         raise ValueError("Unknown control-plane operational endpoint")
 
 
-def verify_workload(kube: list[str], release: DeploymentLock, root: Path) -> None:
-    """Verify rollout, resource identity, Pod readiness and operational responses."""
-    status = json.loads(cluster.run(helm_status_command(root)))
+def verify_resources(kube: list[str], release: DeploymentLock) -> None:
+    """Verify resource identity, Pod readiness and operational responses."""
     cluster.run([*kube, "rollout", "status", f"deployment/{RELEASE}", "--timeout=300s"])
     deployment = json.loads(cluster.run([*kube, "get", "deployment", RELEASE, "-o", "json"]))
     service = json.loads(cluster.run([*kube, "get", "service", RELEASE, "-o", "json"]))
     pods = json.loads(cluster.run([*kube, "get", "pods", "-l", SELECTOR, "-o", "json"]))
-    validate_helm_status(status, release)
     validate_deployment(deployment, release)
     validate_service(service)
     validate_pods(pods, release)
     proxy = f"/api/v1/namespaces/{postgres.NAMESPACE}/services/http:{RELEASE}:http/proxy"
     for path in ("livez", "readyz", "metrics"):
         validate_endpoint(path, cluster.run([*kube, "get", "--raw", f"{proxy}/{path}"]))
+
+
+def verify_workload(kube: list[str], release: DeploymentLock, root: Path) -> None:
+    """Verify the legacy Helm release and its live workload resources."""
+    status = json.loads(cluster.run(helm_status_command(root)))
+    validate_helm_status(status, release)
+    verify_resources(kube, release)
+
+
+def verify_managed_workload(root: Path = cluster.ROOT) -> None:
+    """Verify prerequisites and resources without assuming a deployment reconciler."""
+    release = validate_release(
+        root / "deployments/local-control-plane.json",
+        root.parent / "perfeng-k8s",
+        root.parent / "perfeng-control-plane",
+    )
+    control_plane_migration.execute("health", root)
+    control_plane_runtime.execute("health", root)
+    verify_resources(postgres.kubectl(root), release)
 
 
 def execute(action: str, root: Path = cluster.ROOT) -> None:

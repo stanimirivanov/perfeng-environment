@@ -2,30 +2,31 @@
 
 ## TL;DR
 
-- This is a parallel architecture spike; it does not replace or modify the
-  working Milestone 1 deployment path.
+- Argo CD now owns the sample SUT and control-plane workloads; the existing
+  commands still provision their external infrastructure and runtime inputs.
 - Argo CD is selected through the official, human-readable `v3.5.2` install
   manifest; the upstream manifest supplies its tested dependency image tags.
 - Run `gitops.py validate` offline before review, then merge the GitOps files to
   `main` before executing bootstrap because the root Application reads `main`.
-- Set `PERFENG_REPOSITORIES_READ_TOKEN` to a GitHub token with read-only Contents
-  access to the private repositories before executing deployment.
-- The root and sample-SUT Applications synchronize automatically, but pruning
-  and self-healing remain disabled during the spike.
+- Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
+  with read-only Contents access to the private repositories before deployment.
+- The root, sample-SUT and control-plane Applications synchronize automatically,
+  but pruning and self-healing remain disabled during the spike.
 
 ## Scope
 
 This step installs a non-HA Argo CD control plane into the existing verified
 `perfeng-local` kind cluster, provisions one immutable private-repository
-credential, and creates the `perfeng-local-root` Application. The root currently
-manages the restricted `perfeng-local` AppProject and the sample SUT as its first
-child Application. PostgreSQL, SeaweedFS, the control plane and performance-Run
-resources are not migrated yet.
+credential, and creates the `perfeng-local-root` Application. The root manages
+the restricted `perfeng-local` AppProject, the sample SUT and the control plane
+as child Applications. PostgreSQL, SeaweedFS, database migrations, runtime
+Secrets and ConfigMaps, and performance-Run resources are not migrated yet.
 
-The existing Python deployment commands remain available as the Milestone 1
-rollback path. Once the child Application is active, Argo CD owns the sample SUT
-and `cluster.py deploy --execute` must not be run concurrently. Other existing
-deployments are unchanged, and this step performs no data migration.
+The existing Helm deployment commands remain available as the Milestone 1
+rollback path. Once the child Applications are active, do not run
+`cluster.py deploy --execute` or `control_plane_deployment.py deploy --execute`.
+Other existing deployments are unchanged, and this step performs no data
+migration or credential rotation.
 
 Environment composition in this spike lives in Kustomize and Argo CD resources.
 The small Python boundary does not generate those resources: it verifies the
@@ -49,6 +50,8 @@ The first command verifies:
 - the official Argo CD source and explicit semantic release tag;
 - root Application source, destination and non-destructive sync policy;
 - sample-SUT chart source, release name, destination and sync policy;
+- control-plane chart commit, image digest, runtime resource names, registry
+  mounts, destination and sync policy against the reviewed deployment lock;
 - creation of only the explicitly allowed `perf-sut` destination namespace;
 - agreement between the AppProject source repositories and `workspace.json`.
 
@@ -79,17 +82,46 @@ foundation before deployment so that Argo CD can find
 `gitops/environments/local` in the remote repository.
 
 If the GitOps foundation is already running, merging this change causes the root
-Application to create the sample-SUT child automatically. Run the health command
-afterward; rerunning deployment is safe but not required.
+Application to create both child Applications automatically. Run the health
+command afterward; rerunning deployment is safe but not required.
 
-Use the same private-repository token used by repository validation. It needs
-read-only Contents access to the private `perfeng-*` repositories. Package-only
-access is insufficient for Git. Store it only in the current process
-environment:
+The control-plane child intentionally does not generate or own credentials,
+database state, migrations or runtime configuration. Before merging or
+executing this step against a fresh cluster, complete the provisioning sections
+in [the local control-plane guide](local-control-plane.md) through **Runtime
+inputs**, then verify the external resources:
 
 ```powershell
-$env:PERFENG_REPOSITORIES_READ_TOKEN = Read-Host `
+uv run --locked python scripts/control_plane_migration.py health --execute
+uv run --locked python scripts/control_plane_runtime.py health --execute
+```
+
+The Application may report `Degraded` until these prerequisites exist. Argo CD
+does not replace, rotate or delete them.
+
+Use the same private-repository token used by repository validation. Create a
+fine-grained personal access token restricted to the `perfeng-*` repositories,
+with repository **Contents** set to **Read-only**; GitHub adds read-only Metadata
+access automatically. It needs no write permission and no Packages permission.
+The classic `PERFENG_REPOSITORIES_READ_TOKEN` with `read:packages` remains a
+separate GHCR credential and cannot check out private Git repositories. Store
+the source token only in the current process environment:
+
+```powershell
+$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
   "GitHub private-repository read token" -MaskInput
+uv run --locked python scripts/gitops.py deploy --execute
+```
+
+If an earlier GitOps bootstrap created the immutable repository-credential
+Secret from the package-only token, replace only that known owned Secret before
+rerunning deployment. This is an explicit credential rotation; deployment never
+deletes or silently overwrites it:
+
+```powershell
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n argocd delete secret `
+  perfeng-github-repository-credentials
 uv run --locked python scripts/gitops.py deploy --execute
 ```
 
@@ -103,9 +135,12 @@ The command:
 5. waits for all six Deployments and the application-controller StatefulSet;
 6. creates or validates an immutable Argo CD repository-credential template;
 7. ownership-checks and applies the local root Application;
-8. waits for the root and sample-SUT Applications to become `Synced` and
-   `Healthy`;
-9. waits for the sample-SUT Deployment rollout.
+8. waits for the root, sample-SUT and control-plane Applications to become
+   `Synced` and `Healthy`;
+9. waits for the sample-SUT Deployment rollout;
+10. validates the control-plane prerequisites, exact image and resource shape,
+    ready Pod, Service, and operational endpoints without requiring Helm release
+    history.
 
 On a fresh cluster the child creates its exact `perf-sut` destination namespace.
 The AppProject does not permit an arbitrary destination, and an existing
@@ -127,9 +162,10 @@ uv run --locked python scripts/gitops.py health --execute
 ```
 
 The executable command validates namespace and Secret ownership, waits for the
-pinned Argo CD workloads, verifies the root Application identity, requires the
-root and sample-SUT Applications to be both `Synced` and `Healthy`, and waits for
-the sample-SUT Deployment rollout.
+pinned Argo CD workloads, verifies the root Application identity, requires all
+three Applications to be both `Synced` and `Healthy`, and validates both child
+workloads. Control-plane acceptance is reconciler-neutral: it validates live
+resources and endpoints without expecting a Helm release record.
 
 Standard Kubernetes inspection remains available without installing the Argo CD
 CLI:
@@ -169,6 +205,35 @@ uv run --locked python scripts/cluster.py deploy --execute
 The order matters: deleting the child before the Git revert reaches `main`
 allows the root Application to recreate it.
 
+## Control-plane ownership and rollback
+
+The control-plane child renders `charts/control-plane` from the exact
+`perfeng-k8s` commit selected in `deployments/local-control-plane.json`. Its
+values use the selected image digest and name the immutable runtime resources
+assembled from that same reviewed release. Argo CD owns only the chart's
+Deployment, Service and service account/RBAC resources; the prerequisite
+Secrets, ConfigMaps, migration Job, PostgreSQL data and SeaweedFS data stay
+outside the Application.
+
+Do not use the legacy control-plane Helm deployment command while this child is
+active. To return workload ownership to Helm:
+
+1. merge a revert that removes `control-plane-application.yaml` from the local
+   root Kustomization;
+2. delete only the unwanted Application while orphaning its workloads;
+3. run the legacy deployment command to reassert the Helm release.
+
+```powershell
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n argocd delete application `
+  perfeng-local-control-plane --cascade=orphan
+uv run --locked python scripts/control_plane_deployment.py deploy --execute
+```
+
+The control-plane child sets `CreateNamespace=false` deliberately. The
+externally provisioned prerequisites create and validate `perf-platform` before
+the workload is reconciled.
+
 ## Safety and limitations
 
 Bootstrap does not delete or adopt an existing `argocd` namespace owned by
@@ -180,9 +245,9 @@ The standard non-HA installation is appropriate for the disposable local spike,
 not production. Production topology, SSO, external secrets, network exposure,
 backups, high availability and controller resource sizing remain undecided.
 
-The next migration task deploys the control plane with content-addressed runtime
-configuration. Drift correction and immutable promotion are tested only after
-that child exists.
+The next migration task proves controlled drift correction and immutable
+promotion for the two child Applications before more stateful services move to
+GitOps.
 
 ## Upgrading Argo CD
 

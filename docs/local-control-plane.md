@@ -1,5 +1,18 @@
 # Local control-plane release
 
+## TL;DR
+
+- The deployment lock pins the control-plane source, image digest, chart commit
+  and runtime bundle as one reviewed selection.
+- Provision PostgreSQL, storage, registry access, migrations and immutable
+  runtime inputs in the order below; Argo CD does not own those resources yet.
+- The preferred workload reconciler is the control-plane child Application in
+  [the local GitOps environment](local-gitops.md).
+- Do not run the legacy Helm deploy command while that Application is active;
+  it is retained only as an explicit rollback path.
+- Smoke and persistence checks validate the live workload without depending on
+  Helm release history.
+
 `deployments/local-control-plane.json` is the reviewed deployment lock for the
 first local control-plane integration. It selects three independent immutable
 identities:
@@ -155,7 +168,30 @@ same runtime bytes; advancing the chart does not rotate credentials.
 
 ## Service deployment and operational acceptance
 
-After all immutable runtime inputs pass health checks, deploy the control plane:
+After all immutable runtime inputs pass health checks, use the control-plane
+child Application described in [the local GitOps guide](local-gitops.md). The
+Application renders the chart from the exact locked `perfeng-k8s` commit and
+supplies only non-secret resource names and the immutable image identity.
+Credentials remain in Kubernetes Secrets and do not enter Application values.
+
+After the GitOps change is merged to `main`, verify reconciliation and the live
+workload:
+
+```sh
+uv run --locked python scripts/gitops.py validate
+uv run --locked python scripts/gitops.py health --execute
+```
+
+Acceptance requires the root and control-plane Applications to be `Synced` and
+`Healthy`, one fully available Deployment, and one ready Pod using the locked
+image reference, exact runtime resource mounts and dedicated control-plane node.
+It also validates the ClusterIP Service and requests `/livez`, `/readyz` and
+`/metrics` through the authenticated Kubernetes API service proxy without
+exposing a host port. Health is read-only and does not repair or replace a
+divergent release.
+
+The former Helm deployment remains an explicit rollback path. Use it only after
+removing the control-plane child Application as documented in the GitOps guide:
 
 ```sh
 uv run --locked python scripts/control_plane_deployment.py deploy
@@ -163,19 +199,8 @@ uv run --locked python scripts/control_plane_deployment.py deploy --execute
 uv run --locked python scripts/control_plane_deployment.py health --execute
 ```
 
-The deploy command reconstructs the chart from the exact locked `perfeng-k8s`
-commit in a temporary directory. It does not use chart files from the sibling
-working tree. Helm receives only non-secret resource names and immutable image
-identity; credentials remain in Kubernetes Secrets and do not enter Helm values
-or release history.
-
-Acceptance requires a deployed Helm release with the locked chart version, one
-fully available Deployment and one ready Pod using the locked image reference,
-the exact runtime resource mounts and the dedicated control-plane node. It also
-validates the ClusterIP Service and requests
-`/livez`, `/readyz` and `/metrics` through the authenticated Kubernetes API
-service proxy, without exposing a host port. Health is read-only and does not
-repair or replace a divergent release.
+The legacy deploy reconstructs the chart from the locked commit in a temporary
+directory and validates Helm release history in addition to the live resources.
 
 ## Authenticated k6-to-analysis smoke run
 
