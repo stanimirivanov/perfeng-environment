@@ -2,17 +2,55 @@ import base64
 import hashlib
 import json
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 from scripts import control_plane_runtime as runtime
 from scripts.control_plane_release import DeploymentLock
 
 RELEASE = DeploymentLock(
-    "image", "a" * 40, "b" * 40, "chart", "1.0.0", "bundle/1.0.0", "1.0.0", "0.13.0"
+    "image",
+    "a" * 40,
+    "b" * 40,
+    "chart",
+    "1.0.0",
+    "bundle/1.0.0",
+    "1.0.0",
+    "0.13.0",
+    "perfeng-control-plane-runtime-" + "1" * 12,
+    "perfeng-runtime-registry-" + "2" * 12,
 )
 
 
 class ControlPlaneRuntimeTests(unittest.TestCase):
+    def test_content_address_is_order_independent_and_changes_with_data(self) -> None:
+        first = runtime.content_addressed_name("configuration", {"a": "1", "b": "2"})
+        reordered = runtime.content_addressed_name("configuration", {"b": "2", "a": "1"})
+        changed = runtime.content_addressed_name("configuration", {"a": "1", "b": "3"})
+
+        self.assertEqual(first, reordered)
+        self.assertNotEqual(first, changed)
+        self.assertRegex(first, r"^configuration-[0-9a-f]{12}$")
+
+    def test_lock_must_select_names_derived_from_reviewed_bytes(self) -> None:
+        runtime_data = {"runtime": "value"}
+        registry_data = {"registry": "value"}
+        release = replace(
+            RELEASE,
+            runtime_config_map=runtime.content_addressed_name(
+                runtime.RUNTIME_CONFIG_PREFIX, runtime_data
+            ),
+            registry_config_map=runtime.content_addressed_name(
+                runtime.REGISTRY_CONFIG_PREFIX, registry_data
+            ),
+        )
+
+        runtime.validate_config_map_selection(release, runtime_data, registry_data)
+        with self.assertRaisesRegex(ValueError, "runtime ConfigMap identity"):
+            runtime.validate_config_map_selection(release, {"runtime": "changed"}, registry_data)
+        with self.assertRaisesRegex(ValueError, "registry ConfigMap identity"):
+            runtime.validate_config_map_selection(release, runtime_data, {"registry": "changed"})
+
     def test_configuration_is_complete_and_contains_no_credentials(self) -> None:
         values = runtime.runtime_configuration(RELEASE)
         self.assertEqual(len(values), 33)

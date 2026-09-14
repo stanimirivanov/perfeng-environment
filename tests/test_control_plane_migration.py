@@ -16,6 +16,8 @@ RELEASE = DeploymentLock(
     bundle_path="bundles/local-kind-windows/1.1.0",
     bundle_version="1.1.0",
     contracts_version="0.13.0",
+    runtime_config_map="perfeng-control-plane-runtime-" + "1" * 12,
+    registry_config_map="perfeng-runtime-registry-" + "2" * 12,
 )
 
 

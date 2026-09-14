@@ -61,6 +61,10 @@ jobs:
           --k8s-root ../perfeng-k8s
           --control-plane-root ../perfeng-control-plane
         working-directory: perfeng-environment
+      - name: Validate content-addressed runtime selection
+        if: runner.os == 'Linux'
+        run: uv run --locked python scripts/control_plane_runtime.py validate
+        working-directory: perfeng-environment
       - name: Install Helm for offline rendering
         if: runner.os == 'Linux'
         shell: bash

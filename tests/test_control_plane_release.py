@@ -40,6 +40,10 @@ class ControlPlaneReleaseTests(unittest.TestCase):
                     "version": "1.1.0",
                     "contractsVersion": "0.13.0",
                 },
+                "runtimeResources": {
+                    "runtimeConfigMap": "perfeng-control-plane-runtime-" + "4" * 12,
+                    "registryConfigMap": "perfeng-runtime-registry-" + "5" * 12,
+                },
             },
         }
 
@@ -51,6 +55,7 @@ class ControlPlaneReleaseTests(unittest.TestCase):
         lock = self.load()
         self.assertEqual(lock.chart_version, "0.2.0")
         self.assertIn("@sha256:", lock.image)
+        self.assertEqual(lock.runtime_config_map, "perfeng-control-plane-runtime-" + "4" * 12)
 
     def test_rejects_mutable_or_ambiguous_identity(self) -> None:
         cases = [
@@ -58,6 +63,8 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             ("sourceRevision", "main"),
             ("chartPath", "../control-plane"),
             ("bundleVersion", "1.2.0"),
+            ("runtimeConfigMap", "perfeng-control-plane-runtime"),
+            ("registryConfigMap", "perfeng-runtime-registry"),
         ]
         for field, value in cases:
             with self.subTest(field=field):
@@ -66,6 +73,8 @@ class ControlPlaneReleaseTests(unittest.TestCase):
                     candidate["controlPlane"][field] = value
                 elif field == "chartPath":
                     candidate["deployment"]["chart"]["path"] = value
+                elif field in {"runtimeConfigMap", "registryConfigMap"}:
+                    candidate["deployment"]["runtimeResources"][field] = value
                 else:
                     candidate["deployment"]["runtimeBundle"]["version"] = value
                 self.path.write_text(json.dumps(candidate), encoding="utf-8")

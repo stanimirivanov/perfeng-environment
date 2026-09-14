@@ -61,10 +61,10 @@ def helm_command(chart: Path, release: DeploymentLock, root: Path) -> list[str]:
         "image": release.image,
         "imagePullSecret": IMAGE_PULL_SECRET,
         "executionNamespace": EXECUTION_NAMESPACE,
-        "runtimeConfigMap": control_plane_runtime.RUNTIME_CONFIG,
+        "runtimeConfigMap": release.runtime_config_map,
         "runtimeSecret": control_plane_runtime.RUNTIME_SECRET,
         "authenticationSecret": control_plane_runtime.AUTHENTICATION_SECRET,
-        "registryConfigMap": control_plane_runtime.REGISTRY_CONFIG,
+        "registryConfigMap": release.registry_config_map,
     }
     for name, value in values.items():
         command.extend(["--set-string", f"{name}={value}"])
@@ -136,7 +136,7 @@ def validate_deployment(value: dict[str, Any], release: DeploymentLock) -> None:
     env_from = container.get("envFrom")
     volumes = {item.get("name"): item for item in template.get("volumes", [])}
     expected_env_from = [
-        {"configMapRef": {"name": control_plane_runtime.RUNTIME_CONFIG}},
+        {"configMapRef": {"name": release.runtime_config_map}},
         {"secretRef": {"name": control_plane_runtime.RUNTIME_SECRET}},
     ]
     expected_registry_items = registry_items(release)
@@ -160,7 +160,7 @@ def validate_deployment(value: dict[str, Any], release: DeploymentLock) -> None:
         or volumes.get("authentication", {}).get("secret", {}).get("secretName")
         != control_plane_runtime.AUTHENTICATION_SECRET
         or volumes.get("registry", {}).get("configMap", {}).get("name")
-        != control_plane_runtime.REGISTRY_CONFIG
+        != release.registry_config_map
         or volumes.get("registry", {}).get("configMap", {}).get("items") != expected_registry_items
     ):
         raise ValueError("Control-plane Deployment differs from the reviewed release")

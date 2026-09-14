@@ -30,6 +30,8 @@ CONTROL_PLANE_IMAGE = re.compile(
 REVISION = re.compile(r"[0-9a-f]{40}")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 REPOSITORY_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
+RUNTIME_CONFIG_MAP = re.compile(r"perfeng-control-plane-runtime-[0-9a-f]{12}")
+REGISTRY_CONFIG_MAP = re.compile(r"perfeng-runtime-registry-[0-9a-f]{12}")
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,8 @@ class DeploymentLock:
     bundle_path: str
     bundle_version: str
     contracts_version: str
+    runtime_config_map: str
+    registry_config_map: str
 
 
 def mapping(value: Any, fields: set[str], location: str) -> Mapping[str, Any]:
@@ -98,7 +102,9 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
     image = string(control_plane["image"], CONTROL_PLANE_IMAGE, "control-plane image")
 
     deployment = mapping(
-        root["deployment"], {"repository", "revision", "chart", "runtimeBundle"}, "deployment"
+        root["deployment"],
+        {"repository", "revision", "chart", "runtimeBundle", "runtimeResources"},
+        "deployment",
     )
     if deployment["repository"] != DEPLOYMENT_REPOSITORY:
         raise ValueError("Invalid deployment repository")
@@ -116,6 +122,17 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
     contracts_version = string(bundle["contractsVersion"], VERSION, "contracts version")
     if PurePosixPath(bundle_path).name != bundle_version:
         raise ValueError("Runtime-bundle path and version differ")
+    resources = mapping(
+        deployment["runtimeResources"],
+        {"runtimeConfigMap", "registryConfigMap"},
+        "runtime resources",
+    )
+    runtime_config_map = string(
+        resources["runtimeConfigMap"], RUNTIME_CONFIG_MAP, "runtime ConfigMap"
+    )
+    registry_config_map = string(
+        resources["registryConfigMap"], REGISTRY_CONFIG_MAP, "registry ConfigMap"
+    )
 
     return DeploymentLock(
         image=image,
@@ -126,6 +143,8 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
         bundle_path=bundle_path,
         bundle_version=bundle_version,
         contracts_version=contracts_version,
+        runtime_config_map=runtime_config_map,
+        registry_config_map=registry_config_map,
     )
 
 
