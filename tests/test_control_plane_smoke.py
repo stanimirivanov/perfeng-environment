@@ -187,12 +187,21 @@ class ControlPlaneSmokeTests(unittest.TestCase):
 
         self.assertEqual(verify_workload.call_count, 2)
         kubectl.assert_called_once()
-        self.assertEqual(run.call_count, 4)
+        self.assertEqual(run.call_count, 2)
         self.assertEqual(
-            run.call_args_list[0].args[0][-2:], ["deployment/control-plane", "--replicas=0"]
+            run.call_args_list[0].args[0][-6:],
+            [
+                "delete",
+                "pod",
+                "-l",
+                "app.kubernetes.io/name=perfeng-control-plane",
+                "--wait=true",
+                "--timeout=120s",
+            ],
         )
         self.assertEqual(
-            run.call_args_list[2].args[0][-2:], ["deployment/control-plane", "--replicas=1"]
+            run.call_args_list[1].args[0][-4:],
+            ["rollout", "status", "deployment/control-plane", "--timeout=300s"],
         )
         run_client.assert_called_once_with(smoke.cluster.ROOT, {}, run_id)
 

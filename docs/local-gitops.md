@@ -10,8 +10,8 @@
   `main` before executing bootstrap because the root Application reads `main`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
-- The root, sample-SUT and control-plane Applications synchronize automatically,
-  but pruning and self-healing remain disabled during the spike.
+- The two workload Applications synchronize and self-heal automatically. The
+  root Application does not self-heal, and destructive pruning remains disabled.
 
 ## Scope
 
@@ -180,6 +180,32 @@ kubectl --kubeconfig .local/perfeng-local.kubeconfig `
 Do not paste Secret YAML, decoded credentials or the initial Argo CD admin
 password into an issue or diagnostic output.
 
+## Controlled self-healing acceptance
+
+Self-healing is enabled for the sample-SUT and control-plane Applications only.
+The root Application does not self-heal; accidental live changes to environment
+composition remain visible as drift and require operator correction. Pruning
+remains disabled everywhere.
+
+After this change reaches `main` and GitOps health passes, introduce one bounded,
+reversible replica drift in the stateless sample SUT:
+
+```powershell
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n perf-sut patch deployment sample-sut `
+  --type merge --patch '{"spec":{"replicas":2}}' -o jsonpath='{.spec.replicas}'
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n perf-sut wait `
+  --for=jsonpath='{.spec.replicas}'=1 deployment/sample-sut --timeout=180s
+uv run --locked python scripts/gitops.py health --execute
+```
+
+The patch response must show `2`; the wait succeeds only after Argo CD restores
+the reviewed value `1`. The final health check requires all Applications to be
+`Synced` and `Healthy` and both workloads to pass their existing acceptance
+checks. Do not use the control plane for deliberate drift: the stateless sample
+SUT proves the same reconciliation policy without interrupting the Run API.
+
 ## Sample SUT ownership and rollback
 
 The child Application renders the existing `charts/sample-sut` chart from this
@@ -237,17 +263,17 @@ the workload is reconciled.
 ## Safety and limitations
 
 Bootstrap does not delete or adopt an existing `argocd` namespace owned by
-another installation. It does not rotate an existing credential, enable pruning,
-enable self-healing, expose the Argo CD API server, or install a host-side Argo
-CD CLI. There is deliberately no uninstall command in this step.
+another installation. It does not rotate an existing credential, enable
+pruning, self-heal the root Application, expose the Argo CD API server, or
+install a host-side Argo CD CLI. There is deliberately no uninstall command in
+this step.
 
 The standard non-HA installation is appropriate for the disposable local spike,
 not production. Production topology, SSO, external secrets, network exposure,
 backups, high availability and controller resource sizing remain undecided.
 
-The next migration task proves controlled drift correction and immutable
-promotion for the two child Applications before more stateful services move to
-GitOps.
+The next migration task proves immutable release promotion before more stateful
+services move to GitOps.
 
 ## Upgrading Argo CD
 
