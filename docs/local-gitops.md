@@ -176,6 +176,17 @@ three Applications to be both `Synced` and `Healthy`, and validates both child
 workloads. Control-plane acceptance is reconciler-neutral: it validates live
 resources and endpoints without expecting a Helm release record.
 
+Each wait names the exact Deployment, StatefulSet or Application and desired
+state before it starts. An Application that narrowly misses its primary
+180-second reconciliation window receives one 60-second grace period. The
+command inspects status at the timeout boundary first, so a state reached while
+`kubectl wait` exits is accepted without another delay. If reconciliation still
+fails, output includes the Application's sync and health state, revision,
+operation phase, and bounded condition messages. Workload rollout failures
+include replica counts and concise Pod readiness, restart and waiting reasons.
+The diagnostic queries never read Secret resources, redact common credential
+forms from controller messages, and do not change cluster state.
+
 Standard Kubernetes inspection remains available without installing the Argo CD
 CLI:
 
