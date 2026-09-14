@@ -18,6 +18,8 @@ RELEASE = DeploymentLock(
     "bundle/1.0.0",
     "1.0.0",
     "0.13.0",
+    "perfeng-control-plane-runtime-" + "1" * 12,
+    "perfeng-runtime-registry-" + "2" * 12,
 )
 ITEMS = [
     {"key": "jobs--analysis.yaml", "path": "jobs/analysis.yaml"},
@@ -47,7 +49,8 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
 
         arguments = "\n".join(command)
         self.assertIn(f"image={RELEASE.image}", arguments)
-        self.assertIn("runtimeConfigMap=perfeng-control-plane-runtime", arguments)
+        self.assertIn(f"runtimeConfigMap={RELEASE.runtime_config_map}", arguments)
+        self.assertIn(f"registryConfigMap={RELEASE.registry_config_map}", arguments)
         self.assertIn("authenticationSecret=perfeng-control-plane-authentication", arguments)
         self.assertIn("registryItems[0].path=jobs/analysis.yaml", arguments)
         self.assertNotIn("PASSWORD", arguments)
@@ -99,7 +102,7 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
                                 "name": "control-plane",
                                 "image": RELEASE.image,
                                 "envFrom": [
-                                    {"configMapRef": {"name": "perfeng-control-plane-runtime"}},
+                                    {"configMapRef": {"name": RELEASE.runtime_config_map}},
                                     {"secretRef": {"name": "perfeng-control-plane-runtime"}},
                                 ],
                             }
@@ -121,7 +124,7 @@ class ControlPlaneDeploymentTests(unittest.TestCase):
                             {
                                 "name": "registry",
                                 "configMap": {
-                                    "name": "perfeng-runtime-registry",
+                                    "name": RELEASE.registry_config_map,
                                     "items": ITEMS,
                                 },
                             },

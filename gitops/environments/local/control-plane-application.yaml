@@ -19,10 +19,10 @@ spec:
         image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:ec073372f7a27620f7322fc74eb722dca6754ef8133888e79971c1514186f278
         imagePullSecret: perfeng-control-plane-registry
         executionNamespace: perf-generators
-        runtimeConfigMap: perfeng-control-plane-runtime
+        runtimeConfigMap: perfeng-control-plane-runtime-35b4be7ee294
         runtimeSecret: perfeng-control-plane-runtime
         authenticationSecret: perfeng-control-plane-authentication
-        registryConfigMap: perfeng-runtime-registry
+        registryConfigMap: perfeng-runtime-registry-ab0e16d589c4
         registryItems:
           - key: jobs--analysis.yaml
             path: jobs/analysis.yaml

@@ -7,7 +7,16 @@ from scripts import control_plane_smoke as smoke
 from scripts.control_plane_release import DeploymentLock
 
 RELEASE = DeploymentLock(
-    "image", "a" * 40, "b" * 40, "chart", "1.0.0", "bundle/1.0.0", "1.0.0", "0.13.0"
+    "image",
+    "a" * 40,
+    "b" * 40,
+    "chart",
+    "1.0.0",
+    "bundle/1.0.0",
+    "1.0.0",
+    "0.13.0",
+    "perfeng-control-plane-runtime-" + "1" * 12,
+    "perfeng-runtime-registry-" + "2" * 12,
 )
 POLICY = b'{"metadata":{"name":"checkout-observe","version":"1.0.0"}}'
 ENTRY = {

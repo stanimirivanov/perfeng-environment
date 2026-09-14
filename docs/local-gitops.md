@@ -4,6 +4,8 @@
 
 - Argo CD now owns the sample SUT and control-plane workloads; the existing
   commands still provision their external infrastructure and runtime inputs.
+- Non-secret control-plane runtime inputs use lock-selected, content-addressed
+  ConfigMap names, allowing new and old selections to coexist.
 - Argo CD is selected through the official, human-readable `v3.5.2` install
   manifest; the upstream manifest supplies its tested dependency image tags.
 - Run `gitops.py validate` offline before review, then merge the GitOps files to
@@ -98,6 +100,13 @@ uv run --locked python scripts/control_plane_runtime.py health --execute
 
 The Application may report `Degraded` until these prerequisites exist. Argo CD
 does not replace, rotate or delete them.
+
+For a runtime-selection change, run the updated runtime `validate` and `deploy`
+commands from the reviewed branch before merging it. This creates only the new
+content-addressed ConfigMaps; it does not change the current Deployment. Merge
+the lock and Application reference together, then let Argo CD perform the
+rollout and run GitOps health. The previous ConfigMaps remain available for a
+Git revert because pruning is disabled.
 
 Use the same private-repository token used by repository validation. Create a
 fine-grained personal access token restricted to the `perfeng-*` repositories,
@@ -241,6 +250,12 @@ Deployment, Service and service account/RBAC resources; the prerequisite
 Secrets, ConfigMaps, migration Job, PostgreSQL data and SeaweedFS data stay
 outside the Application.
 
+The non-secret ConfigMap identities are derived from their exact canonical
+content and recorded in the deployment lock. Changing their bytes therefore
+creates a new resource rather than mutating or manually deleting the active
+immutable ConfigMap. Secret identities remain stable and credential rotation
+stays outside GitOps.
+
 Do not use the legacy control-plane Helm deployment command while this child is
 active. To return workload ownership to Helm:
 
@@ -272,8 +287,9 @@ The standard non-HA installation is appropriate for the disposable local spike,
 not production. Production topology, SSO, external secrets, network exposure,
 backups, high availability and controller resource sizing remain undecided.
 
-The next migration task proves immutable release promotion before more stateful
-services move to GitOps.
+The next migration task exercises a real immutable runtime selection change,
+including pre-staging, Argo CD rollout, smoke acceptance and Git rollback,
+before more stateful services move to GitOps.
 
 ## Upgrading Argo CD
 

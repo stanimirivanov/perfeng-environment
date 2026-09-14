@@ -38,10 +38,10 @@ else:
         validate as validate_release,
     )
 
-RUNTIME_CONFIG = "perfeng-control-plane-runtime"
+RUNTIME_CONFIG_PREFIX = "perfeng-control-plane-runtime"
 RUNTIME_SECRET = "perfeng-control-plane-runtime"
 AUTHENTICATION_SECRET = "perfeng-control-plane-authentication"
-REGISTRY_CONFIG = "perfeng-runtime-registry"
+REGISTRY_CONFIG_PREFIX = "perfeng-runtime-registry"
 OWNER = postgres.OWNER
 PERMISSIONS = [
     "runs:create",
@@ -90,6 +90,36 @@ def runtime_configuration(release: DeploymentLock) -> dict[str, str]:
         "PERFENG_RECONCILIATION_REPORTING_ATTEMPT_TIMEOUT": "16s",
         "PERFENG_RECONCILIATION_REPORTING_RETRY_AFTER": "8s",
     }
+
+
+def content_addressed_name(prefix: str, data: dict[str, str]) -> str:
+    """Return the deterministic Kubernetes identity for non-secret data."""
+    payload = json.dumps(
+        data,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"{prefix}-{hashlib.sha256(payload).hexdigest()[:12]}"
+
+
+def validate_config_map_selection(
+    release: DeploymentLock,
+    runtime_data: dict[str, str],
+    registry_data: dict[str, str],
+) -> None:
+    """Require the lock to select the identities derived from reviewed bytes."""
+    expected = {
+        "runtime": content_addressed_name(RUNTIME_CONFIG_PREFIX, runtime_data),
+        "registry": content_addressed_name(REGISTRY_CONFIG_PREFIX, registry_data),
+    }
+    selected = {
+        "runtime": release.runtime_config_map,
+        "registry": release.registry_config_map,
+    }
+    for purpose in expected:
+        if selected[purpose] != expected[purpose]:
+            raise ValueError(f"Locked {purpose} ConfigMap identity differs from reviewed bytes")
 
 
 def selected_registry_paths(manifest_bytes: bytes) -> list[str]:
@@ -216,6 +246,9 @@ def validate_resource(value: dict[str, Any], expected: dict[str, Any]) -> None:
 def execute(action: str, root: Path = cluster.ROOT) -> None:
     """Create or verify the complete external runtime input set."""
     release = validate_release()
+    runtime_data = runtime_configuration(release)
+    registry_data = registry_files(release)
+    validate_config_map_selection(release, runtime_data, registry_data)
     cluster.verify_local_docker()
     cluster.verify_context(root)
     kube = postgres.kubectl(root)
@@ -227,9 +260,9 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
     )
     credentials = runtime_credentials(database, uploader)
     resources = [
-        object_document("ConfigMap", RUNTIME_CONFIG, runtime_configuration(release), release),
+        object_document("ConfigMap", release.runtime_config_map, runtime_data, release),
         object_document("Secret", RUNTIME_SECRET, credentials, release),
-        object_document("ConfigMap", REGISTRY_CONFIG, registry_files(release), release),
+        object_document("ConfigMap", release.registry_config_map, registry_data, release),
     ]
     current: dict[tuple[str, str], dict[str, Any] | None] = {}
     for resource in resources:
@@ -278,11 +311,19 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["deploy", "health"])
+    parser.add_argument("action", choices=["validate", "deploy", "health"])
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     try:
-        if args.execute:
+        if args.action == "validate":
+            release = validate_release()
+            validate_config_map_selection(
+                release,
+                runtime_configuration(release),
+                registry_files(release),
+            )
+            print("Validated content-addressed control-plane runtime selection.")
+        elif args.execute:
             execute(args.action)
         else:
             print("Preview: assemble immutable control-plane configuration and credentials.")

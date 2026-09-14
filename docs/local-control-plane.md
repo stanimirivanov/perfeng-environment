@@ -3,7 +3,8 @@
 ## TL;DR
 
 - The deployment lock pins the control-plane source, image digest, chart commit
-  and runtime bundle as one reviewed selection.
+  runtime bundle and content-addressed runtime ConfigMaps as one reviewed
+  selection.
 - Provision PostgreSQL, storage, registry access, migrations and immutable
   runtime inputs in the order below; Argo CD does not own those resources yet.
 - The preferred workload reconciler is the control-plane child Application in
@@ -150,6 +151,7 @@ After migration health passes, assemble the external inputs required by the
 control-plane chart:
 
 ```sh
+uv run --locked python scripts/control_plane_runtime.py validate
 uv run --locked python scripts/control_plane_runtime.py deploy
 uv run --locked python scripts/control_plane_runtime.py deploy --execute
 uv run --locked python scripts/control_plane_runtime.py health --execute
@@ -165,6 +167,20 @@ later smoke client. Existing resources must match every owned byte and are never
 updated or rotated implicitly. Their creation-revision annotation remains
 historical provenance when a later chart-only deployment commit selects the
 same runtime bytes; advancing the chart does not rotate credentials.
+
+The two non-secret ConfigMap names end with the first 12 hexadecimal characters
+of the SHA-256 digest of their canonical JSON data. The deployment lock records
+those derived names, and `validate` fails when either name differs from the
+reviewed runtime or registry bytes. Runtime and authentication Secrets retain
+stable names because credential rotation is a separate explicit operation.
+
+When a reviewed change produces new runtime bytes, deploy the new runtime inputs
+before merging the Application reference. The new immutable ConfigMaps coexist
+with the current selection, so pre-staging does not affect the running workload.
+After the merge, Argo CD changes the Deployment reference and performs the
+rollout. Old ConfigMaps are deliberately retained while pruning is disabled;
+they support rollback and require a separate reviewed retention policy before
+cleanup.
 
 ## Service deployment and operational acceptance
 

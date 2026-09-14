@@ -16,6 +16,10 @@
       "path": "bundles/local-kind-windows/1.1.3",
       "version": "1.1.3",
       "contractsVersion": "0.13.0"
+    },
+    "runtimeResources": {
+      "runtimeConfigMap": "perfeng-control-plane-runtime-35b4be7ee294",
+      "registryConfigMap": "perfeng-runtime-registry-ab0e16d589c4"
     }
   }
 }
