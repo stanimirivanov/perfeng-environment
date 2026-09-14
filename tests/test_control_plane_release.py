@@ -58,6 +58,35 @@ class ControlPlaneReleaseTests(unittest.TestCase):
         self.assertIn("@sha256:", lock.image)
         self.assertEqual(lock.runtime_config_map, "perfeng-control-plane-runtime-" + "4" * 12)
 
+    def test_ci_checkouts_match_the_deployment_lock(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        lock = load_lock(root / "deployments/local-control-plane.json")
+        workflow = yaml.safe_load((root / ".github/workflows/validate.yml").read_text())
+        steps = workflow["jobs"]["validate"]["steps"]
+        checkouts = {step.get("name"): step.get("with") for step in steps if "name" in step}
+        token = "${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}"
+
+        self.assertEqual(
+            checkouts["Check out pinned control-plane deployment source"],
+            {
+                "repository": "stanimirivanov/perfeng-k8s",
+                "ref": lock.deployment_revision,
+                "token": token,
+                "path": "perfeng-k8s",
+                "persist-credentials": False,
+            },
+        )
+        self.assertEqual(
+            checkouts["Check out pinned control-plane source"],
+            {
+                "repository": "stanimirivanov/perfeng-control-plane",
+                "ref": lock.source_revision,
+                "token": token,
+                "path": "perfeng-control-plane",
+                "persist-credentials": False,
+            },
+        )
+
     def test_rejects_mutable_or_ambiguous_identity(self) -> None:
         cases = [
             ("image", "ghcr.io/stanimirivanov/perfeng-control-plane:latest"),
