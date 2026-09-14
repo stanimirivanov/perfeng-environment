@@ -510,9 +510,7 @@ def verify_after_restart(run_id: str, root: Path = cluster.ROOT) -> None:
     kube = postgres.kubectl(root)
     selector = "app.kubernetes.io/name=perfeng-control-plane"
     print("Restarting the control-plane Pod without changing its reviewed template...", flush=True)
-    cluster.run([*kube, "scale", "deployment/control-plane", "--replicas=0"])
-    cluster.run([*kube, "wait", "--for=delete", "pod", "-l", selector, "--timeout=120s"])
-    cluster.run([*kube, "scale", "deployment/control-plane", "--replicas=1"])
+    cluster.run([*kube, "delete", "pod", "-l", selector, "--wait=true", "--timeout=120s"])
     cluster.run([*kube, "rollout", "status", "deployment/control-plane", "--timeout=300s"])
     control_plane_deployment.verify_managed_workload(root)
     result, name = run_client(root, {}, run_id)

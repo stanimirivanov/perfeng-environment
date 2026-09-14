@@ -233,11 +233,12 @@ uv run --locked python scripts/control_plane_smoke.py --verify-run <run-id>
 uv run --locked python scripts/control_plane_smoke.py --verify-run <run-id> --execute
 ```
 
-The executable form first validates the deployment, scales it to zero and back
-to one without changing its reviewed Pod template, validates the replacement,
-then retrieves the selected completed Run and its exact artifact set through a
-new restricted client Pod. PostgreSQL and SeaweedFS are not restarted by this
-check.
+The executable form first validates the deployment, deletes its current Pod
+without changing desired Deployment state, validates the controller-created
+replacement, then retrieves the selected completed Run and its exact artifact
+set through a new restricted client Pod. PostgreSQL and SeaweedFS are not
+restarted by this check. Avoiding a temporary replica change keeps this
+acceptance compatible with GitOps self-healing.
 
 Changing an image, source revision, chart, bundle or contracts version requires
 reviewing a new lock change. Never replace a digest with a tag or a Git commit

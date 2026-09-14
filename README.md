@@ -50,7 +50,8 @@ creates only the externally managed image-pull Secret required by the chart.
 The [local GitOps foundation](docs/local-gitops.md) is a reversible Argo CD
 spike. It manages its AppProject, sample SUT and control-plane workloads while
 the existing commands continue to provision stateful services, migrations,
-credentials and immutable runtime inputs.
+credentials and immutable runtime inputs. Workload Applications self-heal
+reviewed drift; root self-healing and destructive pruning remain disabled.
 
 ## Layout
 
