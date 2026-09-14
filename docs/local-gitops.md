@@ -8,8 +8,8 @@
   manifest; the upstream manifest supplies its tested dependency image tags.
 - Run `gitops.py validate` offline before review, then merge the GitOps files to
   `main` before executing bootstrap because the root Application reads `main`.
-- Set `PERFENG_REPOSITORIES_READ_TOKEN` to a GitHub token with read-only Contents
-  access to the private repositories before executing deployment.
+- Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
+  with read-only Contents access to the private repositories before deployment.
 - The root, sample-SUT and control-plane Applications synchronize automatically,
   but pruning and self-healing remain disabled during the spike.
 
@@ -99,14 +99,29 @@ uv run --locked python scripts/control_plane_runtime.py health --execute
 The Application may report `Degraded` until these prerequisites exist. Argo CD
 does not replace, rotate or delete them.
 
-Use the same private-repository token used by repository validation. It needs
-read-only Contents access to the private `perfeng-*` repositories. Package-only
-access is insufficient for Git. Store it only in the current process
-environment:
+Use the same private-repository token used by repository validation. Create a
+fine-grained personal access token restricted to the `perfeng-*` repositories,
+with repository **Contents** set to **Read-only**; GitHub adds read-only Metadata
+access automatically. It needs no write permission and no Packages permission.
+The classic `PERFENG_REPOSITORIES_READ_TOKEN` with `read:packages` remains a
+separate GHCR credential and cannot check out private Git repositories. Store
+the source token only in the current process environment:
 
 ```powershell
-$env:PERFENG_REPOSITORIES_READ_TOKEN = Read-Host `
+$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
   "GitHub private-repository read token" -MaskInput
+uv run --locked python scripts/gitops.py deploy --execute
+```
+
+If an earlier GitOps bootstrap created the immutable repository-credential
+Secret from the package-only token, replace only that known owned Secret before
+rerunning deployment. This is an explicit credential rotation; deployment never
+deletes or silently overwrites it:
+
+```powershell
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n argocd delete secret `
+  perfeng-github-repository-credentials
 uv run --locked python scripts/gitops.py deploy --execute
 ```
 

@@ -12,29 +12,29 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: perfeng-environment
           persist-credentials: false
       - name: Check out pinned control-plane deployment source
         if: runner.os == 'Linux'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: stanimirivanov/perfeng-k8s
           ref: 0ef84d55af3bd69a6a58eb14f2dbb1cf21a2531c
-          token: ${{ secrets.PERFENG_REPOSITORIES_READ_TOKEN }}
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-k8s
           persist-credentials: false
       - name: Check out pinned control-plane source
         if: runner.os == 'Linux'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: stanimirivanov/perfeng-control-plane
           ref: a9b3945ff3678362c29739fbf122727fe97348be
-          token: ${{ secrets.PERFENG_REPOSITORIES_READ_TOKEN }}
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-control-plane
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version-file: perfeng-environment/.python-version
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9

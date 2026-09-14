@@ -31,7 +31,7 @@ CONTROL_PLANE_NAMESPACE = "perf-platform"
 REPOSITORY_CREDENTIALS = "perfeng-github-repository-credentials"
 REPOSITORY_PREFIX = "https://github.com/stanimirivanov"
 REPOSITORY_URL = REPOSITORY_PREFIX + "/perfeng-environment.git"
-TOKEN_ENVIRONMENT_VARIABLE = "PERFENG_REPOSITORIES_READ_TOKEN"
+TOKEN_ENVIRONMENT_VARIABLE = "PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN"
 DEPLOYMENTS = (
     "argocd-applicationset-controller",
     "argocd-dex-server",
