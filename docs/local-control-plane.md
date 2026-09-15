@@ -13,6 +13,8 @@
   it is retained only as an explicit rollback path.
 - Smoke and persistence checks validate the live workload without depending on
   Helm release history.
+- Diagnose failures in dependency order with the
+  [local troubleshooting runbook](troubleshooting.md).
 
 `deployments/local-control-plane.json` is the reviewed deployment lock for the
 first local control-plane integration. It selects three independent immutable
@@ -33,8 +35,8 @@ uv run --locked python scripts/control_plane_release.py validate
 Validation reads tracked files directly from the locked Git commits. Newer or
 dirty sibling working trees therefore cannot silently change the selected
 source, chart or bundle. CI checks out the exact private revisions using the
-read-only `PERFENG_REPOSITORIES_READ_TOKEN` secret and performs the same
-validation.
+read-only `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` secret and performs the
+same validation.
 
 This lock is deployment input, not proof that an image is registry-addressable
 or that a cluster is healthy. It contains no credentials and does not create

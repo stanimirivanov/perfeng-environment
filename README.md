@@ -11,6 +11,8 @@
   Argo CD control plane without replacing existing deployments.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
+- Start with the [local troubleshooting runbook](docs/troubleshooting.md) when
+  Docker, kind, Argo CD or an end-to-end check fails.
 - Never commit credentials or replace explicit release versions with `stable`,
   `latest`, or branches.
 
