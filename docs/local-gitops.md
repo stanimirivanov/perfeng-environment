@@ -307,8 +307,10 @@ pre-stage that ConfigMap before merge; Argo CD then rolls out the new selection
 without mutating or deleting the previous one. Reverting the Git selection
 restores the prior chart and ConfigMap identity.
 
-The next migration work defines retention and rollback tests for PostgreSQL and
-SeaweedFS before either stateful service moves under Argo CD ownership.
+[ADR 0002](decisions/0002-stateful-gitops-ownership.md) defines the required
+retention, unchanged-identity and rollback acceptance for stateful adoption.
+PostgreSQL is the next child Application; SeaweedFS follows only after the
+PostgreSQL adoption and rollback sequence passes.
 
 ## Upgrading Argo CD
 

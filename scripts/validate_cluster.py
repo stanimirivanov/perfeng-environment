@@ -24,12 +24,21 @@ def validate_object_store() -> None:
     assert all(obj["metadata"]["namespace"] == "perf-platform" for obj in objects)
     sts = next(obj for obj in objects if obj["kind"] == "StatefulSet")
     service = next(obj for obj in objects if obj["kind"] == "Service")
+    assert sts["metadata"]["name"] == "seaweedfs"
+    assert service["metadata"]["name"] == "seaweedfs"
     assert sts["spec"]["replicas"] == 1
+    assert sts["spec"]["serviceName"] == "seaweedfs"
     assert sts["spec"]["persistentVolumeClaimRetentionPolicy"] == {
         "whenDeleted": "Retain",
         "whenScaled": "Retain",
     }
     pod = sts["spec"]["template"]
+    expected_labels = {
+        "app.kubernetes.io/instance": "seaweedfs",
+        "app.kubernetes.io/name": "seaweedfs",
+    }
+    assert sts["spec"]["selector"]["matchLabels"] == expected_labels
+    assert pod["metadata"]["labels"] == expected_labels
     assert service["spec"]["selector"] == pod["metadata"]["labels"]
     assert service["spec"]["type"] == "ClusterIP"
     assert service["spec"]["ports"] == [{"name": "s3", "port": 8333, "targetPort": "s3"}]
@@ -62,9 +71,15 @@ def validate_object_store() -> None:
     assert re.fullmatch(r"haproxy:[0-9.]+-alpine@sha256:[0-9a-f]{64}", proxy["image"])
     assert proxy["ports"] == [{"name": "s3", "containerPort": 8333}]
     proxy_config = next(obj for obj in objects if obj["kind"] == "ConfigMap")
+    assert proxy_config["metadata"]["name"] == "seaweedfs-proxy"
     assert "server local 127.0.0.1:9000 check" in proxy_config["data"]["haproxy.cfg"]
     assert secret["secretName"] == "perfeng-s3-server-auth-v3"
-    claim = sts["spec"]["volumeClaimTemplates"][0]
+    claims = sts["spec"]["volumeClaimTemplates"]
+    assert len(claims) == 1
+    claim = claims[0]
+    assert claim["metadata"]["name"] == "data"
+    assert f"{claim['metadata']['name']}-{sts['metadata']['name']}-0" == "data-seaweedfs-0"
+    assert claim["spec"]["accessModes"] == ["ReadWriteOnce"]
     assert claim["spec"]["storageClassName"] == "standard"
     assert claim["spec"]["resources"]["requests"]["storage"] == "5Gi"
     for override in [
@@ -80,7 +95,8 @@ def validate_object_store() -> None:
         )
         assert result.returncode != 0
     print(
-        "Validated SeaweedFS storage, authentication references, and private listeners (offline)."
+        "Validated SeaweedFS retained identity, storage, authentication references, "
+        "and private listeners (offline)."
     )
 
 
@@ -105,13 +121,21 @@ def validate_postgres() -> None:
     assert all(obj["metadata"]["namespace"] == "perf-platform" for obj in objects)
     sts = next(obj for obj in objects if obj["kind"] == "StatefulSet")
     service = next(obj for obj in objects if obj["kind"] == "Service")
+    assert sts["metadata"]["name"] == "postgres"
+    assert service["metadata"]["name"] == "postgres"
     assert sts["spec"]["replicas"] == 1
-    assert sts["spec"]["serviceName"] == service["metadata"]["name"]
+    assert sts["spec"]["serviceName"] == "postgres"
     assert sts["spec"]["persistentVolumeClaimRetentionPolicy"] == {
         "whenDeleted": "Retain",
         "whenScaled": "Retain",
     }
     pod = sts["spec"]["template"]
+    expected_labels = {
+        "app.kubernetes.io/instance": "postgres",
+        "app.kubernetes.io/name": "postgres",
+    }
+    assert sts["spec"]["selector"]["matchLabels"] == expected_labels
+    assert pod["metadata"]["labels"] == expected_labels
     assert service["spec"]["selector"] == pod["metadata"]["labels"]
     assert service["spec"]["type"] == "ClusterIP"
     assert service["spec"]["clusterIP"] == "None"
@@ -132,11 +156,15 @@ def validate_postgres() -> None:
     assert volumes["auth"]["secret"]["secretName"] == "perfeng-postgres-auth"
     for probe in ["startupProbe", "readinessProbe", "livenessProbe"]:
         assert container[probe]["exec"]["command"][0] == "pg_isready"
-    claim = sts["spec"]["volumeClaimTemplates"][0]
+    claims = sts["spec"]["volumeClaimTemplates"]
+    assert len(claims) == 1
+    claim = claims[0]
+    assert claim["metadata"]["name"] == "data"
+    assert f"{claim['metadata']['name']}-{sts['metadata']['name']}-0" == "data-postgres-0"
     assert claim["spec"]["storageClassName"] == "standard"
     assert claim["spec"]["resources"]["requests"]["storage"] == "2Gi"
     assert claim["spec"]["accessModes"] == ["ReadWriteOnce"]
-    print("Validated local PostgreSQL chart, Secret references, and retained PVC (offline).")
+    print("Validated local PostgreSQL retained identity, Secret references, and PVC (offline).")
 
 
 def validate() -> None:
