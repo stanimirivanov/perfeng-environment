@@ -4,4 +4,5 @@ resources:
   - project.yaml
   - sample-sut-application.yaml
   - postgres-application.yaml
+  - seaweedfs-application.yaml
   - control-plane-application.yaml

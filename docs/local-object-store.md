@@ -1,5 +1,17 @@
 # Local S3 artifact storage
 
+## TL;DR
+
+- SeaweedFS provides private, single-node, S3-compatible local artifact storage
+  backed by the retained `data-seaweedfs-0` PVC.
+- Argo CD adopts the existing `seaweedfs` chart and release without owning or
+  rotating its external credential Secrets.
+- Initial GitOps adoption has pruning and self-healing disabled until identity,
+  restart-persistence and rollback acceptance pass.
+- `object_store.py health --execute` verifies rollout, PVC binding and bucket
+  access; `smoke` creates one durable probe and `verify` reads that exact object.
+- This local service is neither production storage nor a backup system.
+
 SeaweedFS provides the local S3 endpoint for raw artifacts (proposal sections
 35-37 and 83). This single-node development service is not production storage
 or a claim of full AWS S3 compatibility. It replaces the prototype MinIO
@@ -115,6 +127,11 @@ must record artifact URI, checksum, size, measurement
 window, and producer identity using perfeng-contracts. This step does not run k6
 or upload real run artifacts. The prototype MinIO chart/data remains untouched;
 existing data requires explicit export/import, not a filesystem move.
+
+The GitOps child uses the same chart path, release name, StatefulSet, Service,
+external Secrets and generated PVC identity. Do not run the Helm deployment
+command while `perfeng-local-seaweedfs` is active. Adoption and rollback follow
+[ADR 0002](decisions/0002-stateful-gitops-ownership.md).
 
 References: [SeaweedFS pinned source](https://github.com/seaweedfs/seaweedfs/tree/4.45),
 [MinIO maintenance status](https://github.com/minio/minio),

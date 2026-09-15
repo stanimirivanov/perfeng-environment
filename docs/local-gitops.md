@@ -2,8 +2,8 @@
 
 ## TL;DR
 
-- Argo CD owns the sample SUT, PostgreSQL and control-plane workloads. The
-  PostgreSQL child is re-adopted after a successful rollback rehearsal.
+- Argo CD owns the sample SUT, PostgreSQL, SeaweedFS and control-plane workloads.
+  SeaweedFS is entering conservative stateful adoption.
 - Non-secret control-plane runtime inputs use lock-selected, content-addressed
   ConfigMap names, allowing new and old selections to coexist.
 - Argo CD is selected through the official, human-readable `v3.5.2` install
@@ -12,8 +12,8 @@
   `main` before executing bootstrap because the root Application reads `main`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
-- All three workload Applications synchronize and self-heal automatically. The
-  root does not self-heal, and destructive pruning remains disabled.
+- All four workload Applications synchronize automatically. SeaweedFS and the
+  root do not self-heal, and destructive pruning remains disabled.
 - Use the [troubleshooting runbook](troubleshooting.md) to distinguish delayed
   reconciliation, persistent drift and an unhealthy Argo CD controller.
 
@@ -23,10 +23,10 @@ This step installs a non-HA Argo CD control plane into the existing verified
 `perfeng-local` kind cluster, provisions one immutable private-repository
 credential, and creates the `perfeng-local-root` Application. The root manages
 the restricted `perfeng-local` AppProject, the sample SUT and the control plane
-as child Applications. It also re-adopts the existing PostgreSQL Helm release
-after its rollback rehearsal preserved the StatefulSet, PVC, PV, external
-Secret and data. SeaweedFS, database migrations, runtime Secrets and ConfigMaps,
-and performance-Run resources are not migrated yet.
+as child Applications. It also owns the existing PostgreSQL and SeaweedFS Helm
+releases without replacing their StatefulSets, PVCs, PVs, external Secrets or
+data. Database migrations, runtime Secrets and ConfigMaps, and performance-Run
+resources are not migrated.
 
 The existing Helm deployment commands remain available as the Milestone 1
 rollback path. Once the child Applications are active, do not run
@@ -57,6 +57,8 @@ The first command verifies:
 - root Application source, destination and non-destructive sync policy;
 - sample-SUT chart source, release name, destination and sync policy;
 - PostgreSQL chart source, unchanged release name, destination and conservative
+  adoption policy;
+- SeaweedFS chart source, unchanged release name, destination and conservative
   adoption policy;
 - control-plane chart commit, image digest, runtime resource names, registry
   mounts, destination and sync policy against the reviewed deployment lock;
@@ -156,11 +158,12 @@ The command:
 5. waits for all six Deployments and the application-controller StatefulSet;
 6. creates or validates an immutable Argo CD repository-credential template;
 7. ownership-checks and applies the local root Application;
-8. waits for the root, sample-SUT, PostgreSQL and control-plane Applications to
-   become `Synced` and `Healthy`;
+8. waits for the root, sample-SUT, PostgreSQL, SeaweedFS and control-plane
+   Applications to become `Synced` and `Healthy`;
 9. waits for the sample-SUT Deployment rollout;
 10. verifies the PostgreSQL rollout, retained PVC and authenticated SQL access;
-11. validates the control-plane prerequisites, exact image and resource shape,
+11. verifies the SeaweedFS rollout, retained PVC and authenticated bucket access;
+12. validates the control-plane prerequisites, exact image and resource shape,
     ready Pod, Service, and operational endpoints without requiring Helm release
     history.
 
@@ -176,7 +179,7 @@ immutable.
 
 ## Health and inspection
 
-Run the read-only health workflow after bootstrap:
+Run the non-destructive health workflow after bootstrap:
 
 ```powershell
 uv run --locked python scripts/gitops.py health
@@ -185,10 +188,14 @@ uv run --locked python scripts/gitops.py health --execute
 
 The executable command validates namespace and Secret ownership, waits for the
 pinned Argo CD workloads, verifies the root Application identity, requires all
-four Applications to be both `Synced` and `Healthy`, and validates the sample
-SUT, PostgreSQL and control-plane workloads. Workload acceptance is
+five Applications to be both `Synced` and `Healthy`, and validates the sample
+SUT, PostgreSQL, SeaweedFS and control-plane workloads. Workload acceptance is
 reconciler-neutral: it validates live resources and endpoints without expecting
 a Helm release record.
+
+The SeaweedFS health check creates one bounded, short-lived client Job for
+authenticated bucket access. It does not upload an object, create a bucket,
+rotate credentials or modify stored data.
 
 Each wait names the exact Deployment, StatefulSet or Application and desired
 state before it starts. An Application that narrowly misses its primary
@@ -217,8 +224,8 @@ password into an issue or diagnostic output.
 ## Controlled self-healing acceptance
 
 Self-healing is enabled for the sample-SUT, PostgreSQL and control-plane
-Applications. The root does not self-heal, so composition drift remains visible
-and requires operator correction. Pruning remains disabled everywhere.
+Applications. SeaweedFS remains observation-only during initial adoption, and
+the root does not self-heal. Pruning remains disabled everywhere.
 
 After this change reaches `main` and GitOps health passes, introduce one bounded,
 reversible replica drift in the stateless sample SUT:
@@ -307,6 +314,21 @@ This drift test does not change replicas, the Pod template, credentials or
 storage. Finish by verifying the recorded identities and probe. Do not run
 `scripts/postgres.py deploy --execute` while the child is active.
 
+## SeaweedFS ownership and adoption
+
+The SeaweedFS child renders `charts/seaweedfs` with the unchanged release name
+`seaweedfs` into `perf-platform`. The first adoption enables synchronization but
+keeps pruning and self-healing disabled. Its server and client credentials stay
+outside direct Argo CD ownership, and the retained PVC continues to be generated
+by the existing StatefulSet claim template.
+
+Before merge, record the StatefulSet, PVC, PV and credential Secret identities
+and create one conditional S3 probe. After adoption, require unchanged identities
+and verify the exact earlier probe ID. Restart only SeaweedFS and verify that same
+object again. Do not run `scripts/object_store.py deploy --execute` while the
+child is active. Rollback and self-healing remain later reviewed steps under
+[ADR 0002](decisions/0002-stateful-gitops-ownership.md).
+
 ## Control-plane ownership and rollback
 
 The control-plane child renders `charts/control-plane` from the exact
@@ -363,8 +385,8 @@ restores the prior chart and ConfigMap identity.
 
 [ADR 0002](decisions/0002-stateful-gitops-ownership.md) defines the required
 retention, unchanged-identity and rollback acceptance for stateful adoption.
-PostgreSQL is enabling stateful self-healing after successful adoption, rollback
-and re-adoption. SeaweedFS follows after this final PostgreSQL acceptance passes.
+PostgreSQL completed its stateful migration. SeaweedFS is entering conservative
+adoption and must still pass restart, rollback, re-adoption and self-healing.
 
 ## Upgrading Argo CD
 
