@@ -6,8 +6,8 @@
   PVC; it is not production storage or a backup system.
 - `postgres.py deploy --execute` provisions the immutable external credential
   and Helm release for initial bootstrap or explicit GitOps rollback only.
-- Once `perfeng-local-postgres` is active, Argo CD owns the StatefulSet and
-  Service. Do not run the Helm deployment command concurrently.
+- `perfeng-local-postgres` is temporarily inactive for its rollback rehearsal.
+  Run Helm only after the child Application has been orphaned.
 - `postgres.py health --execute` remains reconciler-neutral and verifies the
   rollout, bound PVC and authenticated SQL access.
 - Stateful GitOps adoption must preserve StatefulSet, PVC, PV and Secret UIDs
@@ -34,8 +34,8 @@ uv run --locked python scripts/postgres.py health --execute
 ```
 
 The deploy command is the bootstrap path before the PostgreSQL Argo CD child is
-introduced and the rollback path after that child has been orphaned. Once the
-child Application is active, use `gitops.py health --execute` or the standalone
+introduced and the rollback path after that child has been orphaned. During
+active GitOps ownership, use `gitops.py health --execute` or the standalone
 PostgreSQL health command; do not run another Helm upgrade.
 
 Without `--execute`, no cluster calls, credential generation, or writes occur.
