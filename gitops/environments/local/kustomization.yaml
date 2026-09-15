@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
   - project.yaml
   - sample-sut-application.yaml
+  - postgres-application.yaml
   - control-plane-application.yaml
