@@ -1,5 +1,18 @@
 # Local PostgreSQL
 
+## TL;DR
+
+- PostgreSQL is a single-instance local metadata database with a retained 2 GiB
+  PVC; it is not production storage or a backup system.
+- `postgres.py deploy --execute` provisions the immutable external credential
+  and Helm release for initial bootstrap or explicit GitOps rollback only.
+- Once `perfeng-local-postgres` is active, Argo CD owns the StatefulSet and
+  Service. Do not run the Helm deployment command concurrently.
+- `postgres.py health --execute` remains reconciler-neutral and verifies the
+  rollout, bound PVC and authenticated SQL access.
+- Stateful GitOps adoption must preserve StatefulSet, PVC, PV and Secret UIDs
+  and the pre-adoption persistence probe defined by ADR 0002.
+
 This optional foundation provides the metadata database from proposal sections
 37-38 and 83. It is a single-instance development database, not production
 storage, a SUT database, or the object store for raw artifacts.
@@ -19,6 +32,11 @@ uv run --locked python scripts/postgres.py deploy
 uv run --locked python scripts/postgres.py deploy --execute
 uv run --locked python scripts/postgres.py health --execute
 ```
+
+The deploy command is the bootstrap path before the PostgreSQL Argo CD child is
+introduced and the rollback path after that child has been orphaned. Once the
+child Application is active, use `gitops.py health --execute` or the standalone
+PostgreSQL health command; do not run another Helm upgrade.
 
 Without `--execute`, no cluster calls, credential generation, or writes occur.
 Execution verifies the local Docker endpoint and dedicated kind kubeconfig before
@@ -58,10 +76,12 @@ run PostgreSQL health separately when using this optional component.
   the physical host and competes with Kubernetes. This is not a calibrated lab.
 - PVC: `data-postgres-0`, 2 GiB, `ReadWriteOnce`, kind local-path storage.
 
-The environment owns the server deployment, bootstrap credentials, storage
-configuration, and application-login provisioning. `perfeng-control-plane` owns
-its tables, migrations, runtime privilege contract, and upgrade tests. This base
-database command installs no application roles or schema; the separate
+The environment repository owns the desired server deployment, bootstrap
+credentials, storage configuration, and application-login provisioning. Argo CD
+reconciles the StatefulSet and Service while the credential Secret and generated
+PVC keep their separate lifecycles. `perfeng-control-plane` owns its tables,
+migrations, runtime privilege contract, and upgrade tests. This base database
+command installs no application roles or schema; the separate
 [control-plane release workflow](local-control-plane.md#database-identities)
 provisions least-privilege logins without giving the service bootstrap access.
 
@@ -101,7 +121,8 @@ PowerShell text pipeline. Test `pg_restore` into a separate disposable database
 before relying on the export. Backup scheduling, encryption, retention policies,
 automated restore, and major-version migration are not implemented here.
 
-Manual persistence acceptance after a successful deployment (local fixture only):
+Manual persistence acceptance after a successful deployment or before GitOps
+adoption (local fixture only):
 
 ```sh
 kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local -n perf-platform exec postgres-0 -- psql -X -U postgres -d perfeng -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS environment_smoke; CREATE TABLE IF NOT EXISTS environment_smoke.persistence_probe (id integer PRIMARY KEY); INSERT INTO environment_smoke.persistence_probe VALUES (1) ON CONFLICT DO NOTHING;"
