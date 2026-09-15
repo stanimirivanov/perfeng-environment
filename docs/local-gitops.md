@@ -12,8 +12,8 @@
   `main` before executing bootstrap because the root Application reads `main`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
-- All three workload Applications synchronize automatically. PostgreSQL and the
-  root do not self-heal, and destructive pruning remains disabled.
+- All three workload Applications synchronize and self-heal automatically. The
+  root does not self-heal, and destructive pruning remains disabled.
 - Use the [troubleshooting runbook](troubleshooting.md) to distinguish delayed
   reconciliation, persistent drift and an unhealthy Argo CD controller.
 
@@ -216,10 +216,9 @@ password into an issue or diagnostic output.
 
 ## Controlled self-healing acceptance
 
-Self-healing is enabled for the stateless sample-SUT and control-plane
-Applications only. The re-adopted PostgreSQL Application and root do not
-self-heal. Stateful or composition drift therefore remains visible and requires
-operator correction. Pruning remains disabled everywhere.
+Self-healing is enabled for the sample-SUT, PostgreSQL and control-plane
+Applications. The root does not self-heal, so composition drift remains visible
+and requires operator correction. Pruning remains disabled everywhere.
 
 After this change reaches `main` and GitOps health passes, introduce one bounded,
 reversible replica drift in the stateless sample SUT:
@@ -267,9 +266,9 @@ allows the root Application to recreate it.
 
 ## PostgreSQL ownership and adoption
 
-The reviewed PostgreSQL child renders the existing `charts/postgres` chart with
-the unchanged Helm release name `postgres` into `perf-platform`. Its policy has
-automated synchronization enabled but both pruning and self-healing disabled.
+The reviewed PostgreSQL child renders `charts/postgres` with the unchanged Helm
+release name `postgres` into `perf-platform`. Its policy has automated
+synchronization and self-healing enabled while pruning remains disabled.
 The chart continues to reference the separately provisioned immutable Secret
 and generates the same retained `data-postgres-0` PVC through the same
 StatefulSet claim template.
@@ -288,11 +287,25 @@ adoption restart, orphan propagation, Helm reassertion and a rollback restart.
 This revision reactivates the exact reviewed child manifest without changing its
 chart, release name or conservative sync policy.
 
-After this revision reaches `main`, require the child to become `Synced` and
-`Healthy`, verify the same recorded identities and probe, restart PostgreSQL,
-and repeat those checks. Do not run `scripts/postgres.py deploy --execute` while
-the child is active. A later reviewed change may enable PostgreSQL self-healing
-only after this re-adoption acceptance passes; pruning remains disabled.
+The re-adoption also passed with unchanged identities and probe through another
+restart. This revision enables self-healing and makes the chart's rolling-update
+partition explicit at `0`. After merge, test only that safe field by changing it
+to `1` and waiting for Argo CD to restore `0`:
+
+```powershell
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n perf-platform patch statefulset postgres `
+  --type merge --patch '{"spec":{"updateStrategy":{"rollingUpdate":{"partition":1}}}}'
+kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+  --context kind-perfeng-local -n perf-platform wait `
+  --for=jsonpath='{.spec.updateStrategy.rollingUpdate.partition}'=0 `
+  statefulset/postgres --timeout=180s
+uv run --locked python scripts/gitops.py health --execute
+```
+
+This drift test does not change replicas, the Pod template, credentials or
+storage. Finish by verifying the recorded identities and probe. Do not run
+`scripts/postgres.py deploy --execute` while the child is active.
 
 ## Control-plane ownership and rollback
 
@@ -350,9 +363,8 @@ restores the prior chart and ConfigMap identity.
 
 [ADR 0002](decisions/0002-stateful-gitops-ownership.md) defines the required
 retention, unchanged-identity and rollback acceptance for stateful adoption.
-PostgreSQL is being re-adopted after its successful rollback rehearsal. Enabling
-its stateful self-healing is next. SeaweedFS follows only after that sequence
-passes.
+PostgreSQL is enabling stateful self-healing after successful adoption, rollback
+and re-adoption. SeaweedFS follows after this final PostgreSQL acceptance passes.
 
 ## Upgrading Argo CD
 

@@ -7,7 +7,8 @@
 - `postgres.py deploy --execute` provisions the immutable external credential
   and Helm release for initial bootstrap or explicit GitOps rollback only.
 - `perfeng-local-postgres` is re-adopted after its successful rollback
-  rehearsal. Do not run Helm while the child Application is active.
+  rehearsal and self-heals non-destructive drift. Pruning remains disabled; do
+  not run Helm while the child Application is active.
 - `postgres.py health --execute` remains reconciler-neutral and verifies the
   rollout, bound PVC and authenticated SQL access.
 - Stateful GitOps adoption must preserve StatefulSet, PVC, PV and Secret UIDs
@@ -75,6 +76,8 @@ run PostgreSQL health separately when using this optional component.
   Database activity therefore avoids the two workload workers, but still shares
   the physical host and competes with Kubernetes. This is not a calibrated lab.
 - PVC: `data-postgres-0`, 2 GiB, `ReadWriteOnce`, kind local-path storage.
+- Chart: `0.2.0`, with an explicit rolling-update partition of `0` used for a
+  non-disruptive self-healing acceptance check.
 
 The environment repository owns the desired server deployment, bootstrap
 credentials, storage configuration, and application-login provisioning. Argo CD

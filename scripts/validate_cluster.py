@@ -125,6 +125,10 @@ def validate_postgres() -> None:
     assert service["metadata"]["name"] == "postgres"
     assert sts["spec"]["replicas"] == 1
     assert sts["spec"]["serviceName"] == "postgres"
+    assert sts["spec"]["updateStrategy"] == {
+        "type": "RollingUpdate",
+        "rollingUpdate": {"partition": 0},
+    }
     assert sts["spec"]["persistentVolumeClaimRetentionPolicy"] == {
         "whenDeleted": "Retain",
         "whenScaled": "Retain",

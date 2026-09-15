@@ -6,6 +6,10 @@ metadata:
 spec:
   serviceName: {{ .Release.Name }}
   replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
