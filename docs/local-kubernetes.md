@@ -8,6 +8,8 @@
   dedicated `.local/perfeng-local.kubeconfig`.
 - After cluster creation, use either the [GitOps path](local-gitops.md) or the
   legacy Helm deployment path for the sample SUT, never both concurrently.
+- Use the [troubleshooting runbook](troubleshooting.md) before recreating an
+  unavailable cluster or changing kubeconfig state.
 - Teardown permanently destroys all cluster-local state.
 
 This is a disposable development environment, not a production configuration or

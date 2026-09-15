@@ -1,0 +1,326 @@
+# Local platform troubleshooting
+
+## TL;DR
+
+- Run every command from the `perfeng-environment` repository and use
+  `.local/perfeng-local.kubeconfig`; the similarly named context in the global
+  kubeconfig may point to an earlier kind API-server port.
+- Diagnose in dependency order: Docker, kind, Argo CD, Applications, stateful
+  prerequisites, control-plane workload, then the end-to-end smoke path.
+- Stop at the first failing layer. A passing smoke run proves the product path,
+  but it does not waive a persistent GitOps health failure.
+- Commands marked **read-only** inspect or wait. Commands marked **mutating**
+  intentionally change the local environment. Run no **destructive** command
+  unless loss of the disposable cluster and all cluster-local data is intended.
+- Never paste Secret YAML, credential environment variables, decoded tokens or
+  unreviewed logs into an issue.
+
+## Scope and command safety
+
+This runbook diagnoses the supported local Windows and kind environment. It is
+not a production incident procedure. Start PowerShell in the repository root:
+
+```powershell
+Set-Location C:\Source\perf-eng\perfeng-environment
+$kubeconfig = (Resolve-Path .local/perfeng-local.kubeconfig).Path
+```
+
+The labels used below mean:
+
+| Label | Meaning |
+|---|---|
+| **read-only** | Reads local or cluster state, or waits for a condition |
+| **mutating** | Creates, restarts or reconciles an explicitly named local resource |
+| **destructive** | Deletes durable or broad local state |
+
+Preview-first repository commands remain previews until `--execute` is supplied.
+Do not use the legacy `cluster.py deploy --execute` or
+`control_plane_deployment.py deploy --execute` while Argo CD owns the sample SUT
+and control-plane workloads.
+
+## Quick health checklist
+
+Run the checks in order and stop at the first failure.
+
+| Layer | Command | Healthy result |
+|---|---|---|
+| Workspace | `uv run --locked python scripts/workspace.py status` | Every repository is `existing`; no destination is missing or conflicting |
+| Docker | `docker context show` and `docker version` | Context is `desktop-linux`; client and Linux server respond |
+| kind | `kind get clusters` | `perfeng-local` is listed |
+| Kubernetes | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local get nodes` | Three nodes report `Ready` |
+| Argo CD | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get pods` | Every current Argo CD Pod is `Running` and ready |
+| Applications | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get applications -o wide` | Root, sample SUT and control plane are `Synced` and `Healthy` |
+| PostgreSQL | `uv run --locked python scripts/postgres.py health --execute` | PostgreSQL health completes successfully |
+| Object storage | `uv run --locked python scripts/object_store.py health --execute` | SeaweedFS health completes successfully |
+| Database identities | `uv run --locked python scripts/control_plane_database.py health --execute` | Owned roles and credentials validate without rotation |
+| Migration | `uv run --locked python scripts/control_plane_migration.py health --execute` | The locked migration Job and runtime grants validate |
+| Runtime inputs | `uv run --locked python scripts/control_plane_runtime.py health --execute` | The selected Secrets and immutable ConfigMaps validate |
+| GitOps workload | `uv run --locked python scripts/gitops.py health --execute` | All Applications and both managed workloads pass |
+| Product path | `uv run --locked python scripts/control_plane_smoke.py --execute` | A Run completes with five verified artifacts |
+
+The product-path command is **mutating**: it creates a Run, Kubernetes Jobs and
+immutable evidence. The other `health` commands are designed as read-only live
+checks. Their prerequisite discovery still contacts Docker, kind or Kubernetes.
+
+## Docker or kind does not respond
+
+Symptoms include `kind get clusters` hanging, an empty Docker container list
+after cleanup, or a connection failure before any Kubernetes check.
+
+**Read-only** checks:
+
+```powershell
+docker context show
+docker version
+kind get clusters
+```
+
+Docker Desktop must be running with Linux containers. After a Docker Desktop
+restart, wait until `docker version` reports both client and server before
+retrying kind. Removing images only makes the next bootstrap slower; it does not
+invalidate the repository configuration.
+
+If `perfeng-local` is genuinely absent, preview and then create it:
+
+```powershell
+# read-only preview
+uv run --locked python scripts/cluster.py up
+
+# mutating
+uv run --locked python scripts/cluster.py up --execute
+```
+
+Do not use `cluster.py down` as a repair. It is **destructive** and permanently
+removes all PostgreSQL, SeaweedFS and Run state stored in the cluster.
+
+## Plain kubectl cannot connect
+
+A message such as `dial tcp 127.0.0.1:<port>: connectex: ... actively refused`
+usually means the global kubeconfig retained the API-server port of a deleted
+kind cluster. The context name may still be `kind-perfeng-local`, so the name
+alone is not proof that the endpoint is current.
+
+Use the repository-owned kubeconfig explicitly:
+
+```powershell
+# read-only
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local get nodes
+```
+
+For convenience, redirect only the current PowerShell process:
+
+```powershell
+$env:KUBECONFIG = $kubeconfig
+kubectl --context kind-perfeng-local get nodes
+```
+
+Remove the process override when finished:
+
+```powershell
+Remove-Item Env:KUBECONFIG
+```
+
+The environment tools deliberately do not rewrite the user's global
+`~/.kube/config`. Do not run `kind export kubeconfig` as routine project repair;
+it broadens a local operation into global configuration maintenance.
+
+## Argo CD controllers are unavailable
+
+Inspect the controller workloads and recent warnings:
+
+```powershell
+# read-only
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  get deployments,statefulsets,pods
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  get events --field-selector type=Warning `
+  --sort-by=.metadata.creationTimestamp
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n kube-system `
+  get pods -l k8s-app=kube-dns
+```
+
+`Pending`, `CrashLoopBackOff`, high restart counts, or DNS timeout events identify
+an infrastructure failure rather than Application drift. Preserve the warning
+output before recovery.
+
+If CoreDNS is ready but a repo server or application controller repeatedly
+reports transport or DNS failures, recreate only its Pod and wait for its owner
+to restore readiness:
+
+```powershell
+# mutating; use only after recording the failure
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  delete pod -l app.kubernetes.io/name=argocd-repo-server `
+  --wait=true --timeout=120s
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  rollout status deployment/argocd-repo-server --timeout=300s
+```
+
+Use the equivalent exact label and StatefulSet rollout only when the failing Pod
+is `argocd-application-controller`. Do not restart every Argo CD component at
+once; doing so removes the evidence needed to identify the failing boundary.
+
+## An Application is OutOfSync or Degraded
+
+Inspect all Applications, then describe only the failing one:
+
+```powershell
+# read-only
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  get applications -o wide
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  describe application perfeng-local-root
+```
+
+Interpret the result before changing anything:
+
+- `operation=Succeeded`, `health=Healthy`, healthy child Applications and a
+  recent expected revision usually indicate delayed aggregate status. Wait for
+  one reconciliation interval and rerun GitOps health once.
+- A revision older than the merged `main` commit points to delayed repository
+  refresh or private-repository access. Inspect Application conditions and the
+  repo-server Pod before rotating credentials.
+- `Degraded` or a named resource with persistent drift is not transient. Inspect
+  that resource and its events; do not run Helm or manually apply a competing
+  manifest.
+- A passing control-plane smoke run proves the execution path still works. Keep
+  the GitOps health gate strict until its management-plane status also converges.
+
+Check only that the repository credential exists; never print its data:
+
+```powershell
+# read-only; does not retrieve Secret content
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+  get secret perfeng-github-repository-credentials -o name
+```
+
+For an expired or incorrectly scoped credential, follow the explicit immutable
+Secret rotation procedure in [the GitOps guide](local-gitops.md). The token needs
+read-only Contents access to the selected private repositories, not write access.
+
+## A prerequisite health check fails
+
+Run the prerequisite checks in the order shown in the quick checklist. A later
+failure is often only a consequence of an earlier missing service.
+
+- If PostgreSQL or SeaweedFS is missing, use the preview and deployment procedure
+  in [Local PostgreSQL](local-postgres.md) or
+  [Local S3 artifact storage](local-object-store.md).
+- If control-plane database credentials are missing, deploy the database
+  identities before the migration. Deployment never silently rotates an
+  existing credential.
+- If the migration Job has an unexpected identity, stop. Do not delete it until
+  its image, arguments, ownership labels and deployment revision have been
+  compared with the lock.
+- If a selected content-addressed ConfigMap is missing, validate the release and
+  runtime selection first. For a reviewed promotion, pre-stage it with
+  `control_plane_runtime.py deploy --execute` before merging the Git selection.
+- If an existing Secret or immutable resource has unexpected ownership or data,
+  treat it as a conflict. The tooling intentionally refuses automatic adoption,
+  overwrite or rotation.
+
+The complete creation order and recovery boundaries are maintained in
+[the control-plane guide](local-control-plane.md).
+
+## The control-plane workload is unhealthy
+
+Inspect the Deployment, Pods and warning events without reading Secrets:
+
+```powershell
+# read-only
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  get deployment control-plane
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  get pods -o wide
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  get events --field-selector type=Warning `
+  --sort-by=.metadata.creationTimestamp
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  logs deployment/control-plane --tail=100
+```
+
+Review logs locally for URLs, identifiers or other sensitive values before
+sharing them. Common classifications are:
+
+- `ImagePullBackOff`: validate the GHCR credential with
+  `control_plane_registry.py health --execute`, then use the documented explicit
+  rotation only if the credential is expired.
+- `CreateContainerConfigError`: a selected Secret or ConfigMap is absent; run the
+  prerequisite health checks rather than editing the Deployment.
+- readiness failure: check PostgreSQL, SeaweedFS, migration and runtime inputs in
+  order, then inspect the bounded application log.
+- wrong immutable selection: compare the live `envFrom` ConfigMap name with
+  `deployments/local-control-plane.json`; fix the Git selection or allow Argo CD
+  to reconcile it rather than patching the Deployment.
+
+Inspect the selected non-secret runtime identity with:
+
+```powershell
+# read-only
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  get deployment control-plane `
+  -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}'
+```
+
+## The end-to-end smoke run fails
+
+The smoke command is **mutating** and intentionally retains its client Pod on
+failure. Record the printed Pod name, then inspect that exact Pod:
+
+```powershell
+# read-only; replace the placeholder with the printed name
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  describe pod <retained-smoke-pod>
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+  logs <retained-smoke-pod>
+```
+
+Do not delete the Pod until its phase, events and logs have been inspected. A Run
+that completes with five verified artifacts proves API admission, PostgreSQL
+persistence, Kubernetes execution, SeaweedFS publication, normalization and
+reporting for the selected runtime bundle.
+
+## Validate immutable selections offline
+
+Use these **read-only** checks before blaming live reconciliation:
+
+```powershell
+uv run --locked python scripts/control_plane_release.py validate
+uv run --locked python scripts/control_plane_runtime.py validate
+uv run --locked python scripts/gitops.py validate
+```
+
+They detect mismatched commits, chart versions, runtime bytes, content-addressed
+names and Application values without changing the cluster. Never repair an
+identity mismatch by editing or deleting an immutable ConfigMap in place. Create
+the new reviewed identity, select it in Git and retain the previous identity for
+rollback.
+
+## What to include in a defect report
+
+Include:
+
+- the exact failing command and complete redacted error;
+- `git rev-parse HEAD` and `git status --short --branch`;
+- Docker context name and whether `docker version` reaches the server;
+- `kind get clusters` and the explicit-kubeconfig node summary;
+- `kubectl ... -n argocd get applications -o wide`;
+- Pod names, phases, readiness and restart counts in the failing namespace;
+- bounded warning events and the name of any retained smoke Pod;
+- whether retrying once changed a transient Application state.
+
+Do not include Secret YAML, decoded Secret data, token environment variables,
+database URLs, registry authorization headers, the Argo CD initial admin
+password, or logs that have not been reviewed and redacted.
+
+## Maintenance contract
+
+This runbook owns the diagnostic order, expected healthy signals and routing to
+recovery documentation. The focused guides own deployment details, credential
+rotation, persistence guarantees and destructive procedures.
+
+A pull request must update this runbook when it changes a supported operational
+command, prerequisite, healthy signal, failure classification or recovery path.
+New diagnostics default to read-only, use the dedicated kubeconfig and identify
+their exact target. New mutations and destructive operations must be labeled and
+linked to the document that defines their ownership and rollback boundary.

@@ -14,6 +14,8 @@
   with read-only Contents access to the private repositories before deployment.
 - The two workload Applications synchronize and self-heal automatically. The
   root Application does not self-heal, and destructive pruning remains disabled.
+- Use the [troubleshooting runbook](troubleshooting.md) to distinguish delayed
+  reconciliation, persistent drift and an unhealthy Argo CD controller.
 
 ## Scope
 

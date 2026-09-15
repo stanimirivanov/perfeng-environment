@@ -40,6 +40,14 @@ New and materially changed long documents must comply immediately. Existing
 long documents are brought into compliance when next changed or through a
 dedicated documentation pull request.
 
+Operational changes must update `docs/troubleshooting.md` when they add or
+change a supported command, prerequisite, healthy signal, failure
+classification or recovery path. Keep that runbook as a dependency-ordered
+navigation layer and leave detailed deployment, credential, persistence and
+rollback procedures in their focused guides. Diagnostic commands must default
+to read-only operation, use the dedicated kubeconfig and label any mutation or
+destructive action explicitly.
+
 Architecture decisions belong in `docs/decisions`. Use a numbered filename,
 record the status and date, include alternatives and consequences, and link the
 decision from `docs/decisions/README.md`.
