@@ -6,8 +6,8 @@
   PVC; it is not production storage or a backup system.
 - `postgres.py deploy --execute` provisions the immutable external credential
   and Helm release for initial bootstrap or explicit GitOps rollback only.
-- `perfeng-local-postgres` is temporarily inactive for its rollback rehearsal.
-  Run Helm only after the child Application has been orphaned.
+- `perfeng-local-postgres` is re-adopted after its successful rollback
+  rehearsal. Do not run Helm while the child Application is active.
 - `postgres.py health --execute` remains reconciler-neutral and verifies the
   rollout, bound PVC and authenticated SQL access.
 - Stateful GitOps adoption must preserve StatefulSet, PVC, PV and Secret UIDs

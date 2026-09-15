@@ -2,8 +2,8 @@
 
 ## TL;DR
 
-- Argo CD owns the sample SUT and control-plane workloads. The reviewed
-  PostgreSQL child is temporarily inactive for its rollback rehearsal.
+- Argo CD owns the sample SUT, PostgreSQL and control-plane workloads. The
+  PostgreSQL child is re-adopted after a successful rollback rehearsal.
 - Non-secret control-plane runtime inputs use lock-selected, content-addressed
   ConfigMap names, allowing new and old selections to coexist.
 - Argo CD is selected through the official, human-readable `v3.5.2` install
@@ -12,8 +12,8 @@
   `main` before executing bootstrap because the root Application reads `main`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
-- The active workload Applications synchronize and self-heal automatically.
-  The root does not self-heal, and destructive pruning remains disabled.
+- All three workload Applications synchronize automatically. PostgreSQL and the
+  root do not self-heal, and destructive pruning remains disabled.
 - Use the [troubleshooting runbook](troubleshooting.md) to distinguish delayed
   reconciliation, persistent drift and an unhealthy Argo CD controller.
 
@@ -23,10 +23,10 @@ This step installs a non-HA Argo CD control plane into the existing verified
 `perfeng-local` kind cluster, provisions one immutable private-repository
 credential, and creates the `perfeng-local-root` Application. The root manages
 the restricted `perfeng-local` AppProject, the sample SUT and the control plane
-as child Applications. The reviewed PostgreSQL child manifest remains in the
-repository but is temporarily excluded from the root composition while its
-rollback path is rehearsed. SeaweedFS, database migrations, runtime Secrets and
-ConfigMaps, and performance-Run resources are not migrated yet.
+as child Applications. It also re-adopts the existing PostgreSQL Helm release
+after its rollback rehearsal preserved the StatefulSet, PVC, PV, external
+Secret and data. SeaweedFS, database migrations, runtime Secrets and ConfigMaps,
+and performance-Run resources are not migrated yet.
 
 The existing Helm deployment commands remain available as the Milestone 1
 rollback path. Once the child Applications are active, do not run
@@ -156,8 +156,8 @@ The command:
 5. waits for all six Deployments and the application-controller StatefulSet;
 6. creates or validates an immutable Argo CD repository-credential template;
 7. ownership-checks and applies the local root Application;
-8. waits for the root, sample-SUT and control-plane Applications to become
-   `Synced` and `Healthy`;
+8. waits for the root, sample-SUT, PostgreSQL and control-plane Applications to
+   become `Synced` and `Healthy`;
 9. waits for the sample-SUT Deployment rollout;
 10. verifies the PostgreSQL rollout, retained PVC and authenticated SQL access;
 11. validates the control-plane prerequisites, exact image and resource shape,
@@ -185,8 +185,8 @@ uv run --locked python scripts/gitops.py health --execute
 
 The executable command validates namespace and Secret ownership, waits for the
 pinned Argo CD workloads, verifies the root Application identity, requires all
-three active Applications to be both `Synced` and `Healthy`, and validates the
-sample SUT, PostgreSQL and control-plane workloads. Workload acceptance is
+four Applications to be both `Synced` and `Healthy`, and validates the sample
+SUT, PostgreSQL and control-plane workloads. Workload acceptance is
 reconciler-neutral: it validates live resources and endpoints without expecting
 a Helm release record.
 
@@ -216,10 +216,10 @@ password into an issue or diagnostic output.
 
 ## Controlled self-healing acceptance
 
-Self-healing is enabled for the active stateless sample-SUT and control-plane
-Applications only. The staged PostgreSQL Application has self-healing disabled,
-and the root does not self-heal. Stateful or composition drift therefore remains
-visible and requires operator correction. Pruning remains disabled everywhere.
+Self-healing is enabled for the stateless sample-SUT and control-plane
+Applications only. The re-adopted PostgreSQL Application and root do not
+self-heal. Stateful or composition drift therefore remains visible and requires
+operator correction. Pruning remains disabled everywhere.
 
 After this change reaches `main` and GitOps health passes, introduce one bounded,
 reversible replica drift in the stateless sample SUT:
@@ -282,29 +282,17 @@ Then restart only the StatefulSet and verify that the same probe still exists.
 An Application reporting `Healthy` is not sufficient evidence if an identity
 or binding changed.
 
-The initial adoption and restart-persistence checks passed with unchanged
-StatefulSet, PVC, PV and Secret identities. This revision deliberately removes
-`postgres-application.yaml` from the active root Kustomization while retaining
-and validating the manifest. After it reaches `main`, complete the rollback in
-this order:
+The initial adoption and its rollback rehearsal both passed with unchanged
+StatefulSet, PVC, PV and Secret identities. The persistence probe survived an
+adoption restart, orphan propagation, Helm reassertion and a rollback restart.
+This revision reactivates the exact reviewed child manifest without changing its
+chart, release name or conservative sync policy.
 
-1. wait for the root to observe the revision;
-2. delete only `perfeng-local-postgres` with orphan propagation;
-3. run the PostgreSQL Helm deployment once to reassert legacy ownership;
-4. verify the recorded identities and pre-adoption probe;
-5. restart PostgreSQL and verify the same identities and probe again.
-
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n argocd delete application `
-  perfeng-local-postgres --cascade=orphan
-uv run --locked python scripts/postgres.py deploy --execute
-uv run --locked python scripts/gitops.py health --execute
-```
-
-Do not run the Helm command before the child Application is orphaned. The next
-reviewed change reactivates this exact child manifest only after rollback
-acceptance proves that the identities and data remain unchanged.
+After this revision reaches `main`, require the child to become `Synced` and
+`Healthy`, verify the same recorded identities and probe, restart PostgreSQL,
+and repeat those checks. Do not run `scripts/postgres.py deploy --execute` while
+the child is active. A later reviewed change may enable PostgreSQL self-healing
+only after this re-adoption acceptance passes; pruning remains disabled.
 
 ## Control-plane ownership and rollback
 
@@ -362,8 +350,9 @@ restores the prior chart and ConfigMap identity.
 
 [ADR 0002](decisions/0002-stateful-gitops-ownership.md) defines the required
 retention, unchanged-identity and rollback acceptance for stateful adoption.
-PostgreSQL is in its rollback rehearsal; its unchanged-identity re-adoption is
-next. SeaweedFS follows only after that sequence passes.
+PostgreSQL is being re-adopted after its successful rollback rehearsal. Enabling
+its stateful self-healing is next. SeaweedFS follows only after that sequence
+passes.
 
 ## Upgrading Argo CD
 
