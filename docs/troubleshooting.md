@@ -220,7 +220,9 @@ failure is often only a consequence of an earlier missing service.
   overwrite or rotation.
 
 The complete creation order and recovery boundaries are maintained in
-[the control-plane guide](local-control-plane.md).
+[the control-plane guide](local-control-plane.md). Stateful GitOps ownership
+changes must also satisfy the unchanged-identity and rollback gates in
+[ADR 0002](decisions/0002-stateful-gitops-ownership.md).
 
 ## The control-plane workload is unhealthy
 
