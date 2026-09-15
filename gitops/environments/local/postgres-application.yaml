@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-local-postgres
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+    perfeng.io/workload: postgres
+spec:
+  project: perfeng-local
+  source:
+    repoURL: https://github.com/stanimirivanov/perfeng-environment.git
+    targetRevision: main
+    path: charts/postgres
+    helm:
+      releaseName: postgres
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: perf-platform
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=false
