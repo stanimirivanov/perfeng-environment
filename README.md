@@ -6,10 +6,13 @@
   Kubernetes environment; it does not own component source code.
 - `Taskfile.yml` provides the supported high-level local operator commands while
   the preview-first Python tools remain the auditable safety boundaries.
-- [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selects an
-  Argo CD-centred target architecture, subject to a reversible local spike.
+- [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selected the
+  Argo CD-centred architecture; its local migration is now complete.
 - The [local GitOps environment](docs/local-gitops.md) installs pinned Argo CD
   and reconciles all supported local workloads without competing reconcilers.
+- The [migration completion record](docs/gitops-migration-completion.md) explains
+  why the remaining imperative commands are bootstrap, external-state or
+  acceptance boundaries rather than competing workload reconcilers.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
 - Start with the [local troubleshooting runbook](docs/troubleshooting.md) when
@@ -17,14 +20,15 @@
 - Never commit credentials or replace explicit release versions with `stable`,
   `latest`, or branches.
 
-Workspace bootstrap and development/production environment composition.
+Workspace bootstrap and local environment composition. Production composition
+is not implemented.
 The workspace commands manage source checkouts only. Separate, preview-first
 [local Kubernetes commands](docs/local-kubernetes.md) now provide the kind and
-[sample API foundation](docs/sample-api.md); production composition is not implemented.
-An optional [local PostgreSQL deployment](docs/local-postgres.md) adds persistent
-metadata storage with generated credentials; it is deployed and checked separately.
-An optional [SeaweedFS object store](docs/local-object-store.md) adds S3 storage
-with upload/download and restart-persistence checks.
+[sample API foundation](docs/sample-api.md). Argo CD reconciles the
+[local PostgreSQL](docs/local-postgres.md) and
+[SeaweedFS object store](docs/local-object-store.md) workloads; their external
+credentials, persistent identities and focused checks remain separate safety
+boundaries.
 The [local k6 capture workflow](docs/local-k6-run.md) runs the digest-pinned
 checkout smoke workload and uploads checksum-verified raw artifacts to SeaweedFS.
 The uploader uses [restricted storage credentials](docs/storage-access.md);
@@ -50,13 +54,14 @@ The [local control-plane deployment lock](docs/local-control-plane.md) pins the
 published service image, reviewed Helm chart and runtime-registry bundle before
 deployment. Its preview-first registry command validates private GHCR access and
 creates only the externally managed image-pull Secret required by the chart.
-The [local GitOps foundation](docs/local-gitops.md) is a reversible Argo CD
-spike. It manages its AppProject, sample SUT and control-plane workloads while
-the existing commands continue to provision stateful services, migrations,
-credentials and immutable runtime inputs. Workload Applications self-heal
-reviewed drift. Non-secret control-plane runtime inputs are content-addressed so
-multiple immutable selections can coexist; root self-healing and destructive
-pruning remain disabled.
+The [local GitOps environment](docs/local-gitops.md) manages its AppProject,
+namespaces, sample SUT, PostgreSQL, SeaweedFS and control-plane workloads.
+Remaining imperative commands bootstrap the cluster and reconciler, provision
+external credentials or durable inputs, perform explicit stateful rollback, or
+run acceptance workflows. Workload Applications self-heal reviewed drift.
+Non-secret control-plane runtime inputs are content-addressed so multiple
+immutable selections can coexist; root self-healing and destructive pruning
+remain disabled.
 
 ## Layout
 
@@ -131,8 +136,10 @@ task destroy
 - Bootstrap intentionally stops before reviewed policy publication and the
   control-plane database, migration and runtime-input stages. Continue with the
   [fresh-cluster staged bootstrap](docs/local-gitops.md#fresh-cluster-staged-bootstrap).
-- `task status` is read-only but live. It validates the workspace, cluster and
-  complete GitOps environment and fails while a staged bootstrap is incomplete.
+- `task status` does not apply desired state. It validates the workspace,
+  cluster and complete GitOps environment and fails while a staged bootstrap is
+  incomplete. SeaweedFS semantic health uses a bounded diagnostic Job retained
+  for inspection.
 - `task smoke` first requires complete platform health, then creates one retained
   end-to-end Run and its evidence.
 - `task destroy` displays an interactive warning before invoking the existing

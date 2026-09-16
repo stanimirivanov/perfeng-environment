@@ -8,8 +8,8 @@
 - Published milestone numbers and titles are not silently renamed or reused.
 - M01 — Local Performance Decision Loop established the polyrepo foundation and
   local evidence path.
-- M02 — Declarative Local Operations is active and is replacing imperative
-  workload composition incrementally through reversible GitOps changes.
+- M02 — Declarative Local Operations completed the reversible migration of local
+  workload composition to Argo CD.
 - M03 through M05 are planned; M06 remains deliberately deferred until a real
   non-local deployment is required.
 
@@ -36,7 +36,7 @@ local implementation and operating instructions.
 | Milestone | Status | Outcome | Repositories |
 |:--|:--|:--|:--|
 | M01 — Local Performance Decision Loop | Complete | Execute k6, retain artifacts, normalize results, evaluate policies and baselines, and recover the control plane locally. | All current `perfeng-*` repositories |
-| M02 — Declarative Local Operations | In progress | Replace imperative local workload composition with reversible, observable GitOps ownership while preserving state and rollback paths. | `perfeng-environment`, `perfeng-k8s`, `perfeng-control-plane` |
+| M02 — Declarative Local Operations | Complete | Operate local workloads through reversible, observable GitOps ownership while preserving state and explicit recovery boundaries. | `perfeng-environment`, `perfeng-k8s`, `perfeng-control-plane` |
 | M03 — Native Browser Decision Loop | Planned | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M04 — Kubernetes Benchmark Decision Loop | Planned | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M05 — Operator Visibility and Diagnostics | Planned | Make runs, failures, decisions and correlated telemetry understandable without inspecting individual Pods or scripts. | Primarily `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis` |
@@ -77,24 +77,23 @@ Completed or active slices:
 - adopt PostgreSQL without replacing state, prove rollback and re-adoption, and
   enable controlled self-healing;
 - adopt SeaweedFS without replacing state, prove restart and rollback, re-adopt
-  it and enable controlled self-healing; and
+  it and enable controlled self-healing;
 - retire the superseded sample-SUT Helm path while preserving preview-first
   commands that remain bootstrap, credential, migration or explicit rollback
   boundaries;
 - separate stateful credential and bucket bootstrap from retained Helm rollback
   commands so a fresh cluster can enter GitOps ownership without first deploying
-  PostgreSQL or SeaweedFS imperatively; and
+  PostgreSQL or SeaweedFS imperatively;
 - expose the reviewed bootstrap, status, smoke and destructive teardown
   boundaries through a thin cross-platform Taskfile without duplicating the
-  Python safety and diagnostic implementation; and
+  Python safety and diagnostic implementation;
 - retire the superseded control-plane Helm reconciler while preserving its
-  GitOps-independent workload health and product acceptance checks.
+  GitOps-independent workload health and product acceptance checks; and
+- retire the redundant GitOps deploy action, audit the retained imperative
+  boundaries and record successful completion against ADR 0001.
 
-Remaining completion questions:
+Post-milestone decisions:
 
-- complete the final migration audit and declare the GitOps migration complete
-  against ADR 0001 acceptance while recording the imperative boundaries retained
-  for credentials, migrations, stateful rollback and product acceptance;
 - decide whether reusable infrastructure becomes a separate project and what
   smaller responsibility remains in `perfeng-environment`;
 - define the supported production-composition boundary rather than implying
@@ -103,7 +102,9 @@ Remaining completion questions:
 
 Completion means a contributor can bootstrap, inspect, recover and validate the
 supported local platform from reviewed declarative state without competing
-reconcilers or undocumented data risk.
+reconcilers or undocumented data risk. That outcome is complete for the supported
+local environment; see the
+[migration completion record](../gitops-migration-completion.md).
 
 ## M03 — Native Browser Decision Loop
 

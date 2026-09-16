@@ -25,7 +25,7 @@ tasks:
       - uv run --locked python scripts/storage_access.py --execute
 
   status:
-    desc: Validate the complete local platform without changing it
+    desc: Validate the complete local platform without reconciling desired state
     cmds:
       - uv run --locked python scripts/workspace.py status
       - uv run --locked python scripts/cluster.py health --execute

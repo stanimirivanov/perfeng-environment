@@ -83,7 +83,9 @@ def ensure_secret(root: Path, *, create: bool) -> None:
         print("Reusing existing S3 credentials (not rotated).", flush=True)
         return
     if not create:
-        raise ValueError("S3 credentials are missing; deploy first")
+        raise ValueError(
+            "S3 credentials are missing; run scripts/object_store.py bootstrap --execute first"
+        )
     for kind, name in [("pvc", "data-seaweedfs-0"), ("statefulset", "seaweedfs")]:
         if cluster.run([*kube, "get", kind, name, "--ignore-not-found", "-o", "name"]).strip():
             raise ValueError(
