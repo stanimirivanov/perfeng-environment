@@ -170,7 +170,7 @@ def validate_sample(text: str, root: Path = cluster.ROOT) -> None:
     except (KeyError, TypeError, StopIteration, ValueError):
         valid = False
     if not valid:
-        raise ValueError("Sample API deployment is stale; run cluster.py deploy --execute first")
+        raise ValueError("Sample API deployment is stale; run scripts/gitops.py health --execute")
 
 
 def execute(run_id: str, root: Path = cluster.ROOT) -> int:

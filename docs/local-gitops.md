@@ -28,11 +28,11 @@ Helm releases without replacing their StatefulSets, PVCs, PVs, external Secrets
 or data. Database migrations, runtime Secrets and ConfigMaps, and performance-Run
 resources are not migrated.
 
-The existing Helm deployment commands remain available as the Milestone 1
-rollback path. Once the child Applications are active, do not run
-`cluster.py deploy --execute` or `control_plane_deployment.py deploy --execute`.
-Other existing deployments are unchanged, and this step performs no data
-migration or credential rotation.
+The sample SUT no longer has a second Helm deployment path: Argo CD is its only
+workload reconciler, and rollback uses a reviewed Git revert. The stateful and
+control-plane Helm commands remain explicit rollback boundaries. Do not run
+`control_plane_deployment.py deploy --execute` while its child Application is
+active. This step performs no data migration or credential rotation.
 
 Environment composition in this spike lives in Kustomize and Argo CD resources.
 The small Python boundary does not generate those resources: it verifies the
@@ -261,26 +261,15 @@ SUT proves the same reconciliation policy without interrupting the Run API.
 
 The child Application renders the existing `charts/sample-sut` chart from this
 repository with Helm release name `sample-sut` into `perf-sut`. It does not copy
-the chart or invent a second set of values. Argo CD can adopt the resources from
-an existing local Helm deployment; its Helm release metadata is not deleted.
+the chart or invent a second set of values. The root Application also owns the
+four reviewed namespace resources and reconciles them before workload
+Applications. `cluster.py bootstrap` may pre-create those exact resources for
+credential bootstrap, but it does not deploy the sample SUT.
 
-Do not use the legacy Helm deployment command while the child Application is
-active. To return ownership to the legacy path:
-
-1. merge a revert that removes `sample-sut-application.yaml` from the local root
-   Kustomization;
-2. delete only the now-unwanted Application while orphaning its workloads;
-3. run the existing Helm deployment command to reassert the legacy release.
-
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n argocd delete application `
-  perfeng-local-sample-sut --cascade=orphan
-uv run --locked python scripts/cluster.py deploy --execute
-```
-
-The order matters: deleting the child before the Git revert reaches `main`
-allows the root Application to recreate it.
+Recover a bad sample-SUT change by reverting the reviewed chart or Application
+change in Git and waiting for `perfeng-local-sample-sut` to reconcile. Do not
+manually run Helm beside Argo CD. Removing the Application entirely is a
+separate environment-composition change, not a routine rollback procedure.
 
 ## PostgreSQL ownership and adoption
 
