@@ -187,13 +187,29 @@ def validate() -> None:
         "sut",
     }
     assert all("@sha256:" in node["image"] for node in config["nodes"])
-    namespaces = list(yaml.safe_load_all((ROOT / "local/namespaces.yaml").read_text()))
+    namespaces = list(
+        yaml.safe_load_all(
+            (ROOT / "gitops/environments/local/namespaces.yaml").read_text(encoding="utf-8")
+        )
+    )
     assert {item["metadata"]["name"] for item in namespaces} == {
         "perf-platform",
         "perf-generators",
         "perf-sut",
         "monitoring",
     }
+    assert all(
+        item["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "-1"
+        for item in namespaces
+    )
+    assert all(
+        item["metadata"]["labels"]
+        == {
+            "app.kubernetes.io/managed-by": "perfeng-environment",
+            "perfeng.io/environment": "local",
+        }
+        for item in namespaces
+    )
     subprocess.run(["helm", "lint", str(ROOT / "charts/sample-sut"), "--strict"], check=True)
     rendered = subprocess.run(
         [

@@ -78,8 +78,9 @@ Completed or active slices:
   enable controlled self-healing;
 - adopt SeaweedFS without replacing state, prove restart and rollback, re-adopt
   it and enable controlled self-healing; and
-- preserve legacy preview-first commands only where they remain bootstrap,
-  credential, migration or explicit rollback boundaries.
+- retire the superseded sample-SUT Helm path while preserving preview-first
+  commands that remain bootstrap, credential, migration or explicit rollback
+  boundaries.
 
 Remaining completion questions:
 

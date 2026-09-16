@@ -6,8 +6,8 @@
   a production environment or calibrated performance lab.
 - Commands are previews unless `--execute` is supplied and always use the
   dedicated `.local/perfeng-local.kubeconfig`.
-- After cluster creation, use either the [GitOps path](local-gitops.md) or the
-  legacy Helm deployment path for the sample SUT, never both concurrently.
+- After cluster creation, bootstrap the reviewed namespaces and use the
+  [GitOps path](local-gitops.md) for workload deployment.
 - Use the [troubleshooting runbook](troubleshooting.md) before recreating an
   unavailable cluster or changing kubeconfig state.
 - Teardown permanently destroys all cluster-local state.
@@ -40,19 +40,18 @@ uv run --locked python scripts/cluster.py up --execute
 ```
 
 After cluster creation, continue with the [local GitOps guide](local-gitops.md).
-The following commands remain the legacy sample-SUT deployment and rollback
-path. Do not execute the deployment while its Argo CD child Application is
-active:
+Bootstrap applies only the same namespace manifest that the root Application
+later owns. It does not install or reconcile a workload:
 
 ```sh
-uv run --locked python scripts/cluster.py deploy
-uv run --locked python scripts/cluster.py deploy --execute
+uv run --locked python scripts/cluster.py bootstrap
+uv run --locked python scripts/cluster.py bootstrap --execute
 uv run --locked python scripts/cluster.py health --execute
 ```
 
 Without --execute, every action only prints its argument arrays. Creation
 reserves .local/perfeng-local.kubeconfig and never uses your global kubeconfig.
-All kubectl/Helm calls pin that file and kind-perfeng-local explicitly; before
+All kubectl calls pin that file and kind-perfeng-local explicitly; before
 access, its contents must match the named kind cluster's exported kubeconfig.
 Do not edit or share the file: it contains cluster-admin credentials. The
 directory is Git-ignored, with owner-only permissions requested on POSIX;
@@ -60,8 +59,7 @@ review Windows ACLs on shared machines.
 
 Execution requires a local Docker socket context (Unix socket or Windows named
 pipe). TCP/SSH Docker contexts are rejected, even if a TCP endpoint is loopback.
-Inherited Helm Kubernetes overrides and the global KUBECONFIG variable are not
-used by child commands.
+The global KUBECONFIG variable is not used by child commands.
 
 Each executed command prints start/completion messages, with an elapsed-time
 update every 10 seconds while waiting. These updates indicate waiting, not
@@ -76,12 +74,12 @@ automatic deletion or adoption. Failed creation retains nodes and local state
 for diagnosis. Inspect them before choosing explicit cleanup; do not rerun
 startup expecting it to erase a partial environment.
 
-The legacy deployment applies four namespaces and installs the sample-sut Helm
-release in perf-sut. The GitOps child creates its destination namespace and
-renders the same chart. Health checks require three Ready, uncordoned nodes,
-correct placement labels, no memory/disk/PID pressure, and successful
-CoreDNS/sample-SUT rollouts. These checks do not measure CPU saturation or
-network performance.
+Bootstrap applies the four namespace resources with the same identities and
+labels later reconciled by the root Application. The cluster command no longer
+installs the sample SUT or any other workload. Cluster health requires three
+Ready, uncordoned nodes, correct placement labels, no memory/disk/PID pressure,
+and a successful CoreDNS rollout. Workload health belongs to `gitops.py health`.
+These checks do not measure CPU saturation or network performance.
 
 To access the local fixture after deployment:
 
@@ -112,16 +110,16 @@ attempted.
 
 ## Namespace, placement, secret, and storage boundaries
 
-- perf-platform: future control-plane/analysis infrastructure.
-- perf-generators: future k6/browser Jobs, selecting workload: performance-generator.
+- perf-platform: control-plane, PostgreSQL and object-store infrastructure.
+- perf-generators: k6 and other execution Jobs, selecting workload: performance-generator.
 - perf-sut: local SUT workloads, selecting workload: sut.
 - monitoring: reserved for later observability installation.
 
-The base cluster commands install no privileged platform RBAC, default passwords,
-Secrets, PVCs, PostgreSQL, object store, or observability components. The optional
-[PostgreSQL deployment](local-postgres.md) adds its own Secret and PVC separately.
-The optional [SeaweedFS deployment](local-object-store.md) adds S3 storage with
-separate credentials and checks.
+The base cluster commands install no workload, privileged platform RBAC,
+default password, Secret, PVC, PostgreSQL, object store or observability
+component. The [PostgreSQL](local-postgres.md) and
+[SeaweedFS](local-object-store.md) workflows provision external credentials and
+retain explicit rollback boundaries while Argo CD owns their workloads.
 The sample pod has no
 service-account token, runs non-root, drops capabilities, and uses a read-only
 root filesystem with resource requests/limits and readiness/liveness probes.
@@ -149,8 +147,7 @@ string construction, current-context reliance, or pre-creation cleanup.
 The source remains intact; historical ancestry import is owner-operated.
 
 Offline Helm lint/template and unit checks are not a successful deployment.
-Run cluster creation, the selected deployment path and its health checks, then
+Run cluster creation, namespace bootstrap, GitOps deployment and health checks, then
 verify the endpoint on a Docker-capable host before considering live acceptance
-complete. PostgreSQL is available as an optional backing service; SeaweedFS
-provides optional local S3 storage, and the sample API supports the existing
-business-flow scenarios. Durable k6 Job integration remains a subsequent slice.
+complete. PostgreSQL and SeaweedFS support the control plane, and the sample API
+supports the existing business-flow scenarios.

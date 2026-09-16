@@ -1,5 +1,14 @@
 # Local sample API
 
+## TL;DR
+
+- Argo CD is the only supported deployer for the local sample SUT.
+- Validate the chart offline, then use `gitops.py health --execute` after merge.
+- Recover a bad deployment by reverting reviewed Git state; do not run a second
+  Helm reconciler.
+- The fixture proves platform wiring and failure handling, not realistic
+  application performance.
+
 The sample-sut chart now serves a stateless API matching the existing checkout,
 search, and account k6 scenarios. It replaces the earlier HTTP echo response.
 It tests platform wiring and failure handling, not realistic application latency,
@@ -38,16 +47,10 @@ for the child and workload health:
 uv run --locked python scripts/gitops.py health --execute
 ~~~
 
-The commands below remain the legacy deployment and rollback path. Do not run
-`cluster.py deploy --execute` while the Argo CD child Application is active.
-
 ~~~sh
 uv run --locked python -m unittest discover -s tests
 uv run --locked python scripts/validate_cluster.py
 uv run --locked python scripts/check_sample_api.py --runner-repo ../perfeng-k6
-uv run --locked python scripts/cluster.py deploy
-uv run --locked python scripts/cluster.py deploy --execute
-uv run --locked python scripts/cluster.py health --execute
 ~~~
 
 The optional k6 check requires the sibling runner and k6 2.2.0. It runs three
@@ -59,8 +62,8 @@ It clears inherited k6 settings, authorization tokens, and proxy overrides.
 Temporary summaries are removed after checking; these are not retained run
 artifacts. It does not modify the runner repository or Kubernetes.
 
-Cluster deployment replaces the echo pod but keeps the existing Service name,
-port, namespace, and SUT-node placement. It does not touch PostgreSQL or SeaweedFS.
+GitOps deployment keeps the existing Service name, port, namespace and SUT-node
+placement. It does not touch PostgreSQL or SeaweedFS.
 The Python 3.12.14-slim-bookworm runtime is digest-pinned. API code is owned here
 under charts/sample-sut/files/server.py and mounted read-only through a ConfigMap.
 Its SHA-256 is included in the pod template so source changes trigger rollout.
@@ -79,10 +82,10 @@ invalid JSON with a successful checkout status. Health remains available in all
 modes: business failure must not look like Kubernetes readiness failure.
 
 Modes are startup configuration only, never controlled by request headers/query
-parameters. For a deliberate local negative deployment, set fixtureMode through
-Helm while explicitly pinning the dedicated kubeconfig/context and namespace.
-Return to ok afterwards. Default cluster deployment uses the chart defaults;
-verify the root mode response if you have applied manual Helm overrides.
+parameters. For a deliberate local negative deployment, change `fixtureMode` in
+reviewed Git state, merge it, observe the behavior and revert the change. Do not
+introduce a manual Helm override beside the Argo CD reconciler. The default chart
+mode is `ok`; verify the root response after reconciliation.
 
 ## Ownership and next step
 

@@ -20,7 +20,7 @@ storage, a SUT database, or the object store for raw artifacts.
 
 ## Deploy and check
 
-First complete `cluster.py up --execute` and `cluster.py deploy --execute` as
+First complete `cluster.py up --execute` and `cluster.py bootstrap --execute` as
 described in [local Kubernetes](local-kubernetes.md). PostgreSQL requires the
 `perf-platform` namespace and kind's `standard` local-path StorageClass with
 `WaitForFirstConsumer` binding. No provisioner is installed by this script.

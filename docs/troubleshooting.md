@@ -34,9 +34,9 @@ The labels used below mean:
 | **destructive** | Deletes durable or broad local state |
 
 Preview-first repository commands remain previews until `--execute` is supplied.
-Do not use the legacy `cluster.py deploy --execute` or
-`control_plane_deployment.py deploy --execute` while Argo CD owns the sample SUT
-and control-plane workloads.
+The cluster command does not deploy workloads. Do not use the legacy
+`control_plane_deployment.py deploy --execute` while Argo CD owns the
+control-plane workload.
 
 ## Quick health checklist
 
