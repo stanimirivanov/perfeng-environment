@@ -148,9 +148,17 @@ does not claim a production environment or a successful deployment.
 
 ## Development
 
-Contribution and documentation conventions, including the required TL;DR for
-long documents, are defined in [CONTRIBUTING.md](CONTRIBUTING.md). Architecture
-decisions are indexed in [docs/decisions](docs/decisions/README.md).
+Start with the repository working agreement and follow the linked sources of
+truth:
+
+- [Repository working agreement](AGENTS.md)
+- [Contributor workflow](CONTRIBUTING.md)
+- [Engineering standards](docs/development/engineering-standards.md)
+- [Architecture decisions](docs/decisions/README.md)
+- [Cross-repository roadmap](docs/roadmap/milestones.md)
+
+Contribution and documentation conventions include the required TL;DR for long
+documents and the exact completion-report format used for PR-sized work.
 
 ```sh
 uv run --locked ruff check .

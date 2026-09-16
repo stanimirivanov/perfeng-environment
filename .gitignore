@@ -1,6 +1,28 @@
+# Operating-system and IDE-local state
+.DS_Store
+Thumbs.db
 /.idea/
+*.iml
+
+# Local configuration, credentials and runtime state
+.env
+.env.*
+!.env.example
 /.local/
+
+# Python environments, caches and reports
 /.venv/
 /.ruff_cache/
+.mypy_cache/
+.pytest_cache/
 __pycache__/
-*.pyc
+*.py[cod]
+.coverage
+htmlcov/
+
+# Build and temporary output
+build/
+dist/
+*.egg-info/
+*.tmp
+*.log

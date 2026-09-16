@@ -1,5 +1,18 @@
 # Restricted local artifact uploader
 
+## TL;DR
+
+- Runtime transfer Jobs use a restricted S3 identity, never the bootstrap
+  administrator.
+- Matching immutable credentials exist in `perf-platform` and
+  `perf-generators`; mismatched or partial ownership is rejected.
+- The identity can read and write run objects and read reviewed policies, but
+  cannot list buckets, delete objects or publish policy.
+- Upgrade through the preview-first object-store and storage-access commands;
+  credentials are reused rather than rotated.
+- Run the live policy probe after deployment because manifest inspection alone
+  does not prove authorization behavior.
+
 Runtime transfer containers use perfeng-s3-uploader-auth, not the bootstrap
 administrator. The same immutable uploader identity is provisioned in both
 perf-platform, for infrastructure verification Jobs, and perf-generators, for

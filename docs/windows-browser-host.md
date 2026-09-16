@@ -1,5 +1,18 @@
 # Windows browser host
 
+## TL;DR
+
+- Browser performance runs execute on a qualified native Windows host rather
+  than inside the Linux kind cluster.
+- Validate the versioned profile anywhere, then run the read-only host check
+  immediately before Playwright execution.
+- A failed qualification prevents comparable baseline use; it does not alter
+  host settings.
+- Assemble qualification and measurement evidence into an immutable environment
+  artifact before upload.
+- Upload and diagnostic-manifest steps preserve exact bytes and remain separate
+  from control-plane registration.
+
 Browser performance runs execute natively on an owned Windows machine rather
 than inside the local Linux kind cluster. The versioned
 `windows-mainstream/1.0.0` profile defines one controlled reference machine; it
