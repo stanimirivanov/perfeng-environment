@@ -5,6 +5,8 @@
 - Use an ADR for durable decisions affecting compatibility, security, state,
   topology, ownership or multiple components.
 - Number ADRs sequentially and never reuse a number.
+- Allocate a number from fresh repository state; renumber after a concurrent
+  collision instead of forcing a merge.
 - Accepted ADRs are historical records; supersede rather than rewrite them.
 - Record alternatives, consequences, rollout and validation.
 
@@ -35,6 +37,16 @@ superseded ADR links to its replacement. Do not edit the decision or
 consequences of an accepted ADR to make history appear cleaner; add a dated note
 or a new ADR.
 
+Add every ADR to the index below. Immediately before creating an ADR, refresh
+the branch as the current workflow allows and inspect both this index and the
+decision directory. Allocate the lowest unused four-digit number from that
+state. The filename does not reserve the number outside the proposed change.
+
+If concurrent work uses the same number, refresh the branch, rename the later
+ADR to the next available number, and update its title, index entry and
+references. Treat this as renumbering, not a content merge. Accepted or
+published ADR numbers remain immutable.
+
 ## Template
 
 ```markdown
@@ -49,9 +61,19 @@ or a new ADR.
 
 ## Context
 
+What forces a decision now? Include constraints and quality attributes.
+
 ## Decision
 
+State the decision and its scope precisely.
+
 ## Alternatives considered
+
+### Alternative
+
+- Benefits:
+- Costs and risks:
+- Reason not selected:
 
 ## Consequences
 
@@ -66,6 +88,8 @@ or a new ADR.
 ## Security and operations
 
 ## Validation
+
+How will the assumptions and consequences be verified?
 ```
 
 ## Index

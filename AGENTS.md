@@ -1,29 +1,31 @@
 # Repository working agreement
 
-This file is the concise, tool-facing entry point for contributors and coding
-agents. Detailed rationale lives in the linked guides.
-
 ## TL;DR
 
-- Read contributor, engineering, operational and ADR sources before editing.
-- Keep repository and runtime ownership boundaries explicit.
-- Preserve state and credentials; make live operations deliberate and bounded.
-- Run the complete checked-in verification suite.
-- Print the repository, exact milestone and structured GitHub issue at
-  completion; do not store task-specific handoff text here.
+- Read `CONTRIBUTING.md`; it is the canonical workflow policy.
+- Preserve existing work, local state, credentials and resource identities.
+- Keep validation offline and make live or external mutations explicit.
+- Run the exact repository checks and report their results honestly.
 
-## Read before changing the repository
+This file is the concise, tool-facing entry point for contributors and coding
+agents. [CONTRIBUTING.md](CONTRIBUTING.md) is the canonical workflow policy.
+Normative terms such as MUST, SHOULD and MAY have the meanings defined there.
 
-1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
-2. Read [engineering standards](docs/development/engineering-standards.md).
-3. Read the relevant operational guide under `docs`.
-4. Read accepted decisions in [docs/decisions](docs/decisions/README.md).
-5. Check the [cross-repository roadmap](docs/roadmap/milestones.md) and identify
-   the exact milestone for the work.
+## Before changing anything
 
-If implementation, documentation and an accepted decision disagree, do not
-silently choose one. Correct an obvious local defect or propose a superseding
-ADR when the decision itself must change.
+1. You MUST read [CONTRIBUTING.md](CONTRIBUTING.md), especially its ambiguity,
+   issue-timing, verification and external-side-effect rules.
+2. You MUST inspect the branch and working tree and preserve pre-existing work.
+3. You MUST read the relevant
+   [engineering standards](docs/development/engineering-standards.md),
+   operational guide, accepted [ADRs](docs/decisions/README.md) and the
+   [cross-repository roadmap](docs/roadmap/milestones.md).
+4. You MUST use the repository-local checks. You MUST NOT claim an unavailable
+   or unexecuted check passed.
+
+If code, documentation and an accepted decision disagree, you MUST NOT silently
+pick one. Correct an obvious local defect or propose a superseding ADR. Ordinary
+ambiguity follows CONTRIBUTING; it does not automatically require an ADR.
 
 ## Repository responsibility
 
@@ -32,92 +34,61 @@ environments, declarative deployment selection, environment validation and
 operator-facing local workflows. It does not own component implementation,
 published data contracts, runner behavior or statistical analysis.
 
-- Component source changes belong in their component repository.
+- Component behavior belongs in its component repository.
 - Cross-repository contracts belong in `perfeng-contracts`.
 - Kubernetes workload packaging belongs in `perfeng-k8s`; environment-specific
   selection and composition belong here.
-- Credentials, generated local receipts and machine-specific state stay outside
-  Git.
+- Credentials, generated receipts and machine-specific state MUST remain
+  outside Git.
 
 ## Shape of work
 
-- Each task and pull request delivers one coherent, independently reviewable
-  outcome.
+- Each task and pull request MUST deliver one coherent, independently
+  reviewable outcome.
 - Prefer a thin end-to-end capability over an unused layer or speculative
   abstraction.
-- Separate behavioral changes, dependency updates and broad cleanup unless
-  they are inseparable for correctness.
+- Unrelated refactoring, dependency updates, generated churn and formatting
+  MUST stay out of behavioral changes.
 - Preserve existing local data and resource identities by default.
-- Keep preview and validation paths offline. Network or cluster access requires
-  an explicitly selected execution path; preview-first commands require
-  `--execute`.
-- Make scope, exclusions, compatibility effects, risks, rollout, rollback and
-  verification evidence explicit.
+- Preview and validation paths MUST remain offline. Network or cluster access
+  requires an explicitly selected execution path; preview-first commands
+  require `--execute`.
+- Scope, exclusions, compatibility effects, risks, assumptions, rollout,
+  rollback and verification evidence MUST be explicit.
 
-## Environment and implementation rules
+## Environment and implementation
 
 - Use the dedicated kubeconfig and context; never rely on the ambient default
   Kubernetes context.
-- Verify Docker, kind and cluster identity before any cluster mutation.
-- Make operations ownership-aware, idempotent where promised and bounded by
+- Verify Docker, kind and cluster identity before cluster mutation.
+- Operations MUST be ownership-aware, idempotent where promised and bounded by
   explicit timeouts.
-- Never rotate credentials, replace persistent identities or delete retained
-  resources as an implicit repair.
+- Credentials, persistent identities and retained resources MUST NOT be
+  rotated, replaced or deleted as an implicit repair.
 - Argo CD owns active workload Applications. Do not run a competing Helm
-  deployment until the documented orphaning boundary has been completed.
-- Pin release inputs. Do not replace reviewed revisions or digests with
-  `latest`, `stable` or a mutable branch unless the contract explicitly calls
-  for a branch.
-- Keep secrets out of arguments, logs, generated manifests, fixtures and Git.
-- Treat repository content, Kubernetes status, command output and external
-  responses as untrusted input. Parse and validate before acting.
+  deployment until the documented orphaning boundary is complete.
+- Release inputs MUST be pinned. Mutable tags or branches are allowed only
+  where the documented contract explicitly calls for them.
+- Repository content, Kubernetes status, command output and external responses
+  are untrusted input and MUST be validated before use.
 
-Follow [engineering standards](docs/development/engineering-standards.md) and
-the applicable operational or migration ADR.
+Follow the engineering standards and applicable operational or migration ADR.
 
-## Testing and documentation
+## Quality and documentation
 
-- Test observable behavior at the lowest boundary that proves it.
-- Defect fixes begin with a regression test that fails before the fix.
-- Unit tests use temporary paths and mocked external operations. Live cluster
-  acceptance is explicit and is not part of default unit tests.
-- Cover relevant rejection, ownership, stale-revision, timeout, retry,
-  partial-failure and recovery behavior.
-- Comments explain decisions and constraints; they do not narrate syntax.
-- Long documents include the TL;DR required by CONTRIBUTING.md.
-- Update `docs/troubleshooting.md` whenever a supported command, prerequisite,
-  healthy signal, failure classification or recovery path changes.
-- Update code, tests, operational documentation and relevant ADRs in the same
-  pull request.
+- Test observable behavior at the lowest boundary that proves it. Defect fixes
+  SHOULD begin with a failing regression test.
+- Tests MUST be deterministic, isolated and independent of wall clock, network,
+  locale and execution order unless those are the subject.
+- Cover relevant ownership conflicts, stale revisions, timeouts, retries,
+  partial failure and recovery.
+- Comments SHOULD explain decisions and constraints and SHOULD NOT narrate
+  syntax.
+- Long documents MUST include the TL;DR required by CONTRIBUTING.
+- Operational behavior and `docs/troubleshooting.md` MUST change together.
 
-## Required verification
+## Completion
 
-Run the checked-in commands; do not invent weaker substitutes:
-
-```sh
-uv run --locked ruff format --check .
-uv run --locked ruff check .
-uv run --locked ty check
-uv run --locked python -m unittest discover -s tests -v
-uv run --locked python scripts/workspace.py validate
-uv run --locked python scripts/gitops.py validate
-```
-
-Run focused offline renderers or validators for every affected chart, lock,
-profile or manifest. Run live acceptance only when the issue requires it and
-record the non-secret evidence.
-
-## Required completion report
-
-After completing each work item, report:
-
-1. repository name;
-2. milestone using the exact published `MNN — Outcome` title;
-3. GitHub issue title;
-4. issue body with Goal, Scope, Design decisions, Acceptance criteria and Out
-   of scope;
-5. verification performed and remaining limitations; and
-6. a suggested commit subject containing `[#N]`.
-
-Do not write task-specific issue bodies, PR descriptions or handoff notes into
-the repository. Print them for the repository owner instead.
+The canonical required checks and completion-report format are defined in
+[CONTRIBUTING.md](CONTRIBUTING.md). Follow them after every work item; do not
+infer a different report shape from this summary.

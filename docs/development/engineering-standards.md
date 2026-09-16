@@ -11,15 +11,25 @@
 - Document invariants, side effects, healthy signals, rollback and recovery.
 - Pin dependencies and run the same checked-in checks locally and in CI.
 
+## Policy strength
+
+Normative terms use the meanings defined in
+[CONTRIBUTING.md](../../CONTRIBUTING.md#policy-language-and-sources-of-truth).
+MUST and MUST NOT are reviewable requirements; SHOULD and SHOULD NOT are strong
+defaults that require a recorded reason to deviate; MAY is optional. Other
+imperative or advisory wording explains recommended practice and becomes
+mandatory only when an issue, ADR or checked-in tool makes it explicit.
+
 ## Purpose and applicability
 
 These standards apply to Python scripts, tests, Helm charts, Kustomize and Argo
 CD resources, workspace metadata, lock files and operational documentation.
 They supplement accepted ADRs and focused operational guides.
 
-The goal is maintainable correctness, not ceremonial compliance. A local
-deviation is acceptable when its trade-off is explicit and tested. A durable
-change to security, state ownership, topology or compatibility requires an ADR.
+The goal is maintainable correctness, not ceremonial compliance. A deviation
+from a strong default MAY be accepted when its trade-off is explicit and
+tested. A durable change to security, state ownership, topology or
+compatibility requires an ADR.
 
 ## Architecture and ownership
 

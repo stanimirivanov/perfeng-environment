@@ -67,6 +67,9 @@ migration.
 
 Completed or active slices:
 
+- centralize the cross-repository roadmap and establish the hardened
+  contributor and engineering harness in this repository before adapting it to
+  the component repositories;
 - select Argo CD through an accepted architecture decision;
 - bootstrap a pinned local Argo CD control plane and private-repository access;
 - manage the sample SUT and control plane through child Applications;

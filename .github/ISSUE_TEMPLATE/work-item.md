@@ -19,13 +19,23 @@ Describe the problem and observable result.
 
 ## Design decisions
 
-- Important choices, constraints, compatibility effects and ADR links.
+- Important choices, assumptions, constraints, compatibility effects and ADR
+  links.
+
+## Security and operations
+
+- Trust boundaries, credentials, persistent resources, external side effects,
+  rollout, recovery and rollback.
 
 ## Acceptance criteria
 
 - [ ] Observable behavior and verification evidence.
 - [ ] Relevant failure or negative behavior is covered.
 - [ ] Documentation and operational effects are addressed.
+
+## Verification
+
+- Required and focused checks, including expected live acceptance.
 
 ## Out of scope
 
