@@ -200,13 +200,24 @@ rotate credentials or modify stored data.
 Each wait names the exact Deployment, StatefulSet or Application and desired
 state before it starts. An Application that narrowly misses its primary
 180-second reconciliation window receives one 60-second grace period. The
-command inspects status at the timeout boundary first, so a state reached while
-`kubectl wait` exits is accepted without another delay. If reconciliation still
-fails, output includes the Application's sync and health state, revision,
-operation phase, and bounded condition messages. Workload rollout failures
+command inspects status at both timeout boundaries, so a state reached while
+`kubectl wait` exits is accepted without another delay. Before the grace period,
+it requests one normal refresh using the
+[`argocd.argoproj.io/refresh` annotation](https://argo-cd.readthedocs.io/en/stable/user-guide/annotations-and-labels/).
+This is a metadata mutation that requests a fresh comparison, not an explicit
+sync or hard cache refresh. Existing automated-sync, pruning and self-healing
+policies remain unchanged. The request has a 10-second API timeout; failure
+prints a warning and does not prevent the grace wait or replace its error.
+
+If reconciliation still fails, output includes the Application's sync and
+health state, revision, operation phase, bounded condition messages and up to
+20 reported out-of-sync resource identities, health states and pruning flags.
+If no individual drift is reported, the output says so without treating the
+Application as synchronized. Workload rollout failures
 include replica counts and concise Pod readiness, restart and waiting reasons.
-The diagnostic queries never read Secret resources, redact common credential
-forms from controller messages, and do not change cluster state.
+The diagnostic queries never read Secret resources or resource manifests,
+redact common credential forms, and do not change cluster state. Only the
+explicitly announced refresh request changes Application metadata.
 
 Standard Kubernetes inspection remains available without installing the Argo CD
 CLI:
