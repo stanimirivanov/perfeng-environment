@@ -174,9 +174,16 @@ kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
 
 Interpret the result before changing anything:
 
+- A primary Application wait timeout prints up to 20 reported out-of-sync
+  resources and requests one normal comparison refresh before its single
+  60-second grace period. This announced metadata mutation has a 10-second API
+  timeout; it is not an explicit sync and leaves reconciliation policies
+  unchanged. A refresh warning does not replace the original timeout.
 - `operation=Succeeded`, `health=Healthy`, healthy child Applications and a
   recent expected revision usually indicate delayed aggregate status. Wait for
-  one reconciliation interval and rerun GitOps health once.
+  one reconciliation interval and rerun GitOps health once. If the output says
+  no individual drift was reported, the comparison may be stale; do not assume
+  synchronization or reset the cluster.
 - A revision older than the merged `main` commit points to delayed repository
   refresh or private-repository access. Inspect Application conditions and the
   repo-server Pod before rotating credentials.
