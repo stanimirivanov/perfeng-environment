@@ -1,4 +1,4 @@
-# Local GitOps foundation
+# Local GitOps environment
 
 ## TL;DR
 
@@ -21,7 +21,7 @@
 
 ## Scope
 
-This step installs a non-HA Argo CD control plane into the existing verified
+The bootstrap path installs a non-HA Argo CD control plane into the verified
 `perfeng-local` kind cluster, provisions one immutable private-repository
 credential, and creates the `perfeng-local-root` Application. The root manages
 the restricted `perfeng-local` AppProject, the sample SUT and the control plane
@@ -33,9 +33,9 @@ resources are not migrated.
 The sample SUT and control plane no longer have second Helm deployment paths:
 Argo CD is their only workload reconciler, and release rollback uses a reviewed
 Git revert. PostgreSQL and SeaweedFS retain their explicit Helm rollback commands
-under ADR 0002. This step performs no data migration or credential rotation.
+under ADR 0002. The migration performed no data migration or credential rotation.
 
-Environment composition in this spike lives in Kustomize and Argo CD resources.
+Environment composition lives in Kustomize and Argo CD resources.
 The small Python boundary does not generate those resources: it verifies the
 dedicated local cluster, protects ownership, supplies private credentials over
 stdin, invokes Kustomize, and performs bounded health checks. The Taskfile wraps
@@ -50,7 +50,6 @@ Docker or Kubernetes:
 ```powershell
 uv run --locked python scripts/gitops.py validate
 uv run --locked python scripts/gitops.py bootstrap
-uv run --locked python scripts/gitops.py deploy
 ```
 
 The first command verifies:
@@ -67,9 +66,9 @@ The first command verifies:
 - exact ownership of the four reviewed local namespaces;
 - agreement between the AppProject source repositories and `workspace.json`.
 
-The second and third commands are staged-bootstrap and complete-deployment
-previews. Preview never downloads the install manifest, reads a credential or
-contacts the cluster.
+The second command previews staged bootstrap. Preview never downloads the install
+manifest, reads a credential or contacts the cluster. There is no separate
+imperative deploy action after bootstrap; Argo CD reconciles committed changes.
 
 The official upstream manifest is not copied into this repository. The
 Kustomize bootstrap references the explicit `v3.5.2` release tag and trusts the
@@ -158,18 +157,19 @@ The `initialize` action runs only after Argo CD has reconciled SeaweedFS and
 creates the expected bucket if it is absent.
 
 After the remaining control-plane prerequisites are complete, use the compact
-read-only and acceptance entry points:
+status and acceptance entry points:
 
 ```powershell
 task status
 task smoke
 ```
 
-`task status` requires the complete platform to be healthy. `task smoke` runs
-that status check first and then creates one retained product Run and its
-evidence; it is not a read-only command.
+`task status` requires the complete platform to be healthy and never applies
+desired workload state. Its SeaweedFS semantic check creates a bounded diagnostic
+Job retained for inspection. `task smoke` runs status first and then creates one
+retained product Run and its evidence.
 
-## Deploy after merge
+## Reconcile after merge
 
 The root Application reads
 `https://github.com/stanimirivanov/perfeng-environment.git` at `main`. Merge this
@@ -178,7 +178,7 @@ foundation before deployment so that Argo CD can find
 
 If the GitOps foundation is already running, merging a child-Application change
 causes the root Application to reconcile it automatically. Run the health
-command afterward; rerunning deployment is safe but not required.
+command afterward; there is no deploy command to reapply workload state.
 
 The PostgreSQL child intentionally references, but does not own, the separately
 provisioned `perfeng-postgres-auth` Secret and StatefulSet-generated PVC. Use the
@@ -186,11 +186,11 @@ staged bootstrap above on a fresh cluster. Do not run the PostgreSQL Helm
 deployment command while its child Application is active.
 
 The control-plane child intentionally does not generate or own credentials,
-database state, migrations or runtime configuration. Before running the complete
-`deploy` action, complete the provisioning sections in
+database state, migrations or runtime configuration. Before expecting complete
+health, complete the provisioning sections in
 [the local control-plane guide](local-control-plane.md) through **Runtime
-inputs**. Use the staged `bootstrap` action instead on a fresh cluster. Verify
-the external resources with:
+inputs**. Use the staged `bootstrap` action on a fresh cluster. Verify the
+external resources with:
 
 ```powershell
 uv run --locked python scripts/control_plane_migration.py health --execute
@@ -218,22 +218,22 @@ the source token only in the current process environment:
 ```powershell
 $env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
   "GitHub private-repository read token" -MaskInput
-uv run --locked python scripts/gitops.py deploy --execute
+uv run --locked python scripts/gitops.py bootstrap --execute
 ```
 
 If an earlier GitOps bootstrap created the immutable repository-credential
 Secret from the package-only token, replace only that known owned Secret before
-rerunning deployment. This is an explicit credential rotation; deployment never
+rerunning bootstrap. This is an explicit credential rotation; bootstrap never
 deletes or silently overwrites it:
 
 ```powershell
 kubectl --kubeconfig .local/perfeng-local.kubeconfig `
   --context kind-perfeng-local -n argocd delete secret `
   perfeng-github-repository-credentials
-uv run --locked python scripts/gitops.py deploy --execute
+uv run --locked python scripts/gitops.py bootstrap --execute
 ```
 
-The command:
+Bootstrap:
 
 1. verifies the local Docker endpoint, kind identity and dedicated kubeconfig;
 2. creates the owned `argocd` namespace or validates its existing ownership;
@@ -243,14 +243,14 @@ The command:
 5. waits for all six Deployments and the application-controller StatefulSet;
 6. creates or validates an immutable Argo CD repository-credential template;
 7. ownership-checks and applies the local root Application;
-8. waits for the root, sample-SUT, PostgreSQL, SeaweedFS and control-plane
-   Applications to become `Synced` and `Healthy`;
-9. waits for the sample-SUT Deployment rollout;
-10. verifies the PostgreSQL rollout, retained PVC and authenticated SQL access;
-11. verifies the SeaweedFS rollout, retained PVC and authenticated bucket access;
-12. validates the control-plane prerequisites, exact image and resource shape,
-    ready Pod, Service, and operational endpoints without requiring Helm release
-    history.
+8. waits for the root to synchronize and for the sample-SUT, PostgreSQL and
+   SeaweedFS Applications to become `Synced` and `Healthy`; and
+9. verifies PostgreSQL health before returning at the staged boundary.
+
+After explicit policy, database, migration and runtime preparation, `task status`
+or `gitops.py health --execute` waits for every Application and validates the
+sample SUT, PostgreSQL, SeaweedFS and control-plane workloads. It never applies
+the Argo CD installation, credentials, root Application or workload resources.
 
 The root Application owns the exact four local namespaces. The AppProject does
 not permit arbitrary destinations, and bootstrap may pre-create only those same
@@ -467,11 +467,12 @@ Bootstrap does not delete or adopt an existing `argocd` namespace owned by
 another installation. It does not rotate an existing credential, enable
 pruning, self-heal the root Application, expose the Argo CD API server, or
 install a host-side Argo CD CLI. There is deliberately no uninstall command in
-this step.
+this repository.
 
-The standard non-HA installation is appropriate for the disposable local spike,
-not production. Production topology, SSO, external secrets, network exposure,
-backups, high availability and controller resource sizing remain undecided.
+The standard non-HA installation is appropriate for the disposable local
+environment, not production. Production topology, SSO, external secrets,
+network exposure, backups, high availability and controller resource sizing
+remain undecided.
 
 The first immutable promotion moves the required HTTP listener policy from a
 chart-level override into the complete runtime ConfigMap. The deployment lock
@@ -499,3 +500,4 @@ References:
 - [Argo CD declarative setup](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/)
 - [Argo CD private repositories](https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories/)
 - [ADR 0001](decisions/0001-gitops-environment-composition.md)
+- [GitOps migration completion](gitops-migration-completion.md)

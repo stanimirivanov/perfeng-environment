@@ -112,7 +112,7 @@ class ObjectStoreTests(unittest.TestCase):
 
     def test_health_never_creates_missing_secret(self):
         with patch("scripts.object_store.cluster.run", return_value="") as run:
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(ValueError, "object_store.py bootstrap"):
                 store.ensure_secret(cluster.ROOT, create=False)
             self.assertEqual(run.call_count, 1)
 

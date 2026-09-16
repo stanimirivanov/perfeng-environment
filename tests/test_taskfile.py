@@ -33,7 +33,7 @@ class TaskfileTests(unittest.TestCase):
             ],
         )
 
-    def test_status_is_read_only_and_smoke_requires_it(self) -> None:
+    def test_status_is_diagnostic_and_smoke_requires_it(self) -> None:
         status = self.tasks["status"]["cmds"]
         self.assertTrue(
             all("--execute" in command or "workspace.py status" in command for command in status)

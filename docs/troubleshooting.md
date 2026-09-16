@@ -79,8 +79,10 @@ Run the checks in order and stop at the first failure.
 | Product path | `uv run --locked python scripts/control_plane_smoke.py --execute` | A Run completes with five verified artifacts |
 
 The product-path command is **mutating**: it creates a Run, Kubernetes Jobs and
-immutable evidence. The other `health` commands are designed as read-only live
-checks. Their prerequisite discovery still contacts Docker, kind or Kubernetes.
+immutable evidence. Most health checks are read-only. Object-store health creates
+a bounded `s3-health-*` diagnostic Job and retains it for inspection, so
+`task status` does not reconcile desired state but is not strictly read-only.
+Prerequisite discovery contacts Docker, kind or Kubernetes.
 
 ## Docker or kind does not respond
 
