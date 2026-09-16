@@ -13,6 +13,11 @@
 - The [migration completion record](docs/gitops-migration-completion.md) explains
   why the remaining imperative commands are bootstrap, external-state or
   acceptance boundaries rather than competing workload reconcilers.
+- [ADR 0004](docs/decisions/0004-separate-kubernetes-infrastructure.md)
+  selects a staged extraction of reusable Kubernetes substrate and Argo CD
+  bootstrap into `kubernetes-platform-infrastructure`; the
+  [cloud options evaluation](docs/cloud-kubernetes-options.md) records why OCI
+  is the first guarded candidate and why it is not deployable yet.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
 - Start with the [local troubleshooting runbook](docs/troubleshooting.md) when

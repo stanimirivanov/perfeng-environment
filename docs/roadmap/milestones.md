@@ -92,10 +92,12 @@ Completed or active slices:
 - retire the redundant GitOps deploy action, audit the retained imperative
   boundaries and record successful completion against ADR 0001.
 
-Post-milestone decisions:
+Post-milestone decisions and follow-up:
 
-- decide whether reusable infrastructure becomes a separate project and what
-  smaller responsibility remains in `perfeng-environment`;
+- [ADR 0004](../decisions/0004-separate-kubernetes-infrastructure.md)
+  selects a project-neutral Kubernetes infrastructure repository and retains
+  Perfeng composition, roadmap and acceptance ownership here; extraction is
+  follow-up work and does not reopen M02;
 - define the supported production-composition boundary rather than implying
   that the local kind topology is production; and
 - reconcile GitHub milestone status with this roadmap.
@@ -162,6 +164,11 @@ includes:
 - disaster-recovery exercises.
 
 Cloud deployment is included only when it becomes an explicit requirement.
+The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
+current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
+blocked until the runtime has reviewed `linux/arm64` releases and the provider
+capacity and zero-cost preflight pass. A free integration lab is not evidence of
+production readiness.
 
 ## Planning review
 
