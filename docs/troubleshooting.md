@@ -36,9 +36,9 @@ The labels used below mean:
 | **destructive** | Deletes durable or broad local state |
 
 Preview-first repository commands remain previews until `--execute` is supplied.
-The cluster command does not deploy workloads. Do not use the legacy
-`control_plane_deployment.py deploy --execute` while Argo CD owns the
-control-plane workload.
+The cluster command does not deploy workloads. The control plane has no separate
+Helm deployment command; Argo CD is its only workload reconciler. Use
+`control_plane_health.py --execute` for its focused read-only check.
 
 ## Operator task boundaries
 

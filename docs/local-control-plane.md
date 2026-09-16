@@ -9,8 +9,8 @@
   runtime inputs in the order below; Argo CD does not own those resources yet.
 - The preferred workload reconciler is the control-plane child Application in
   [the local GitOps environment](local-gitops.md).
-- Do not run the legacy Helm deploy command while that Application is active;
-  it is retained only as an explicit rollback path.
+- The superseded Helm deploy command has been removed; release rollback uses a
+  reviewed Git revert while Argo CD remains the sole workload reconciler.
 - Smoke and persistence checks validate the live workload without depending on
   Helm release history.
 - Diagnose failures in dependency order with the
@@ -206,17 +206,18 @@ It also validates the ClusterIP Service and requests `/livez`, `/readyz` and
 exposing a host port. Health is read-only and does not repair or replace a
 divergent release.
 
-The former Helm deployment remains an explicit rollback path. Use it only after
-removing the control-plane child Application as documented in the GitOps guide:
+Run the focused workload check when diagnosing the control plane independently
+of the other GitOps-managed workloads:
 
 ```sh
-uv run --locked python scripts/control_plane_deployment.py deploy
-uv run --locked python scripts/control_plane_deployment.py deploy --execute
-uv run --locked python scripts/control_plane_deployment.py health --execute
+uv run --locked python scripts/control_plane_health.py
+uv run --locked python scripts/control_plane_health.py --execute
 ```
 
-The legacy deploy reconstructs the chart from the locked commit in a temporary
-directory and validates Helm release history in addition to the live resources.
+The check validates prerequisite identities, live Kubernetes resources and the
+operational endpoints without consulting Helm release history. Roll back a bad
+release by reverting the reviewed deployment selection in Git and allowing Argo
+CD to reconcile the prior state; do not create a competing Helm owner.
 
 ## Authenticated k6-to-analysis smoke run
 

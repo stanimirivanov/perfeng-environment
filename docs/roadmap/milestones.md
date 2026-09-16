@@ -86,13 +86,15 @@ Completed or active slices:
   PostgreSQL or SeaweedFS imperatively; and
 - expose the reviewed bootstrap, status, smoke and destructive teardown
   boundaries through a thin cross-platform Taskfile without duplicating the
-  Python safety and diagnostic implementation.
+  Python safety and diagnostic implementation; and
+- retire the superseded control-plane Helm reconciler while preserving its
+  GitOps-independent workload health and product acceptance checks.
 
 Remaining completion questions:
 
-- declare the GitOps migration complete against ADR 0001 acceptance;
-- identify and remove superseded orchestration without deleting necessary
-  safety, credential or acceptance boundaries;
+- complete the final migration audit and declare the GitOps migration complete
+  against ADR 0001 acceptance while recording the imperative boundaries retained
+  for credentials, migrations, stateful rollback and product acceptance;
 - decide whether reusable infrastructure becomes a separate project and what
   smaller responsibility remains in `perfeng-environment`;
 - define the supported production-composition boundary rather than implying
