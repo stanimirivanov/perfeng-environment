@@ -210,9 +210,15 @@ read-only Contents access to the selected private repositories, not write access
 Run the prerequisite checks in the order shown in the quick checklist. A later
 failure is often only a consequence of an earlier missing service.
 
-- If PostgreSQL or SeaweedFS is missing, use the preview and deployment procedure
-  in [Local PostgreSQL](local-postgres.md) or
-  [Local S3 artifact storage](local-object-store.md).
+- If PostgreSQL or SeaweedFS credentials are missing on a fresh cluster, run the
+  corresponding `bootstrap` action before `gitops.py bootstrap --execute`.
+  Bootstrap does not deploy a workload or rotate an existing identity.
+- If either stateful workload is missing after credentials exist, inspect its
+  child Application and use the staged procedure in the
+  [GitOps guide](local-gitops.md#fresh-cluster-staged-bootstrap). Do not repair it
+  with the retained Helm rollback command while Argo CD owns the Application.
+- If the object-store workload is ready but bucket health fails, run
+  `object_store.py initialize --execute`, then repeat object-store health.
 - If control-plane database credentials are missing, deploy the database
   identities before the migration. Deployment never silently rotates an
   existing credential.
@@ -226,8 +232,10 @@ failure is often only a consequence of an earlier missing service.
   treat it as a conflict. The tooling intentionally refuses automatic adoption,
   overwrite or rotation.
 
-The complete creation order and recovery boundaries are maintained in
-[the control-plane guide](local-control-plane.md). Stateful GitOps ownership
+The complete creation order and recovery boundaries are maintained in the
+[staged GitOps guide](local-gitops.md#fresh-cluster-staged-bootstrap). The
+control-plane Application may be `Degraded` during that bounded staged interval;
+final GitOps health must not be accepted in that state. Stateful GitOps ownership
 changes must also satisfy the unchanged-identity and rollback gates in
 [ADR 0002](decisions/0002-stateful-gitops-ownership.md).
 

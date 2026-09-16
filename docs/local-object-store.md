@@ -6,6 +6,8 @@
   backed by the retained `data-seaweedfs-0` PVC.
 - `perfeng-local-seaweedfs` self-heals reviewed drift after successful rollback
   and re-adoption acceptance. Pruning remains disabled.
+- `object_store.py bootstrap --execute` creates only external credential
+  identities; `initialize` creates the bucket after Argo CD deploys SeaweedFS.
 - Adoption, rollback and their restart-persistence checks passed without
   replacing storage, credential identities or the original probe object.
 - `object_store.py health --execute` verifies rollout, PVC binding and bucket
@@ -18,17 +20,25 @@ or a claim of full AWS S3 compatibility. It replaces the prototype MinIO
 deployment because the upstream MinIO repository is archived and unmaintained.
 Platform artifact contracts remain vendor-neutral S3 references.
 
-## Deploy and check
+## Bootstrap, initialize and check
 
-First complete the base cluster up/deploy steps. The script requires the
+First complete the base cluster up/bootstrap steps. The script requires the
 perf-platform namespace and kind's standard local-path StorageClass with delayed
 binding. It verifies the local Docker endpoint and dedicated kubeconfig before
 cluster access. Run from this repository in PowerShell or a POSIX shell:
 
 ~~~sh
 uv run --locked python scripts/validate_cluster.py
-uv run --locked python scripts/object_store.py deploy
-uv run --locked python scripts/object_store.py deploy --execute
+uv run --locked python scripts/object_store.py bootstrap
+uv run --locked python scripts/object_store.py bootstrap --execute
+~~~
+
+Complete `gitops.py bootstrap --execute` as described in the
+[staged GitOps guide](local-gitops.md#fresh-cluster-staged-bootstrap). Then run:
+
+~~~sh
+uv run --locked python scripts/object_store.py initialize
+uv run --locked python scripts/object_store.py initialize --execute
 uv run --locked python scripts/object_store.py health --execute
 uv run --locked python scripts/object_store.py smoke --execute
 ~~~
@@ -36,8 +46,12 @@ uv run --locked python scripts/object_store.py smoke --execute
 Without --execute, no credentials are generated, no cluster calls are made,
 and no resources change.
 
-- deploy: reuse/create credentials, install the chart, wait for storage, and
-  create perfeng-artifacts if absent. Creation and authenticated access must succeed.
+- bootstrap: reuse or create the bootstrap and restricted credential identities
+  without installing or changing the SeaweedFS workload.
+- initialize: after the staged GitOps bootstrap, wait for storage and create
+  `perfeng-artifacts` if absent. Creation and authenticated access must succeed.
+- deploy: retained only for explicit rollback after the child Application has
+  been orphaned; it reasserts the Helm release and initializes the bucket.
 - health: check rollout, a Bound PVC, and authenticated bucket access. It creates
   a short-lived client Job, but writes no objects and creates no bucket.
 - smoke: conditionally upload a fixed payload to a unique smoke/<probe-id>.bin
@@ -60,8 +74,9 @@ create another object and would not test persistence.
 Client Jobs have a 180-second deadline, no automatic retries, and cleanup 600
 seconds after completion/failure. They use pinned AWS CLI, Secret references,
 bounded resources, and no service-account token. Failures report the Job name;
-inspect its status/logs within 10 minutes. Deployment failures retain resources
-and credentials. Progress messages indicate waiting, not guaranteed progress.
+inspect its status/logs within 10 minutes. Bootstrap, initialization and rollback
+failures retain resources and credentials. Progress messages indicate waiting,
+not guaranteed progress.
 
 ## Runtime and security
 
@@ -88,18 +103,20 @@ There is no host port or ingress. TCP probes check availability; client Jobs
 perform stronger S3 checks. The server runs non-root with a read-only root
 filesystem, dropped capabilities, and no service-account token.
 
-First deployment generates an access key and a 256-bit secret key, creating the
+Bootstrap generates an access key and a 256-bit secret key when no stateful
+resources or matching credential exist, creating the
 immutable perfeng-s3-auth Secret through private stdin. Credentials are absent
-from arguments, chart values, Helm release data, Git, and host files. The server
+from arguments, chart values, Git and host files. The server
 uses a read-only Secret file; clients use Secret-backed environment variables.
-Redeploy reuses credentials. Missing credentials alongside an existing PVC or
-StatefulSet cause refusal rather than silent regeneration.
+Repeated bootstrap and rollback reuse credentials. Missing credentials alongside
+an existing PVC or StatefulSet cause refusal rather than silent regeneration.
 
 The bootstrap identity has administrative access. The local k6 uploader now uses
 a [separate restricted identity](storage-access.md). Chart 0.3.0 mounts the v3
 additive server configuration Secret with read-only policy-object access; the
 original bootstrap Secret and superseded v2 server Secret are retained.
-Deploy creates/reuses the restricted Secret pair before upgrading the chart. TLS,
+Bootstrap creates or reuses the restricted Secret pair without upgrading the
+chart. TLS,
 encryption at rest, and NetworkPolicy enforcement are not configured. Kubernetes
 Secret-read/pod-exec privileges confer storage-admin access. Do not expose this
 service externally or store production data. The smoke check is not a complete

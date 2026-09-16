@@ -4,8 +4,10 @@
 
 - PostgreSQL is a single-instance local metadata database with a retained 2 GiB
   PVC; it is not production storage or a backup system.
-- `postgres.py deploy --execute` provisions the immutable external credential
-  and Helm release for initial bootstrap or explicit GitOps rollback only.
+- `postgres.py bootstrap --execute` provisions only the immutable external
+  credential; it does not deploy PostgreSQL.
+- `postgres.py deploy --execute` is retained only for explicit GitOps rollback
+  after the child Application has been orphaned.
 - `perfeng-local-postgres` is re-adopted after its successful rollback
   rehearsal and self-heals non-destructive drift. Pruning remains disabled; do
   not run Helm while the child Application is active.
@@ -18,7 +20,7 @@ This optional foundation provides the metadata database from proposal sections
 37-38 and 83. It is a single-instance development database, not production
 storage, a SUT database, or the object store for raw artifacts.
 
-## Deploy and check
+## Bootstrap and check
 
 First complete `cluster.py up --execute` and `cluster.py bootstrap --execute` as
 described in [local Kubernetes](local-kubernetes.md). PostgreSQL requires the
@@ -29,36 +31,51 @@ From this repository, in PowerShell or a POSIX shell:
 
 ```sh
 uv run --locked python scripts/validate_cluster.py
-uv run --locked python scripts/postgres.py deploy
-uv run --locked python scripts/postgres.py deploy --execute
+uv run --locked python scripts/postgres.py bootstrap
+uv run --locked python scripts/postgres.py bootstrap --execute
+```
+
+Bootstrap creates or verifies only the external Secret. The staged flow in the
+[local GitOps guide](local-gitops.md#fresh-cluster-staged-bootstrap) deploys the
+PostgreSQL workload. After that stage, verify it with:
+
+```sh
 uv run --locked python scripts/postgres.py health --execute
 ```
 
-The deploy command is the bootstrap path before the PostgreSQL Argo CD child is
-introduced and the rollback path after that child has been orphaned. During
-active GitOps ownership, use `gitops.py health --execute` or the standalone
-PostgreSQL health command; do not run another Helm upgrade.
+During active GitOps ownership, use `gitops.py health --execute` or the
+standalone PostgreSQL health command; do not run a Helm upgrade.
+
+The deploy action remains an explicit rollback tool. Use it only after following
+the orphaning boundary in the local GitOps guide:
+
+```sh
+uv run --locked python scripts/postgres.py deploy
+uv run --locked python scripts/postgres.py deploy --execute
+```
 
 Without `--execute`, no cluster calls, credential generation, or writes occur.
 Execution verifies the local Docker endpoint and dedicated kind kubeconfig before
-any Kubernetes access. It prints progress without revealing child output.
-The initial image download can take several minutes. A failed deployment leaves
-resources and credentials in place for inspection; it does not roll back or
-delete data. Redeploy after correcting the cause.
+any Kubernetes access. It prints progress without revealing child output. A
+failed bootstrap leaves credentials in place for safe retry and never installs
+or changes a workload. A failed rollback deployment leaves resources and
+credentials in place for inspection; it does not delete data.
 
-Deployment generates a 256-bit random password only on the first deployment,
-creates an immutable `perfeng-postgres-auth` Kubernetes Secret via private stdin,
-then installs release `postgres`. There are no passwords in arguments, chart
-values, Helm release data, Git, or host files. Subsequent deployments reuse the
-owned Secret and do not rotate it. If a StatefulSet or PVC exists without the
-Secret, the script refuses to create a replacement password. Restore the matching
-Secret using your private backup/recovery process; do not delete the PVC to bypass
-the check. Concurrent credential creation fails rather than overwriting a Secret.
+Bootstrap generates a 256-bit random password only when no database resources
+or matching credential exist. It creates an immutable
+`perfeng-postgres-auth` Kubernetes Secret via private stdin,
+without installing release `postgres`. There are no passwords in arguments,
+chart values, Git or host files. Subsequent bootstrap and rollback commands
+reuse the owned Secret and do not rotate it. If a StatefulSet or PVC exists
+without the Secret, the script refuses to create a replacement password.
+Restore the matching Secret using your private backup/recovery process; do not delete the PVC to
+bypass the check. Concurrent credential creation fails rather than overwriting
+a Secret.
 
 The health command verifies rollout, a Bound PVC, and an authenticated `SELECT 1`
 through the Service DNS name. It does not create tables or prove backup recovery.
-The existing `cluster.py health` still checks only nodes, CoreDNS, and the SUT;
-run PostgreSQL health separately when using this optional component.
+The existing `cluster.py health` checks only nodes and CoreDNS; run PostgreSQL
+health separately or through the complete GitOps health workflow.
 
 ## Runtime and ownership
 
