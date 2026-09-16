@@ -49,7 +49,7 @@ Run the checks in order and stop at the first failure.
 | kind | `kind get clusters` | `perfeng-local` is listed |
 | Kubernetes | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local get nodes` | Three nodes report `Ready` |
 | Argo CD | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get pods` | Every current Argo CD Pod is `Running` and ready |
-| Applications | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get applications -o wide` | Root, sample SUT and control plane are `Synced` and `Healthy` |
+| Applications | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get applications -o wide` | Root and all four workload Applications are `Synced` and `Healthy` |
 | PostgreSQL | `uv run --locked python scripts/postgres.py health --execute` | PostgreSQL health completes successfully |
 | Object storage | `uv run --locked python scripts/object_store.py health --execute` | SeaweedFS health completes successfully |
 | Database identities | `uv run --locked python scripts/control_plane_database.py health --execute` | Owned roles and credentials validate without rotation |
