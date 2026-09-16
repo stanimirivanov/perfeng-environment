@@ -117,12 +117,13 @@ These items do not block the completed local migration:
 - external secret management and credential rotation;
 - PostgreSQL and object-storage backup and restore;
 - Argo CD SSO, high availability and capacity planning;
-- deciding whether reusable local infrastructure becomes a separate project;
+- extracting reusable local infrastructure into the project-neutral repository
+  selected by ADR 0004;
 - reducing `perfeng-environment` after that repository-boundary decision; and
 - broader operator telemetry tracked by M05 — Operator Visibility and
   Diagnostics.
 
-The next planning step is to evaluate the infrastructure-project split against
-the retained-boundary inventory above. That evaluation must not move
+ADR 0004 evaluates and selects the infrastructure-project split against the
+retained-boundary inventory above. Its staged extraction must not move
 performance-product behavior, cross-repository contracts or environment-specific
-release selection into a generic infrastructure repository by accident.
+release selection into the generic infrastructure repository by accident.
