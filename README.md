@@ -4,11 +4,12 @@
 
 - This repository composes the local performance-platform workspace and its
   Kubernetes environment; it does not own component source code.
-- The current preview-first Python tools remain the working Milestone 1 path.
+- `Taskfile.yml` provides the supported high-level local operator commands while
+  the preview-first Python tools remain the auditable safety boundaries.
 - [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selects an
   Argo CD-centred target architecture, subject to a reversible local spike.
-- The parallel [local GitOps foundation](docs/local-gitops.md) installs a pinned
-  Argo CD control plane without replacing existing deployments.
+- The [local GitOps environment](docs/local-gitops.md) installs pinned Argo CD
+  and reconciles all supported local workloads without competing reconcilers.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
 - Start with the [local troubleshooting runbook](docs/troubleshooting.md) when
@@ -107,6 +108,39 @@ Workspace from File. IntelliJ's root .idea directory is ignored.
 The workspace script itself uses only the Python standard library. A preinstalled
 Python 3.12 can run it directly without uv; uv pins the development tools.
 The separate cluster tooling also requires the locked PyYAML dependency.
+
+## Local operator tasks
+
+Install [Task 3](https://taskfile.dev/docs/installation/) in addition to the
+prerequisites in the focused operating guides. The Taskfile is a small,
+cross-platform façade over the existing Python commands; orchestration safety,
+credential input, identity validation and timeouts remain in those commands.
+
+```sh
+task --list
+task bootstrap
+task status
+task smoke
+task destroy
+```
+
+- `task bootstrap` creates or validates `perfeng-local`, establishes external
+  credential identities, reconciles the stateful GitOps foundation and
+  initializes the local S3 bucket. The two required GitHub tokens are read from
+  their documented environment variables or requested through hidden input.
+- Bootstrap intentionally stops before reviewed policy publication and the
+  control-plane database, migration and runtime-input stages. Continue with the
+  [fresh-cluster staged bootstrap](docs/local-gitops.md#fresh-cluster-staged-bootstrap).
+- `task status` is read-only but live. It validates the workspace, cluster and
+  complete GitOps environment and fails while a staged bootstrap is incomplete.
+- `task smoke` first requires complete platform health, then creates one retained
+  end-to-end Run and its evidence.
+- `task destroy` displays an interactive warning before invoking the existing
+  exact-name deletion boundary. It permanently deletes all cluster-local data.
+
+The detailed Python commands remain the diagnostic, preview and recovery
+interface. The Makefile remains the engineering validation interface; Task does
+not duplicate formatting, linting or test targets.
 
 ## Safety and status
 

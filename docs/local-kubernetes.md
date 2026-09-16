@@ -8,6 +8,8 @@
   dedicated `.local/perfeng-local.kubeconfig`.
 - After cluster creation, bootstrap the reviewed namespaces and use the
   [GitOps path](local-gitops.md) for workload deployment.
+- Prefer `task bootstrap` for safe create-or-reuse behavior and `task destroy`
+  only when permanent loss of all cluster-local data is intended.
 - Use the [troubleshooting runbook](troubleshooting.md) before recreating an
   unavailable cluster or changing kubeconfig state.
 - Teardown permanently destroys all cluster-local state.
@@ -18,8 +20,9 @@ a calibrated performance lab. No cluster is created by validation or CI.
 ## Prerequisites
 
 Use kind v0.31.0, Docker with Linux containers and cgroup v2, Helm, kubectl,
-Python 3.12, and uv. Rendering was checked with Helm v4.1.4. The local kubectl
-client is v1.36.4; live compatibility still needs validation on your Docker host.
+Python 3.12, uv and Task 3 for the high-level operator commands. Rendering was
+checked with Helm v4.1.4. The local kubectl client is v1.36.4; live compatibility
+still needs validation on your Docker host.
 
 The kind node image is pinned to the digest published in the
 [kind v0.31.0 release](https://github.com/kubernetes-sigs/kind/releases/tag/v0.31.0).
@@ -38,6 +41,11 @@ uv run --locked python scripts/validate_cluster.py
 uv run --locked python scripts/cluster.py up
 uv run --locked python scripts/cluster.py up --execute
 ```
+
+The high-level `task bootstrap` command uses `cluster.py ensure --execute`: it
+creates the cluster only when both its name and dedicated kubeconfig are absent,
+or validates the health and ownership of the existing cluster. An orphaned
+cluster or kubeconfig is rejected rather than adopted or replaced.
 
 After cluster creation, continue with the [local GitOps guide](local-gitops.md).
 Bootstrap applies only the same namespace manifest that the root Application
@@ -100,6 +108,10 @@ Preview, then explicitly confirm the exact cluster name:
 uv run --locked python scripts/cluster.py down
 uv run --locked python scripts/cluster.py down --execute --confirm-delete perfeng-local
 ```
+
+The operator façade retains both protections. `task destroy` displays an
+interactive destructive-action prompt and then supplies the exact reviewed name
+to the cluster command. Do not bypass the prompt in routine use.
 
 Deletion destroys all cluster-local state and removes the dedicated kubeconfig.
 Data cannot be recovered unless exported beforehand. The command verifies the

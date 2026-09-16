@@ -1,0 +1,44 @@
+version: "3"
+
+tasks:
+  default:
+    desc: List the supported local operator tasks
+    silent: true
+    cmds:
+      - task --list
+
+  bootstrap:
+    desc: Bootstrap the local cluster and stateful GitOps foundation
+    summary: |
+      Create or validate the named kind cluster, establish external credential
+      identities, install Argo CD, reconcile the stateful Applications, and
+      initialize the local S3 bucket. This stops before reviewed policy
+      publication and control-plane database/runtime preparation.
+    cmds:
+      - uv run --locked python scripts/cluster.py ensure --execute
+      - uv run --locked python scripts/cluster.py bootstrap --execute
+      - uv run --locked python scripts/postgres.py bootstrap --execute
+      - uv run --locked python scripts/object_store.py bootstrap --execute
+      - uv run --locked python scripts/control_plane_registry.py deploy --execute
+      - uv run --locked python scripts/gitops.py bootstrap --execute
+      - uv run --locked python scripts/object_store.py initialize --execute
+      - uv run --locked python scripts/storage_access.py --execute
+
+  status:
+    desc: Validate the complete local platform without changing it
+    cmds:
+      - uv run --locked python scripts/workspace.py status
+      - uv run --locked python scripts/cluster.py health --execute
+      - uv run --locked python scripts/gitops.py health --execute
+
+  smoke:
+    desc: Validate platform health and run one retained end-to-end smoke Run
+    cmds:
+      - task: status
+      - uv run --locked python scripts/control_plane_smoke.py --execute
+
+  destroy:
+    desc: Permanently delete the named local cluster and all cluster-local data
+    prompt: This permanently deletes perfeng-local and all cluster-local data. Continue?
+    cmds:
+      - uv run --locked python scripts/cluster.py down --execute --confirm-delete perfeng-local

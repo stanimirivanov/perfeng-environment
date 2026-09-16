@@ -80,10 +80,13 @@ Completed or active slices:
   it and enable controlled self-healing; and
 - retire the superseded sample-SUT Helm path while preserving preview-first
   commands that remain bootstrap, credential, migration or explicit rollback
-  boundaries; and
+  boundaries;
 - separate stateful credential and bucket bootstrap from retained Helm rollback
   commands so a fresh cluster can enter GitOps ownership without first deploying
-  PostgreSQL or SeaweedFS imperatively.
+  PostgreSQL or SeaweedFS imperatively; and
+- expose the reviewed bootstrap, status, smoke and destructive teardown
+  boundaries through a thin cross-platform Taskfile without duplicating the
+  Python safety and diagnostic implementation.
 
 Remaining completion questions:
 

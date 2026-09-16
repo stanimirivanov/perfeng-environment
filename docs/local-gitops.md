@@ -10,6 +10,8 @@
   manifest; the upstream manifest supplies its tested dependency image tags.
 - Run `gitops.py validate` offline before review, then merge the GitOps files to
   `main` before executing bootstrap because the root Application reads `main`.
+- Use `task bootstrap` for the stateful foundation, then complete the explicit
+  policy and control-plane preparation before `task status` or `task smoke`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
 - All four workload Applications synchronize and self-heal automatically. The
@@ -101,6 +103,22 @@ state reaches `main`:
    control-plane runtime inputs; and
 7. require the complete GitOps health workflow and product smoke test to pass.
 
+Task 3 provides the supported high-level entry point for stages 1 through the
+S3 initialization and access probe:
+
+```powershell
+task bootstrap
+```
+
+The task creates a missing `perfeng-local` cluster or validates and reuses the
+owned cluster when it already exists. It then calls the same commands shown
+below. It never passes secret values in arguments and does not weaken ownership,
+timeout or credential-reuse checks. The task stops at the explicit policy and
+control-plane preparation boundary; complete those reviewed stages below.
+
+The individual commands remain canonical for preview, diagnosis and partial
+recovery:
+
 ```powershell
 uv run --locked python scripts/cluster.py up --execute
 uv run --locked python scripts/cluster.py bootstrap --execute
@@ -139,6 +157,18 @@ Neither stateful bootstrap action creates a workload, PVC or bucket. Repeating
 them validates and reuses the immutable credential identities without rotation.
 The `initialize` action runs only after Argo CD has reconciled SeaweedFS and
 creates the expected bucket if it is absent.
+
+After the remaining control-plane prerequisites are complete, use the compact
+read-only and acceptance entry points:
+
+```powershell
+task status
+task smoke
+```
+
+`task status` requires the complete platform to be healthy. `task smoke` runs
+that status check first and then creates one retained product Run and its
+evidence; it is not a read-only command.
 
 ## Deploy after merge
 
