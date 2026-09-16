@@ -9,6 +9,8 @@ Problem and resulting behavior:
 
 Boundaries and deliberate exclusions:
 
+Assumptions and unresolved questions:
+
 ## Design, compatibility and operations
 
 - ADRs:
@@ -16,6 +18,7 @@ Boundaries and deliberate exclusions:
 - Security effects:
 - Persistent-resource effects:
 - Rollout, recovery and rollback:
+- Externally visible or destructive actions authorized by:
 
 ## Verification
 
@@ -29,11 +32,14 @@ Boundaries and deliberate exclusions:
 
 Commands and non-secret evidence:
 
+Checks not run, blocking reason and residual risk:
+
 ## Limitations and review
 
 - [ ] One coherent, independently mergeable outcome
 - [ ] Relevant negative and failure behavior is tested
 - [ ] Documentation and troubleshooting are current
 - [ ] No secrets, local receipts, machine-specific paths or unrelated churn
+- [ ] No unapproved external side effects or destructive actions
 
 Known limitations and follow-up:

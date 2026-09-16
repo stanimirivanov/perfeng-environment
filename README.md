@@ -156,6 +156,8 @@ truth:
 - [Engineering standards](docs/development/engineering-standards.md)
 - [Architecture decisions](docs/decisions/README.md)
 - [Cross-repository roadmap](docs/roadmap/milestones.md)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
 
 Contribution and documentation conventions include the required TL;DR for long
 documents and the exact completion-report format used for PR-sized work.
@@ -166,7 +168,13 @@ uv run --locked ruff format --check .
 uv run --locked ty check
 uv run --locked python -m unittest discover -s tests -v
 uv run --locked python scripts/workspace.py validate
+uv run --locked python scripts/gitops.py validate
+uv run --locked python scripts/validate_cluster.py
 ```
+
+On systems with Make, `make validate` runs the same non-mutating checks and
+tests. The individual commands above remain the portable, authoritative
+interface.
 
 Tests use temporary paths and mocked clone operations, never GitHub writes.
 CI is configured to validate on Windows and Linux.
