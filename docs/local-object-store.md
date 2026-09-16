@@ -4,10 +4,10 @@
 
 - SeaweedFS provides private, single-node, S3-compatible local artifact storage
   backed by the retained `data-seaweedfs-0` PVC.
-- Argo CD adopts the existing `seaweedfs` chart and release without owning or
-  rotating its external credential Secrets.
-- Initial GitOps adoption has pruning and self-healing disabled until identity,
-  restart-persistence and rollback acceptance pass.
+- The reviewed `perfeng-local-seaweedfs` child is temporarily inactive for its
+  rollback rehearsal. Run Helm only after the child Application is orphaned.
+- Its initial GitOps adoption and restart-persistence acceptance passed without
+  replacing storage or credential identities.
 - `object_store.py health --execute` verifies rollout, PVC binding and bucket
   access; `smoke` creates one durable probe and `verify` reads that exact object.
 - This local service is neither production storage nor a backup system.
@@ -128,10 +128,11 @@ window, and producer identity using perfeng-contracts. This step does not run k6
 or upload real run artifacts. The prototype MinIO chart/data remains untouched;
 existing data requires explicit export/import, not a filesystem move.
 
-The GitOps child uses the same chart path, release name, StatefulSet, Service,
-external Secrets and generated PVC identity. Do not run the Helm deployment
-command while `perfeng-local-seaweedfs` is active. Adoption and rollback follow
-[ADR 0002](decisions/0002-stateful-gitops-ownership.md).
+The reviewed GitOps child uses the same chart path, release name, StatefulSet,
+Service, external Secrets and generated PVC identity. It is temporarily absent
+from root composition for the rollback rehearsal. Do not run the Helm deployment
+command until `perfeng-local-seaweedfs` has been orphaned. Adoption and rollback
+follow [ADR 0002](decisions/0002-stateful-gitops-ownership.md).
 
 References: [SeaweedFS pinned source](https://github.com/seaweedfs/seaweedfs/tree/4.45),
 [MinIO maintenance status](https://github.com/minio/minio),
