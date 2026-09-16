@@ -30,7 +30,7 @@ def existing_secret():
 
 class ObjectStoreTests(unittest.TestCase):
     def test_preview_does_not_execute_or_generate_credentials(self):
-        for action in ["deploy", "health", "smoke", "verify"]:
+        for action in ["bootstrap", "deploy", "initialize", "health", "smoke", "verify"]:
             args = ["object_store.py", action]
             if action == "verify":
                 args += ["--probe-id", PROBE]
@@ -117,10 +117,10 @@ class ObjectStoreTests(unittest.TestCase):
             self.assertEqual(run.call_count, 1)
 
     def test_client_checks_are_separate_and_no_automatic_object_deletion(self):
-        for action in ["deploy", "health", "smoke", "verify"]:
+        for action in ["initialize", "health", "smoke", "verify"]:
             script = store.client_script(action, PROBE)
             self.assertNotIn("delete-object", script)
-            self.assertEqual("create-bucket" in script, action == "deploy")
+            self.assertEqual("create-bucket" in script, action == "initialize")
             self.assertEqual("put-object" in script, action == "smoke")
             if action in {"smoke", "verify"}:
                 self.assertIn("--no-sign-request", script)
@@ -164,6 +164,31 @@ class ObjectStoreTests(unittest.TestCase):
                 store.execute("deploy", PROBE)
             run.assert_not_called()
 
+    def test_bootstrap_creates_credentials_without_deploying_a_workload(self):
+        storage = json.dumps(
+            {
+                "provisioner": "rancher.io/local-path",
+                "volumeBindingMode": "WaitForFirstConsumer",
+            }
+        )
+        with (
+            patch("scripts.object_store.cluster.verify_local_docker"),
+            patch("scripts.object_store.cluster.verify_context"),
+            patch(
+                "scripts.object_store.cluster.run",
+                side_effect=["namespace/perf-platform", storage],
+            ) as run,
+            patch("scripts.object_store.ensure_secret") as ensure,
+            patch("scripts.storage_access.ensure_credentials") as restricted,
+            redirect_stdout(io.StringIO()) as output,
+        ):
+            store.execute("bootstrap", PROBE)
+
+        ensure.assert_called_once_with(cluster.ROOT, create=True)
+        restricted.assert_called_once_with(cluster.ROOT, create=True)
+        self.assertFalse(any(call.args[0][0] == "helm" for call in run.call_args_list))
+        self.assertIn("completed: bootstrap", output.getvalue())
+
     def test_successful_health_and_failed_job_are_distinct(self):
         for failed in [False, True]:
             responses = [
@@ -187,6 +212,32 @@ class ObjectStoreTests(unittest.TestCase):
                 else:
                     store.execute("health", PROBE)
                     self.assertIn("completed: health", output.getvalue())
+
+    def test_initialize_creates_the_bucket_after_gitops_rollout(self):
+        with (
+            patch("scripts.object_store.cluster.verify_local_docker"),
+            patch("scripts.object_store.cluster.verify_context"),
+            patch("scripts.object_store.ensure_secret"),
+            patch("scripts.storage_access.ensure_credentials") as restricted,
+            patch(
+                "scripts.object_store.cluster.run",
+                side_effect=[
+                    "namespace/perf-platform",
+                    "ready",
+                    '{"status":{"phase":"Bound"}}',
+                    "",
+                    "",
+                ],
+            ) as run,
+            redirect_stdout(io.StringIO()),
+        ):
+            store.execute("initialize", PROBE)
+
+        restricted.assert_called_once_with(cluster.ROOT, create=False)
+        create = run.call_args_list[3]
+        job = json.loads(create.kwargs["input_data"])
+        script = job["spec"]["template"]["spec"]["containers"][0]["command"][-1]
+        self.assertIn("create-bucket", script)
 
 
 if __name__ == "__main__":

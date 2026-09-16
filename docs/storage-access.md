@@ -26,19 +26,24 @@ policy writes, bucket administration and objects outside these resource scopes
 are not granted. Workload and analysis containers still receive no storage
 credentials.
 
-## Upgrade an existing local installation
+## Bootstrap or verify the restricted identity
 
 Run from perfeng-environment after reviewing the previews:
 
 ~~~powershell
-uv run --locked python scripts/object_store.py deploy
-uv run --locked python scripts/storage_access.py
-uv run --locked python scripts/object_store.py deploy --execute
-uv run --locked python scripts/storage_access.py --execute
-uv run --locked python scripts/k6_run.py --execute
+uv run --locked python scripts/object_store.py bootstrap
+uv run --locked python scripts/object_store.py bootstrap --execute
 ~~~
 
-Deployment is additive:
+After the staged GitOps bootstrap deploys and initializes SeaweedFS, verify the
+live authorization boundary:
+
+~~~powershell
+uv run --locked python scripts/storage_access.py
+uv run --locked python scripts/storage_access.py --execute
+~~~
+
+Credential bootstrap is additive and does not deploy or restart SeaweedFS:
 
 1. Validate and retain the existing immutable perfeng-s3-auth bootstrap Secret.
 2. Create matching immutable perfeng-s3-uploader-auth Secrets in perf-platform
@@ -46,17 +51,17 @@ Deployment is additive:
    key.
 3. Create immutable perfeng-s3-server-auth-v3 containing s3.json, which combines
    the unchanged bootstrap identity with the uploader and its attached policy.
-4. Upgrade chart 0.3.0 to mount that server Secret. This restarts SeaweedFS;
-   schedule the upgrade when no captures are running. Its PVC is reused.
+4. Let the GitOps-managed chart mount the reviewed server Secret. Initial
+   bootstrap starts SeaweedFS later; an existing reconciled workload is unchanged.
 
 An existing v2 server Secret is intentionally retained for rollback inspection;
 it is no longer mounted after the chart upgrade. The uploader access key and
 secret key are reused rather than rotated.
 
 Credentials are sent through private stdin, not command arguments, host files,
-Git, chart values or Helm release data. Helm owns neither Secret. Redeployment
-reuses both identities; it does not rotate them. A partial migration with an
-existing uploader or only one namespace copy can be retried. Unknown, mutable,
+Git or chart values. Neither Helm nor Argo CD owns the Secret values. Repeated
+bootstrap reuses both identities; it does not rotate them. A partial migration
+with an existing uploader or only one namespace copy can be retried. Unknown, mutable,
 inconsistent or orphaned credentials are refused. Restore matching Secrets
 instead of deleting them to force regeneration.
 

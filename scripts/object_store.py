@@ -1,4 +1,4 @@
-"""Preview-first local SeaweedFS deployment and S3 checks; never prints credentials."""
+"""Preview-first SeaweedFS credential bootstrap, rollback deployment and S3 checks."""
 
 import argparse
 import base64
@@ -111,7 +111,7 @@ def ensure_secret(root: Path, *, create: bool) -> None:
 
 
 def client_script(action: str, probe_id: str) -> str:
-    if action not in {"deploy", "health", "smoke", "verify"}:
+    if action not in {"initialize", "health", "smoke", "verify"}:
         raise ValueError("Unknown object-store action")
     if not re.fullmatch(r"[0-9a-f]{32}", probe_id):
         raise ValueError("Probe ID must contain exactly 32 lowercase hexadecimal characters")
@@ -122,7 +122,7 @@ def client_script(action: str, probe_id: str) -> str:
         '--cli-read-timeout 30 s3api "$@"; }\n'
     )
     head = f'aws_s3 head-bucket --bucket "{BUCKET}" >/dev/null\n'
-    if action == "deploy":
+    if action == "initialize":
         return (
             preamble
             + (
@@ -247,14 +247,15 @@ def client_job(action: str, probe_id: str, job_name: str, root: Path) -> dict[st
 
 
 def execute(action: str, probe_id: str, root: Path = cluster.ROOT) -> None:
-    # Validate the entire client plan before any mutation.
+    # Validate any required client plan before mutation.
     job_name = f"s3-{action}-{uuid.uuid4().hex[:16]}"
-    job = client_job(action, probe_id, job_name, root)
+    job_action = "initialize" if action == "deploy" else action
+    job = None if action == "bootstrap" else client_job(job_action, probe_id, job_name, root)
     cluster.verify_local_docker()
     cluster.verify_context(root)
     kube = kubectl(root)
     cluster.run([*kube, "get", "namespace", NAMESPACE, "-o", "name"])
-    if action == "deploy":
+    if action in {"bootstrap", "deploy"}:
         sc = json.loads(cluster.run([*kube, "get", "storageclass", "standard", "-o", "json"]))
         if (
             sc.get("provisioner") != "rancher.io/local-path"
@@ -263,13 +264,17 @@ def execute(action: str, probe_id: str, root: Path = cluster.ROOT) -> None:
             raise ValueError(
                 "Expected kind's standard local-path StorageClass with delayed binding"
             )
-    ensure_secret(root, create=action == "deploy")
-    if action == "deploy":
+    ensure_secret(root, create=action in {"bootstrap", "deploy"})
+    if action in {"bootstrap", "deploy", "initialize"}:
         if __package__:
             from . import storage_access
         else:
             import storage_access
-        storage_access.ensure_credentials(root, create=True)
+        storage_access.ensure_credentials(root, create=action in {"bootstrap", "deploy"})
+    if action == "bootstrap":
+        print("Local object-store action completed: bootstrap", flush=True)
+        return
+    if action == "deploy":
         print("Deploying SeaweedFS (first image download may take several minutes)...", flush=True)
         cluster.run(
             [
@@ -294,6 +299,8 @@ def execute(action: str, probe_id: str, root: Path = cluster.ROOT) -> None:
     if pvc.get("status", {}).get("phase") != "Bound":
         raise ValueError("SeaweedFS PVC is not Bound")
     print(f"Running S3 check Job {job_name}...", flush=True)
+    if job is None:
+        raise ValueError("Object-store client plan is missing")
     cluster.run([*kube, "create", "-f", "-"], input_data=json.dumps(job).encode("utf-8"))
     try:
         cluster.run(
@@ -313,7 +320,9 @@ def execute(action: str, probe_id: str, root: Path = cluster.ROOT) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["deploy", "health", "smoke", "verify"])
+    parser.add_argument(
+        "action", choices=["bootstrap", "deploy", "initialize", "health", "smoke", "verify"]
+    )
     parser.add_argument("--probe-id")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
@@ -326,13 +335,19 @@ def main() -> int:
         if args.execute:
             execute(args.action, probe_id)
         else:
-            plan = client_job(args.action, probe_id, "s3-preview", cluster.ROOT)
+            job_action = "initialize" if args.action == "deploy" else args.action
+            plan = (
+                None
+                if args.action == "bootstrap"
+                else client_job(job_action, probe_id, "s3-preview", cluster.ROOT)
+            )
             print("Preview: verify local cluster, namespace, credentials, rollout and PVC.")
+            if args.action in {"bootstrap", "deploy"}:
+                print("Create or reuse bootstrap and restricted credentials through private stdin.")
             if args.action == "deploy":
-                print(
-                    "Then create/reuse bootstrap and restricted credentials, install the chart and ensure the bucket."
-                )
-            print(json.dumps(plan, indent=2))
+                print("Then install the rollback chart and initialize the bucket.")
+            if plan is not None:
+                print(json.dumps(plan, indent=2))
             print(
                 "Preview only. Add --execute to run. No credentials generated or resources changed."
             )

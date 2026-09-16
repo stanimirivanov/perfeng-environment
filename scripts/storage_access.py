@@ -136,7 +136,9 @@ def ensure_credentials(root: Path, *, create: bool) -> None:
     execution_uploader = json.loads(execution_text) if execution_text.strip() else None
     bootstrap_secret = current[store.SECRET]
     if bootstrap_secret is None:
-        raise ValueError("Bootstrap S3 credentials missing; deploy object storage first")
+        raise ValueError(
+            "Bootstrap S3 credentials missing; run object_store.py bootstrap --execute first"
+        )
     store.validate_secret(bootstrap_secret)
     bootstrap = decode(bootstrap_secret, store.SECRET, {"access-key", "secret-key", "s3.json"})
     uploader = current[UPLOADER_SECRET]
@@ -151,7 +153,7 @@ def ensure_credentials(root: Path, *, create: bool) -> None:
         )
     if not create and (uploader is None or server is None):
         raise ValueError(
-            "Restricted storage credentials missing; run object_store.py deploy --execute"
+            "Restricted storage credentials missing; run object_store.py bootstrap --execute"
         )
     if uploader is None:
         active = cluster.run(
@@ -199,7 +201,7 @@ def ensure_credentials(root: Path, *, create: bool) -> None:
     if execution_uploader is None:
         if not create:
             raise ValueError(
-                "Execution uploader credentials missing; run object_store.py deploy --execute"
+                "Execution uploader credentials missing; run object_store.py bootstrap --execute"
             )
         cluster.run(
             [*execution_kube, "create", "-f", "-"],

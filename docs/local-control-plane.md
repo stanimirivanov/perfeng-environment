@@ -44,13 +44,13 @@ Kubernetes resources.
 
 ## Local infrastructure prerequisites
 
-The source-workspace bootstrap does not create runtime infrastructure. Before
-starting this workflow, create and verify the local kind cluster, sample API,
-SeaweedFS and its restricted storage identities using
-[local Kubernetes](local-kubernetes.md),
-[local object storage](local-object-store.md), and
-[storage access](storage-access.md). Publish the checkout reporting policy from
-the exact locked runtime bundle using [policy publication](policy-publication.md).
+The source-workspace bootstrap does not create runtime infrastructure. On a
+fresh cluster, follow the complete
+[staged GitOps bootstrap](local-gitops.md#fresh-cluster-staged-bootstrap). It
+creates external credentials before Argo CD reconciles PostgreSQL and SeaweedFS,
+then initializes storage before this control-plane provisioning sequence.
+Publish the checkout reporting policy from the exact locked runtime bundle using
+[policy publication](policy-publication.md).
 Removing Docker containers or volumes removes this entire local environment;
 recreate these prerequisites before deploying the control plane.
 
@@ -101,13 +101,11 @@ used by CI is a separate credential. See [Working with the Container registry](h
 
 ## Database identities
 
-The identity command requires the base PostgreSQL service and its bootstrap
-Secret. Deploy and verify that foundation first, as described in
-[local PostgreSQL](local-postgres.md):
+The identity command requires the GitOps-managed PostgreSQL service and its
+external bootstrap Secret. Bootstrap and verify that foundation first, as
+described in [local PostgreSQL](local-postgres.md):
 
 ```sh
-uv run --locked python scripts/postgres.py deploy
-uv run --locked python scripts/postgres.py deploy --execute
 uv run --locked python scripts/postgres.py health --execute
 ```
 

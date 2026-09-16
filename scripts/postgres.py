@@ -1,4 +1,4 @@
-"""Preview-first PostgreSQL deployment into the verified local kind cluster."""
+"""Preview-first PostgreSQL credential bootstrap, rollback deployment and health."""
 
 import argparse
 import base64
@@ -53,6 +53,8 @@ def commands(action: str, root: Path = cluster.ROOT) -> list[list[str]]:
     ]
     if action == "health":
         return health
+    if action == "bootstrap":
+        return []
     if action == "deploy":
         return [
             [
@@ -103,7 +105,7 @@ def ensure_secret(root: Path, *, create: bool) -> None:
         return
     if not create:
         raise ValueError(
-            "PostgreSQL credentials are missing; run scripts/postgres.py deploy --execute first"
+            "PostgreSQL credentials are missing; run scripts/postgres.py bootstrap --execute first"
         )
     # A retained volume may contain an initialized database. A new password would
     # not reset it. Also refuse to race a previous/foreign StatefulSet deployment.
@@ -134,9 +136,9 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
     cluster.verify_local_docker()
     cluster.verify_context(root)
     kube = kubectl(root)
-    # Do not create namespaces or provisioners implicitly; cluster deploy owns them.
+    # Do not create namespaces or provisioners implicitly; cluster bootstrap owns them.
     cluster.run([*kube, "get", "namespace", NAMESPACE, "-o", "name"])
-    if action == "deploy":
+    if action in {"bootstrap", "deploy"}:
         storage = json.loads(cluster.run([*kube, "get", "storageclass", "standard", "-o", "json"]))
         if (
             storage.get("provisioner") != "rancher.io/local-path"
@@ -145,7 +147,7 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
             raise ValueError(
                 "Expected kind's standard local-path StorageClass with delayed binding"
             )
-    ensure_secret(root, create=action == "deploy")
+    ensure_secret(root, create=action in {"bootstrap", "deploy"})
     planned = commands(action, root)
     for index, command in enumerate(planned):
         print(f"PostgreSQL {action}: step {index + 1}/{len(planned)}...", flush=True)
@@ -160,16 +162,18 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["deploy", "health"])
+    parser.add_argument("action", choices=["bootstrap", "deploy", "health"])
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     try:
         if args.execute:
             execute(args.action)
         else:
-            print("Preview: verify the local cluster and namespace; deploy checks local storage.")
             print(
-                "Credentials: reuse owned Secret, or create via private stdin only on fresh deploy."
+                "Preview: verify the local cluster and namespace; bootstrap and deploy check local storage."
+            )
+            print(
+                "Credentials: reuse the owned Secret, or create it through private stdin during bootstrap or rollback deployment."
             )
             for command in commands(args.action):
                 print(json.dumps(command))

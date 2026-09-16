@@ -19,18 +19,21 @@ def existing_secret():
 
 class PostgresTests(unittest.TestCase):
     def test_preview_has_no_execution_or_secret_generation(self):
-        with (
-            patch("sys.argv", ["postgres.py", "deploy"]),
-            patch("scripts.postgres.cluster.run") as run,
-            patch("scripts.postgres.secrets.token_urlsafe") as generate,
-            redirect_stdout(io.StringIO()) as output,
-        ):
-            self.assertEqual(postgres.main(), 0)
-            run.assert_not_called()
-            generate.assert_not_called()
-            self.assertIn("Preview only", output.getvalue())
+        for action in ["bootstrap", "deploy", "health"]:
+            with (
+                self.subTest(action=action),
+                patch("sys.argv", ["postgres.py", action]),
+                patch("scripts.postgres.cluster.run") as run,
+                patch("scripts.postgres.secrets.token_urlsafe") as generate,
+                redirect_stdout(io.StringIO()) as output,
+            ):
+                self.assertEqual(postgres.main(), 0)
+                run.assert_not_called()
+                generate.assert_not_called()
+                self.assertIn("Preview only", output.getvalue())
 
     def test_all_commands_pin_local_context_and_kubeconfig(self):
+        self.assertEqual(postgres.commands("bootstrap"), [])
         for action in ["deploy", "health"]:
             for command in postgres.commands(action):
                 self.assertIn(str(cluster.kubeconfig(cluster.ROOT)), command)
@@ -101,7 +104,9 @@ class PostgresTests(unittest.TestCase):
 
     def test_missing_secret_health_never_creates(self):
         with patch("scripts.postgres.cluster.run", return_value="") as run:
-            with self.assertRaisesRegex(ValueError, r"scripts/postgres\.py deploy --execute first"):
+            with self.assertRaisesRegex(
+                ValueError, r"scripts/postgres\.py bootstrap --execute first"
+            ):
                 postgres.ensure_secret(cluster.ROOT, create=False)
             self.assertEqual(run.call_count, 1)
 
@@ -117,16 +122,44 @@ class PostgresTests(unittest.TestCase):
         run.assert_not_called()
 
     def test_wrong_storage_class_stops_before_secret_creation(self):
+        for action in ["bootstrap", "deploy"]:
+            with (
+                self.subTest(action=action),
+                patch("scripts.postgres.cluster.verify_local_docker"),
+                patch("scripts.postgres.cluster.verify_context"),
+                patch(
+                    "scripts.postgres.cluster.run",
+                    side_effect=["namespace/perf-platform", "{}"],
+                ),
+                patch("scripts.postgres.ensure_secret") as ensure,
+                redirect_stdout(io.StringIO()),
+                self.assertRaisesRegex(ValueError, "StorageClass"),
+            ):
+                postgres.execute(action)
+            ensure.assert_not_called()
+
+    def test_bootstrap_creates_credentials_without_deploying_a_workload(self):
+        storage = json.dumps(
+            {
+                "provisioner": "rancher.io/local-path",
+                "volumeBindingMode": "WaitForFirstConsumer",
+            }
+        )
         with (
             patch("scripts.postgres.cluster.verify_local_docker"),
             patch("scripts.postgres.cluster.verify_context"),
-            patch("scripts.postgres.cluster.run", side_effect=["namespace/perf-platform", "{}"]),
+            patch(
+                "scripts.postgres.cluster.run",
+                side_effect=["namespace/perf-platform", storage],
+            ) as run,
             patch("scripts.postgres.ensure_secret") as ensure,
-            redirect_stdout(io.StringIO()),
-            self.assertRaisesRegex(ValueError, "StorageClass"),
+            redirect_stdout(io.StringIO()) as output,
         ):
-            postgres.execute("deploy")
-        ensure.assert_not_called()
+            postgres.execute("bootstrap")
+
+        ensure.assert_called_once_with(cluster.ROOT, create=True)
+        self.assertFalse(any(call.args[0][0] == "helm" for call in run.call_args_list))
+        self.assertIn("completed: bootstrap", output.getvalue())
 
     def test_health_requires_bound_volume_and_authenticated_query(self):
         for phase, result, success in [

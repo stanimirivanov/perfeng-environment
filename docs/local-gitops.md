@@ -48,6 +48,7 @@ Docker or Kubernetes:
 
 ```powershell
 uv run --locked python scripts/gitops.py validate
+uv run --locked python scripts/gitops.py bootstrap
 uv run --locked python scripts/gitops.py deploy
 ```
 
@@ -62,11 +63,12 @@ The first command verifies:
   stateful self-healing policy;
 - control-plane chart commit, image digest, runtime resource names, registry
   mounts, destination and sync policy against the reviewed deployment lock;
-- creation of only the explicitly allowed `perf-sut` destination namespace;
+- exact ownership of the four reviewed local namespaces;
 - agreement between the AppProject source repositories and `workspace.json`.
 
-The second command is only a deployment preview. Preview never downloads the
-install manifest, reads a credential or contacts the cluster.
+The second and third commands are staged-bootstrap and complete-deployment
+previews. Preview never downloads the install manifest, reads a credential or
+contacts the cluster.
 
 The official upstream manifest is not copied into this repository. The
 Kustomize bootstrap references the explicit `v3.5.2` release tag and trusts the
@@ -84,6 +86,60 @@ Review the rendered Argo CD, Dex and Redis image tags as part of an upgrade.
 Rendering needs network access to fetch the versioned upstream manifest; the
 repository validation above remains offline.
 
+## Fresh-cluster staged bootstrap
+
+The fresh-cluster path deliberately separates external credential creation from
+workload reconciliation. Run these stages in order after the reviewed GitOps
+state reaches `main`:
+
+1. create the cluster and apply only the reviewed namespace resources;
+2. create PostgreSQL and S3 credential Secrets without running Helm;
+3. create the private GHCR pull Secret;
+4. bootstrap Argo CD and wait only for the sample SUT, PostgreSQL and SeaweedFS;
+5. initialize the S3 bucket and publish the reviewed reporting policy;
+6. provision database identities, run the migration and assemble immutable
+   control-plane runtime inputs; and
+7. require the complete GitOps health workflow and product smoke test to pass.
+
+```powershell
+uv run --locked python scripts/cluster.py up --execute
+uv run --locked python scripts/cluster.py bootstrap --execute
+uv run --locked python scripts/postgres.py bootstrap --execute
+uv run --locked python scripts/object_store.py bootstrap --execute
+
+$env:PERFENG_REPOSITORIES_READ_TOKEN = Read-Host `
+  "GHCR package-read token" -MaskInput
+uv run --locked python scripts/control_plane_registry.py deploy --execute
+
+$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
+  "GitHub private-repository read token" -MaskInput
+uv run --locked python scripts/gitops.py bootstrap --execute
+uv run --locked python scripts/object_store.py initialize --execute
+uv run --locked python scripts/storage_access.py --execute
+```
+
+Publish the checkout policy through the exact reviewed command in
+[policy publication](policy-publication.md), then continue:
+
+```powershell
+uv run --locked python scripts/control_plane_database.py deploy --execute
+uv run --locked python scripts/control_plane_migration.py deploy --execute
+uv run --locked python scripts/control_plane_runtime.py deploy --execute
+uv run --locked python scripts/gitops.py health --execute
+uv run --locked python scripts/control_plane_smoke.py --execute
+```
+
+During the staged interval, `perfeng-local-control-plane` may be `Degraded`
+because its external Secrets, database schema and runtime ConfigMaps do not yet
+exist. The bootstrap command does not wait for or claim success for that
+Application. Final GitOps health remains fail-closed and requires all five
+Applications and every workload acceptance check.
+
+Neither stateful bootstrap action creates a workload, PVC or bucket. Repeating
+them validates and reuses the immutable credential identities without rotation.
+The `initialize` action runs only after Argo CD has reconciled SeaweedFS and
+creates the expected bucket if it is absent.
+
 ## Deploy after merge
 
 The root Application reads
@@ -96,16 +152,16 @@ causes the root Application to reconcile it automatically. Run the health
 command afterward; rerunning deployment is safe but not required.
 
 The PostgreSQL child intentionally references, but does not own, the separately
-provisioned `perfeng-postgres-auth` Secret and StatefulSet-generated PVC. Before
-the first adoption, complete the health and pre-adoption persistence checks in
-[the local PostgreSQL guide](local-postgres.md). Do not run the PostgreSQL Helm
+provisioned `perfeng-postgres-auth` Secret and StatefulSet-generated PVC. Use the
+staged bootstrap above on a fresh cluster. Do not run the PostgreSQL Helm
 deployment command while its child Application is active.
 
 The control-plane child intentionally does not generate or own credentials,
-database state, migrations or runtime configuration. Before merging or
-executing this step against a fresh cluster, complete the provisioning sections
-in [the local control-plane guide](local-control-plane.md) through **Runtime
-inputs**, then verify the external resources:
+database state, migrations or runtime configuration. Before running the complete
+`deploy` action, complete the provisioning sections in
+[the local control-plane guide](local-control-plane.md) through **Runtime
+inputs**. Use the staged `bootstrap` action instead on a fresh cluster. Verify
+the external resources with:
 
 ```powershell
 uv run --locked python scripts/control_plane_migration.py health --execute
@@ -167,9 +223,9 @@ The command:
     ready Pod, Service, and operational endpoints without requiring Helm release
     history.
 
-On a fresh cluster the child creates its exact `perf-sut` destination namespace.
-The AppProject does not permit an arbitrary destination, and an existing
-namespace's metadata is left untouched.
+The root Application owns the exact four local namespaces. The AppProject does
+not permit arbitrary destinations, and bootstrap may pre-create only those same
+reviewed resources before Argo CD adoption.
 
 The token is not accepted as an argument, written to a file, printed, or placed
 in Git. It is sent to Kubernetes only as manifest stdin. An existing owned
