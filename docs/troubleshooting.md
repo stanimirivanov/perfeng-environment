@@ -9,6 +9,8 @@
   prerequisites, control-plane workload, then the end-to-end smoke path.
 - Stop at the first failing layer. A passing smoke run proves the product path,
   but it does not waive a persistent GitOps health failure.
+- Use `task status` for the complete platform and the first failing underlying
+  Python command for focused diagnosis or recovery.
 - Commands marked **read-only** inspect or wait. Commands marked **mutating**
   intentionally change the local environment. Run no **destructive** command
   unless loss of the disposable cluster and all cluster-local data is intended.
@@ -37,6 +39,24 @@ Preview-first repository commands remain previews until `--execute` is supplied.
 The cluster command does not deploy workloads. Do not use the legacy
 `control_plane_deployment.py deploy --execute` while Argo CD owns the
 control-plane workload.
+
+## Operator task boundaries
+
+Use `task bootstrap` for a fresh or already-owned local cluster, then complete
+the policy and control-plane preparation documented in the
+[GitOps guide](local-gitops.md). Use `task status` only when checking the complete
+platform: it is expected to fail during the intentional staged-bootstrap gap.
+Use the individual Python command from the first failing layer below when a task
+needs diagnosis or partial recovery.
+
+If `task` is not recognized, install Task 3 and open a new terminal so the
+executable is on `PATH`. Do not replace it with an unrelated executable also
+named `task`. `task --list` must show `bootstrap`, `status`, `smoke` and
+`destroy` from this repository's `Taskfile.yml`.
+
+`task smoke` is mutating because it creates retained Run evidence. `task destroy`
+is destructive and requires an interactive confirmation; it removes all local
+database, object-store and run state with the named kind cluster.
 
 ## Quick health checklist
 
@@ -89,6 +109,12 @@ uv run --locked python scripts/cluster.py up
 # mutating
 uv run --locked python scripts/cluster.py up --execute
 ```
+
+For the supported end-to-end bootstrap, run `task bootstrap` instead. It uses
+the idempotent ensure boundary and continues through the stateful GitOps
+foundation. If a cluster exists without its dedicated kubeconfig, or the
+kubeconfig exists without the named cluster, ensure stops for operator diagnosis
+instead of adopting or deleting either side.
 
 Do not use `cluster.py down` as a repair. It is **destructive** and permanently
 removes all PostgreSQL, SeaweedFS and Run state stored in the cluster.
