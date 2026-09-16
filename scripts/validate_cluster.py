@@ -28,6 +28,10 @@ def validate_object_store() -> None:
     assert service["metadata"]["name"] == "seaweedfs"
     assert sts["spec"]["replicas"] == 1
     assert sts["spec"]["serviceName"] == "seaweedfs"
+    assert sts["spec"]["updateStrategy"] == {
+        "type": "RollingUpdate",
+        "rollingUpdate": {"partition": 0},
+    }
     assert sts["spec"]["persistentVolumeClaimRetentionPolicy"] == {
         "whenDeleted": "Retain",
         "whenScaled": "Retain",

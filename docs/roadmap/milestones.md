@@ -76,8 +76,8 @@ Completed or active slices:
 - improve bounded reconciliation diagnostics and troubleshooting;
 - adopt PostgreSQL without replacing state, prove rollback and re-adoption, and
   enable controlled self-healing;
-- adopt SeaweedFS without replacing state and prove restart and rollback;
-- re-adopt SeaweedFS and then enable controlled self-healing; and
+- adopt SeaweedFS without replacing state, prove restart and rollback, re-adopt
+  it and enable controlled self-healing; and
 - preserve legacy preview-first commands only where they remain bootstrap,
   credential, migration or explicit rollback boundaries.
 
