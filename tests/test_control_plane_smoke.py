@@ -172,7 +172,7 @@ class ControlPlaneSmokeTests(unittest.TestCase):
     @patch("scripts.control_plane_smoke.run_client")
     @patch("scripts.control_plane_smoke.cluster.run")
     @patch("scripts.control_plane_smoke.postgres.kubectl", return_value=["kubectl", "base"])
-    @patch("scripts.control_plane_smoke.control_plane_deployment.verify_managed_workload")
+    @patch("scripts.control_plane_smoke.control_plane_health.verify")
     def test_persistence_check_restarts_then_retrieves(
         self,
         verify_workload,

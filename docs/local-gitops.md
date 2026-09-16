@@ -30,18 +30,17 @@ Helm releases without replacing their StatefulSets, PVCs, PVs, external Secrets
 or data. Database migrations, runtime Secrets and ConfigMaps, and performance-Run
 resources are not migrated.
 
-The sample SUT no longer has a second Helm deployment path: Argo CD is its only
-workload reconciler, and rollback uses a reviewed Git revert. The stateful and
-control-plane Helm commands remain explicit rollback boundaries. Do not run
-`control_plane_deployment.py deploy --execute` while its child Application is
-active. This step performs no data migration or credential rotation.
+The sample SUT and control plane no longer have second Helm deployment paths:
+Argo CD is their only workload reconciler, and release rollback uses a reviewed
+Git revert. PostgreSQL and SeaweedFS retain their explicit Helm rollback commands
+under ADR 0002. This step performs no data migration or credential rotation.
 
 Environment composition in this spike lives in Kustomize and Argo CD resources.
 The small Python boundary does not generate those resources: it verifies the
 dedicated local cluster, protects ownership, supplies private credentials over
-stdin, invokes Kustomize, and performs bounded health checks. Later migration
-steps can replace that boundary with a task runner and an external-secrets
-solution without rewriting the composition.
+stdin, invokes Kustomize, and performs bounded health checks. The Taskfile wraps
+that boundary without generating or rewriting the composition; an external
+secret integration remains deferred until a real provider is selected.
 
 ## Review the pinned inputs
 
@@ -449,20 +448,14 @@ creates a new resource rather than mutating or manually deleting the active
 immutable ConfigMap. Secret identities remain stable and credential rotation
 stays outside GitOps.
 
-Do not use the legacy control-plane Helm deployment command while this child is
-active. To return workload ownership to Helm:
-
-1. merge a revert that removes `control-plane-application.yaml` from the local
-   root Kustomization;
-2. delete only the unwanted Application while orphaning its workloads;
-3. run the legacy deployment command to reassert the Helm release.
-
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n argocd delete application `
-  perfeng-local-control-plane --cascade=orphan
-uv run --locked python scripts/control_plane_deployment.py deploy --execute
-```
+The superseded control-plane Helm deployment command was removed after the
+GitOps path passed release, smoke and post-restart acceptance. Roll back a bad
+control-plane release by reverting its reviewed deployment selection in Git,
+allowing the existing child Application to reconcile the prior selection, and
+then running `task status` and `task smoke`. This keeps one workload owner and
+does not rotate or remove the external Secrets, runtime resources, migration Job,
+database data or object-store data. Removing the Application or returning it to
+Helm is no longer a supported routine rollback.
 
 The control-plane child sets `CreateNamespace=false` deliberately. The
 externally provisioned prerequisites create and validate `perf-platform` before
