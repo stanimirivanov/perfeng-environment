@@ -50,6 +50,14 @@
       }
     },
     {
+      "name": "k8s-infrastructure",
+      "path": "../k8s-infrastructure",
+      "url": "https://github.com/stanimirivanov/k8s-infrastructure.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
       "name": "perfeng-environment",
       "path": ".",
       "url": "https://github.com/stanimirivanov/perfeng-environment.git",

@@ -64,7 +64,13 @@ The first command verifies:
 - control-plane chart commit, image digest, runtime resource names, registry
   mounts, destination and sync policy against the reviewed deployment lock;
 - exact ownership of the four reviewed local namespaces;
-- agreement between the AppProject source repositories and `workspace.json`.
+- a least-privilege AppProject source allowlist containing exactly the
+  repositories referenced by its child Applications.
+
+Workspace membership does not imply deployment authorization. In particular,
+the project-neutral `k8s-infrastructure` checkout is not a workload source for
+the Perfeng AppProject. Adding another child Application requires reviewing its
+repository access in the same change.
 
 The second command previews staged bootstrap. Preview never downloads the install
 manifest, reads a credential or contacts the cluster. There is no separate
