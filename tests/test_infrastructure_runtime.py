@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 import subprocess
 import tarfile
 import tempfile
@@ -25,26 +24,6 @@ def archive_with(name: str, content: bytes = b"", *, symbolic_link: bool = False
             member.size = len(content)
             archive.addfile(member, io.BytesIO(content))
     return output.getvalue()
-
-
-def namespace(owner: str) -> str:
-    labels = {"app.kubernetes.io/managed-by": owner}
-    if owner == infrastructure_runtime.INFRASTRUCTURE_OWNER:
-        labels.update(
-            {
-                "app.kubernetes.io/name": infrastructure_runtime.NAMESPACE,
-                "app.kubernetes.io/part-of": "kubernetes-substrate",
-            }
-        )
-    else:
-        labels["perfeng.io/purpose"] = "gitops-control-plane"
-    return json.dumps(
-        {
-            "apiVersion": "v1",
-            "kind": "Namespace",
-            "metadata": {"name": infrastructure_runtime.NAMESPACE, "labels": labels},
-        }
-    )
 
 
 class InfrastructureRuntimeTests(unittest.TestCase):
@@ -110,45 +89,6 @@ class InfrastructureRuntimeTests(unittest.TestCase):
         self.assertIn("scripts.local_kind", cast(list[str], observed["command"]))
         validate.assert_called_once_with(infrastructure_root=Path(temporary))
         self.assertEqual(git.call_args.args[-3:], ("archive", "--format=tar", lock.revision))
-
-    def test_legacy_owner_restoration_is_exact_and_ordered(self) -> None:
-        kube = ["kubectl"]
-        with (
-            patch("scripts.infrastructure_runtime.invoke_provider", return_value=0) as provider,
-            patch("scripts.infrastructure_runtime.kubectl", return_value=kube),
-            patch(
-                "scripts.infrastructure_runtime.run_private",
-                side_effect=[
-                    namespace(infrastructure_runtime.INFRASTRUCTURE_OWNER),
-                    "",
-                    namespace(infrastructure_runtime.LEGACY_OWNER),
-                ],
-            ) as run,
-        ):
-            result = infrastructure_runtime.restore_legacy_owner(Path("infrastructure"))
-
-        self.assertEqual(result, 0)
-        provider.assert_called_once_with(
-            "cluster",
-            "health",
-            execute=True,
-            infrastructure_root=Path("infrastructure"),
-        )
-        self.assertEqual(run.call_count, 3)
-        self.assertEqual(
-            run.call_args_list[1].args[0][-5:],
-            ["apply", "--server-side", "--force-conflicts", "-f", "-"],
-        )
-        self.assertIn(
-            b"managed-by: perfeng-environment", run.call_args_list[1].kwargs["input_data"]
-        )
-
-    def test_foreign_namespace_cannot_be_restored_as_legacy_owner(self) -> None:
-        with self.assertRaisesRegex(ValueError, "unexpected ownership"):
-            infrastructure_runtime.validate_namespace_owner(
-                namespace("another-owner"),
-                infrastructure_runtime.INFRASTRUCTURE_OWNER,
-            )
 
 
 if __name__ == "__main__":

@@ -176,17 +176,6 @@ def validate_postgres() -> None:
 
 
 def validate() -> None:
-    config = yaml.safe_load((ROOT / "local/kind/cluster-config.yaml").read_text())
-    assert config["name"] == "perfeng-local"
-    assert config["networking"]["apiServerAddress"] == "127.0.0.1"
-    assert len(config["nodes"]) == 3
-    assert [node["role"] for node in config["nodes"]] == ["control-plane", "worker", "worker"]
-    assert {node["labels"]["workload"] for node in config["nodes"]} == {
-        "control-plane",
-        "performance-generator",
-        "sut",
-    }
-    assert all("@sha256:" in node["image"] for node in config["nodes"])
     namespaces = list(
         yaml.safe_load_all(
             (ROOT / "gitops/environments/local/namespaces.yaml").read_text(encoding="utf-8")
@@ -268,7 +257,7 @@ def validate() -> None:
     assert container["readinessProbe"]["httpGet"]["port"] == "http"
     assert container["resources"]["requests"]["cpu"] == "100m"
     assert service["spec"]["ports"][0]["targetPort"] == "http"
-    print("Validated kind layout, four namespaces, and rendered sample SUT chart (offline).")
+    print("Validated four namespaces and the rendered sample SUT chart (offline).")
     validate_postgres()
     validate_object_store()
 

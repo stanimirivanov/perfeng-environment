@@ -1,10 +1,9 @@
-"""Run the immutable Kubernetes infrastructure selection or restore its handoff."""
+"""Run the immutable Kubernetes infrastructure selection."""
 
 from __future__ import annotations
 
 import argparse
 import io
-import json
 import subprocess
 import sys
 import tarfile
@@ -12,7 +11,6 @@ import tempfile
 from pathlib import Path, PurePosixPath
 
 if __package__:
-    from . import cluster
     from .infrastructure_lock import portable_path
     from .infrastructure_release import (
         DEFAULT_INFRASTRUCTURE_ROOT,
@@ -20,17 +18,12 @@ if __package__:
         validate,
     )
 else:
-    import cluster
     from infrastructure_lock import portable_path
     from infrastructure_release import DEFAULT_INFRASTRUCTURE_ROOT, git, validate
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE_LIMIT = 16 * 1024 * 1024
 PROVIDER_TIMEOUT = 10_800
-KUBECTL_TIMEOUT = 60
-INFRASTRUCTURE_OWNER = "k8s-infrastructure"
-LEGACY_OWNER = "perfeng-environment"
-NAMESPACE = "argocd"
 MODULES = {"cluster": "scripts.local_kind", "argocd": "scripts.argocd"}
 ACTIONS = {
     "cluster": {"up", "ensure", "health", "down"},
@@ -135,102 +128,12 @@ def invoke_provider(
     return completed.returncode
 
 
-def kubectl() -> list[str]:
-    """Return the exact local namespace command prefix for rollback."""
-    return [
-        "kubectl",
-        "--kubeconfig",
-        str(cluster.kubeconfig(ROOT)),
-        "--context",
-        cluster.CONTEXT,
-        "--namespace",
-        NAMESPACE,
-        "--request-timeout=30s",
-    ]
-
-
-def namespace_command(kube: list[str]) -> list[str]:
-    """Build the read-only Argo CD namespace query."""
-    return [*kube, "get", "namespace", NAMESPACE, "-o", "json"]
-
-
-def run_private(command: list[str], *, input_data: bytes | None = None) -> str:
-    """Run a bounded rollback command without exposing its captured output."""
-    try:
-        completed = subprocess.run(
-            command,
-            input=input_data,
-            capture_output=True,
-            check=False,
-            timeout=KUBECTL_TIMEOUT,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise ValueError("Infrastructure rollback command could not complete") from error
-    if completed.returncode:
-        raise ValueError(
-            f"{Path(command[0]).stem} failed (exit {completed.returncode}); inspect the local target"
-        )
-    try:
-        return completed.stdout.decode("utf-8")
-    except UnicodeDecodeError:
-        raise ValueError("Infrastructure rollback returned invalid UTF-8") from None
-
-
-def validate_namespace_owner(output: str, owner: str) -> None:
-    """Require the complete current or legacy namespace handoff identity."""
-    value = json.loads(output)
-    if not isinstance(value, dict):
-        raise ValueError("Argo CD namespace has an unexpected ownership identity")
-    metadata = value.get("metadata")
-    if not isinstance(metadata, dict):
-        raise ValueError("Argo CD namespace has an unexpected ownership identity")
-    labels = metadata.get("labels")
-    if (
-        value.get("apiVersion") != "v1"
-        or value.get("kind") != "Namespace"
-        or metadata.get("name") != NAMESPACE
-        or not isinstance(labels, dict)
-        or labels.get("app.kubernetes.io/managed-by") != owner
-    ):
-        raise ValueError("Argo CD namespace has an unexpected ownership identity")
-    if owner == INFRASTRUCTURE_OWNER and (
-        labels.get("app.kubernetes.io/name") != NAMESPACE
-        or labels.get("app.kubernetes.io/part-of") != "kubernetes-substrate"
-    ):
-        raise ValueError("Argo CD namespace has incomplete infrastructure ownership")
-    if owner == LEGACY_OWNER and labels.get("perfeng.io/purpose") != "gitops-control-plane":
-        raise ValueError("Argo CD namespace has incomplete legacy ownership")
-
-
-def restore_legacy_owner(infrastructure_root: Path) -> int:
-    """Restore only the reviewed legacy namespace labels after provider health."""
-    result = invoke_provider(
-        "cluster",
-        "health",
-        execute=True,
-        infrastructure_root=infrastructure_root,
-    )
-    if result:
-        return result
-    kube = kubectl()
-    validate_namespace_owner(run_private(namespace_command(kube)), INFRASTRUCTURE_OWNER)
-    manifest = (ROOT / "gitops/bootstrap/argocd/namespace.yaml").read_bytes()
-    run_private(
-        [*kube, "apply", "--server-side", "--force-conflicts", "-f", "-"],
-        input_data=manifest,
-    )
-    validate_namespace_owner(run_private(namespace_command(kube)), LEGACY_OWNER)
-    print("Restored the reviewed perfeng-environment Argo CD namespace owner.")
-    return 0
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("component", choices=[*MODULES, "restore-legacy-owner"])
-    parser.add_argument("action", nargs="?")
+    parser.add_argument("component", choices=MODULES)
+    parser.add_argument("action")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--confirm-delete")
-    parser.add_argument("--confirm-owner")
     parser.add_argument(
         "--infrastructure-root",
         type=Path,
@@ -238,21 +141,6 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        if args.component == "restore-legacy-owner":
-            if args.action is not None or args.confirm_delete is not None:
-                raise ValueError("Legacy-owner restoration does not accept an action or deletion")
-            if not args.execute:
-                print(
-                    "Preview only. Restoration changes only the reviewed Argo CD namespace labels."
-                )
-                print(f"Execution requires --confirm-owner {LEGACY_OWNER}.")
-                return 0
-            if args.confirm_owner != LEGACY_OWNER:
-                raise ValueError(f"Restoration requires --confirm-owner {LEGACY_OWNER}")
-            return restore_legacy_owner(args.infrastructure_root)
-
-        if args.action is None or args.confirm_owner is not None:
-            raise ValueError("Infrastructure component execution requires one valid action")
         return invoke_provider(
             args.component,
             args.action,
@@ -265,7 +153,6 @@ def main() -> int:
         ValueError,
         TypeError,
         KeyError,
-        json.JSONDecodeError,
         tarfile.TarError,
     ) as error:
         print(f"Infrastructure runtime error: {error}")
