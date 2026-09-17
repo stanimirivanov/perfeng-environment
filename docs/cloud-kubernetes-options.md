@@ -180,10 +180,11 @@ Argo CD, stateful persistence and recovery contracts reliably.
 
 ## Recommended sequence
 
-1. Create `kubernetes-platform-infrastructure` and extract the proven local
-   kind and Argo CD substrate without changing behavior.
-2. Define and validate the substrate capability boundary consumed by
-   `perfeng-environment`.
+1. Establish `k8s-infrastructure` and its substrate capability boundary, then
+   extract the proven local kind and Argo CD substrate without changing
+   behavior.
+2. Make `perfeng-environment` consume and validate a reviewed infrastructure
+   release without transferring product-composition ownership.
 3. Import the OCI Terraform as a plain pinned provider stack; do not carry its
    current automatic apply or add an infrastructure-engine migration.
 4. Add multi-platform image builds and immutable `linux/arm64` identities in

@@ -44,6 +44,19 @@ class WorkspaceTests(unittest.TestCase):
     def test_portable_paths(self):
         self.assertEqual(self.load()[0].path, self.root / "perfeng-k6")
 
+    def test_project_neutral_repository_name_is_supported(self):
+        self.data["repositories"][0] = {
+            "name": "k8s-infrastructure",
+            "path": "../k8s-infrastructure",
+            "url": "https://github.com/stanimirivanov/k8s-infrastructure.git",
+            "source": {"branch": "main"},
+        }
+
+        repository = self.load()[0]
+
+        self.assertEqual(repository.name, "k8s-infrastructure")
+        self.assertEqual(repository.path, self.root / "k8s-infrastructure")
+
     def test_linked_destination_is_rejected(self):
         external = self.root / "external"
         external.mkdir()

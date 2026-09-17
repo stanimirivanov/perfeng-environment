@@ -25,6 +25,10 @@
       "path": "../perfeng-k8s"
     },
     {
+      "name": "k8s-infrastructure",
+      "path": "../k8s-infrastructure"
+    },
+    {
       "name": "perfeng-environment",
       "path": "."
     }

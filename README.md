@@ -15,7 +15,8 @@
   acceptance boundaries rather than competing workload reconcilers.
 - [ADR 0004](docs/decisions/0004-separate-kubernetes-infrastructure.md)
   selects a staged extraction of reusable Kubernetes substrate and Argo CD
-  bootstrap into `kubernetes-platform-infrastructure`; the
+  bootstrap. [ADR 0005](docs/decisions/0005-adopt-k8s-infrastructure-name.md)
+  records the created repository name, `k8s-infrastructure`; the
   [cloud options evaluation](docs/cloud-kubernetes-options.md) records why OCI
   is the first guarded candidate and why it is not deployable yet.
 - Clone sibling repositories with the workspace command, then use the focused
@@ -71,14 +72,16 @@ remain disabled.
 ## Layout
 
 Clone this repository into a directory named perfeng-environment. Its parent is
-the workspace root; the six other repositories are siblings. Paths are resolved
+the workspace root; the seven other repositories are siblings. Paths are resolved
 relative to workspace.json, never the terminal's current directory. No absolute
 machine paths, submodules, or copied component sources are used.
 
 workspace.json is authoritative for repository names, URLs, and initial source
 branches. perfeng.code-workspace mirrors its folders for VS Code; validation
 detects drift between them. The prototype and external working-notes folder
-are intentionally not included.
+are intentionally not included. Workspace membership is source-development
+composition only; it does not grant an Argo CD AppProject permission to use a
+repository as workload desired state.
 
 ## Bootstrap: PowerShell
 

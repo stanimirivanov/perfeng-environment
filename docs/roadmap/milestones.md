@@ -2,7 +2,8 @@
 
 ## TL;DR
 
-- This is the single checked-in roadmap for all `perfeng-*` repositories.
+- This is the single checked-in roadmap for the Perfeng repositories and their
+  shared `k8s-infrastructure` substrate.
 - GitHub owns live issue and milestone assignment; this document owns intended
   outcomes, dependencies and sequencing.
 - Published milestone numbers and titles are not silently renamed or reused.
@@ -17,8 +18,9 @@
 
 This roadmap spans `perfeng-contracts`, `perfeng-control-plane`,
 `perfeng-analysis`, `perfeng-k6`, `perfeng-playwright`, `perfeng-k8s` and
-`perfeng-environment`. Component repositories link here and keep only their
-local implementation and operating instructions.
+`perfeng-environment`, plus the project-neutral `k8s-infrastructure` repository
+during extraction and integration. Component repositories link here and keep
+only their local implementation and operating instructions.
 
 - GitHub is authoritative for issue state, assignee, labels and milestone
   membership.
@@ -40,7 +42,7 @@ local implementation and operating instructions.
 | M03 — Native Browser Decision Loop | Planned | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M04 — Kubernetes Benchmark Decision Loop | Planned | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M05 — Operator Visibility and Diagnostics | Planned | Make runs, failures, decisions and correlated telemetry understandable without inspecting individual Pods or scripts. | Primarily `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis` |
-| M06 — Production Readiness | Deferred | Provide a secure, recoverable, upgradeable multi-user deployment when a non-local environment becomes an actual requirement. | All affected `perfeng-*` repositories |
+| M06 — Production Readiness | Deferred | Provide a secure, recoverable, upgradeable multi-user deployment when a non-local environment becomes an actual requirement. | All affected `perfeng-*` repositories and `k8s-infrastructure` |
 
 ## M01 — Local Performance Decision Loop
 
@@ -98,6 +100,10 @@ Post-milestone decisions and follow-up:
   selects a project-neutral Kubernetes infrastructure repository and retains
   Perfeng composition, roadmap and acceptance ownership here; extraction is
   follow-up work and does not reopen M02;
+- [ADR 0005](../decisions/0005-adopt-k8s-infrastructure-name.md) records the
+  created `k8s-infrastructure` repository name, adds it to source-workspace
+  composition and keeps workspace membership separate from GitOps deployment
+  authorization;
 - define the supported production-composition boundary rather than implying
   that the local kind topology is production; and
 - reconcile GitHub milestone status with this roadmap.
