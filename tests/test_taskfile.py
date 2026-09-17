@@ -22,11 +22,12 @@ class TaskfileTests(unittest.TestCase):
         self.assertEqual(
             self.tasks["bootstrap"]["cmds"],
             [
-                "uv run --locked python scripts/cluster.py ensure --execute",
+                "uv run --locked python scripts/infrastructure_runtime.py cluster ensure --execute",
                 "uv run --locked python scripts/cluster.py bootstrap --execute",
                 "uv run --locked python scripts/postgres.py bootstrap --execute",
                 "uv run --locked python scripts/object_store.py bootstrap --execute",
                 "uv run --locked python scripts/control_plane_registry.py deploy --execute",
+                "uv run --locked python scripts/infrastructure_runtime.py argocd bootstrap --execute",
                 "uv run --locked python scripts/gitops.py bootstrap --execute",
                 "uv run --locked python scripts/object_store.py initialize --execute",
                 "uv run --locked python scripts/storage_access.py --execute",
@@ -35,8 +36,14 @@ class TaskfileTests(unittest.TestCase):
 
     def test_status_is_diagnostic_and_smoke_requires_it(self) -> None:
         status = self.tasks["status"]["cmds"]
-        self.assertTrue(
-            all("--execute" in command or "workspace.py status" in command for command in status)
+        self.assertEqual(
+            status,
+            [
+                "uv run --locked python scripts/workspace.py status",
+                "uv run --locked python scripts/infrastructure_runtime.py cluster health --execute",
+                "uv run --locked python scripts/infrastructure_runtime.py argocd health --execute",
+                "uv run --locked python scripts/gitops.py health --execute",
+            ],
         )
         self.assertEqual(self.tasks["smoke"]["cmds"][0], {"task": "status"})
         self.assertIn("control_plane_smoke.py --execute", self.tasks["smoke"]["cmds"][1])
@@ -47,7 +54,7 @@ class TaskfileTests(unittest.TestCase):
         self.assertEqual(
             destroy["cmds"],
             [
-                "uv run --locked python scripts/cluster.py down --execute "
+                "uv run --locked python scripts/infrastructure_runtime.py cluster down --execute "
                 "--confirm-delete perfeng-local"
             ],
         )

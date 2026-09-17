@@ -66,9 +66,9 @@ Run the checks in order and stop at the first failure.
 |---|---|---|
 | Workspace | `uv run --locked python scripts/workspace.py status` | Every repository is `existing`; no destination is missing or conflicting |
 | Docker | `docker context show` and `docker version` | Context is `desktop-linux`; client and Linux server respond |
-| kind | `kind get clusters` | `perfeng-local` is listed |
-| Kubernetes | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local get nodes` | Three nodes report `Ready` |
-| Argo CD | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get pods` | Every current Argo CD Pod is `Running` and ready |
+| Infrastructure selection | `uv run --locked python scripts/infrastructure_release.py validate` | The selected provider commit and compatibility contract validate |
+| kind | `uv run --locked python scripts/infrastructure_runtime.py cluster health --execute` | The named cluster, kubeconfig, nodes, labels and CoreDNS pass |
+| Argo CD | `uv run --locked python scripts/infrastructure_runtime.py argocd health --execute` | The infrastructure-owned namespace and every selected controller pass |
 | Applications | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get applications -o wide` | Root and all four workload Applications are `Synced` and `Healthy` |
 | PostgreSQL | `uv run --locked python scripts/postgres.py health --execute` | PostgreSQL health completes successfully |
 | Object storage | `uv run --locked python scripts/object_store.py health --execute` | SeaweedFS health completes successfully |
@@ -106,10 +106,10 @@ If `perfeng-local` is genuinely absent, preview and then create it:
 
 ```powershell
 # read-only preview
-uv run --locked python scripts/cluster.py up
+uv run --locked python scripts/infrastructure_runtime.py cluster ensure
 
 # mutating
-uv run --locked python scripts/cluster.py up --execute
+uv run --locked python scripts/infrastructure_runtime.py cluster ensure --execute
 ```
 
 For the supported end-to-end bootstrap, run `task bootstrap` instead. It uses
@@ -118,8 +118,9 @@ foundation. If a cluster exists without its dedicated kubeconfig, or the
 kubeconfig exists without the named cluster, ensure stops for operator diagnosis
 instead of adopting or deleting either side.
 
-Do not use `cluster.py down` as a repair. It is **destructive** and permanently
-removes all PostgreSQL, SeaweedFS and Run state stored in the cluster.
+Do not use the provider `cluster down` action or `task destroy` as a repair.
+Either is **destructive** and permanently removes all PostgreSQL, SeaweedFS and
+Run state stored in the cluster.
 
 ## Plain kubectl cannot connect
 
@@ -154,6 +155,12 @@ it broadens a local operation into global configuration maintenance.
 
 ## Argo CD controllers are unavailable
 
+First run the selected provider's read-only health boundary:
+
+```powershell
+uv run --locked python scripts/infrastructure_runtime.py argocd health --execute
+```
+
 Inspect the controller workloads and recent warnings:
 
 ```powershell
@@ -187,6 +194,9 @@ kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
 Use the equivalent exact label and StatefulSet rollout only when the failing Pod
 is `argocd-application-controller`. Do not restart every Argo CD component at
 once; doing so removes the evidence needed to identify the failing boundary.
+On a fresh cluster, use `infrastructure_runtime.py argocd bootstrap --execute`
+before the consumer `gitops.py bootstrap --execute`. Do not use consumer
+bootstrap to repair missing provider controllers.
 
 ## An Application is OutOfSync or Degraded
 
@@ -333,18 +343,23 @@ Use these **read-only** checks before blaming live reconciliation:
 uv run --locked python scripts/control_plane_release.py validate
 uv run --locked python scripts/control_plane_runtime.py validate
 uv run --locked python scripts/infrastructure_release.py validate
+uv run --locked python scripts/infrastructure_runtime.py cluster ensure
+uv run --locked python scripts/infrastructure_runtime.py argocd validate
 uv run --locked python scripts/gitops.py validate
 ```
 
 They detect mismatched commits, infrastructure profiles, chart versions,
 runtime bytes, content-addressed names and Application values without changing
-the cluster. Infrastructure validation requires the selected commit to exist in
-the sibling `k8s-infrastructure` checkout; it reads that commit through Git and
-does not switch the checkout or execute its lifecycle code. If the commit is
-missing, fetch it through the normal repository workflow rather than changing
-the lock to the current branch. Never repair an identity mismatch by editing or
-deleting an immutable ConfigMap in place. Create the new reviewed identity,
-select it in Git and retain the previous identity for rollback.
+the cluster. Infrastructure release validation reads the selected commit
+without importing it. The two runtime previews then materialize and execute the
+exact selected code without `--execute`, proving its CLI boundary without
+contacting the cluster. All three require the commit to exist in the sibling
+`k8s-infrastructure` object database and never switch or execute its working
+tree. If the commit is missing, fetch it through the normal repository workflow
+rather than changing the lock to the current branch. Never repair an identity
+mismatch by editing or deleting an immutable ConfigMap in place. Create the new
+reviewed identity, select it in Git and retain the previous identity for
+rollback.
 
 ## What to include in a defect report
 

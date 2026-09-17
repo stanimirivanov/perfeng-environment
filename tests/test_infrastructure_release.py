@@ -61,6 +61,16 @@ class InfrastructureReleaseTests(unittest.TestCase):
         self.assertEqual(validation.get("if"), "runner.os == 'Linux'")
         self.assertIn("scripts/infrastructure_release.py validate", validation.get("run", ""))
         self.assertIn("../k8s-infrastructure", validation.get("run", ""))
+        runtime = next(
+            step
+            for step in steps
+            if step.get("name") == "Exercise immutable infrastructure runtime offline"
+        )
+        self.assertEqual(runtime.get("if"), "runner.os == 'Linux'")
+        self.assertEqual(runtime.get("shell"), "bash")
+        self.assertIn("infrastructure_runtime.py cluster ensure", runtime.get("run", ""))
+        self.assertIn("infrastructure_runtime.py argocd validate", runtime.get("run", ""))
+        self.assertIn("../k8s-infrastructure", runtime.get("run", ""))
 
 
 if __name__ == "__main__":

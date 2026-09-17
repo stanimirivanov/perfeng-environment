@@ -82,15 +82,15 @@ class InfrastructureLockTests(unittest.TestCase):
                 f'NAME = "{self.lock.cluster_name}"\n'
                 f'NODE_IMAGE = "{self.lock.node_image}"\n'
                 'ACTIONS = ("up", "ensure", "health", "down")\n'
-                f'DORMANT_MESSAGE = "{infrastructure_lock.DORMANT_MESSAGE}"\n'
+                f"COMMAND_TIMEOUT = {infrastructure_lock.COMMAND_TIMEOUT}\n"
             ).encode(),
             self.lock.argocd_bootstrap: yaml.safe_dump(kustomization).encode(),
             namespace_path: yaml.safe_dump(namespace).encode(),
             self.lock.argocd_lifecycle: (
                 f'NAMESPACE = "{self.lock.argocd_namespace}"\n'
                 'OWNER = "k8s-infrastructure"\n'
+                'LEGACY_OWNER = "perfeng-environment"\n'
                 'ACTIONS = ("validate", "bootstrap", "health")\n'
-                f'DORMANT_MESSAGE = "{infrastructure_lock.DORMANT_MESSAGE}"\n'
             ).encode(),
         }
 
@@ -107,7 +107,7 @@ class InfrastructureLockTests(unittest.TestCase):
     def test_loads_complete_immutable_selection(self) -> None:
         lock = self.load()
 
-        self.assertEqual(lock.revision, "0554218185c5872fe211cbe044bc6a43ad63355b")
+        self.assertEqual(lock.revision, "65af7eaa655a4032cdcd9aab7db35f1ec36c1781")
         self.assertEqual(lock.profile, "local-kind/perfeng-local")
         self.assertEqual(lock.context, "kind-perfeng-local")
         self.assertEqual(lock.argocd_version, "v3.5.2")
@@ -140,7 +140,7 @@ class InfrastructureLockTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     infrastructure_lock.load_lock(self.path)
 
-    def test_validates_dormant_profile_and_gitops_compatibility(self) -> None:
+    def test_validates_executable_profile_and_gitops_compatibility(self) -> None:
         infrastructure_lock.validate_source(self.lock, self.read)
 
     def test_rejects_cluster_topology_drift(self) -> None:
@@ -151,10 +151,10 @@ class InfrastructureLockTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "local-kind profile"):
             infrastructure_lock.validate_source(self.lock, self.read)
 
-    def test_rejects_an_activated_or_incompatible_lifecycle(self) -> None:
+    def test_rejects_a_dormant_or_incompatible_lifecycle(self) -> None:
         self.files[self.lock.argocd_lifecycle] = b'NAMESPACE = "argocd"\nOWNER = "other"\n'
 
-        with self.assertRaisesRegex(ValueError, "dormant environment contract"):
+        with self.assertRaisesRegex(ValueError, "executable environment contract"):
             infrastructure_lock.validate_source(self.lock, self.read)
 
 

@@ -105,8 +105,10 @@ Post-milestone decisions and follow-up:
   composition and keeps workspace membership separate from GitOps deployment
   authorization;
 - import the local-kind and Argo CD implementation histories into
-  `k8s-infrastructure`, keep both entry points dormant, and pin the first
-  reviewed infrastructure revision here before the explicit ownership cutover;
+  `k8s-infrastructure`, harden and pin their executable lifecycle, then cut the
+  environment operator tasks over to that immutable provider while preserving
+  consumer composition and an explicit rollback boundary; live acceptance and
+  later removal of the retained legacy source remain separate follow-ups;
 - define the supported production-composition boundary rather than implying
   that the local kind topology is production; and
 - reconcile GitHub milestone status with this roadmap.
