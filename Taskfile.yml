@@ -10,16 +10,18 @@ tasks:
   bootstrap:
     desc: Bootstrap the local cluster and stateful GitOps foundation
     summary: |
-      Create or validate the named kind cluster, establish external credential
-      identities, install Argo CD, reconcile the stateful Applications, and
-      initialize the local S3 bucket. This stops before reviewed policy
-      publication and control-plane database/runtime preparation.
+      Use the immutable infrastructure selection to create or validate the named
+      kind cluster and install Argo CD. Then establish Perfeng external
+      credential identities, reconcile the stateful Applications, and initialize
+      the local S3 bucket. This stops before reviewed policy publication and
+      control-plane database/runtime preparation.
     cmds:
-      - uv run --locked python scripts/cluster.py ensure --execute
+      - uv run --locked python scripts/infrastructure_runtime.py cluster ensure --execute
       - uv run --locked python scripts/cluster.py bootstrap --execute
       - uv run --locked python scripts/postgres.py bootstrap --execute
       - uv run --locked python scripts/object_store.py bootstrap --execute
       - uv run --locked python scripts/control_plane_registry.py deploy --execute
+      - uv run --locked python scripts/infrastructure_runtime.py argocd bootstrap --execute
       - uv run --locked python scripts/gitops.py bootstrap --execute
       - uv run --locked python scripts/object_store.py initialize --execute
       - uv run --locked python scripts/storage_access.py --execute
@@ -28,7 +30,8 @@ tasks:
     desc: Validate the complete local platform without reconciling desired state
     cmds:
       - uv run --locked python scripts/workspace.py status
-      - uv run --locked python scripts/cluster.py health --execute
+      - uv run --locked python scripts/infrastructure_runtime.py cluster health --execute
+      - uv run --locked python scripts/infrastructure_runtime.py argocd health --execute
       - uv run --locked python scripts/gitops.py health --execute
 
   smoke:
@@ -41,4 +44,4 @@ tasks:
     desc: Permanently delete the named local cluster and all cluster-local data
     prompt: This permanently deletes perfeng-local and all cluster-local data. Continue?
     cmds:
-      - uv run --locked python scripts/cluster.py down --execute --confirm-delete perfeng-local
+      - uv run --locked python scripts/infrastructure_runtime.py cluster down --execute --confirm-delete perfeng-local

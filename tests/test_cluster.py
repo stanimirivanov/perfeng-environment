@@ -12,6 +12,7 @@ from unittest.mock import patch
 import yaml
 
 from scripts.cluster import (
+    ACTIONS,
     CONTEXT,
     NAME,
     check_nodes,
@@ -25,6 +26,9 @@ from scripts.cluster import (
 
 
 class ClusterTests(unittest.TestCase):
+    def test_cli_exposes_only_consumer_namespace_bootstrap(self):
+        self.assertEqual(ACTIONS, ("bootstrap",))
+
     def test_private_stdin_is_delivered_without_printing(self):
         captured = io.StringIO()
         with redirect_stdout(captured):

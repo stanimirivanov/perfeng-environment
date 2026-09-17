@@ -32,8 +32,8 @@ class GitOpsTests(unittest.TestCase):
                 gitops.execute("deploy")
         validate.assert_not_called()
 
-    def test_repository_configuration_selects_an_explicit_release(self) -> None:
-        self.assertEqual(gitops.validate_configuration(), "v3.5.2")
+    def test_consumer_configuration_is_valid(self) -> None:
+        self.assertIsNone(gitops.validate_configuration())
 
     def test_project_sources_are_limited_to_child_application_repositories(self) -> None:
         applications = [
@@ -134,24 +134,6 @@ class GitOpsTests(unittest.TestCase):
         self.assertIs(policies["control-plane"]["selfHeal"], True)
         self.assertTrue(all(policy["prune"] is False for policy in policies.values()))
 
-    def test_mutable_or_foreign_manifest_source_is_rejected(self) -> None:
-        prefix = "https://raw.githubusercontent.com/argoproj/argo-cd/"
-        sources = [
-            f"{prefix}stable/manifests/install.yaml",
-            f"{prefix}main/manifests/install.yaml",
-            "https://raw.githubusercontent.com/someone/argo-cd/v3.5.2/manifests/install.yaml",
-        ]
-        for source in sources:
-            with self.subTest(source=source):
-                kustomization = {
-                    "apiVersion": "kustomize.config.k8s.io/v1beta1",
-                    "kind": "Kustomization",
-                    "namespace": "argocd",
-                    "resources": ["namespace.yaml", source],
-                }
-                with self.assertRaises(ValueError):
-                    gitops.argocd_version(kustomization)
-
     def test_credentials_are_immutable_and_scoped_to_the_github_owner(self) -> None:
         document = gitops.credential_document(TOKEN)
 
@@ -198,7 +180,7 @@ class GitOpsTests(unittest.TestCase):
         namespace = {"metadata": {"labels": {"app.kubernetes.io/managed-by": "someone-else"}}}
         with patch("scripts.gitops.cluster.run", return_value=json.dumps(namespace)):
             with self.assertRaisesRegex(ValueError, "not owned"):
-                gitops.verify_namespace(["kubectl"], create=True)
+                gitops.verify_namespace(["kubectl"])
 
     def test_root_application_is_applied_through_stdin(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -213,12 +195,10 @@ class GitOpsTests(unittest.TestCase):
         kube = ["kubectl"]
         with (
             patch("scripts.gitops.validate_configuration"),
-            patch("scripts.gitops.cluster.verify_local_docker"),
             patch("scripts.gitops.cluster.verify_context"),
             patch("scripts.gitops.kubectl", return_value=kube),
             patch("scripts.gitops.verify_namespace") as namespace,
-            patch("scripts.gitops.cluster.run"),
-            patch("scripts.gitops.gitops_status.wait_for_argocd"),
+            patch("scripts.gitops.cluster.run") as run,
             patch("scripts.gitops.ensure_credentials") as credentials,
             patch("scripts.gitops.ensure_root") as root,
             patch("scripts.gitops.gitops_status.wait_for_application") as wait,
@@ -228,7 +208,7 @@ class GitOpsTests(unittest.TestCase):
         ):
             gitops.execute("bootstrap")
 
-        namespace.assert_called_once_with(kube, create=True)
+        namespace.assert_called_once_with(kube)
         credentials.assert_called_once_with(kube, create=True)
         root.assert_called_once_with(kube, gitops.cluster.ROOT, apply=True)
         self.assertIs(wait.call_args_list[0].kwargs["require_health"], False)
@@ -242,6 +222,7 @@ class GitOpsTests(unittest.TestCase):
             ],
         )
         postgres_health.assert_called_once_with("health", gitops.cluster.ROOT)
+        run.assert_not_called()
         object_store_health.assert_not_called()
         control.assert_not_called()
 
@@ -249,12 +230,10 @@ class GitOpsTests(unittest.TestCase):
         kube = ["kubectl"]
         with (
             patch("scripts.gitops.validate_configuration"),
-            patch("scripts.gitops.cluster.verify_local_docker"),
             patch("scripts.gitops.cluster.verify_context"),
             patch("scripts.gitops.kubectl", return_value=kube),
             patch("scripts.gitops.verify_namespace") as namespace,
             patch("scripts.gitops.cluster.run") as run,
-            patch("scripts.gitops.gitops_status.wait_for_argocd"),
             patch("scripts.gitops.ensure_credentials") as credentials,
             patch("scripts.gitops.ensure_root") as root,
             patch("scripts.gitops.gitops_status.wait_for_application") as wait,
@@ -264,7 +243,7 @@ class GitOpsTests(unittest.TestCase):
         ):
             gitops.execute("health")
 
-        namespace.assert_called_once_with(kube, create=False)
+        namespace.assert_called_once_with(kube)
         credentials.assert_called_once_with(kube, create=False)
         root.assert_called_once_with(kube, gitops.cluster.ROOT, apply=False)
         self.assertTrue(

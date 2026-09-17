@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: stanimirivanov/k8s-infrastructure
-          ref: 0554218185c5872fe211cbe044bc6a43ad63355b
+          ref: 65af7eaa655a4032cdcd9aab7db35f1ec36c1781
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: k8s-infrastructure
           persist-credentials: false
@@ -64,6 +64,16 @@ jobs:
         run: >-
           uv run --locked python scripts/infrastructure_release.py validate
           --infrastructure-root ../k8s-infrastructure
+        working-directory: perfeng-environment
+      - name: Exercise immutable infrastructure runtime offline
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --locked python scripts/infrastructure_runtime.py cluster ensure \
+            --infrastructure-root ../k8s-infrastructure
+          uv run --locked python scripts/infrastructure_runtime.py argocd validate \
+            --infrastructure-root ../k8s-infrastructure
         working-directory: perfeng-environment
       - run: uv run --locked python scripts/gitops.py validate
         working-directory: perfeng-environment

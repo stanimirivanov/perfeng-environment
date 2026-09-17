@@ -22,7 +22,7 @@ storage, a SUT database, or the object store for raw artifacts.
 
 ## Bootstrap and check
 
-First complete `cluster.py up --execute` and `cluster.py bootstrap --execute` as
+First complete provider cluster ensure and `cluster.py bootstrap --execute` as
 described in [local Kubernetes](local-kubernetes.md). PostgreSQL requires the
 `perf-platform` namespace and kind's `standard` local-path StorageClass with
 `WaitForFirstConsumer` binding. No provisioner is installed by this script.
@@ -74,7 +74,7 @@ a Secret.
 
 The health command verifies rollout, a Bound PVC, and an authenticated `SELECT 1`
 through the Service DNS name. It does not create tables or prove backup recovery.
-The existing `cluster.py health` checks only nodes and CoreDNS; run PostgreSQL
+Provider cluster health checks only nodes and CoreDNS; run PostgreSQL
 health separately or through the complete GitOps health workflow.
 
 ## Runtime and ownership
@@ -129,7 +129,7 @@ automatic retention expiry or data cleanup. Inspect disk use as local data grows
 the 2 GiB request is not a storage quota enforced by all local-path filesystems.
 
 Retention is limited to the lifetime of the kind node and its Docker storage.
-`cluster.py down`, Docker storage removal, or loss of the host destroys local
+`task destroy`, Docker storage removal, or loss of the host destroys local
 data. Helm uninstall retains the StatefulSet PVC and the separately created
 Secret, but deleting the namespace removes both. PVC deletion can delete the
 backing local-path data. None of these operations constitutes a backup.

@@ -6,10 +6,12 @@
   SeaweedFS completed rollback, re-adoption and restart-persistence acceptance.
 - Non-secret control-plane runtime inputs use lock-selected, content-addressed
   ConfigMap names, allowing new and old selections to coexist.
-- Argo CD is selected through the official, human-readable `v3.5.2` install
-  manifest; the upstream manifest supplies its tested dependency image tags.
-- Run `gitops.py validate` offline before review, then merge the GitOps files to
-  `main` before executing bootstrap because the root Application reads `main`.
+- Argo CD `v3.5.2` installation and controller readiness belong to the immutable
+  `k8s-infrastructure` selection. This repository owns only consumer
+  credentials, Applications, namespaces and workload acceptance.
+- Validate both the infrastructure selection and `gitops.py` composition before
+  review, then merge the GitOps files to `main` before bootstrap because the
+  root Application reads `main`.
 - Use `task bootstrap` for the stateful foundation, then complete the explicit
   policy and control-plane preparation before `task status` or `task smoke`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
@@ -21,9 +23,10 @@
 
 ## Scope
 
-The bootstrap path installs a non-HA Argo CD control plane into the verified
-`perfeng-local` kind cluster, provisions one immutable private-repository
-credential, and creates the `perfeng-local-root` Application. The root manages
+The selected infrastructure provider installs a non-HA Argo CD control plane
+into the verified `perfeng-local` kind cluster. The consumer bootstrap then
+provisions one immutable private-repository credential and creates the
+`perfeng-local-root` Application. The root manages
 the restricted `perfeng-local` AppProject, the sample SUT and the control plane
 as child Applications. It owns the existing PostgreSQL and re-adopted SeaweedFS
 Helm releases without replacing their StatefulSets, PVCs, PVs, external Secrets
@@ -36,11 +39,11 @@ Git revert. PostgreSQL and SeaweedFS retain their explicit Helm rollback command
 under ADR 0002. The migration performed no data migration or credential rotation.
 
 Environment composition lives in Kustomize and Argo CD resources.
-The small Python boundary does not generate those resources: it verifies the
-dedicated local cluster, protects ownership, supplies private credentials over
-stdin, invokes Kustomize, and performs bounded health checks. The Taskfile wraps
-that boundary without generating or rewriting the composition; an external
-secret integration remains deferred until a real provider is selected.
+The consumer Python boundary does not generate those resources: it requires the
+infrastructure-owned `argocd` namespace, protects consumer ownership, supplies
+private credentials over stdin, applies only the root Application, and performs
+bounded workload health checks. The Taskfile composes that boundary with the
+selected provider without generating or rewriting desired state.
 
 ## Review the pinned inputs
 
@@ -48,13 +51,16 @@ Validate the explicit release and local objects without accessing the network,
 Docker or Kubernetes:
 
 ```powershell
+uv run --locked python scripts/infrastructure_release.py validate
+uv run --locked python scripts/infrastructure_runtime.py argocd validate
 uv run --locked python scripts/gitops.py validate
 uv run --locked python scripts/gitops.py bootstrap
 ```
 
-The first command verifies:
+The infrastructure commands verify the selected provider commit, compatibility
+contract, official semantic Argo CD release and executable lifecycle. The
+consumer validation verifies:
 
-- the official Argo CD source and explicit semantic release tag;
 - root Application source, destination and non-destructive sync policy;
 - sample-SUT chart source, release name, destination and sync policy;
 - PostgreSQL chart source, unchanged release name, destination and conservative
@@ -72,25 +78,11 @@ the project-neutral `k8s-infrastructure` checkout is not a workload source for
 the Perfeng AppProject. Adding another child Application requires reviewing its
 repository access in the same change.
 
-The second command previews staged bootstrap. Preview never downloads the install
-manifest, reads a credential or contacts the cluster. There is no separate
-imperative deploy action after bootstrap; Argo CD reconciles committed changes.
-
-The official upstream manifest is not copied into this repository. The
-Kustomize bootstrap references the explicit `v3.5.2` release tag and trusts the
-component image versions tested in that release. This keeps the selected
-version visible and upgrades small enough to review without introducing another
-manifest-generation script.
-
-Render the exact bootstrap for review without applying it:
-
-```powershell
-kubectl kustomize gitops/bootstrap/argocd
-```
-
-Review the rendered Argo CD, Dex and Redis image tags as part of an upgrade.
-Rendering needs network access to fetch the versioned upstream manifest; the
-repository validation above remains offline.
+The preview commands never read a credential or contact the cluster. There is
+no imperative workload deploy action after bootstrap; Argo CD reconciles
+committed changes. Provider implementation and upgrade instructions live in
+`k8s-infrastructure`; the selected release is recorded and validated through
+the [local infrastructure lock](local-infrastructure-release.md).
 
 ## Fresh-cluster staged bootstrap
 
@@ -101,7 +93,7 @@ state reaches `main`:
 1. create the cluster and apply only the reviewed namespace resources;
 2. create PostgreSQL and S3 credential Secrets without running Helm;
 3. create the private GHCR pull Secret;
-4. bootstrap Argo CD and wait only for the sample SUT, PostgreSQL and SeaweedFS;
+4. bootstrap provider-owned Argo CD, then consumer credentials and Applications;
 5. initialize the S3 bucket and publish the reviewed reporting policy;
 6. provision database identities, run the migration and assemble immutable
    control-plane runtime inputs; and
@@ -124,7 +116,7 @@ The individual commands remain canonical for preview, diagnosis and partial
 recovery:
 
 ```powershell
-uv run --locked python scripts/cluster.py up --execute
+uv run --locked python scripts/infrastructure_runtime.py cluster ensure --execute
 uv run --locked python scripts/cluster.py bootstrap --execute
 uv run --locked python scripts/postgres.py bootstrap --execute
 uv run --locked python scripts/object_store.py bootstrap --execute
@@ -135,6 +127,7 @@ uv run --locked python scripts/control_plane_registry.py deploy --execute
 
 $env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
   "GitHub private-repository read token" -MaskInput
+uv run --locked python scripts/infrastructure_runtime.py argocd bootstrap --execute
 uv run --locked python scripts/gitops.py bootstrap --execute
 uv run --locked python scripts/object_store.py initialize --execute
 uv run --locked python scripts/storage_access.py --execute
@@ -241,22 +234,22 @@ uv run --locked python scripts/gitops.py bootstrap --execute
 
 Bootstrap:
 
-1. verifies the local Docker endpoint, kind identity and dedicated kubeconfig;
-2. creates the owned `argocd` namespace or validates its existing ownership;
-3. lets Kustomize fetch the official versioned install manifest;
-4. applies the rendering using server-side apply, as required for the Argo CD
-   CRDs;
-5. waits for all six Deployments and the application-controller StatefulSet;
-6. creates or validates an immutable Argo CD repository-credential template;
-7. ownership-checks and applies the local root Application;
-8. waits for the root to synchronize and for the sample-SUT, PostgreSQL and
-   SeaweedFS Applications to become `Synced` and `Healthy`; and
-9. verifies PostgreSQL health before returning at the staged boundary.
+1. delegates local cluster ensure and health to the selected infrastructure
+   revision;
+2. pre-creates the exact four consumer namespaces;
+3. delegates Argo CD install and controller readiness to that same revision;
+4. requires the complete `k8s-infrastructure` namespace ownership identity;
+5. creates or validates an immutable Argo CD repository-credential template;
+6. ownership-checks and applies the local root Application;
+7. waits for the root and the sample-SUT, PostgreSQL and SeaweedFS Applications
+   to become `Synced` and `Healthy`; and
+8. verifies PostgreSQL health before returning at the staged boundary.
 
 After explicit policy, database, migration and runtime preparation, `task status`
-or `gitops.py health --execute` waits for every Application and validates the
-sample SUT, PostgreSQL, SeaweedFS and control-plane workloads. It never applies
-the Argo CD installation, credentials, root Application or workload resources.
+first checks provider cluster and Argo CD health, then `gitops.py health
+--execute` waits for every Application and validates the sample SUT, PostgreSQL,
+SeaweedFS and control-plane workloads. Consumer health never applies the Argo CD
+installation, credentials, root Application or workload resources.
 
 The root Application owns the exact four local namespaces. The AppProject does
 not permit arbitrary destinations, and bootstrap may pre-create only those same
@@ -277,8 +270,8 @@ uv run --locked python scripts/gitops.py health
 uv run --locked python scripts/gitops.py health --execute
 ```
 
-The executable command validates namespace and Secret ownership, waits for the
-pinned Argo CD workloads, verifies the root Application identity, requires all
+The executable consumer command validates namespace and Secret ownership,
+verifies the root Application identity, requires all
 five Applications to be both `Synced` and `Healthy`, and validates the sample
 SUT, PostgreSQL, SeaweedFS and control-plane workloads. Workload acceptance is
 reconciler-neutral: it validates live resources and endpoints without expecting
@@ -469,11 +462,11 @@ the workload is reconciled.
 
 ## Safety and limitations
 
-Bootstrap does not delete or adopt an existing `argocd` namespace owned by
-another installation. It does not rotate an existing credential, enable
-pruning, self-heal the root Application, expose the Argo CD API server, or
-install a host-side Argo CD CLI. There is deliberately no uninstall command in
-this repository.
+Neither provider nor consumer bootstrap adopts an `argocd` namespace with an
+unknown owner. Consumer bootstrap does not install Argo CD, rotate an existing
+credential, enable pruning, self-heal the root Application, expose the Argo CD
+API server, or install a host-side Argo CD CLI. There is deliberately no
+uninstall command in this repository.
 
 The standard non-HA installation is appropriate for the disposable local
 environment, not production. Production topology, SSO, external secrets,
@@ -495,10 +488,12 @@ retention and decommissioning decision.
 
 ## Upgrading Argo CD
 
-An Argo CD upgrade changes the explicit release tag, never the resource URL to
-`stable`, `latest`, or a branch. Review the official release and upgrade notes,
-update the version in the Kustomize resource URL, and inspect the rendered
-component image tags. Run offline validation before executing the upgrade.
+Upgrade Argo CD in `k8s-infrastructure`, merge and validate that provider
+release, then promote its immutable commit through
+`deployments/local-infrastructure.json`. Never edit the consumer lock to point
+at `stable`, `latest` or a branch. Review the official release notes and rendered
+component image tags before promotion, then repeat the after-merge acceptance
+from the infrastructure release guide.
 
 References:
 

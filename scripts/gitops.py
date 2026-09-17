@@ -9,7 +9,6 @@ import os
 import uuid
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 import yaml
 
@@ -38,6 +37,7 @@ else:
 
 NAMESPACE = "argocd"
 OWNER = "perfeng-environment"
+INFRASTRUCTURE_OWNER = "k8s-infrastructure"
 ROOT_APPLICATION = "perfeng-local-root"
 ACTIONS = ("validate", "bootstrap", "health")
 SAMPLE_SUT_APPLICATION = "perfeng-local-sample-sut"
@@ -79,43 +79,6 @@ def load_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"Invalid YAML document: {path.name}")
     return value
-
-
-def argocd_version(kustomization: dict[str, Any]) -> str:
-    """Return the explicit release selected by the official manifest resource."""
-    resources = kustomization.get("resources")
-    if (
-        set(kustomization) != {"apiVersion", "kind", "namespace", "resources"}
-        or kustomization.get("apiVersion") != "kustomize.config.k8s.io/v1beta1"
-        or kustomization.get("kind") != "Kustomization"
-        or kustomization.get("namespace") != NAMESPACE
-        or not isinstance(resources, list)
-        or len(resources) != 2
-        or resources[0] != "namespace.yaml"
-        or not isinstance(resources[1], str)
-    ):
-        raise ValueError("Invalid Argo CD Kustomize bootstrap")
-    manifest = urlparse(resources[1])
-    parts = manifest.path.split("/")
-    if (
-        manifest.scheme != "https"
-        or manifest.netloc != "raw.githubusercontent.com"
-        or manifest.query
-        or manifest.fragment
-        or len(parts) != 6
-        or parts[1:3] != ["argoproj", "argo-cd"]
-        or parts[4:] != ["manifests", "install.yaml"]
-    ):
-        raise ValueError("Argo CD must use the official versioned install manifest")
-    version = parts[3]
-    numbers = version.removeprefix("v").split(".")
-    if (
-        not version.startswith("v")
-        or len(numbers) != 3
-        or not all(item.isdigit() for item in numbers)
-    ):
-        raise ValueError("Argo CD must use an explicit semantic release tag")
-    return version
 
 
 def validate_control_plane_application(
@@ -264,11 +227,8 @@ def validate_project_sources(
         raise ValueError("Invalid local AppProject source repositories")
 
 
-def validate_configuration(root: Path = cluster.ROOT) -> str:
-    """Validate the explicit Argo CD release and local objects without external access."""
-    kustomization = load_yaml(root / "gitops/bootstrap/argocd/kustomization.yaml")
-    version = argocd_version(kustomization)
-
+def validate_configuration(root: Path = cluster.ROOT) -> None:
+    """Validate the consumer-owned local GitOps objects without external access."""
     application = load_yaml(root / "gitops/bootstrap/local-root-application.yaml")
     metadata = application.get("metadata", {})
     spec = application.get("spec", {})
@@ -365,7 +325,6 @@ def validate_configuration(root: Path = cluster.ROOT) -> str:
     validate_postgres_application(postgres_application)
     validate_seaweedfs_application(seaweedfs_application)
     validate_control_plane_application(control_plane, release)
-    return version
 
 
 def credential_document(token: str) -> dict[str, Any]:
@@ -444,21 +403,20 @@ def ensure_credentials(kube: list[str], *, create: bool) -> None:
     )
 
 
-def verify_namespace(kube: list[str], *, create: bool) -> None:
-    """Refuse to adopt a GitOps namespace with a different owner."""
+def verify_namespace(kube: list[str]) -> None:
+    """Require the infrastructure-owned GitOps namespace before composition."""
     current = cluster.run(
         [*kube, "get", "namespace", NAMESPACE, "--ignore-not-found", "-o", "json"]
     )
     if not current.strip():
-        if create:
-            return
-        raise ValueError("Argo CD namespace is missing; run bootstrap first")
+        raise ValueError("Argo CD namespace is missing; run infrastructure bootstrap first")
     labels = json.loads(current).get("metadata", {}).get("labels", {})
     if (
-        labels.get("app.kubernetes.io/managed-by") != OWNER
-        or labels.get("perfeng.io/purpose") != "gitops-control-plane"
+        labels.get("app.kubernetes.io/managed-by") != INFRASTRUCTURE_OWNER
+        or labels.get("app.kubernetes.io/name") != NAMESPACE
+        or labels.get("app.kubernetes.io/part-of") != "kubernetes-substrate"
     ):
-        raise ValueError("Existing argocd namespace is not owned by perfeng-environment")
+        raise ValueError("Existing argocd namespace is not owned by k8s-infrastructure")
 
 
 def ensure_root(kube: list[str], root: Path, *, apply: bool) -> None:
@@ -478,27 +436,14 @@ def ensure_root(kube: list[str], root: Path, *, apply: bool) -> None:
 
 
 def execute(action: str, root: Path = cluster.ROOT) -> None:
-    """Bootstrap or health-check the pinned local GitOps control plane."""
+    """Bootstrap or health-check consumer-owned GitOps composition."""
     if action not in {"bootstrap", "health"}:
         raise ValueError("Unknown executable GitOps action")
     validate_configuration(root)
-    cluster.verify_local_docker()
     cluster.verify_context(root)
     kube = kubectl(root)
     mutating = action == "bootstrap"
-    verify_namespace(kube, create=mutating)
-    if mutating:
-        cluster.run(
-            [
-                *kube,
-                "apply",
-                "--server-side",
-                "--force-conflicts",
-                "-k",
-                str(root / "gitops/bootstrap/argocd"),
-            ]
-        )
-    gitops_status.wait_for_argocd(kube)
+    verify_namespace(kube)
     ensure_credentials(kube, create=mutating)
     ensure_root(kube, root, apply=mutating)
     gitops_status.wait_for_application(kube, ROOT_APPLICATION, require_health=action != "bootstrap")
@@ -532,12 +477,12 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.action == "validate":
-            version = validate_configuration()
-            print(f"Validated official Argo CD {version} manifest and local Applications.")
+            validate_configuration()
+            print("Validated local GitOps Applications and composition.")
         elif args.execute:
             execute(args.action)
         else:
-            print(f"Preview: {args.action} the pinned local Argo CD GitOps control plane.")
+            print(f"Preview: {args.action} the local consumer GitOps composition.")
             if args.action == "bootstrap":
                 print(f"Missing Git credentials use {TOKEN_ENVIRONMENT_VARIABLE}.")
             print("Preview only. Add --execute to access the network or local cluster.")

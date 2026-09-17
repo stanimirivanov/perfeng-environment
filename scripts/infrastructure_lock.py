@@ -25,9 +25,7 @@ PROFILE = re.compile(r"[a-z0-9-]+/[a-z0-9-]+")
 REPOSITORY_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
 NODE_IMAGE = re.compile(r"kindest/node:v[0-9]+\.[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}")
 ARGOCD_VERSION = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
-DORMANT_MESSAGE = (
-    "Live execution remains owned by perfeng-environment until the reviewed ownership cutover"
-)
+COMMAND_TIMEOUT = 600
 
 
 @dataclass(frozen=True)
@@ -223,9 +221,12 @@ def validate_source(lock: InfrastructureLock, read: Callable[[str], bytes]) -> N
         cluster_constants.get("NAME") != lock.cluster_name
         or cluster_constants.get("NODE_IMAGE") != lock.node_image
         or cluster_constants.get("ACTIONS") != ("up", "ensure", "health", "down")
-        or cluster_constants.get("DORMANT_MESSAGE") != DORMANT_MESSAGE
+        or cluster_constants.get("COMMAND_TIMEOUT") != COMMAND_TIMEOUT
+        or "DORMANT_MESSAGE" in cluster_constants
     ):
-        raise ValueError("Pinned cluster lifecycle differs from the dormant environment contract")
+        raise ValueError(
+            "Pinned cluster lifecycle differs from the executable environment contract"
+        )
 
     kustomization = yaml.safe_load(read(lock.argocd_bootstrap))
     expected_manifest = (
@@ -261,7 +262,10 @@ def validate_source(lock: InfrastructureLock, read: Callable[[str], bytes]) -> N
     if (
         argocd_constants.get("NAMESPACE") != lock.argocd_namespace
         or argocd_constants.get("OWNER") != "k8s-infrastructure"
+        or argocd_constants.get("LEGACY_OWNER") != "perfeng-environment"
         or argocd_constants.get("ACTIONS") != ("validate", "bootstrap", "health")
-        or argocd_constants.get("DORMANT_MESSAGE") != DORMANT_MESSAGE
+        or "DORMANT_MESSAGE" in argocd_constants
     ):
-        raise ValueError("Pinned Argo CD lifecycle differs from the dormant environment contract")
+        raise ValueError(
+            "Pinned Argo CD lifecycle differs from the executable environment contract"
+        )

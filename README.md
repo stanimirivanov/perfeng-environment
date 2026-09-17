@@ -8,8 +8,9 @@
   the preview-first Python tools remain the auditable safety boundaries.
 - [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selected the
   Argo CD-centred architecture; its local migration is now complete.
-- The [local GitOps environment](docs/local-gitops.md) installs pinned Argo CD
-  and reconciles all supported local workloads without competing reconcilers.
+- The immutable `k8s-infrastructure` selection owns local kind and Argo CD;
+  the [local GitOps environment](docs/local-gitops.md) reconciles Perfeng
+  workloads without competing reconcilers.
 - The [migration completion record](docs/gitops-migration-completion.md) explains
   why the remaining imperative commands are bootstrap, external-state or
   acceptance boundaries rather than competing workload reconcilers.
@@ -18,7 +19,7 @@
   bootstrap. [ADR 0005](docs/decisions/0005-adopt-k8s-infrastructure-name.md)
   records the created repository name, `k8s-infrastructure`; the
   [local infrastructure lock](docs/local-infrastructure-release.md) pins and
-  validates the first reviewed dormant revision without transferring ownership.
+  executes the reviewed provider revision through a content-selected archive.
   The [cloud options evaluation](docs/cloud-kubernetes-options.md) records why
   OCI is the first guarded candidate and why it is not deployable yet.
 - Clone sibling repositories with the workspace command, then use the focused
@@ -64,9 +65,9 @@ deployment. Its preview-first registry command validates private GHCR access and
 creates only the externally managed image-pull Secret required by the chart.
 The separate [local infrastructure lock](docs/local-infrastructure-release.md)
 pins the reviewed `k8s-infrastructure` source commit and verifies its local-kind
-and Argo CD compatibility directly from Git. The selected implementation remains
-dormant; local operator tasks continue to use this repository until the explicit
-ownership cutover.
+and Argo CD compatibility directly from Git. Local operator tasks execute that
+exact revision for cluster and reconciler lifecycle while this repository keeps
+Perfeng namespaces, credentials, Applications and acceptance ownership.
 The [local GitOps environment](docs/local-gitops.md) manages its AppProject,
 namespaces, sample SUT, PostgreSQL, SeaweedFS and control-plane workloads.
 Remaining imperative commands bootstrap the cluster and reconciler, provision

@@ -1,4 +1,4 @@
-"""Local-only kind lifecycle. Commands are previews unless --execute is supplied."""
+"""Bootstrap Perfeng namespaces on the selected Kubernetes substrate."""
 
 import argparse
 import json
@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 NAME = "perfeng-local"
 CONTEXT = f"kind-{NAME}"
 PROGRESS_INTERVAL = 10
+ACTIONS = ("bootstrap",)
 
 
 def run(command: list[str], *, input_data: bytes | None = None) -> str:
@@ -226,25 +227,16 @@ def ensure(root: Path = ROOT) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["up", "ensure", "bootstrap", "health", "down"])
+    parser.add_argument("action", choices=ACTIONS)
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--confirm-delete")
     args = parser.parse_args()
     try:
         if not args.execute:
-            if args.action == "ensure":
-                print(json.dumps(["kind", "get", "clusters"]))
-                print("Execution creates the missing named cluster or validates the existing one.")
-            else:
-                for command in commands(args.action):
-                    print(json.dumps(command))
-            print(
-                "Preview only. Add --execute to run; down also requires --confirm-delete perfeng-local."
-            )
-        elif args.action == "ensure":
-            ensure()
+            for command in commands(args.action):
+                print(json.dumps(command))
+            print("Preview only. Add --execute to bootstrap the Perfeng namespaces.")
         else:
-            execute(args.action, confirmation=args.confirm_delete)
+            execute(args.action)
     except (OSError, ValueError, yaml.YAMLError) as error:
         print(f"Local cluster error: {error}")
         return 1
