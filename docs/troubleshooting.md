@@ -332,14 +332,19 @@ Use these **read-only** checks before blaming live reconciliation:
 ```powershell
 uv run --locked python scripts/control_plane_release.py validate
 uv run --locked python scripts/control_plane_runtime.py validate
+uv run --locked python scripts/infrastructure_release.py validate
 uv run --locked python scripts/gitops.py validate
 ```
 
-They detect mismatched commits, chart versions, runtime bytes, content-addressed
-names and Application values without changing the cluster. Never repair an
-identity mismatch by editing or deleting an immutable ConfigMap in place. Create
-the new reviewed identity, select it in Git and retain the previous identity for
-rollback.
+They detect mismatched commits, infrastructure profiles, chart versions,
+runtime bytes, content-addressed names and Application values without changing
+the cluster. Infrastructure validation requires the selected commit to exist in
+the sibling `k8s-infrastructure` checkout; it reads that commit through Git and
+does not switch the checkout or execute its lifecycle code. If the commit is
+missing, fetch it through the normal repository workflow rather than changing
+the lock to the current branch. Never repair an identity mismatch by editing or
+deleting an immutable ConfigMap in place. Create the new reviewed identity,
+select it in Git and retain the previous identity for rollback.
 
 ## What to include in a defect report
 
