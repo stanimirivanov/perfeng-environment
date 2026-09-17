@@ -124,8 +124,8 @@ this repository before its source history and ownership moved to
 `k8s-infrastructure`. The environment now consumes a content-selected provider
 release while retaining product-specific bootstrap and acceptance.
 
-Offline validation is not deployment acceptance. After the ownership-cutover
-PR reaches `main`, run the exact procedure in
-[local infrastructure release selection](local-infrastructure-release.md),
-including stateful identity checks when reusing an existing cluster. Remove the
-legacy implementation source only in a later PR after that evidence passes.
+Offline validation is not deployment acceptance. Run the exact procedure in
+[local infrastructure release selection](local-infrastructure-release.md)
+after every provider promotion, including stateful identity checks when reusing
+an existing cluster. The initial ownership cutover passed that gate and the
+superseded lifecycle source has been removed.

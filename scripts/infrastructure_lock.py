@@ -262,7 +262,6 @@ def validate_source(lock: InfrastructureLock, read: Callable[[str], bytes]) -> N
     if (
         argocd_constants.get("NAMESPACE") != lock.argocd_namespace
         or argocd_constants.get("OWNER") != "k8s-infrastructure"
-        or argocd_constants.get("LEGACY_OWNER") != "perfeng-environment"
         or argocd_constants.get("ACTIONS") != ("validate", "bootstrap", "health")
         or "DORMANT_MESSAGE" in argocd_constants
     ):

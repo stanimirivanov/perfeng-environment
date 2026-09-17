@@ -1,6 +1,6 @@
 # Local Kubernetes infrastructure release selection
 
-- Status: Selected executable revision; live acceptance pending
+- Status: Active provider; ownership cutover accepted
 - Selected repository: `stanimirivanov/k8s-infrastructure`
 - Selected profile: `local-kind/perfeng-local`
 
@@ -14,10 +14,11 @@
 - `task bootstrap`, `task status`, and `task destroy` delegate substrate work to
   that immutable provider. `perfeng-environment` retains Perfeng namespaces,
   credentials, Applications, workloads, and product acceptance.
-- Run the after-merge acceptance below before removing the retained legacy
-  cluster and Argo CD source from this repository.
-- If the ownership handoff itself must be reversed, use the bounded namespace
-  rollback command below; do not run two Argo CD installers concurrently.
+- The initial cutover passed provider health, complete Perfeng health, stateful
+  identity inspection and a five-artifact smoke Run on 2026-09-17. Superseded
+  cluster and Argo CD installer source has been removed from this repository.
+- Roll back a provider release by selecting a previously accepted immutable
+  provider commit. There is no second local lifecycle owner.
 
 ## Purpose and ownership boundary
 
@@ -38,10 +39,9 @@ root and child Applications, workload health, smoke tests, and the roadmap.
 The infrastructure repository is not an Argo CD workload source and is not
 added to the Perfeng AppProject.
 
-The legacy implementations remain checked in temporarily as rollback evidence.
-Their public command surfaces no longer own cluster or Argo CD operation:
-`cluster.py` exposes only Perfeng namespace bootstrap, while `gitops.py` manages
-consumer credentials, Applications and workload health.
+`cluster.py` exposes only Perfeng namespace bootstrap and shared safe command
+utilities, while `gitops.py` manages consumer credentials, Applications and
+workload health. Neither contains a cluster or Argo CD controller lifecycle.
 
 ## Immutable execution
 
@@ -90,11 +90,10 @@ compatibility evidence together:
 The lock intentionally does not follow `main`. Workspace bootstrap may clone
 `main` for development, but mutable branches are not deployment inputs.
 
-## After-merge acceptance
+## Release acceptance
 
-Run this acceptance only after the consumer cutover reaches `main`. It mutates
-the local environment and assumes its data may be retained by the existing
-named cluster:
+Run this acceptance after every provider promotion reaches `main`. It mutates
+the local environment and may reuse retained data in the existing named cluster:
 
 ```powershell
 uv run --locked python scripts/infrastructure_release.py validate
@@ -118,30 +117,18 @@ identities before and after acceptance when reusing a stateful cluster. Run the
 existing persistence probes from the stateful runbooks. A passing smoke Run is
 not permission to ignore changed persistent identities.
 
-Only after this acceptance is recorded should a separate PR remove the retained
-legacy cluster and Argo CD implementation files and their obsolete tests.
+The initial ownership cutover completed this sequence on 2026-09-17. The
+existing PostgreSQL and SeaweedFS StatefulSets and PVCs retained their older
+creation identities, all Applications and workload checks passed, and the smoke
+Run produced five verified artifacts.
 
-## Rollback of the ownership handoff
+## Release rollback
 
-Routine release rollback selects the previous reviewed provider commit in the
-lock. Do not edit the sibling checkout or point the lock at a mutable branch.
-
-If provider bootstrap fails specifically because the existing Argo CD namespace
-handoff must be reversed, first inspect the cluster and provider diagnostics.
-Then preview and explicitly restore only the reviewed legacy namespace labels:
-
-```powershell
-uv run --locked python scripts/infrastructure_runtime.py restore-legacy-owner
-uv run --locked python scripts/infrastructure_runtime.py restore-legacy-owner `
-  --execute --confirm-owner perfeng-environment
-```
-
-The executable rollback first requires provider cluster health, requires the
-current complete `k8s-infrastructure` namespace identity, server-side applies
-the retained legacy namespace manifest, and verifies the resulting
-`perfeng-environment` identity. It does not uninstall Argo CD, rotate a Secret,
-change an Application, delete a workload, or alter durable data. After rollback,
-use only the reviewed legacy recovery procedure; never run both installers.
+Provider release rollback selects the previous accepted provider commit in the
+lock and matching CI checkout. Do not edit the sibling checkout, point the lock
+at a mutable branch, or restore the removed environment-owned installer from
+Git history. If no accepted provider revision is compatible with the live
+cluster, stop and review a forward recovery; do not introduce a second owner.
 
 ## Failure and recovery
 

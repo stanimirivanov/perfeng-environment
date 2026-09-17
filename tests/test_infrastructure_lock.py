@@ -89,7 +89,6 @@ class InfrastructureLockTests(unittest.TestCase):
             self.lock.argocd_lifecycle: (
                 f'NAMESPACE = "{self.lock.argocd_namespace}"\n'
                 'OWNER = "k8s-infrastructure"\n'
-                'LEGACY_OWNER = "perfeng-environment"\n'
                 'ACTIONS = ("validate", "bootstrap", "health")\n'
             ).encode(),
         }
@@ -151,7 +150,7 @@ class InfrastructureLockTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "local-kind profile"):
             infrastructure_lock.validate_source(self.lock, self.read)
 
-    def test_rejects_a_dormant_or_incompatible_lifecycle(self) -> None:
+    def test_rejects_an_incompatible_lifecycle(self) -> None:
         self.files[self.lock.argocd_lifecycle] = b'NAMESPACE = "argocd"\nOWNER = "other"\n'
 
         with self.assertRaisesRegex(ValueError, "executable environment contract"):
