@@ -17,8 +17,10 @@
   selects a staged extraction of reusable Kubernetes substrate and Argo CD
   bootstrap. [ADR 0005](docs/decisions/0005-adopt-k8s-infrastructure-name.md)
   records the created repository name, `k8s-infrastructure`; the
-  [cloud options evaluation](docs/cloud-kubernetes-options.md) records why OCI
-  is the first guarded candidate and why it is not deployable yet.
+  [local infrastructure lock](docs/local-infrastructure-release.md) pins and
+  validates the first reviewed dormant revision without transferring ownership.
+  The [cloud options evaluation](docs/cloud-kubernetes-options.md) records why
+  OCI is the first guarded candidate and why it is not deployable yet.
 - Clone sibling repositories with the workspace command, then use the focused
   guides under `docs` for the environment capability you need.
 - Start with the [local troubleshooting runbook](docs/troubleshooting.md) when
@@ -60,6 +62,11 @@ The [local control-plane deployment lock](docs/local-control-plane.md) pins the
 published service image, reviewed Helm chart and runtime-registry bundle before
 deployment. Its preview-first registry command validates private GHCR access and
 creates only the externally managed image-pull Secret required by the chart.
+The separate [local infrastructure lock](docs/local-infrastructure-release.md)
+pins the reviewed `k8s-infrastructure` source commit and verifies its local-kind
+and Argo CD compatibility directly from Git. The selected implementation remains
+dormant; local operator tasks continue to use this repository until the explicit
+ownership cutover.
 The [local GitOps environment](docs/local-gitops.md) manages its AppProject,
 namespaces, sample SUT, PostgreSQL, SeaweedFS and control-plane workloads.
 Remaining imperative commands bootstrap the cluster and reconciler, provision

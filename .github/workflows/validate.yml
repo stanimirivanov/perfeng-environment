@@ -16,6 +16,15 @@ jobs:
         with:
           path: perfeng-environment
           persist-credentials: false
+      - name: Check out pinned Kubernetes infrastructure
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/k8s-infrastructure
+          ref: 0554218185c5872fe211cbe044bc6a43ad63355b
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+          path: k8s-infrastructure
+          persist-credentials: false
       - name: Check out pinned control-plane deployment source
         if: runner.os == 'Linux'
         uses: actions/checkout@v7
@@ -49,6 +58,12 @@ jobs:
       - run: uv run --locked python -m unittest discover -s tests -v
         working-directory: perfeng-environment
       - run: uv run --locked python scripts/workspace.py validate
+        working-directory: perfeng-environment
+      - name: Validate immutable local infrastructure selection
+        if: runner.os == 'Linux'
+        run: >-
+          uv run --locked python scripts/infrastructure_release.py validate
+          --infrastructure-root ../k8s-infrastructure
         working-directory: perfeng-environment
       - run: uv run --locked python scripts/gitops.py validate
         working-directory: perfeng-environment

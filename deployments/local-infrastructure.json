@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "https://github.com/stanimirivanov/k8s-infrastructure.git",
+    "revision": "0554218185c5872fe211cbe044bc6a43ad63355b"
+  },
+  "profile": {
+    "name": "local-kind/perfeng-local",
+    "clusterConfiguration": "clusters/local-kind/perfeng-local/cluster-config.yaml",
+    "clusterLifecycle": "scripts/local_kind.py",
+    "argoCDBootstrap": "clusters/local-kind/perfeng-local/addons/argocd/kustomization.yaml",
+    "argoCDLifecycle": "scripts/argocd.py"
+  },
+  "compatibility": {
+    "clusterName": "perfeng-local",
+    "context": "kind-perfeng-local",
+    "kubeconfig": ".local/perfeng-local.kubeconfig",
+    "nodeImage": "kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f",
+    "argoCDVersion": "v3.5.2",
+    "argoCDNamespace": "argocd"
+  }
+}

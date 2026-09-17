@@ -104,6 +104,9 @@ Post-milestone decisions and follow-up:
   created `k8s-infrastructure` repository name, adds it to source-workspace
   composition and keeps workspace membership separate from GitOps deployment
   authorization;
+- import the local-kind and Argo CD implementation histories into
+  `k8s-infrastructure`, keep both entry points dormant, and pin the first
+  reviewed infrastructure revision here before the explicit ownership cutover;
 - define the supported production-composition boundary rather than implying
   that the local kind topology is production; and
 - reconcile GitHub milestone status with this roadmap.
