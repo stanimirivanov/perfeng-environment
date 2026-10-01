@@ -33,8 +33,6 @@ IGNORED_DIRECTORIES = {
 }
 LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 REFERENCE = re.compile(r"^\s*\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))", re.MULTILINE)
-ACTION = re.compile(r"^\s*(?:-\s*)?uses:\s*(.*?)\s*$")
-YAML_BLOCK_SCALAR = re.compile(r"^\s*(?:-\s*)?[^:#]+:\s*[|>][+-]?\d*\s*(?:#.*)?$")
 ADR_NAME = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
 ADR_HEADING = re.compile(r"^# ADR(?:-| )(\d{4}):\s+\S")
 METADATA = re.compile(r"^- ([A-Za-z][A-Za-z ]+):\s*(.*)$", re.MULTILINE)
@@ -290,62 +288,6 @@ def _adr_violations(root: Path) -> list[Violation]:
     return violations
 
 
-def _action_references(text: str) -> list[tuple[str, int]]:
-    references: list[tuple[str, int]] = []
-    block_indent: int | None = None
-    for line_number, line in enumerate(text.splitlines(), start=1):
-        stripped = line.lstrip(" ")
-        indent = len(line) - len(stripped)
-        if block_indent is not None:
-            if not stripped or indent > block_indent:
-                continue
-            block_indent = None
-        if YAML_BLOCK_SCALAR.match(line):
-            block_indent = indent
-            continue
-        match = ACTION.match(line)
-        if not match:
-            continue
-        raw = match.group(1).strip()
-        if raw.startswith(('"', "'")):
-            quote = raw[0]
-            closing = raw.find(quote, 1)
-            reference = raw[1:closing] if closing >= 0 else raw
-        else:
-            reference = raw.split("#", 1)[0].strip()
-        references.append((reference, line_number))
-    return references
-
-
-def _workflow_violations(root: Path) -> list[Violation]:
-    violations: list[Violation] = []
-    workflows = root / ".github/workflows"
-    actions = root / ".github/actions"
-    paths: set[Path] = set()
-    if workflows.is_dir():
-        paths.update([*workflows.glob("*.yml"), *workflows.glob("*.yaml")])
-    if actions.is_dir():
-        paths.update([*actions.rglob("action.yml"), *actions.rglob("action.yaml")])
-    for path in sorted(paths):
-        text = path.read_text(encoding="utf-8")
-        for reference, line_number in _action_references(text):
-            _, separator, revision = reference.rpartition("@")
-            if reference.startswith(("./", "docker://")) or (
-                separator and re.fullmatch(r"v\d+", revision)
-            ):
-                continue
-            violations.append(
-                Violation(
-                    path.relative_to(root).as_posix(),
-                    line_number,
-                    "workflow.action-version",
-                    f"{reference} is not a semantic-major action reference",
-                    "use owner/action@vN; keep immutable hashes in deployment/ref fields",
-                )
-            )
-    return violations
-
-
 def check_repository(root: Path) -> list[Violation]:
     root = root.resolve()
     violations: list[Violation] = []
@@ -359,7 +301,6 @@ def check_repository(root: Path) -> list[Violation]:
         violations.extend(_markdown_violations(root, path))
     violations.extend(_template_violations(root))
     violations.extend(_adr_violations(root))
-    violations.extend(_workflow_violations(root))
     return sorted(set(violations))
 
 

@@ -5,7 +5,7 @@
 - Use Python 3.12 and the exact `uv.lock`; bootstrap with `uv sync --locked`.
 - Add a dependency only for a current repository-owned need after license, maintenance, security, and replacement review.
 - Keep live infrastructure CLIs explicit prerequisites rather than hidden Python dependencies.
-- GitHub Actions use semantic major references; immutable component and source selections continue to use exact digests and commit hashes.
+- GitHub Actions may use reviewed release tags or commit pins; component and source selections retain their exact identities.
 - Dependabot may propose grouped GitHub Actions updates; Python updates remain a manual, lockfile-aware workflow until the hosted updater supports the pinned uv toolchain reliably.
 
 ## Python dependencies
@@ -20,7 +20,7 @@ Helm, Git, Task, Docker, kind, kubectl, and Argo CD tools are operational prereq
 
 ## GitHub Actions and immutable selections
 
-Workflow `uses:` entries use semantic major versions such as `actions/checkout@v7`. This policy intentionally does not apply to deployment image digests, artifact checksums, lock content, or `actions/checkout` `ref:` values selecting a reviewed sibling revision; those remain exact immutable identities.
+Workflow `uses:` entries may use reviewed release tags or commit SHAs. The repository policy validator does not enforce one reference style. Deployment image digests, artifact checksums, lock content, and `actions/checkout` `ref:` values selecting a reviewed sibling revision remain exact immutable identities.
 
 Automated dependency review is not required. Dependabot updates GitHub Actions only. Python dependency updates remain manual and MUST update `uv.lock` with the repository-pinned toolchain; every dependency pull request must pass the same checks as other changes.
 
