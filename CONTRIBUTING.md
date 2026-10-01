@@ -30,7 +30,10 @@ silently create another normative level.
 |:--|:--|
 | Contributor workflow, issue timing, escalation and completion | This document |
 | Concise contributor and agent entry point | [AGENTS.md](AGENTS.md) |
+| Task-oriented documentation routing | [docs/README.md](docs/README.md) |
+| Coding harness and verification tiers | [docs/development/harness.md](docs/development/harness.md) |
 | Engineering and Python/GitOps standards | [docs/development/engineering-standards.md](docs/development/engineering-standards.md) |
+| Dependency admission and supply chain | [docs/development/dependency-policy.md](docs/development/dependency-policy.md) |
 | Architecture decisions | [docs/decisions](docs/decisions/README.md) |
 | Cross-repository milestones and planned work | [docs/roadmap/milestones.md](docs/roadmap/milestones.md) |
 | Supported commands and layout | [README.md](README.md) |
@@ -49,7 +52,7 @@ implementation they operate.
 A contributor MUST:
 
 - inspect the branch and working tree and preserve unrelated changes;
-- read the relevant operational guide, engineering standards and accepted ADRs;
+- use the documentation map to read the relevant operational guide, engineering standards and accepted ADRs;
 - identify the smallest independently reviewable observable outcome;
 - identify affected persistent resources, credentials, contracts, manifests,
   troubleshooting paths, rollout and recovery behavior; and
@@ -238,15 +241,10 @@ A contributor MUST run every applicable required check supported by the current
 environment. Narrow checks MAY provide interim feedback but MUST NOT be
 presented as equivalent to the required suite.
 
-```sh
-uv run --locked ruff format --check .
-uv run --locked ruff check .
-uv run --locked ty check
-uv run --locked python -m unittest discover -s tests -v
-uv run --locked python scripts/workspace.py validate
-uv run --locked python scripts/gitops.py validate
-uv run --locked python scripts/validate_cluster.py
-```
+Run `make verify` for the repository-local inner loop and `make validate` for
+complete non-live acceptance. Changes to immutable sibling selections also run
+`make release-selection-check`. The exact commands and prerequisites are
+inventoried in the [harness guide](docs/development/harness.md).
 
 Run focused offline renderers or validators for every affected chart, lock,
 profile or manifest.

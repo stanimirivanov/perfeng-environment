@@ -86,6 +86,10 @@ class ControlPlaneReleaseTests(unittest.TestCase):
                 "persist-credentials": False,
             },
         )
+        makefile = (root / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("scripts/control_plane_release.py validate", makefile)
+        self.assertIn('--k8s-root "$(K8S_ROOT)"', makefile)
+        self.assertIn('--control-plane-root "$(CONTROL_PLANE_ROOT)"', makefile)
 
     def test_rejects_mutable_or_ambiguous_identity(self) -> None:
         cases = [

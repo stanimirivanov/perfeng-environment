@@ -210,7 +210,10 @@ truth:
 
 - [Repository working agreement](AGENTS.md)
 - [Contributor workflow](CONTRIBUTING.md)
+- [Documentation map](docs/README.md)
+- [Coding harness](docs/development/harness.md)
 - [Engineering standards](docs/development/engineering-standards.md)
+- [Dependency policy](docs/development/dependency-policy.md)
 - [Architecture decisions](docs/decisions/README.md)
 - [Cross-repository roadmap](docs/roadmap/milestones.md)
 - [Security policy](SECURITY.md)
@@ -219,19 +222,10 @@ truth:
 Contribution and documentation conventions include the required TL;DR for long
 documents and the exact completion-report format used for PR-sized work.
 
-```sh
-uv run --locked ruff check .
-uv run --locked ruff format --check .
-uv run --locked ty check
-uv run --locked python -m unittest discover -s tests -v
-uv run --locked python scripts/workspace.py validate
-uv run --locked python scripts/gitops.py validate
-uv run --locked python scripts/validate_cluster.py
-```
-
-On systems with Make, `make validate` runs the same non-mutating checks and
-tests. The individual commands above remain the portable, authoritative
-interface.
+Run `make bootstrap` once, `make verify` during implementation, and
+`make validate` before handoff. The [harness guide](docs/development/harness.md)
+separates repository-local checks, offline Helm rendering, exact sibling-release
+validation, supply-chain checks, and explicitly authorized live operations.
 
 Tests use temporary paths and mocked clone operations, never GitHub writes.
 CI is configured to validate on Windows and Linux.

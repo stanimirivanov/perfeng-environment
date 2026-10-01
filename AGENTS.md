@@ -16,10 +16,9 @@ Normative terms such as MUST, SHOULD and MAY have the meanings defined there.
 1. You MUST read [CONTRIBUTING.md](CONTRIBUTING.md), especially its ambiguity,
    issue-timing, verification and external-side-effect rules.
 2. You MUST inspect the branch and working tree and preserve pre-existing work.
-3. You MUST read the relevant
-   [engineering standards](docs/development/engineering-standards.md),
-   operational guide, accepted [ADRs](docs/decisions/README.md) and the
-   [cross-repository roadmap](docs/roadmap/milestones.md).
+3. You MUST use the [documentation map](docs/README.md) to select the relevant
+   engineering standard, operational guide, accepted ADR and roadmap material.
+   You MUST NOT bulk-read unrelated guides merely because they exist.
 4. You MUST use the repository-local checks. You MUST NOT claim an unavailable
    or unexecuted check passed.
 

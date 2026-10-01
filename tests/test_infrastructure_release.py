@@ -56,21 +56,31 @@ class InfrastructureReleaseTests(unittest.TestCase):
         validation = next(
             step
             for step in steps
-            if step.get("name") == "Validate immutable local infrastructure selection"
+            if step.get("name") == "Validate exact adjacent release selections"
         )
         self.assertEqual(validation.get("if"), "runner.os == 'Linux'")
-        self.assertIn("scripts/infrastructure_release.py validate", validation.get("run", ""))
-        self.assertIn("../k8s-infrastructure", validation.get("run", ""))
-        runtime = next(
-            step
-            for step in steps
-            if step.get("name") == "Exercise immutable infrastructure runtime offline"
+        self.assertEqual(validation.get("run"), "make release-selection-check")
+        self.assertEqual(validation.get("working-directory"), "perfeng-environment")
+        makefile = (infrastructure_release.ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("scripts/infrastructure_release.py validate", makefile)
+        self.assertIn("scripts/infrastructure_runtime.py cluster ensure", makefile)
+        self.assertIn("scripts/infrastructure_runtime.py argocd validate", makefile)
+        self.assertIn('--infrastructure-root "$(INFRASTRUCTURE_ROOT)"', makefile)
+
+    def test_ci_helm_archive_uses_checked_in_checksum(self) -> None:
+        checksum = (
+            (infrastructure_release.ROOT / ".helm-linux-amd64.sha256")
+            .read_text(encoding="utf-8")
+            .strip()
         )
-        self.assertEqual(runtime.get("if"), "runner.os == 'Linux'")
-        self.assertEqual(runtime.get("shell"), "bash")
-        self.assertIn("infrastructure_runtime.py cluster ensure", runtime.get("run", ""))
-        self.assertIn("infrastructure_runtime.py argocd validate", runtime.get("run", ""))
-        self.assertIn("../k8s-infrastructure", runtime.get("run", ""))
+        workflow = (infrastructure_release.ROOT / ".github/workflows/validate.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertRegex(checksum, r"^[0-9a-f]{64}$")
+        self.assertIn("< perfeng-environment/.helm-linux-amd64.sha256", workflow)
+        self.assertIn("sha256sum --check", workflow)
+        self.assertNotIn("tar.gz.sha256", workflow)
 
 
 if __name__ == "__main__":
