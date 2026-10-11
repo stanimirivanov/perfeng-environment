@@ -3,7 +3,7 @@ K8S_ROOT ?= ../perfeng-k8s
 CONTROL_PLANE_ROOT ?= ../perfeng-control-plane
 UV_RUN := uv run --locked --offline
 
-.PHONY: help bootstrap doctor fmt fmt-check docs-check check test verify render-check release-selection-check supply-chain validate
+.PHONY: help bootstrap doctor fmt fmt-check docs-check check test verify render-check native-gateway-check release-selection-check supply-chain validate
 
 help:
 	@echo perfeng-environment engineering command surface
@@ -16,6 +16,7 @@ help:
 	@echo "  make test       Run the unit-test suite"
 	@echo "  make verify     Run the network-independent inner loop"
 	@echo "  make render-check  Validate Helm charts offline"
+	@echo "  make native-gateway-check  Adapt the native HTTPS gateway with reviewed Caddy"
 	@echo "  make release-selection-check  Validate exact adjacent release selections"
 	@echo "  make supply-chain  Verify the lock and audit dependencies"
 	@echo "  make validate   Run complete non-live acceptance"
@@ -52,6 +53,9 @@ verify: check test
 
 render-check:
 	$(UV_RUN) python scripts/validate_cluster.py
+
+native-gateway-check:
+	$(UV_RUN) python scripts/native_connectivity.py validate --execute
 
 release-selection-check:
 	$(UV_RUN) python scripts/infrastructure_release.py validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"

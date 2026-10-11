@@ -15,6 +15,7 @@
 | Setup | `make bootstrap` | Resolve the locked Python environment; network may be required. |
 | Inner loop | `make verify` | Run repository-local formatting, policy, static, configuration, and unit checks without cluster access. |
 | Render acceptance | `make render-check` | Lint and render charts offline; requires Helm. |
+| Native gateway configuration | `make native-gateway-check` | Adapt the real Caddyfile offline using reviewed Caddy 2.11.7; no server, CA or trust provisioning. CI verifies archive checksums on Windows/Linux. |
 | Supply chain | `make supply-chain` | Check the lock and known vulnerabilities; vulnerability data may require network access. |
 | Complete non-live acceptance | `make validate` | Aggregate verification, rendering, and supply-chain checks; advisory lookup may require network access. |
 | Pinned integration | `make release-selection-check` | Validate exact sibling revisions selected by deployment locks; requires the adjacent repositories and their selected commits. |

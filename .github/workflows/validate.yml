@@ -63,6 +63,23 @@ jobs:
       - name: Run repository-local verification
         run: make verify
         working-directory: perfeng-environment
+      - name: Install checksum-verified Caddy for offline gateway adaptation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = Get-Content perfeng-environment/native-gateway/caddy-release.json -Raw | ConvertFrom-Json
+          $platform = if ($IsWindows) { 'windows_amd64' } else { 'linux_amd64' }
+          $extension = if ($IsWindows) { 'zip' } else { 'tar.gz' }
+          $archive = Join-Path $env:RUNNER_TEMP "caddy.$extension"
+          $destination = Join-Path $env:RUNNER_TEMP 'perfeng-caddy'
+          Invoke-WebRequest "https://github.com/caddyserver/caddy/releases/download/v$($release.version)/caddy_$($release.version)_$platform.$extension" -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne $release.sha512.$platform) { throw 'Caddy release checksum mismatch' }
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          if ($IsWindows) { Expand-Archive $archive -DestinationPath $destination } else { tar -xzf $archive -C $destination; if ($LASTEXITCODE -ne 0) { throw 'Caddy extraction failed' } }
+          $destination | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Validate native gateway configuration without starting a server
+        run: make native-gateway-check
+        working-directory: perfeng-environment
       - name: Install Helm for offline rendering
         if: runner.os == 'Linux'
         shell: bash

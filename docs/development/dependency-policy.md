@@ -20,6 +20,14 @@ Helm, Git, Task, Docker, kind, kubectl, and Argo CD tools are operational prereq
 
 ## GitHub Actions and immutable selections
 
+The opt-in native gateway uses Caddy 2.11.7 (Apache-2.0); see the
+[connectivity guide](../native-worker-connectivity.md) for the replacement
+boundary and patched-toolchain requirement for live serving. Its official
+Windows/Linux archive SHA-512 values are pinned in
+`native-gateway/caddy-release.json`. CI uses checksum-verified binaries solely
+for offline adaptation. Changes to these pins require a release/security review
+and actual Caddyfile adaptation, not a text-only configuration test.
+
 Workflow `uses:` entries may use reviewed release tags or commit SHAs. The repository policy validator does not enforce one reference style. Deployment image digests, artifact checksums, lock content, and `actions/checkout` `ref:` values selecting a reviewed sibling revision remain exact immutable identities.
 
 Automated dependency review is not required. Dependabot updates GitHub Actions only. Python dependency updates remain manual and MUST update `uv.lock` with the repository-pinned toolchain; every dependency pull request must pass the same checks as other changes.

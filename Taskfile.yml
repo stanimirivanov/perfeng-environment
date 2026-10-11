@@ -45,3 +45,23 @@ tasks:
     prompt: This permanently deletes perfeng-local and all cluster-local data. Continue?
     cmds:
       - uv run --locked python scripts/infrastructure_runtime.py cluster down --execute --confirm-delete perfeng-local
+
+  native:api:
+    desc: Forward the reviewed control-plane Service to loopback for at most one hour
+    cmds:
+      - uv run --locked python scripts/native_connectivity.py forward-api --execute
+
+  native:s3:
+    desc: Forward the reviewed SeaweedFS Service to loopback for at most one hour
+    cmds:
+      - uv run --locked python scripts/native_connectivity.py forward-s3 --execute
+
+  native:gateway:
+    desc: Serve local HTTPS endpoints and the controlled search target without installing trust
+    cmds:
+      - uv run --locked python scripts/native_connectivity.py gateway --execute
+
+  native:check:
+    desc: Check trusted TLS, readiness, exact target bytes and anonymous storage denial
+    cmds:
+      - uv run --locked python scripts/native_connectivity.py check --execute --ca-file .local/native-gateway/caddy-data/pki/authorities/local/root.crt
