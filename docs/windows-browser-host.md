@@ -69,6 +69,11 @@ remain separate integration boundaries.
 
 ## Publish local browser artifacts
 
+For the control-plane Native Worker path, use the separate
+[native connectivity guide](native-worker-connectivity.md) for trusted HTTPS
+endpoints, the controlled search target and release-selection gates. The manual
+publication steps below remain the earlier, independent evidence workflow.
+
 After the runner and environment assembler succeed, preview the storage bridge:
 
 ```powershell

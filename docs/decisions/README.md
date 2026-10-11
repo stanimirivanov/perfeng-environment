@@ -101,3 +101,4 @@ How will the assumptions and consequences be verified?
 | [0003](0003-centralize-project-roadmap.md) | Accepted | Keep one cross-repository roadmap in the workspace-composition repository while retaining repository-local contributor harnesses. |
 | [0004](0004-separate-kubernetes-infrastructure.md) | Accepted | Separate reusable Kubernetes substrates and GitOps bootstrap from Perfeng-specific environment composition. |
 | [0005](0005-adopt-k8s-infrastructure-name.md) | Accepted | Adopt the created `k8s-infrastructure` name and separate workspace membership from GitOps source authorization. |
+| [0006](0006-loopback-native-worker-connectivity.md) | Proposed | Use an opt-in loopback HTTPS gateway and controlled target for native Windows integration. |

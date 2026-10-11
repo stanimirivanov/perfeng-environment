@@ -2,6 +2,10 @@
 
 ## TL;DR
 
+- For trusted Windows-worker API/S3 access or search-target failures, follow the
+  [native connectivity checklist](native-worker-connectivity.md#failure-and-recovery).
+  TLS/readiness is not proof of signed upload, internal read-back or acquisition.
+
 - Run every command from the `perfeng-environment` repository and use
   `.local/perfeng-local.kubeconfig`; the similarly named context in the global
   kubeconfig may point to an earlier kind API-server port.

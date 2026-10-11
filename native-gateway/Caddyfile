@@ -1,0 +1,49 @@
+{
+	admin off
+	persist_config off
+	auto_https disable_redirects
+	skip_install_trust
+	storage file_system {
+		root .local/native-gateway/caddy-data
+	}
+	log {
+		output discard
+	}
+	servers {
+		protocols h1 h2
+	}
+}
+
+https://127.0.0.1:8443 {
+	bind 127.0.0.1
+	tls internal
+	reverse_proxy 127.0.0.1:18080 {
+		header_up Host {http.request.hostport}
+	}
+}
+
+https://127.0.0.1:9443 {
+	bind 127.0.0.1
+	tls internal
+	reverse_proxy 127.0.0.1:18333 {
+		header_up Host {http.request.hostport}
+	}
+}
+
+https://127.0.0.1:10443 {
+	bind 127.0.0.1
+	tls internal
+	root * native-gateway/search
+	header {
+		Cache-Control no-store
+		X-Content-Type-Options nosniff
+		Content-Security-Policy "default-src 'none'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+	}
+	@read method GET HEAD
+	handle @read {
+		file_server
+	}
+	handle {
+		respond 405
+	}
+}

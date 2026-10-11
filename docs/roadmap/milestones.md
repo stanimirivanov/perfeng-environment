@@ -134,6 +134,33 @@ Planned outcomes:
 The browser capture, CDP diagnostics and environment qualification created in
 M01 are foundations, not evidence that this control-plane loop is complete.
 
+### Six completion batches
+
+The remaining work is organized by substantial outcomes rather than individual
+files or layers. Known-attempt inspection is already implemented. The separate
+HTTPS upload-signing origin is a completed control-plane prerequisite.
+
+1. `perfeng-k8s`: publish the complete immutable native Windows runtime bundle,
+   including source, qualification, recipe, policy and analysis/report selection.
+   Real qualification evidence and candidate identities remain promotion gates.
+2. `perfeng-environment`: establish trusted local API/S3 connectivity and the
+   controlled target, then select the reviewed releases and worker identity.
+   The opt-in loopback gateway and its checks are prepared; native bundle/image
+   selection and signed PUT/internal read-back acceptance are not yet complete.
+   Connectivity was advanced ahead of bundle promotion to obtain real inputs.
+3. `perfeng-contracts`: define worker-scoped discovery for a lost acquisition
+   response before the attempt ID is known, without restoring lease authority.
+4. `perfeng-control-plane`: implement discovery with durable worker-scoped,
+   expiry and concurrency semantics.
+5. `perfeng-playwright`: complete explicit manual recovery using authoritative
+   server state and retained local evidence, with no inferred lease authority.
+6. `perfeng-environment`: prove qualification through approved-baseline decision
+   on a representative Windows host, including cancellation and restart recovery.
+
+M03 remains incomplete until live acceptance passes. An operator-started
+`run-once` worker and safe manual recovery are the intended scope; an unattended
+Windows service is not required. Do not count mocks or readiness as completion.
+
 ## M04 — Kubernetes Benchmark Decision Loop
 
 Planned outcomes:

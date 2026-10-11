@@ -15,7 +15,17 @@ class TaskfileTests(unittest.TestCase):
         self.assertEqual(self.document["version"], "3")
         self.assertEqual(
             set(self.tasks),
-            {"default", "bootstrap", "status", "smoke", "destroy"},
+            {
+                "default",
+                "bootstrap",
+                "status",
+                "smoke",
+                "destroy",
+                "native:api",
+                "native:s3",
+                "native:gateway",
+                "native:check",
+            },
         )
 
     def test_bootstrap_sequences_existing_safety_boundaries(self) -> None:
@@ -58,6 +68,16 @@ class TaskfileTests(unittest.TestCase):
                 "--confirm-delete perfeng-local"
             ],
         )
+
+    def test_native_connectivity_remains_opt_in_and_uses_existing_safety_boundary(self) -> None:
+        for name, action in (("api", "forward-api"), ("s3", "forward-s3"), ("gateway", "gateway")):
+            self.assertEqual(
+                self.tasks[f"native:{name}"]["cmds"],
+                [f"uv run --locked python scripts/native_connectivity.py {action} --execute"],
+            )
+        self.assertIn("--ca-file .local/native-gateway/", self.tasks["native:check"]["cmds"][0])
+        for name in ("bootstrap", "status", "smoke"):
+            self.assertNotIn("native:", str(self.tasks[name]))
 
 
 if __name__ == "__main__":
