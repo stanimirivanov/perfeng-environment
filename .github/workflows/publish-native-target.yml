@@ -1,0 +1,66 @@
+name: Build and optionally publish controlled browser candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified main-branch candidate to GHCR
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Verify source
+        run: |
+          uv sync --locked
+          make verify
+          git diff --exit-code
+      - name: Build and verify isolated Linux AMD64 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/stanimirivanov/perfeng-native-search:sha-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "NATIVE_TARGET_IMAGE=$image" >> "$GITHUB_ENV"
+          uv run --locked --offline python scripts/native_target.py build --image "$image" --revision "$GITHUB_SHA" --execute
+      - name: Authenticate only for explicit publication
+        if: inputs.publish
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Publish and verify registry-addressable candidate
+        if: inputs.publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "$NATIVE_TARGET_IMAGE"
+          reference="$(uv run --locked --offline python scripts/native_target.py reference --image "$NATIVE_TARGET_IMAGE" --revision "$GITHUB_SHA" --execute)"
+          docker pull --platform linux/amd64 "$reference"
+          uv run --locked --offline python scripts/native_target.py verify --image "$reference" --revision "$GITHUB_SHA" --execute
+          identity="$(uv run --locked --offline python scripts/native_target.py validate)"
+          target="$(printf '%s' "$identity" | python -c 'import json,sys; print(json.load(sys.stdin)["targetSha256"])')"
+          printf 'Verified native candidate image: %s\n\nSource revision: %s\n\nTarget SHA-256: %s\n\nPlatform: linux/amd64\n' "$reference" "$GITHUB_SHA" "$target" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build-only summary
+        if: ${{ !inputs.publish }}
+        run: echo 'Build and isolated verification passed; no image was published or promoted.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Log out
+        if: ${{ always() && inputs.publish }}
+        run: docker logout ghcr.io

@@ -25,6 +25,12 @@
 
 ## Canonical collections
 
+For controlled target image builds/publication and qualification blockers, read
+[the immutable browser candidate guide](native-browser-candidate.md).
+For explicit four-core 4K cohort selection and evidence binding, read the
+[Windows host guide](windows-browser-host.md#select-a-comparison-cohort) and
+[ADR 0008](decisions/0008-separate-four-core-4k-browser-cohort.md).
+
 - [Development](development/) contains engineering and harness guidance.
 - [Decisions](decisions/README.md) records durable architecture and ownership choices.
 - [Roadmap](roadmap/milestones.md) owns checked-in cross-repository sequencing.

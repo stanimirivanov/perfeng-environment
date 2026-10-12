@@ -9,6 +9,7 @@ Thumbs.db
 .env.*
 !.env.example
 /.local/
+/results/
 
 # Python environments, caches and reports
 /.venv/

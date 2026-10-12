@@ -9,6 +9,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import yaml
 
@@ -325,7 +326,8 @@ def evaluate(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any
     )
     for name in ("width", "height", "scaleFactor", "refreshRateHz"):
         require(display[name] == spec["display"][name], f"display {name} differs")
-    for name in ("source", "plan", "batterySaver"):
+    require(UUID(power["plan"]) == UUID(spec["power"]["plan"]), "power plan differs")
+    for name in ("source", "batterySaver"):
         require(power[name] == spec["power"][name], f"power {name} differs")
     require(
         cpu["idleCpuPercent"] <= spec["calibration"]["maximumIdleCpuPercent"],

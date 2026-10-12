@@ -48,11 +48,16 @@ creates exact bundle-owned policy bytes with an operator-approved checksum and
 verifies the stored object before writing a local receipt.
 A [native Windows browser-host profile](docs/windows-browser-host.md) defines
 and checks the controlled machine conditions used by Playwright measurements.
+The default mainstream cohort is preserved; the separately versioned four-core
+4K laptop cohort requires explicit profile selection throughout the evidence workflow.
 The opt-in [native connectivity gateway](docs/native-worker-connectivity.md)
 provides loopback HTTPS API/storage access and a controlled search target on
 the same Windows host. It does not install trust or enable native acquisition.
 The browser-environment assembler binds an accepted qualification to the actual
 Playwright runtime without inventing missing host or browser values.
+The [controlled browser candidate](docs/native-browser-candidate.md) packages
+the search fixture as a digest-verifiable image. Its opt-in publisher does not
+promote a runtime bundle, change gateway routing or enable native acquisition.
 The local browser uploader publishes those exact bytes through the restricted
 storage identity and returns verified immutable artifact references.
 The browser-diagnostics assembler binds those references to the runner's

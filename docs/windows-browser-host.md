@@ -10,6 +10,8 @@
   host settings.
 - Assemble qualification and measurement evidence into an immutable environment
   artifact before upload.
+- Select the four-core 4K laptop profile explicitly at qualification and assembly;
+  the mainstream profile remains the default.
 - Upload and diagnostic-manifest steps preserve exact bytes and remain separate
   from control-plane registration.
 
@@ -17,6 +19,51 @@ Browser performance runs execute natively on an owned Windows machine rather
 than inside the local Linux kind cluster. The versioned
 `windows-mainstream/1.0.0` profile defines one controlled reference machine; it
 is not a statistical claim about the average customer laptop.
+
+## Select a comparison cohort
+
+Two separately identified profiles are available:
+
+| Profile | Minimum available logical cores | Display (resolution, scale, integer Hz) | Selection |
+|:--|:--|:--|:--|
+| `windows-mainstream/1.0.0` | 8 | 1920×1080, 1.25, 60 | Default |
+| `windows-four-core-4k/1.0.0` | 4 | 3840×2160, 1, 59 | Explicit `--profile` |
+
+[ADR 0008](decisions/0008-separate-four-core-4k-browser-cohort.md) records the
+separate laptop cohort. Both retain OS build at least 22631, 16 GiB total and
+8 GiB available memory, hardware acceleration, physical Windows x64 execution,
+headed Chrome for Testing, AC/Balanced power, synchronized clock and background
+CPU at most 10%. The 59 Hz value matches the Windows collector's integer
+observation, not a relaxed 59–60 Hz range. Confirm the intended display and
+100% scaling on the host; neither profile represents all Windows laptops.
+
+For the laptop, validate offline and then collect a fresh live report:
+
+```powershell
+uv run --locked python scripts/browser_host.py validate --profile profiles/browser/windows-four-core-4k.yaml
+uv run --locked python scripts/browser_host.py check --profile profiles/browser/windows-four-core-4k.yaml --output results/m03-four-core-4k-qualification.json
+```
+
+A different hardware profile does not waive other failures. OS build 22621
+and background CPU 20% still reject under this profile. Do not edit an existing
+report or use a recorded snapshot to qualify the laptop. This workflow does not
+update the OS or change host settings; resolving those gates is a separate
+operator action. Use a new output filename on each subsequent check.
+
+Carry the exact printed profile identity and fingerprint into the Playwright
+configuration; do not reuse the mainstream fingerprint or baseline. After real
+measurements complete, assemble with the same explicit selection:
+
+```powershell
+uv run --locked python scripts/browser_environment.py assemble --profile profiles/browser/windows-four-core-4k.yaml --qualification results/m03-four-core-4k-qualification.json --measurements results/playwright-measurements.json --output results/browser-environment-four-core-4k.json
+```
+
+Selecting the profile does not update a worker configuration, promote a runtime
+bundle or enable acquisition. Evidence from these two cohorts is not comparable
+as the same environment. To return to mainstream, select it for future runs;
+never relabel earlier evidence.
+
+## Qualify the default reference host
 
 Validate the profile on any development platform:
 

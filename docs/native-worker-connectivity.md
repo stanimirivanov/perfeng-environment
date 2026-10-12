@@ -171,6 +171,11 @@ for actual execution-host evidence.
 
 ## Promotion gates and credentials
 
+The controlled fixture now has [immutable image packaging](native-browser-candidate.md).
+The gateway still serves checkout files for pre-promotion checks. Deploy the
+published candidate digest and cut over the target route in the reviewed native
+selection before claiming that a Run tested that candidate image.
+
 The existing deployment lock still selects the earlier k6 image and bundle.
 This PR does not invent a published image digest or enable worker acquisition.
 Before running a native attempt, the subsequent release selection must:

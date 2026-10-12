@@ -11,7 +11,7 @@
   local evidence path.
 - M02 — Declarative Local Operations completed the reversible migration of local
   workload composition to Argo CD.
-- M03 through M05 are planned; M06 remains deliberately deferred until a real
+- M03 is in progress; M04 and M05 are planned. M06 remains deliberately deferred until a real
   non-local deployment is required.
 
 ## Ownership and update rules
@@ -39,7 +39,7 @@ only their local implementation and operating instructions.
 |:--|:--|:--|:--|
 | M01 — Local Performance Decision Loop | Complete | Execute k6, retain artifacts, normalize results, evaluate policies and baselines, and recover the control plane locally. | All current `perfeng-*` repositories |
 | M02 — Declarative Local Operations | Complete | Operate local workloads through reversible, observable GitOps ownership while preserving state and explicit recovery boundaries. | `perfeng-environment`, `perfeng-k8s`, `perfeng-control-plane` |
-| M03 — Native Browser Decision Loop | Planned | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
+| M03 — Native Browser Decision Loop | In progress | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M04 — Kubernetes Benchmark Decision Loop | Planned | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M05 — Operator Visibility and Diagnostics | Planned | Make runs, failures, decisions and correlated telemetry understandable without inspecting individual Pods or scripts. | Primarily `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis` |
 | M06 — Production Readiness | Deferred | Provide a secure, recoverable, upgradeable multi-user deployment when a non-local environment becomes an actual requirement. | All affected `perfeng-*` repositories and `k8s-infrastructure` |
@@ -150,12 +150,26 @@ HTTPS upload-signing origin is a completed control-plane prerequisite.
    Connectivity was advanced ahead of bundle promotion to obtain real inputs.
 3. `perfeng-contracts`: define worker-scoped discovery for a lost acquisition
    response before the attempt ID is known, without restoring lease authority.
+   Source complete in `143daa5`; bundle 0.21.0 / Native Worker API 2.2.0.
 4. `perfeng-control-plane`: implement discovery with durable worker-scoped,
    expiry and concurrency semantics.
+   Source complete in `365ecb8`; a verified Linux AMD64 image is published,
+   but this environment still selects the previous service and runtime bundle.
 5. `perfeng-playwright`: complete explicit manual recovery using authoritative
    server state and retained local evidence, with no inferred lease authority.
+   Source complete in `c918cdb`; functional Windows checks passed. Real
+   Windows/control-plane recovery acceptance remains part of batch 6.
 6. `perfeng-environment`: prove qualification through approved-baseline decision
    on a representative Windows host, including cancellation and restart recovery.
+
+Batch 2's controlled target now has [immutable candidate packaging](../native-browser-candidate.md).
+Publication, image-backed target deployment/gateway cutover and native runtime
+selection remain promotion gates. The current host report is REJECTED against
+`windows-mainstream/1.0.0`. The separately identified
+`windows-four-core-4k/1.0.0` profile now represents the available laptop's
+CPU/display conditions while retaining OS and calibration gates; a fresh
+accepted live capture is still required. Do not treat a qualification-report
+hash as a browser-environment artifact.
 
 M03 remains incomplete until live acceptance passes. An operator-started
 `run-once` worker and safe manual recovery are the intended scope; an unattended
