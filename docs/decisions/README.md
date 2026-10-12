@@ -102,3 +102,5 @@ How will the assumptions and consequences be verified?
 | [0004](0004-separate-kubernetes-infrastructure.md) | Accepted | Separate reusable Kubernetes substrates and GitOps bootstrap from Perfeng-specific environment composition. |
 | [0005](0005-adopt-k8s-infrastructure-name.md) | Accepted | Adopt the created `k8s-infrastructure` name and separate workspace membership from GitOps source authorization. |
 | [0006](0006-loopback-native-worker-connectivity.md) | Proposed | Use an opt-in loopback HTTPS gateway and controlled target for native Windows integration. |
+| [0007](0007-package-controlled-browser-candidate.md) | Proposed | Give the controlled fixture an honest immutable candidate image identity without prematurely promoting or deploying it. |
+| [0008](0008-separate-four-core-4k-browser-cohort.md) | Proposed | Define a separate explicitly selected four-core 4K laptop cohort without relaxing OS or calibration gates. |

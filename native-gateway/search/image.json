@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "repository": "ghcr.io/stanimirivanov/perfeng-native-search",
+  "platform": "linux/amd64",
+  "baseImage": "docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim@sha256:7f79f463c6eb0d0bf8782992bb9636434398e3e5848398805aef2c9b025d8609"
+}

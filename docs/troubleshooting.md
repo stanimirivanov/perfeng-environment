@@ -23,6 +23,22 @@
 
 ## Scope and command safety
 
+For candidate image build/publication or rejected browser-host qualification,
+follow the [candidate guide](native-browser-candidate.md). GUID braces/case are
+equivalent power-plan identity; hardware, OS, display and calibration mismatches
+still require review. Never edit a rejected report to qualify a run. Image
+functional verification does not replace base/runtime advisory review.
+
+For the four-core 4K laptop, select
+`--profile profiles/browser/windows-four-core-4k.yaml` as documented in the
+[host guide](windows-browser-host.md#select-a-comparison-cohort). Use it for both
+the live host check and environment assembly, and match the runner's profile
+identity/fingerprint. A missing selection still uses mainstream and will reject
+the different hardware. OS build 22621 or background CPU 20% still rejects the
+laptop profile; resolve the independent gate before making a fresh capture.
+Never alter the earlier report, reuse its hash as environment evidence or mix
+the two cohorts' baselines. These checks do not modify host settings.
+
 This runbook diagnoses the supported local Windows and kind environment. It is
 not a production incident procedure. Start PowerShell in the repository root:
 

@@ -26,9 +26,18 @@ Unavailable checks follow the constrained-environment protocol in
 
 ## Harness principles
 
+`make native-target-image-check` is a separate explicit Docker build and isolated
+loopback image verification tier. It can fetch the pinned base and is not an
+offline validation aggregate. CI exercises it without publishing or deploying;
+the main-only publisher requires an explicit publication choice.
+
 The root Makefile is the stable engineering command surface. CI invokes those targets instead of duplicating their internals. Repository validation stays offline and does not infer that a live cluster is healthy. Live Task commands remain separate because they require credentials, inspect external state, or mutate retained resources.
 
 Checks should fail with the affected path, violated invariant, likely correction, and canonical guidance. New checks must be deterministic, cross-platform when part of `make verify`, and covered by focused tests. Do not weaken a check because a sandbox lacks its prerequisite.
+
+`make check` validates both checked-in browser cohorts offline. The optional
+laptop cohort does not replace the mainstream CLI default; live qualification
+and assembly require the same explicit profile selection.
 
 ## Extending the harness
 

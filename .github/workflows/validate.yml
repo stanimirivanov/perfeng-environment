@@ -112,3 +112,20 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Audit locked dependencies
         run: make supply-chain
+
+  native-target-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uv sync --locked
+      - name: Build and verify candidate without publishing or deploying
+        run: uv run --locked --offline python scripts/native_target.py build --image "perfeng-native-search:ci-${{ github.sha }}" --revision "${{ github.sha }}" --execute
