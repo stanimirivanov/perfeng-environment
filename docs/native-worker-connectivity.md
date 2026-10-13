@@ -3,7 +3,8 @@
 ## TL;DR
 
 - The worker and Docker Desktop must run on the same Windows host; this is not LAN ingress.
-- Deploy/verify the [selected image-backed target](local-native-target.md), then start `task native:api`, `task native:s3`, `task native:target` and `task native:gateway` in separate terminals.
+- Select the first audited serving release, run `task native:setup`, then `task native:doctor` and `task native:up` in one foreground terminal.
+- The supervisor owns three tunnels and Caddy, reports readiness and stops only its children. No PATH change or local Go build is required.
 - Caddy generates a private CA but does not install trust. Review its fingerprint before trusting it.
 - Use `https://127.0.0.1:8443` for the API, `:9443` for S3 uploads and `:10443/` for the search target.
 - `task native:check` proves selected target image/Pod identity, trusted TLS, API readiness, exact fixture bytes and anonymous S3 denial only.
@@ -17,9 +18,9 @@ cluster, expose NodePorts or compete with Argo CD. All listeners bind IPv4
 loopback. A worker on a different machine needs a separately reviewed topology.
 
 Complete the [local platform setup](local-control-plane.md) and confirm Docker,
-the dedicated kubeconfig and the existing Services are healthy. Install the
-reviewed Caddy 2.11.7 CLI on the execution host; Python never downloads tools or
-installs trust. Caddy is an Apache-2.0, maintained HTTPS server replacing the
+the dedicated kubeconfig and the existing Services are healthy. The explicit
+managed setup acquires the reviewed Caddy 2.11.7 CLI; preview, doctor and startup
+never download tools or install trust. Caddy is an Apache-2.0, maintained HTTPS server replacing the
 need for a custom proxy. The replacement boundary is the small Caddyfile, not
 application code. See its [release](https://github.com/caddyserver/caddy/releases/tag/v2.11.7),
 [Host-forwarding behavior](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
@@ -33,38 +34,58 @@ not absence of vulnerabilities. In particular, use a patched Go toolchain when
 building Caddy from the reviewed release; an upstream release built before a Go
 security fix does not inherit the control-plane dependency update.
 
-The currently verified official archive reports Go 1.26.8. The `gateway` action
-therefore refuses it for live serving, while `validate` permits offline
-adaptation. Build the reviewed Caddy source with Go >=1.26.9 and x/net >=v0.60.0
-without module replacements. This minimum-version gate addresses known findings;
-it is not an advisory audit of the rest of the binary.
+The official adaptation archive reports Go 1.26.8 and is not a serving fallback.
+Serving has a separate reviewed asset/checksum/source selection in
+`native-gateway/serving-release.json`. The publisher builds the standard entry
+point as a dependency using locked modules, Go 1.26.9 and x/net >=v0.60.0,
+without replacements. It checks real version/build output, audits the resulting
+executable and exercises isolated Windows TLS startup/shutdown. Local setup
+checks the selected bytes and metadata again. Build minima and a past audit do
+not prove freedom from future advisories; security updates require release review.
 
-Example source build on a host with Go installed, from the repository root
-(creates an isolated local build module under ignored state, not Git or Kubernetes):
+## Managed setup
+
+[ADR 0010](decisions/0010-manage-native-connectivity-workflow.md) defines this
+workflow. The checked-in release starts unselected deliberately: no unpublished
+binary or fabricated checksum can be installed.
+
+One-time release-owner handoff, after merging the implementation:
+
+1. Run **Build and optionally publish verified native gateway** on `main`, with
+   `publish=true`. It refuses to overwrite existing releases. PR/push runs only
+   build, audit and test; they never publish.
+2. Download the `gateway-release-selection` artifact. Review its source revision,
+   asset ID/checksum and workflow audit/TLS evidence. Keep it under ignored `results`.
+3. Preview then apply the exact selection, review the Git diff and commit it:
 
 ```powershell
-$env:GOTOOLCHAIN = "go1.26.9"
-New-Item -ItemType Directory .local/native-gateway/build
-Push-Location .local/native-gateway/build
-go mod init local.perfeng/caddy-build
-go get github.com/caddyserver/caddy/v2@v2.11.7 golang.org/x/net@v0.60.0
-go build -o ../caddy.exe github.com/caddyserver/caddy/v2/cmd/caddy
-Pop-Location
-$env:PATH = (Resolve-Path .local/native-gateway).Path + ";" + $env:PATH
-caddy version
-caddy build-info
+uv run --locked python -m scripts.native_gateway_release select --file results/release-selection.json
+uv run --locked python -m scripts.native_gateway_release select --file results/release-selection.json --execute
 ```
 
-Use the dependency review process for later Go or Caddy updates; do not silently
-substitute `latest`. Confirm the selected binary is built with the patched
-toolchain before serving. Audit the resulting binary with the reviewed scanner
-in `perfeng-control-plane` (`go tool -modfile=tools/quality/go.mod govulncheck
--mode=binary <absolute-path-to-caddy.exe>` from that repository). Require no
-findings, and review unexpected dependencies rather than bypassing the gate.
-The local build directory must be new; inspect an existing directory instead
-of deleting or reinitializing it. Record its module selections with local
-acceptance evidence. `make native-gateway-check` adapts the Caddyfile using
-the selected CLI, without provisioning certificates or opening a listener.
+Operator setup needs Windows AMD64, uv, Task and the existing cluster tools—not Go.
+Private release downloads use the existing repository **contents-read** token,
+not a packages-only GHCR token. If it is not already set in this terminal:
+
+```powershell
+$gatewayToken = Read-Host "Repository contents-read token" -AsSecureString
+$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = [System.Net.NetworkCredential]::new("", $gatewayToken).Password
+task native:setup
+task native:doctor
+```
+
+Setup installs under `.local/native-gateway/tools/<sha256>/caddy.exe`, checks
+bytes before execution and uses an absolute path thereafter. Repeating setup
+reuses verified bytes. Modified installations and unknown existing builds are
+not overwritten. New gateway state is created privately; existing state is
+never repaired implicitly. If doctor reports a permission problem, review the
+directory and any earlier CA exposure, then explicitly use `task native:permissions`.
+It restricts the root to this account, SYSTEM and administrators, retains every
+file and checks child ACLs. Separately protected/broad child ACLs require manual
+review. No certificate trust is installed. Do not trust previously exposed keys.
+
+The setup token is not needed after installation; clear it when no longer needed:
+`Remove-Item Env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN`.
 
 ## Preview and start
 
@@ -78,20 +99,26 @@ uv run --locked python scripts/native_connectivity.py gateway
 uv run --locked python scripts/native_connectivity.py check
 ```
 
-Start each of these in its own terminal, from this repository:
+Normal operation uses one foreground terminal, from this repository:
 
 ```powershell
-task native:api
-task native:s3
-task native:target
-task native:gateway
+task native:doctor
+task native:up
 ```
 
-Each session stays in the foreground, ends after at most one hour and can be
-stopped with Ctrl+C. It does not become a Windows service or automatically
-restart. The forwards verify local Docker, the dedicated kind kubeconfig and
-the expected Service identity before opening a tunnel. Restart them after a
-Pod replacement. Gateway state and CA keys remain under ignored
+Doctor reports every independent prerequisite as PASS, FAIL, ACTION REQUIRED or
+NOT CHECKED. Cluster reads have explicit command budgets; a foreign/unavailable
+cluster prevents resource reads. Missing Windows/Node trust is a separate browser
+action, not permission to bypass TLS. Occupied ports are conflicts: stop your old
+independent forwarding/gateway sessions first; no foreign listener is adopted.
+
+Up verifies state/tool/resource identities, owns three tunnels and Caddy, waits
+for endpoints and checks CA-backed TLS, exact content and anonymous denial.
+Only then does it print CONNECTIVITY READY and URLs. It stays in the foreground,
+ends after at most one hour and stops all its children on Ctrl+C, partial startup
+failure or any child exit. Windows Job ownership also cleans up assigned children
+if the supervisor is terminated. It is not a service or automatic restart loop.
+Restart the session after a target Pod replacement. Gateway state and CA keys remain under ignored
 `.local/native-gateway/caddy-data`; do not commit, copy or delete that private
 state as an implicit repair.
 
@@ -120,7 +147,8 @@ ACL for `.local/native-gateway` to the execution account and necessary system
 administrators using the directory's Security settings. Verify that broad
 workspace read permissions are not inherited by private key files. The wrapper
 rejects redirected state but does not rewrite Windows ACLs; key access is an
-explicit host-setup responsibility. Do not trust a CA whose private key has been
+explicit host-setup responsibility. The managed doctor/up also verify private
+gateway permissions. Do not trust a CA whose private key has been
 exposed to other untrusted users.
 
 Inspect that file and its fingerprint locally. The `.key` files are private and
@@ -215,6 +243,18 @@ published image or qualification identities block promotion, not gateway use.
 
 ## Failure and recovery
 
+Start with `task native:doctor`; it reports the exact executable/checksum/build,
+dedicated API, resources, ports, CA fingerprint and trust actions without repair.
+Errors have fixed classifications and next actions. Unknown display versions are
+not accepted merely because compilation succeeded. Missing tools, rejected bytes,
+timeouts, port conflicts and child exits are distinct failures, not a generic
+"external output withheld" diagnosis. Only safe fixed tool metadata and
+credential-free probe results are shown; raw Caddy request logs stay disabled.
+
+The old `native:api`, `native:s3`, `native:target` and `native:gateway` tasks remain
+advanced single-boundary diagnostics. They are not the normal onboarding path;
+do not run them concurrently with `native:up` on the same ports.
+
 The probe sends only credential-free GETs, refuses redirects and environment
 proxies, reads at most 64 KiB per response and has a 10-second timeout per
 request. It requires exact API readiness bytes, exact target files and an S3
@@ -234,7 +274,7 @@ authentication, signed upload and acquisition remain unverified.
   upstream and selected service image. Do not log the grant or retry by changing
   its URL. Use the worker's supported retry/retained-evidence behavior.
 
-Stopping the four sessions removes exposure without changing workloads,
+Stopping the supervised session (or the four advanced sessions) removes exposure without changing workloads,
 objects, PVCs, Secrets or Applications. CA trust is retained deliberately. To
 remove it, identify the exact installed certificate fingerprint and review
 `certutil -user -delstore Root <that-fingerprint>` before executing it; never
@@ -245,6 +285,8 @@ delete unrelated roots or rotate the gateway CA automatically. Clear
 
 - `make verify`: deterministic preview, identity, transport, fixture and Task tests.
 - `make native-gateway-check`: real Caddyfile adaptation, offline and no trust/state provisioning.
+- Windows gateway workflow: actual locked binary build/audit and isolated TLS/Host/URI plus owned-child cleanup; no cluster or system trust.
+- `task native:doctor`/`task native:up`: explicit prerequisite inspection and supervised connectivity only, not worker/qualification acceptance.
 - `task native:check`: explicit live TLS/readiness/fixture/anonymous-denial checks.
 - Final M03 acceptance: actual qualified browser execution, signed upload,
   internal read-back, normalization, baseline decision, cancellation and recovery.

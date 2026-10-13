@@ -23,6 +23,23 @@
 
 ## Scope and command safety
 
+For native gateway failures, start with **read-only** `task native:doctor`.
+It reports independent tool/checksum/build, private-state, Docker, dedicated API,
+resource, port and trust checks. `RELEASE_UNSELECTED` means the first audited
+serving binary has not been published/selected, not that Docker needs resetting.
+`TOOL_VERSION` includes expected/observed metadata and executable path; a manual
+build may print `unknown`. Do not recompile by hand or change PATH: use the
+[managed setup and release selection](native-worker-connectivity.md#managed-setup).
+`PORT_CONFLICT` requires inspection of the exact listener, not killing every
+Caddy/kubectl process. Stop your old independent sessions before `native:up`.
+`STATE_PERMISSIONS`/`HOST_SECURITY` require review of the gateway directory's
+Security settings; `task native:permissions` is a separately prompted local
+permission change, never an implicit doctor repair. Previously exposed CA keys
+require a separate trust/CA review, not an automatic rotation. API/cluster probes
+have bounded command budgets; failures retain all cluster data. `native:up`
+stops its own children on failure, interruption or one-hour expiry and retains CA.
+
+
 For image-backed target failures, use [the local native target guide](local-native-target.md).
 Run `task native:target-health` before `task native:target`; candidate package
 access, ready platform digest and UID controller ownership must agree. Restart

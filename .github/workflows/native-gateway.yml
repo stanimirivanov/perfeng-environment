@@ -1,0 +1,96 @@
+name: Build and optionally publish verified native gateway
+
+on:
+  pull_request:
+    paths: [native-gateway/**, scripts/native_gateway*.py, scripts/native_connectivity.py, tests/test_native_gateway*.py, .github/workflows/native-gateway.yml]
+  push:
+    branches: [main]
+    paths: [native-gateway/**, scripts/native_gateway*.py, scripts/native_connectivity.py, .github/workflows/native-gateway.yml]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a verified main-only Windows gateway release
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows-serving:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.9'
+          cache-dependency-path: |
+            native-gateway/build/go.sum
+            native-gateway/audit/go.sum
+      - run: uv sync --locked
+      - name: Verify repository and real child ownership
+        run: |
+          $formatted = gofmt -l native-gateway/build/main.go
+          if ($LASTEXITCODE -ne 0 -or $formatted) { throw 'Caddy entry point needs gofmt' }
+          uv run --locked --offline ruff check .
+          if ($LASTEXITCODE -ne 0) { throw 'Static checks failed' }
+          uv run --locked --offline python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+      - name: Build locked serving binary and audit its actual dependencies
+        shell: pwsh
+        run: |
+          uv run --locked --offline python -m scripts.native_gateway_release build --output .local/gateway-package --revision $env:GITHUB_SHA --execute
+          if ($LASTEXITCODE -ne 0) { throw 'Gateway build/audit failed' }
+          git diff --exit-code -- native-gateway/build native-gateway/audit
+          if ($LASTEXITCODE -ne 0) { throw 'Gateway locks changed during build' }
+      - name: Exercise actual isolated Windows TLS startup and shutdown
+        run: uv run --locked --offline python -m scripts.native_gateway_smoke --binary .local/gateway-package/caddy.exe --execute
+      - uses: actions/upload-artifact@v6
+        with:
+          name: verified-windows-gateway
+          path: .local/gateway-package/
+          retention-days: 7
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: windows-serving
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: verified-windows-gateway
+          path: package
+      - name: Publish only a new audited release and produce reviewable selection
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $record = Get-Content package/build-record.json -Raw | ConvertFrom-Json
+          if ($record.sourceRevision -ne $env:GITHUB_SHA -or $record.audit.status -ne 'passed' -or $record.development -ne $false) { throw 'Unexpected build provenance or dirty source' }
+          if ((Get-FileHash package/caddy.exe -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record.sha256) { throw 'Artifact checksum mismatch' }
+          $tag = "native-gateway-$($env:GITHUB_SHA)"
+          gh release create $tag package/caddy.exe package/build-record.json --target $env:GITHUB_SHA --title "Verified Windows Caddy $($record.caddyVersion) / $($record.goVersion)" --notes 'Audited locked build; isolated Windows TLS/Host/URI and cleanup checks passed. This release does not select itself or install trust.'
+          if ($LASTEXITCODE -ne 0) { throw 'Publication failed; existing releases are never overwritten' }
+          $assetId = gh api "repos/$env:GH_REPO/releases/tags/$tag" --jq '.assets[] | select(.name == "caddy.exe") | .id'
+          if ($LASTEXITCODE -ne 0) { throw 'Asset lookup failed' }
+          $selection = [ordered]@{ schemaVersion = 1; platform = 'windows/amd64'; caddyVersion = $record.caddyVersion; goVersion = $record.goVersion; release = [ordered]@{ tag = $tag; assetId = [long]$assetId; sha256 = $record.sha256; sizeBytes = $record.sizeBytes; sourceRevision = $record.sourceRevision } }
+          $selection | ConvertTo-Json -Depth 5 | Set-Content release-selection.json -Encoding utf8NoBOM
+          "Verified gateway SHA-256: $($record.sha256)`n`nSource revision: $($record.sourceRevision)`n`nRelease: $tag`n`nDownload the selection artifact, review it, then run python -m scripts.native_gateway_release select --file <path-to-release-selection.json> --execute and commit the lock. No local/cluster/trust state is changed by selection." | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - uses: actions/upload-artifact@v6
+        with:
+          name: gateway-release-selection
+          path: release-selection.json
+          retention-days: 30

@@ -26,6 +26,16 @@ Unavailable checks follow the constrained-environment protocol in
 
 ## Harness principles
 
+The explicit `native-gateway.yml` Windows tier builds the serving binary from
+locked Go inputs, audits it and exercises real isolated TLS/Host/URI and child
+cleanup. It creates temporary loopback listeners/CA state but never changes a
+trust store or contacts Kubernetes. This is separate from offline adaptation
+and `make verify`; the main-only publication job requires `publish=true`.
+Operators use `native:setup`, `native:doctor` and `native:up` after the first
+reviewed serving release has been selected. Production connectivity and M03
+acceptance remain separate live tiers.
+
+
 `make native-target-image-check` is a separate explicit Docker build and isolated
 loopback image verification tier. It can fetch the pinned base and is not an
 offline validation aggregate. CI exercises it without publishing or deploying;

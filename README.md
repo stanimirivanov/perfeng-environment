@@ -53,6 +53,10 @@ The default mainstream cohort is preserved; the separately versioned four-core
 The opt-in [native connectivity gateway](docs/native-worker-connectivity.md)
 provides loopback HTTPS API/storage access and a controlled search target on
 the same Windows host. It does not install trust or enable native acquisition.
+Use `task native:setup`, `task native:doctor`, then `task native:up` for the
+managed workflow. The first serving release must be explicitly published and
+selected; until then setup fails closed. No manual Go build or PATH change is
+part of normal operation. Existing gateway CA state is retained.
 The browser-environment assembler binds an accepted qualification to the actual
 Playwright runtime without inventing missing host or browser values.
 The [controlled browser candidate](docs/native-browser-candidate.md) packages

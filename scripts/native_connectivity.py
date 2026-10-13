@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
+import shutil
 import ssl
 import subprocess
 import urllib.error
@@ -12,10 +12,19 @@ import urllib.request
 from pathlib import Path
 
 if __package__:
-    from . import cluster, control_plane_health, native_target_health, native_target_release
+    from . import (
+        cluster,
+        control_plane_health,
+        native_gateway_host,
+        native_gateway_tool,
+        native_target_health,
+        native_target_release,
+    )
 else:
     import cluster
     import control_plane_health
+    import native_gateway_host
+    import native_gateway_tool
     import native_target_health
     import native_target_release
 
@@ -115,55 +124,35 @@ def verify_forward(action: str, root: Path) -> str | None:
             raise ValueError("SeaweedFS Service differs from the reviewed local release")
 
 
-def verify_serving_build(build_info: str) -> None:
-    """Reject known-vulnerable Go/x/net builds; this is not a substitute for an advisory audit."""
-    go = re.search(r"^go\s+go(\d+)\.(\d+)\.(\d+)\s*$", build_info, re.MULTILINE)
-    net = re.search(r"^dep\s+golang.org/x/net\s+v(\d+)\.(\d+)\.(\d+)\s", build_info, re.MULTILINE)
-    if (
-        go is None
-        or tuple(map(int, go.groups())) < (1, 26, 9)
-        or net is None
-        or tuple(map(int, net.groups())) < (0, 60, 0)
-        or re.search(r"^=>", build_info, re.MULTILINE)
-    ):
-        raise ValueError(
-            "Caddy serving requires reviewed Go >=1.26.9 and x/net >=v0.60.0 without replacements; see the connectivity guide"
-        )
-
-
 def run_tool(action: str, root: Path = ROOT) -> None:
     """Run one bounded foreground session or offline adaptation; never install trust or tools."""
+    invocation = command(action, root)
     if action in FORWARDS:
         pod = verify_forward(action, root)
+        if action == "forward-target":
+            invocation[-2] = f"pod/{pod}"
+    elif action == "gateway":
+        invocation[0] = str(native_gateway_tool.installed(root))
+        native_gateway_host.private_permissions(root)
     else:
-        version = subprocess.run(["caddy", "version"], capture_output=True, check=True, timeout=10)
-        observed_version = version.stdout.decode("utf-8").split()
-        if not observed_version or observed_version[0] != CADDY_VERSION:
-            raise ValueError(f"Use reviewed Caddy {CADDY_VERSION}")
-        state = root / ".local/native-gateway"
-        for path in (root / ".local", state):
-            if path.resolve() != path or path.is_symlink():
-                raise ValueError("Redirected gateway state is not allowed")
-        if state.exists() and any(
-            path.is_symlink() or path.is_junction() for path in state.rglob("*")
-        ):
-            raise ValueError("Redirected gateway state is not allowed")
-        if action == "gateway":
-            build_info = subprocess.run(
-                ["caddy", "build-info"], capture_output=True, check=True, timeout=10
+        binary = shutil.which("caddy")
+        if binary is None:
+            raise native_gateway_tool.GatewayError(
+                "TOOL_MISSING",
+                "Offline Caddy CLI is missing",
+                "use the checksum-verified CI adaptation tool",
             )
-            verify_serving_build(build_info.stdout.decode("utf-8"))
+        invocation[0] = str(Path(binary).resolve())
+        native_gateway_tool.metadata(Path(binary), serving=False)
     timeout = 10 if action == "validate" else SESSION_SECONDS
     print(f"Starting {action}; stop with Ctrl+C (maximum {timeout}s).", flush=True)
     subprocess.run(
-        (
-            [*command(action, root)[:-2], f"pod/{pod}", FORWARDS[action][1]]
-            if action == "forward-target"
-            else command(action, root)
-        ),
+        invocation,
         cwd=root,
         check=True,
         timeout=timeout,
+        stdout=subprocess.DEVNULL if action == "gateway" else None,
+        stderr=subprocess.DEVNULL if action == "gateway" else None,
     )
 
 
@@ -184,10 +173,14 @@ def read_endpoint(url: str, context: ssl.SSLContext) -> tuple[int, bytes]:
         ) from None
 
 
-def check(ca_file: Path, root: Path = ROOT) -> None:
+def check(ca_file: Path, root: Path = ROOT, expected_pod: str | None = None) -> None:
     """Check TLS, readiness, anonymous S3 denial and exact target bytes; no objects are written."""
     files = native_target_release.expected_files(root)
     before = native_target_health.verify(root)
+    if expected_pod is not None and before != expected_pod:
+        raise ValueError(
+            "Native target Pod changed before the connectivity check; restart its forward"
+        )
     context = ssl.create_default_context(cafile=str(ca_file))
     checks = [("control plane", ORIGINS["controlPlane"] + "/readyz", b"ok\n")]
     checks.extend(
@@ -200,11 +193,25 @@ def check(ca_file: Path, root: Path = ROOT) -> None:
         expected = files[name]
         checks.append((name, ORIGINS["target"] + "/" + name, expected))
     for label, url, expected in checks:
-        status, content = read_endpoint(url, context)
+        try:
+            status, content = read_endpoint(url, context)
+        except ValueError:
+            raise native_gateway_tool.GatewayError(
+                "TLS_ENDPOINT",
+                f"{label} at the selected loopback origin is unavailable",
+                "inspect its tunnel and reviewed CA; do not bypass TLS",
+            ) from None
         if status != 200 or len(content) > MAX_RESPONSE_BYTES or content != expected:
             raise ValueError(f"Unexpected {label} response; check gateway and selected fixture")
         print(f"Verified TLS and {label}.", flush=True)
-    status, content = read_endpoint(ORIGINS["s3"] + "/perfeng-artifacts", context)
+    try:
+        status, content = read_endpoint(ORIGINS["s3"] + "/perfeng-artifacts", context)
+    except ValueError:
+        raise native_gateway_tool.GatewayError(
+            "TLS_ENDPOINT",
+            "S3 at the selected loopback origin is unavailable",
+            "inspect the S3 tunnel and reviewed CA; do not bypass TLS",
+        ) from None
     if (
         status != 403
         or len(content) > MAX_RESPONSE_BYTES

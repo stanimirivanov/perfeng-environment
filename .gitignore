@@ -23,6 +23,7 @@ htmlcov/
 
 # Build and temporary output
 build/
+!/native-gateway/build/
 dist/
 *.egg-info/
 *.tmp
