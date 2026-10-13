@@ -56,8 +56,10 @@ the same Windows host. It does not install trust or enable native acquisition.
 The browser-environment assembler binds an accepted qualification to the actual
 Playwright runtime without inventing missing host or browser values.
 The [controlled browser candidate](docs/native-browser-candidate.md) packages
-the search fixture as a digest-verifiable image. Its opt-in publisher does not
-promote a runtime bundle, change gateway routing or enable native acquisition.
+the search fixture as a digest-verifiable image. The separate
+[native target selection](docs/local-native-target.md) pins its chart/image in
+Argo CD and proxies HTTPS to an identity-checked Pod. Neither its opt-in publisher
+nor target deployment promotes a native runtime bundle or enables acquisition.
 The local browser uploader publishes those exact bytes through the restricted
 storage identity and returns verified immutable artifact references.
 The browser-diagnostics assembler binds those references to the runner's

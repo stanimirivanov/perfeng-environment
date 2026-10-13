@@ -61,6 +61,16 @@ tasks:
     cmds:
       - uv run --locked python scripts/native_connectivity.py gateway --execute
 
+  native:target:
+    desc: Verify the selected image-backed target and forward its exact Pod to loopback
+    cmds:
+      - uv run --locked python scripts/native_connectivity.py forward-target --execute
+
+  native:target-health:
+    desc: Verify candidate registry access and owned ready resources without modifying them
+    cmds:
+      - uv run --locked python scripts/native_target_health.py --execute
+
   native:check:
     desc: Check trusted TLS, readiness, exact target bytes and anonymous storage denial
     cmds:

@@ -16,8 +16,9 @@
   policy and control-plane preparation before `task status` or `task smoke`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
-- All four workload Applications synchronize and self-heal automatically. The
-  root does not self-heal, and destructive pruning remains disabled everywhere.
+- The four established workload Applications synchronize and self-heal automatically.
+  The new [native target](local-native-target.md) also synchronizes, but its initial
+  self-healing is disabled. The root does not self-heal; pruning remains disabled everywhere.
 - Use the [troubleshooting runbook](troubleshooting.md) to distinguish delayed
   reconciliation, persistent drift and an unhealthy Argo CD controller.
 
@@ -69,6 +70,8 @@ consumer validation verifies:
   stateful self-healing policy;
 - control-plane chart commit, image digest, runtime resource names, registry
   mounts, destination and sync policy against the reviewed deployment lock;
+- native-target chart commit, candidate digest/provenance and external pull
+  Secret against its separate lock, with no initial self-healing;
 - exact ownership of the four reviewed local namespaces;
 - a least-privilege AppProject source allowlist containing exactly the
   repositories referenced by its child Applications.
@@ -147,7 +150,7 @@ uv run --locked python scripts/control_plane_smoke.py --execute
 During the staged interval, `perfeng-local-control-plane` may be `Degraded`
 because its external Secrets, database schema and runtime ConfigMaps do not yet
 exist. The bootstrap command does not wait for or claim success for that
-Application. Final GitOps health remains fail-closed and requires all five
+Application. Final GitOps health remains fail-closed and requires the root plus all five workload
 Applications and every workload acceptance check.
 
 Neither stateful bootstrap action creates a workload, PVC or bucket. Repeating

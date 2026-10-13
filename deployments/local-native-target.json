@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "schemaVersion": 1,
+    "name": "perfeng-native-search",
+    "version": "1.0.0",
+    "image": "ghcr.io/stanimirivanov/perfeng-native-search@sha256:3f6179c9f3784be884761e7c6ceb4229c48631b8290d5cc65d0b488eef3b4386",
+    "source": {
+      "repository": "https://github.com/stanimirivanov/perfeng-environment",
+      "gitSha": "753022c24bbf2f30fd3a620e0788f9b53ae16dd7"
+    },
+    "targetSha256": "ff03e1d7a7544557a3f035218b6b3e3bcce7e434996be5dd3b895af10cbc0fb4",
+    "platform": "linux/amd64"
+  },
+  "deployment": {
+    "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
+    "revision": "a20633e150db4e940aba4355a32a7931b9a7f45a",
+    "chart": {"path": "charts/native-search", "version": "1.0.0"},
+    "namespace": "perf-platform",
+    "releaseName": "native-search",
+    "imagePullSecret": "perfeng-control-plane-registry"
+  }
+}

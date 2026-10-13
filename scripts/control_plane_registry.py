@@ -7,6 +7,7 @@ import base64
 import getpass
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -151,13 +152,18 @@ def verify_registry_credentials(
     token: str,
     image: str,
     opener: Callable[..., Any] = urllib.request.urlopen,
-) -> None:
-    """Authenticate to GHCR and verify access to the locked manifest digest."""
+) -> bytes:
+    """Verify a reviewed platform package digest and return its bounded manifest bytes."""
+    selected = re.fullmatch(
+        r"ghcr\.io/(stanimirivanov/(?:perfeng-control-plane|perfeng-native-search))@sha256:([0-9a-f]{64})",
+        image,
+    )
+    if selected is None:
+        raise ValueError("Registry verification requires a reviewed digest-only platform image")
+    repository, digest = selected.groups()
     config = docker_config(username, token)
     authorization = config["auths"][REGISTRY]["auth"]
-    query = urllib.parse.urlencode(
-        {"service": REGISTRY, "scope": f"repository:{IMAGE_REPOSITORY}:pull"}
-    )
+    query = urllib.parse.urlencode({"service": REGISTRY, "scope": f"repository:{repository}:pull"})
     token_request = urllib.request.Request(
         f"{TOKEN_ENDPOINT}?{query}",
         headers={"Authorization": f"Basic {authorization}"},
@@ -169,22 +175,24 @@ def verify_registry_credentials(
         if not isinstance(bearer, str) or not valid_token(bearer):
             raise ValueError("GHCR returned an invalid bearer credential")
 
-        digest = image.rsplit("@sha256:", 1)[1]
         manifest_request = urllib.request.Request(
-            f"https://{REGISTRY}/v2/{IMAGE_REPOSITORY}/manifests/sha256:{digest}",
+            f"https://{REGISTRY}/v2/{repository}/manifests/sha256:{digest}",
             headers={
                 "Authorization": f"Bearer {bearer}",
                 "Accept": (
                     "application/vnd.oci.image.index.v1+json, "
-                    "application/vnd.oci.image.manifest.v1+json"
+                    "application/vnd.oci.image.manifest.v1+json, "
+                    "application/vnd.docker.distribution.manifest.list.v2+json, "
+                    "application/vnd.docker.distribution.manifest.v2+json"
                 ),
             },
         )
         with opener(manifest_request, timeout=30) as response:
-            read_response(response, MANIFEST_LIMIT)
+            content = read_response(response, MANIFEST_LIMIT)
             actual = response.headers.get("Docker-Content-Digest")
         if actual != f"sha256:{digest}":
             raise ValueError("GHCR returned a different manifest digest")
+        return content
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as error:
         raise ValueError("GHCR authentication or manifest verification failed") from error
 

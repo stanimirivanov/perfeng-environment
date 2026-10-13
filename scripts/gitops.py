@@ -13,7 +13,14 @@ from typing import Any
 import yaml
 
 if __package__:
-    from . import cluster, control_plane_health, gitops_status, object_store, postgres
+    from . import (
+        cluster,
+        control_plane_health,
+        gitops_status,
+        native_target_release,
+        object_store,
+        postgres,
+    )
     from .control_plane_registry import valid_token
     from .control_plane_release import (
         CONTROL_PLANE_HTTP_PORT,
@@ -25,6 +32,7 @@ else:
     import cluster
     import control_plane_health
     import gitops_status
+    import native_target_release
     import object_store
     import postgres
     from control_plane_registry import valid_token
@@ -256,11 +264,15 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
     postgres_application = load_yaml(root / "gitops/environments/local/postgres-application.yaml")
     seaweedfs_application = load_yaml(root / "gitops/environments/local/seaweedfs-application.yaml")
     control_plane = load_yaml(root / "gitops/environments/local/control-plane-application.yaml")
+    native_search = load_yaml(root / "gitops/environments/local/native-search-application.yaml")
+    native_selection = native_target_release.load_selection(
+        root / "deployments/local-native-target.json"
+    )
     release = load_lock(root / "deployments/local-control-plane.json")
     project_spec = project.get("spec", {})
     validate_project_sources(
         project_spec,
-        [sample_sut, postgres_application, seaweedfs_application, control_plane],
+        [sample_sut, postgres_application, seaweedfs_application, control_plane, native_search],
     )
     if (
         root_kustomization.get("resources")
@@ -271,6 +283,7 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
             "postgres-application.yaml",
             "seaweedfs-application.yaml",
             "control-plane-application.yaml",
+            "native-search-application.yaml",
         ]
         or project.get("kind") != "AppProject"
         or project.get("metadata", {}).get("name") != "perfeng-local"
@@ -325,6 +338,8 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
     validate_postgres_application(postgres_application)
     validate_seaweedfs_application(seaweedfs_application)
     validate_control_plane_application(control_plane, release)
+    native_target_release.validate_application(native_search, native_selection)
+    native_target_release.expected_files(root)
 
 
 def credential_document(token: str) -> dict[str, Any]:
@@ -455,6 +470,7 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
         print("Local Argo CD GitOps action completed: bootstrap", flush=True)
         return
     gitops_status.wait_for_application(kube, CONTROL_PLANE_APPLICATION)
+    gitops_status.wait_for_application(kube, native_target_release.APPLICATION)
     cluster.run(
         [
             *kubectl(root, namespace="perf-sut"),

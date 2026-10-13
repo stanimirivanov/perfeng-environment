@@ -20,6 +20,7 @@
 | Control-plane deployment or runtime inputs | [Local control plane](local-control-plane.md) | Deployment lock and pinned sibling validation |
 | k6, browser, or Kubernetes evidence workflows | [Local k6 run](local-k6-run.md), [Windows browser host](windows-browser-host.md), [local kube-burner](local-kube-burner.md) | Relevant tests and focused acceptance guide |
 | Windows worker HTTPS access or controlled browser target | [Native connectivity](native-worker-connectivity.md), [ADR 0006](decisions/0006-loopback-native-worker-connectivity.md) | Gateway adaptation, live preflight and final promotion gates |
+| Image-backed target selection, deployment or forwarding | [Local native target](local-native-target.md), [ADR 0009](decisions/0009-select-image-backed-native-target.md) | Pinned release checks, candidate health and exact HTTPS content |
 | Milestones or cross-repository sequencing | [Milestones](roadmap/milestones.md) | Relevant ADRs and component repositories |
 | Operational failure or live recovery | [Troubleshooting](troubleshooting.md) | The focused operating guide; live commands require explicit authorization |
 

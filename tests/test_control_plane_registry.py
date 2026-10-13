@@ -180,6 +180,37 @@ class ControlPlaneRegistryTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     registry.decode_secret(value)
 
+    def test_candidate_verification_uses_its_own_pull_scope_and_manifest_path(self) -> None:
+        candidate = "ghcr.io/stanimirivanov/perfeng-native-search@sha256:" + "b" * 64
+        responses = iter(
+            [
+                Response(json.dumps({"token": "registry-bearer-token-value"}).encode()),
+                Response(b"candidate-manifest", {"Docker-Content-Digest": "sha256:" + "b" * 64}),
+            ]
+        )
+        requests = []
+
+        def opener(request, **kwargs):
+            requests.append(request)
+            return next(responses)
+
+        self.assertEqual(
+            registry.verify_registry_credentials(registry.USERNAME, TOKEN, candidate, opener),
+            b"candidate-manifest",
+        )
+        self.assertIn("perfeng-native-search", requests[0].full_url)
+        self.assertIn("/v2/stanimirivanov/perfeng-native-search/manifests/", requests[1].full_url)
+
+    def test_unreviewed_registry_repository_fails_before_credential_exchange(self) -> None:
+        opener = Mock()
+        for image in (
+            "ghcr.io/other/search@sha256:" + "a" * 64,
+            "ghcr.io/stanimirivanov/perfeng-native-search:latest",
+        ):
+            with self.assertRaisesRegex(ValueError, "reviewed digest-only"):
+                registry.verify_registry_credentials(registry.USERNAME, TOKEN, image, opener)
+        opener.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

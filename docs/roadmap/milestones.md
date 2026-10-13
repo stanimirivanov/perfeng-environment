@@ -162,9 +162,10 @@ HTTPS upload-signing origin is a completed control-plane prerequisite.
 6. `perfeng-environment`: prove qualification through approved-baseline decision
    on a representative Windows host, including cancellation and restart recovery.
 
-Batch 2's controlled target now has [immutable candidate packaging](../native-browser-candidate.md).
-Publication, image-backed target deployment/gateway cutover and native runtime
-selection remain promotion gates. The current host report is REJECTED against
+Batch 2's controlled target has published [immutable candidate packaging](../native-browser-candidate.md)
+and [image-backed GitOps selection/gateway cutover](../local-native-target.md),
+pinning chart revision `a20633e` and the candidate digest. Live target/HTTPS
+acceptance and native runtime selection remain promotion gates. The earlier host report is REJECTED against
 `windows-mainstream/1.0.0`. The separately identified
 `windows-four-core-4k/1.0.0` profile now represents the available laptop's
 CPU/display conditions while retaining OS and calibration gates; a fresh

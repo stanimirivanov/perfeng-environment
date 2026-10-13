@@ -23,6 +23,13 @@
 
 ## Scope and command safety
 
+For image-backed target failures, use [the local native target guide](local-native-target.md).
+Run `task native:target-health` before `task native:target`; candidate package
+access, ready platform digest and UID controller ownership must agree. Restart
+the target's fourth foreground forward after Pod replacement and restart an old
+gateway to apply the proxy-only route. A missing target/tunnel fails closed,
+never back to checkout files. Retain pull credentials, CA and rejected evidence.
+
 For candidate image build/publication or rejected browser-host qualification,
 follow the [candidate guide](native-browser-candidate.md). GUID braces/case are
 equivalent power-plan identity; hardware, OS, display and calibration mismatches
@@ -89,7 +96,7 @@ Run the checks in order and stop at the first failure.
 | Infrastructure selection | `uv run --locked python scripts/infrastructure_release.py validate` | The selected provider commit and compatibility contract validate |
 | kind | `uv run --locked python scripts/infrastructure_runtime.py cluster health --execute` | The named cluster, kubeconfig, nodes, labels and CoreDNS pass |
 | Argo CD | `uv run --locked python scripts/infrastructure_runtime.py argocd health --execute` | The infrastructure-owned namespace and every selected controller pass |
-| Applications | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get applications -o wide` | Root and all four workload Applications are `Synced` and `Healthy` |
+| Applications | `kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd get applications -o wide` | Root and all five workload Applications are `Synced` and `Healthy` |
 | PostgreSQL | `uv run --locked python scripts/postgres.py health --execute` | PostgreSQL health completes successfully |
 | Object storage | `uv run --locked python scripts/object_store.py health --execute` | SeaweedFS health completes successfully |
 | Database identities | `uv run --locked python scripts/control_plane_database.py health --execute` | Owned roles and credentials validate without rotation |

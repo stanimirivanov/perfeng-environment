@@ -33,17 +33,7 @@ https://127.0.0.1:9443 {
 https://127.0.0.1:10443 {
 	bind 127.0.0.1
 	tls internal
-	root * native-gateway/search
-	header {
-		Cache-Control no-store
-		X-Content-Type-Options nosniff
-		Content-Security-Policy "default-src 'none'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
-	}
-	@read method GET HEAD
-	handle @read {
-		file_server
-	}
-	handle {
-		respond 405
+	reverse_proxy 127.0.0.1:18081 {
+		header_up Host {http.request.hostport}
 	}
 }

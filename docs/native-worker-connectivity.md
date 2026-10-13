@@ -3,10 +3,10 @@
 ## TL;DR
 
 - The worker and Docker Desktop must run on the same Windows host; this is not LAN ingress.
-- Start `task native:api`, `task native:s3` and `task native:gateway` in separate terminals.
+- Deploy/verify the [selected image-backed target](local-native-target.md), then start `task native:api`, `task native:s3`, `task native:target` and `task native:gateway` in separate terminals.
 - Caddy generates a private CA but does not install trust. Review its fingerprint before trusting it.
 - Use `https://127.0.0.1:8443` for the API, `:9443` for S3 uploads and `:10443/` for the search target.
-- `task native:check` proves trusted TLS, API readiness, exact fixture bytes and anonymous S3 denial only.
+- `task native:check` proves selected target image/Pod identity, trusted TLS, API readiness, exact fixture bytes and anonymous S3 denial only.
 - Native acquisition stays blocked until the newer service image, native bundle, worker credential and real qualification evidence are selected and signed PUT/internal read-back passes.
 
 ## Boundary and prerequisites
@@ -73,6 +73,7 @@ From the repository root, preview each boundary without external access:
 ```powershell
 uv run --locked python scripts/native_connectivity.py forward-api
 uv run --locked python scripts/native_connectivity.py forward-s3
+uv run --locked python scripts/native_connectivity.py forward-target
 uv run --locked python scripts/native_connectivity.py gateway
 uv run --locked python scripts/native_connectivity.py check
 ```
@@ -82,6 +83,7 @@ Start each of these in its own terminal, from this repository:
 ```powershell
 task native:api
 task native:s3
+task native:target
 task native:gateway
 ```
 
@@ -97,7 +99,7 @@ state as an implicit repair.
 |:--|:--|:--|
 | Worker API | `https://127.0.0.1:8443` | `127.0.0.1:18080` → `perf-platform/control-plane:8080` |
 | Presigned artifact PUT | `https://127.0.0.1:9443` | `127.0.0.1:18333` → `perf-platform/seaweedfs:8333` |
-| Search journey | `https://127.0.0.1:10443/` | repository-owned `native-gateway/search` files |
+| Search journey | `https://127.0.0.1:10443/` | `127.0.0.1:18081` → exact verified `perf-platform/native-search` Pod, HTTP port 8080 |
 
 No path, query or Host rewriting is configured. Do not alter a presigned URL,
 remove its port or change signed request headers. Automatic HTTP redirects,
@@ -172,9 +174,10 @@ for actual execution-host evidence.
 ## Promotion gates and credentials
 
 The controlled fixture now has [immutable image packaging](native-browser-candidate.md).
-The gateway still serves checkout files for pre-promotion checks. Deploy the
-published candidate digest and cut over the target route in the reviewed native
-selection before claiming that a Run tested that candidate image.
+The [target selection](local-native-target.md) now deploys the published candidate
+through Argo CD and proxies the target route to its verified Pod. Checkout files
+remain exact-byte expectations and build source only; there is no serving fallback.
+Native runtime selection and qualified browser execution are still separate gates.
 
 The existing deployment lock still selects the earlier k6 image and bundle.
 This PR does not invent a published image digest or enable worker acquisition.
@@ -224,13 +227,14 @@ authentication, signed upload and acquisition remain unverified.
   dedicated cluster's Deployment; do not substitute a different endpoint.
 - S3 denial check fails: inspect its forwarding session and bucket policy. A
   public bucket or a proxy's generic 403 is not healthy.
-- Target mismatch: confirm the selected checkout and fixture bytes; do not
-  update the expected identity merely to accept an unknown page.
+- Target unavailable or mismatched: run `task native:target-health`, inspect its
+  fourth foreground forwarding session and pinned source/image bytes; do not
+  update expected identity or fall back to local files to accept an unknown page.
 - Signed PUT fails: check expiry, signed headers, exact Host/port/URI, gateway
   upstream and selected service image. Do not log the grant or retry by changing
   its URL. Use the worker's supported retry/retained-evidence behavior.
 
-Stopping the three sessions removes exposure without changing workloads,
+Stopping the four sessions removes exposure without changing workloads,
 objects, PVCs, Secrets or Applications. CA trust is retained deliberately. To
 remove it, identify the exact installed certificate fingerprint and review
 `certutil -user -delstore Root <that-fingerprint>` before executing it; never

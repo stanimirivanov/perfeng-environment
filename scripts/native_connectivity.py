@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import ssl
@@ -13,10 +12,12 @@ import urllib.request
 from pathlib import Path
 
 if __package__:
-    from . import cluster, control_plane_health
+    from . import cluster, control_plane_health, native_target_health, native_target_release
 else:
     import cluster
     import control_plane_health
+    import native_target_health
+    import native_target_release
 
 ROOT = Path(__file__).resolve().parents[1]
 CADDY_VERSION = "v2.11.7"
@@ -30,6 +31,7 @@ ORIGINS = {
 FORWARDS = {
     "forward-api": ("control-plane", "18080:8080"),
     "forward-s3": ("seaweedfs", "18333:8333"),
+    "forward-target": ("native-search", "18081:8080"),
 }
 
 
@@ -77,15 +79,18 @@ def service_command(action: str, root: Path) -> list[str]:
 
 def target_identity(root: Path = ROOT) -> str:
     """Fingerprint the exact controlled fixture bytes and names, independent of checkout path."""
-    digest = hashlib.sha256()
-    for name in ("index.html", "search.js"):
-        content = (root / "native-gateway/search" / name).read_bytes()
-        digest.update(name.encode() + b"\0" + content + b"\0")
-    return digest.hexdigest()
+    return native_target_release.content_identity(
+        {
+            name: (root / "native-gateway/search" / name).read_bytes()
+            for name in native_target_release.FILE_NAMES
+        }
+    )
 
 
-def verify_forward(action: str, root: Path) -> None:
+def verify_forward(action: str, root: Path) -> str | None:
     """Require the dedicated cluster and expected Service before opening a host tunnel."""
+    if action == "forward-target":
+        return native_target_health.verify(root)
     cluster.verify_local_docker()
     cluster.verify_context(root)
     value = json.loads(cluster.run(service_command(action, root)))
@@ -129,7 +134,7 @@ def verify_serving_build(build_info: str) -> None:
 def run_tool(action: str, root: Path = ROOT) -> None:
     """Run one bounded foreground session or offline adaptation; never install trust or tools."""
     if action in FORWARDS:
-        verify_forward(action, root)
+        pod = verify_forward(action, root)
     else:
         version = subprocess.run(["caddy", "version"], capture_output=True, check=True, timeout=10)
         observed_version = version.stdout.decode("utf-8").split()
@@ -151,7 +156,11 @@ def run_tool(action: str, root: Path = ROOT) -> None:
     timeout = 10 if action == "validate" else SESSION_SECONDS
     print(f"Starting {action}; stop with Ctrl+C (maximum {timeout}s).", flush=True)
     subprocess.run(
-        command(action, root),
+        (
+            [*command(action, root)[:-2], f"pod/{pod}", FORWARDS[action][1]]
+            if action == "forward-target"
+            else command(action, root)
+        ),
         cwd=root,
         check=True,
         timeout=timeout,
@@ -177,10 +186,18 @@ def read_endpoint(url: str, context: ssl.SSLContext) -> tuple[int, bytes]:
 
 def check(ca_file: Path, root: Path = ROOT) -> None:
     """Check TLS, readiness, anonymous S3 denial and exact target bytes; no objects are written."""
+    files = native_target_release.expected_files(root)
+    before = native_target_health.verify(root)
     context = ssl.create_default_context(cafile=str(ca_file))
     checks = [("control plane", ORIGINS["controlPlane"] + "/readyz", b"ok\n")]
+    checks.extend(
+        [
+            ("target root", ORIGINS["target"] + "/", files["index.html"]),
+            ("target health", ORIGINS["target"] + "/healthz", b"ready\n"),
+        ]
+    )
     for name in ("index.html", "search.js"):
-        expected = (root / "native-gateway/search" / name).read_bytes()
+        expected = files[name]
         checks.append((name, ORIGINS["target"] + "/" + name, expected))
     for label, url, expected in checks:
         status, content = read_endpoint(url, context)
@@ -197,6 +214,11 @@ def check(ca_file: Path, root: Path = ROOT) -> None:
             "Expected anonymous S3 AccessDenied; check tunnel, storage identity and bucket policy"
         )
     print("Verified TLS and anonymous S3 denial.")
+    if native_target_health.verify(root) != before:
+        raise ValueError(
+            "Native target Pod changed during the connectivity check; restart its forward"
+        )
+    print("Verified selected image-backed target and unchanged ready Pod.")
     print(f"Controlled target SHA-256: {target_identity(root)}")
     print(
         "Connectivity only: worker authentication, signed PUT/internal read-back and native acquisition are not verified."
@@ -207,7 +229,8 @@ def main(argv: list[str] | None = None) -> int:
     """Preview without external access; live checks and foreground sessions require --execute."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["gateway", "forward-api", "forward-s3", "validate", "check"]
+        "action",
+        choices=["gateway", "forward-api", "forward-s3", "forward-target", "validate", "check"],
     )
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--ca-file", type=Path)
