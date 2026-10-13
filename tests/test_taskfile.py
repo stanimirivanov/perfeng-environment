@@ -25,6 +25,8 @@ class TaskfileTests(unittest.TestCase):
                 "native:s3",
                 "native:gateway",
                 "native:check",
+                "native:target",
+                "native:target-health",
             },
         )
 
@@ -70,12 +72,21 @@ class TaskfileTests(unittest.TestCase):
         )
 
     def test_native_connectivity_remains_opt_in_and_uses_existing_safety_boundary(self) -> None:
-        for name, action in (("api", "forward-api"), ("s3", "forward-s3"), ("gateway", "gateway")):
+        for name, action in (
+            ("api", "forward-api"),
+            ("s3", "forward-s3"),
+            ("gateway", "gateway"),
+            ("target", "forward-target"),
+        ):
             self.assertEqual(
                 self.tasks[f"native:{name}"]["cmds"],
                 [f"uv run --locked python scripts/native_connectivity.py {action} --execute"],
             )
         self.assertIn("--ca-file .local/native-gateway/", self.tasks["native:check"]["cmds"][0])
+        self.assertEqual(
+            self.tasks["native:target-health"]["cmds"],
+            ["uv run --locked python scripts/native_target_health.py --execute"],
+        )
         for name in ("bootstrap", "status", "smoke"):
             self.assertNotIn("native:", str(self.tasks[name]))
 

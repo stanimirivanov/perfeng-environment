@@ -7,3 +7,4 @@ resources:
   - postgres-application.yaml
   - seaweedfs-application.yaml
   - control-plane-application.yaml
+  - native-search-application.yaml

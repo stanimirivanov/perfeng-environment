@@ -62,6 +62,23 @@ class GitOpsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "control-plane Application"):
             gitops.validate_control_plane_application(application, release)
 
+    def test_native_application_is_pinned_without_self_healing_or_pruning(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        application = gitops.load_yaml(
+            root / "gitops/environments/local/native-search-application.yaml"
+        )
+        selection = gitops.native_target_release.load_selection(
+            root / "deployments/local-native-target.json"
+        )
+        gitops.native_target_release.validate_application(application, selection)
+        self.assertEqual(
+            application["spec"]["syncPolicy"]["automated"],
+            {"enabled": True, "prune": False, "selfHeal": False},
+        )
+        application["spec"]["source"]["targetRevision"] = "main"
+        with self.assertRaisesRegex(ValueError, "Native target Application"):
+            gitops.native_target_release.validate_application(application, selection)
+
     def test_postgres_application_preserves_the_existing_release(self) -> None:
         root = Path(__file__).resolve().parents[1]
         application = gitops.load_yaml(root / "gitops/environments/local/postgres-application.yaml")

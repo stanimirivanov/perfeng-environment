@@ -5,14 +5,17 @@
 - Build the existing search fixture as `ghcr.io/stanimirivanov/perfeng-native-search`; its published digest will be the Run candidate identity.
 - Use maintained unprivileged NGINX, a digest-pinned base, a five-file build context including the project license and no custom application server.
 - The main-only publisher is opt-in and verifies the pushed digest after pulling it back. Build-only checks allocate no published identity.
-- This change does not deploy the candidate, cut over the HTTPS gateway, promote a native bundle or enable acquisition.
+- Publication and the [image-backed target selection](local-native-target.md) are separate boundaries; neither promotes a native bundle or enables acquisition.
 - Qualification remains strict. A rejected host report is not an approved environment artifact, and fixture timing is not a customer-performance baseline.
 
 ## Ownership and immutable meaning
 
 `perfeng-environment` already owns the controlled integration fixture under `native-gateway/search`. This image packages that fixture, not production application logic. `perfeng-k8s` still owns Kubernetes workload packaging; a subsequent native promotion must deploy the exact candidate digest and route the HTTPS target to that deployment before declaring the candidate tested.
 
-The old gateway still serves checkout files as an explicit pre-promotion connectivity fixture. Do not select this image as a candidate while continuing to measure those local files and claim image-backed acceptance. Image publication and GitOps promotion are separate boundaries.
+The [selected target](local-native-target.md) now uses the published image and a
+pinned reusable chart behind the proxy-only gateway. Checkout files remain
+verification expectations/build source, not a serving fallback. Image publication,
+GitOps target selection and native runtime promotion remain separate boundaries.
 
 The application content fingerprint remains the hash of the names and exact `index.html`/`search.js` bytes used by the existing gateway. The image digest additionally binds NGINX, configuration and layers. OCI labels record source repository, exact source revision, target version and content fingerprint. Neither fingerprint is a browser-host or browser-environment evidence hash.
 

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-local-native-search
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+    perfeng.io/workload: native-search
+spec:
+  project: perfeng-local
+  source:
+    repoURL: https://github.com/stanimirivanov/perfeng-k8s.git
+    targetRevision: a20633e150db4e940aba4355a32a7931b9a7f45a
+    path: charts/native-search
+    helm:
+      releaseName: native-search
+      valuesObject:
+        image: ghcr.io/stanimirivanov/perfeng-native-search@sha256:3f6179c9f3784be884761e7c6ceb4229c48631b8290d5cc65d0b488eef3b4386
+        imagePullSecret: perfeng-control-plane-registry
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: perf-platform
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=false

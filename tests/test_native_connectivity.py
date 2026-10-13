@@ -15,9 +15,18 @@ from scripts import native_connectivity as gateway
 
 
 class NativeConnectivityTests(unittest.TestCase):
+    def setUp(self):
+        health = patch.object(
+            gateway.native_target_health, "verify", return_value="native-search-fixture"
+        )
+        self.health = health.start()
+        self.addCleanup(health.stop)
+
     def responses(self):
         return [
             (200, b"ok\n"),
+            (200, (gateway.ROOT / "native-gateway/search/index.html").read_bytes()),
+            (200, b"ready\n"),
             (200, (gateway.ROOT / "native-gateway/search/index.html").read_bytes()),
             (200, (gateway.ROOT / "native-gateway/search/search.js").read_bytes()),
             (403, b"<Error><Code>AccessDenied</Code></Error>"),
@@ -25,11 +34,19 @@ class NativeConnectivityTests(unittest.TestCase):
 
     def test_preview_all_actions_is_offline_without_a_ca(self):
         with patch.object(gateway, "run_tool") as run, patch.object(gateway, "check") as check:
-            for action in ("gateway", "forward-api", "forward-s3", "validate", "check"):
+            for action in (
+                "gateway",
+                "forward-api",
+                "forward-s3",
+                "forward-target",
+                "validate",
+                "check",
+            ):
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(gateway.main([action]), 0)
             run.assert_not_called()
             check.assert_not_called()
+            self.health.assert_not_called()
 
     def test_forward_commands_are_dedicated_and_loopback_only(self):
         for action, (service, ports) in gateway.FORWARDS.items():
@@ -160,7 +177,7 @@ class NativeConnectivityTests(unittest.TestCase):
                 with contextlib.redirect_stdout(io.StringIO()) as output:
                     gateway.check(Path("reviewed-root.crt"))
                 create.assert_called_once_with(cafile="reviewed-root.crt")
-                self.assertEqual(read.call_count, 4)
+                self.assertEqual(read.call_count, 6)
                 self.assertTrue(all(call.args[1].check_hostname for call in read.call_args_list))
                 self.assertIn("not verified", output.getvalue())
         with contextlib.redirect_stdout(io.StringIO()), patch.object(gateway, "check") as check:
@@ -174,9 +191,10 @@ class NativeConnectivityTests(unittest.TestCase):
             (0, (302, b"redirect")),
             (0, (200, b"x" * (gateway.MAX_RESPONSE_BYTES + 1))),
             (1, (200, b"different fixture")),
-            (2, (200, b"different script")),
-            (3, (200, b"public bucket")),
-            (3, (403, b"proxy error")),
+            (2, (200, b"different health")),
+            (4, (200, b"different script")),
+            (5, (200, b"public bucket")),
+            (5, (403, b"proxy error")),
         ):
             responses = self.responses()
             responses[index] = response
@@ -206,6 +224,40 @@ class NativeConnectivityTests(unittest.TestCase):
                 redirect.redirect_request(None, None, 302, "found", {}, "https://foreign.invalid")
             )
             response.read.assert_called_once_with(gateway.MAX_RESPONSE_BYTES + 1)
+
+    def test_target_forward_uses_verified_pod_not_a_service_selected_replacement(self):
+        with patch.object(gateway.subprocess, "run") as run:
+            gateway.run_tool("forward-target")
+        self.health.assert_called_once_with(gateway.ROOT)
+        self.assertEqual(run.call_args.args[0][-2:], ["pod/native-search-fixture", "18081:8080"])
+        self.assertEqual(run.call_args.kwargs["timeout"], 3600)
+
+    def test_target_identity_failure_prevents_forward_and_https_checks(self):
+        self.health.side_effect = ValueError("wrong candidate image")
+        with patch.object(gateway.subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "wrong candidate"):
+                gateway.run_tool("forward-target")
+            run.assert_not_called()
+        with patch.object(gateway, "read_endpoint") as read:
+            with self.assertRaisesRegex(ValueError, "wrong candidate"):
+                gateway.check(Path("root.crt"))
+            read.assert_not_called()
+
+    def test_target_pod_replacement_during_check_is_not_accepted(self):
+        self.health.side_effect = ["native-search-before", "native-search-after"]
+        with (
+            patch.object(gateway.ssl, "create_default_context"),
+            patch.object(gateway, "read_endpoint", side_effect=self.responses()),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            with self.assertRaisesRegex(ValueError, "Pod changed"):
+                gateway.check(Path("root.crt"))
+
+    def test_gateway_is_proxy_only_for_the_target(self):
+        configuration = (gateway.ROOT / "native-gateway/Caddyfile").read_text()
+        self.assertIn("reverse_proxy 127.0.0.1:18081", configuration)
+        self.assertNotIn("file_server", configuration)
+        self.assertNotIn("root *", configuration)
 
     def test_transport_failure_does_not_echo_sensitive_vendor_text(self):
         with patch.object(gateway.urllib.request, "build_opener") as build:

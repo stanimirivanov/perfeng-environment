@@ -1,6 +1,7 @@
 INFRASTRUCTURE_ROOT ?= ../k8s-infrastructure
 K8S_ROOT ?= ../perfeng-k8s
 CONTROL_PLANE_ROOT ?= ../perfeng-control-plane
+NATIVE_TARGET_K8S_ROOT ?= $(K8S_ROOT)
 UV_RUN := uv run --locked --offline
 
 .PHONY: help bootstrap doctor fmt fmt-check docs-check check test verify render-check native-gateway-check native-target-image-check release-selection-check supply-chain validate
@@ -69,6 +70,7 @@ release-selection-check:
 	$(UV_RUN) python scripts/infrastructure_runtime.py argocd validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
 	$(UV_RUN) python scripts/control_plane_release.py validate --k8s-root "$(K8S_ROOT)" --control-plane-root "$(CONTROL_PLANE_ROOT)"
 	$(UV_RUN) python scripts/control_plane_runtime.py validate
+	$(UV_RUN) python scripts/native_target_release.py validate --k8s-root "$(NATIVE_TARGET_K8S_ROOT)"
 
 supply-chain:
 	uv lock --check --offline

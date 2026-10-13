@@ -20,6 +20,7 @@ jobs:
         with:
           path: perfeng-environment
           persist-credentials: false
+          fetch-depth: 0
       - name: Check out pinned Kubernetes infrastructure
         if: runner.os == 'Linux'
         uses: actions/checkout@v7
@@ -37,6 +38,15 @@ jobs:
           ref: 87837d49a4d90071b3fc47484f236e8de07d92d3
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-k8s
+          persist-credentials: false
+      - name: Check out pinned native target chart
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/perfeng-k8s
+          ref: a20633e150db4e940aba4355a32a7931b9a7f45a
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+          path: perfeng-native-target-k8s
           persist-credentials: false
       - name: Check out pinned control-plane source
         if: runner.os == 'Linux'
@@ -97,6 +107,8 @@ jobs:
       - name: Validate exact adjacent release selections
         if: runner.os == 'Linux'
         run: make release-selection-check
+        env:
+          NATIVE_TARGET_K8S_ROOT: ../perfeng-native-target-k8s
         working-directory: perfeng-environment
 
   supply-chain:
