@@ -4,7 +4,6 @@ import contextlib
 import io
 import json
 import ssl
-import subprocess
 import tempfile
 import unittest
 import urllib.error
@@ -101,41 +100,23 @@ class NativeConnectivityTests(unittest.TestCase):
     def test_caddy_version_and_session_bounds(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            with patch.object(gateway.subprocess, "run") as run:
-                run.side_effect = lambda command, **kwargs: subprocess.CompletedProcess(
-                    command,
-                    0,
-                    stdout=(
-                        b"go\tgo1.26.9\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\n"
-                        if command == ["caddy", "build-info"]
-                        else b"v2.11.7 fixture\n"
-                    ),
-                )
+            with (
+                patch.object(gateway.subprocess, "run") as run,
+                patch.object(
+                    gateway.native_gateway_tool,
+                    "installed",
+                    return_value=root / "managed/caddy.exe",
+                ),
+                patch.object(gateway.native_gateway_host, "private_permissions"),
+                patch.object(gateway.native_gateway_tool, "metadata"),
+                patch.object(gateway.shutil, "which", return_value=str(root / "offline/caddy.exe")),
+            ):
                 gateway.run_tool("gateway", root)
                 self.assertEqual(run.call_args.kwargs["timeout"], 3600)
                 self.assertEqual(run.call_args.kwargs["cwd"], root)
+                self.assertEqual(run.call_args.args[0][0], str(root / "managed/caddy.exe"))
                 gateway.run_tool("validate", root)
                 self.assertEqual(run.call_args.kwargs["timeout"], 10)
-                run.reset_mock()
-                run.side_effect = None
-                run.return_value = subprocess.CompletedProcess([], 0, stdout=b"v2.10.0\n")
-                with self.assertRaisesRegex(ValueError, "reviewed Caddy"):
-                    gateway.run_tool("gateway", root)
-                self.assertEqual(run.call_count, 1)
-
-    def test_serving_rejects_known_vulnerable_or_unverifiable_builds(self):
-        approved = "go\tgo1.26.9\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\n"
-        gateway.verify_serving_build(approved)
-        gateway.verify_serving_build(approved.replace("go1.26.9", "go1.26.10"))
-        for rejected in (
-            approved.replace("go1.26.9", "go1.26.8"),
-            approved.replace("v0.60.0", "v0.59.0"),
-            approved.replace("go1.26.9", "devel"),
-            "",
-            approved + "=>\t../unreviewed\t(devel)\n",
-        ):
-            with self.assertRaisesRegex(ValueError, "serving requires"):
-                gateway.verify_serving_build(rejected)
 
     def test_malformed_service_shape_fails_before_forward(self):
         for value in ([], None, {"metadata": [], "spec": {}}, {"metadata": {}, "spec": []}):
@@ -155,10 +136,9 @@ class NativeConnectivityTests(unittest.TestCase):
             patch.object(gateway.subprocess, "run") as run,
             patch.object(Path, "is_symlink", return_value=True),
         ):
-            run.return_value = subprocess.CompletedProcess([], 0, stdout=b"v2.11.7\n")
-            with self.assertRaisesRegex(ValueError, "Redirected gateway state"):
-                gateway.run_tool("gateway", Path(directory).resolve())
-            self.assertEqual(run.call_count, 1)
+            with self.assertRaisesRegex(ValueError, "STATE_REDIRECTED"):
+                gateway.native_gateway_tool.safe_state(Path(directory))
+            run.assert_not_called()
 
     def test_release_checksum_selection_agrees_with_tool_version(self):
         release = json.loads((gateway.ROOT / "native-gateway/caddy-release.json").read_text())

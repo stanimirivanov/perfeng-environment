@@ -51,6 +51,27 @@ tasks:
     cmds:
       - uv run --locked python scripts/native_connectivity.py forward-api --execute
 
+  native:setup:
+    desc: Install the checksum-selected audited Windows gateway without PATH or trust writes
+    cmds:
+      - uv run --locked python -m scripts.native_gateway setup --execute
+
+  native:doctor:
+    desc: Report all native connectivity prerequisites without changing state
+    cmds:
+      - uv run --locked python -m scripts.native_gateway doctor --execute
+
+  native:permissions:
+    desc: Explicitly restrict gateway state permissions while retaining all files and CA keys
+    prompt: Restrict .local/native-gateway to this account, SYSTEM and administrators? Review existing CA exposure and child ACLs first.
+    cmds:
+      - uv run --locked python -m scripts.native_gateway permissions --execute
+
+  native:up:
+    desc: Preflight and supervise three tunnels plus the HTTPS gateway in one foreground session
+    cmds:
+      - uv run --locked python -m scripts.native_gateway up --execute
+
   native:s3:
     desc: Forward the reviewed SeaweedFS Service to loopback for at most one hour
     cmds:

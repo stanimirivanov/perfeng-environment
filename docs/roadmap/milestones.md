@@ -172,6 +172,12 @@ CPU/display conditions while retaining OS and calibration gates; a fresh
 accepted live capture is still required. Do not treat a qualification-report
 hash as a browser-environment artifact.
 
+Managed native connectivity is prepared under [ADR 0010](../decisions/0010-manage-native-connectivity-workflow.md):
+setup, independent doctor checks and one supervised foreground session replace
+manual Go builds and four terminals. First serving release publication/selection
+and live acceptance remain explicit gates; this workflow does not promote the
+native runtime or accept a rejected host report.
+
 M03 remains incomplete until live acceptance passes. An operator-started
 `run-once` worker and safe manual recovery are the intended scope; an unattended
 Windows service is not required. Do not count mocks or readiness as completion.

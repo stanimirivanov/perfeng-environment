@@ -1,10 +1,13 @@
 """Bootstrap Perfeng namespaces on the selected Kubernetes substrate."""
 
 import argparse
+import contextlib
+import contextvars
 import json
 import os
 import subprocess
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import yaml
@@ -14,6 +17,21 @@ NAME = "perfeng-local"
 CONTEXT = f"kind-{NAME}"
 PROGRESS_INTERVAL = 10
 ACTIONS = ("bootstrap",)
+_COMMAND_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "command_deadline", default=None
+)
+
+
+@contextlib.contextmanager
+def command_deadline(seconds: float) -> Iterator[None]:
+    """Bound a caller's existing cluster reads without changing other operator command timeouts."""
+    current = _COMMAND_DEADLINE.get()
+    deadline = time.monotonic() + seconds
+    token = _COMMAND_DEADLINE.set(min(current, deadline) if current is not None else deadline)
+    try:
+        yield
+    finally:
+        _COMMAND_DEADLINE.reset(token)
 
 
 def run(command: list[str], *, input_data: bytes | None = None) -> str:
@@ -35,15 +53,30 @@ def run(command: list[str], *, input_data: bytes | None = None) -> str:
         stderr=subprocess.PIPE,
         env={**environment, "KIND_EXPERIMENTAL_PROVIDER": "docker"},
     ) as process:
-        while True:
-            try:
-                stdout, _ = process.communicate(input=input_data, timeout=PROGRESS_INTERVAL)
-                break
-            except subprocess.TimeoutExpired:
-                # communicate() retains pending input; never submit credentials twice.
-                input_data = None
-                elapsed = int(time.monotonic() - started)
-                print(f"Still running {label} command ({elapsed}s elapsed)...", flush=True)
+        try:
+            while True:
+                deadline = _COMMAND_DEADLINE.get()
+                remaining = (
+                    deadline - time.monotonic() if deadline is not None else PROGRESS_INTERVAL
+                )
+                if remaining <= 0:
+                    raise ValueError(
+                        f"{label} exceeded the caller's bounded command deadline; output withheld"
+                    )
+                try:
+                    stdout, _ = process.communicate(
+                        input=input_data, timeout=min(PROGRESS_INTERVAL, remaining)
+                    )
+                    break
+                except subprocess.TimeoutExpired:
+                    # communicate() retains pending input; never submit credentials twice.
+                    input_data = None
+                    elapsed = int(time.monotonic() - started)
+                    print(f"Still running {label} command ({elapsed}s elapsed)...", flush=True)
+        except BaseException:
+            process.kill()
+            process.communicate()
+            raise
     if process.returncode:
         # Never echo a kubeconfig or captured authentication data.
         raise ValueError(f"{label} failed (exit {process.returncode}); inspect the local cluster")

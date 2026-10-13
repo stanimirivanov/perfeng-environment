@@ -105,3 +105,4 @@ How will the assumptions and consequences be verified?
 | [0007](0007-package-controlled-browser-candidate.md) | Proposed | Give the controlled fixture an honest immutable candidate image identity without prematurely promoting or deploying it. |
 | [0008](0008-separate-four-core-4k-browser-cohort.md) | Proposed | Define a separate explicitly selected four-core 4K laptop cohort without relaxing OS or calibration gates. |
 | [0009](0009-select-image-backed-native-target.md) | Proposed | Select the image-backed target declaratively, reuse the owned pull identity and proxy only to its verified Pod without promoting native execution. |
+| [0010](0010-manage-native-connectivity-workflow.md) | Proposed | Acquire a reviewed serving binary, diagnose prerequisites and supervise one bounded foreground native session without implicit trust or state repair. |

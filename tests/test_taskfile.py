@@ -27,6 +27,10 @@ class TaskfileTests(unittest.TestCase):
                 "native:check",
                 "native:target",
                 "native:target-health",
+                "native:setup",
+                "native:doctor",
+                "native:permissions",
+                "native:up",
             },
         )
 
@@ -89,6 +93,14 @@ class TaskfileTests(unittest.TestCase):
         )
         for name in ("bootstrap", "status", "smoke"):
             self.assertNotIn("native:", str(self.tasks[name]))
+
+    def test_managed_native_workflow_has_explicit_execution_and_permission_review(self) -> None:
+        for action in ("setup", "doctor", "permissions", "up"):
+            self.assertEqual(
+                self.tasks[f"native:{action}"]["cmds"],
+                [f"uv run --locked python -m scripts.native_gateway {action} --execute"],
+            )
+        self.assertIn("Restrict .local/native-gateway", self.tasks["native:permissions"]["prompt"])
 
 
 if __name__ == "__main__":
