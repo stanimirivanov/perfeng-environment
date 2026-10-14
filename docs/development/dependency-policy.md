@@ -16,6 +16,13 @@ Every update preserves `uv.lock` and runs `make verify`. Security-sensitive or b
 
 ## External tools
 
+Kubernetes qualification uses maintained MIT-licensed `jsonschema` for the
+vendored Draft 2020-12 evidence schema, with remote resolution disabled. The
+local adapter is its replacement boundary. Only the required core graph is
+installed. RFC 3339 calendar/time-zone checks use the standard library plus the
+pinned timestamp pattern instead of the unrelated URI/email/duration format
+dependency set. Existing dependencies are not upgraded with this admission.
+
 Helm, Git, Task, Docker, kind, kubectl, and Argo CD tools are operational prerequisites with different authority. `make doctor` reports the core engineering toolchain; focused operating guides define additional live prerequisites. Offline render checks may invoke Helm; cluster tools appear only in explicitly selected live paths. Tool acquisition, when automated, must use a reviewed version and repository-anchored integrity check. CI verifies Helm 4.1.4 against `.helm-linux-amd64.sha256` before extraction.
 
 ## GitHub Actions and immutable selections

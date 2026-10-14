@@ -31,6 +31,7 @@ class TaskfileTests(unittest.TestCase):
                 "native:doctor",
                 "native:permissions",
                 "native:up",
+                "kubernetes:qualify",
             },
         )
 
@@ -49,6 +50,14 @@ class TaskfileTests(unittest.TestCase):
                 "uv run --locked python scripts/storage_access.py --execute",
             ],
         )
+
+    def test_kubernetes_qualification_is_explicit_and_not_an_aggregate_dependency(self) -> None:
+        self.assertEqual(
+            self.tasks["kubernetes:qualify"]["cmds"],
+            ["uv run --locked python -m scripts.kubernetes_benchmark check --execute"],
+        )
+        for name in ("bootstrap", "status", "smoke"):
+            self.assertNotIn("kubernetes:qualify", str(self.tasks[name]))
 
     def test_status_is_diagnostic_and_smoke_requires_it(self) -> None:
         status = self.tasks["status"]["cmds"]

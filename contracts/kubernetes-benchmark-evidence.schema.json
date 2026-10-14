@@ -1,0 +1,612 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perfeng.dev/schemas/kubernetes-benchmark-evidence/v1/kubernetes-benchmark-evidence.schema.json",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "description": "a string matching the pattern ^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "version": {
+      "type": "string",
+      "description": "a string matching the pattern ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "sha256": {
+      "type": "string",
+      "description": "a string matching the pattern ^[a-f0-9]{64}$",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:[0-5]\\d(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:[0-5]\\d(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$"
+    }
+  },
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "scope",
+    "profile",
+    "environment",
+    "target",
+    "captureWindow",
+    "status",
+    "checks",
+    "nodes",
+    "samples"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "enum": [
+        1
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "KubernetesBenchmarkEvidence"
+      ]
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "preflight"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "runId",
+            "testId",
+            "workload"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "measurement"
+              ]
+            },
+            "runId": {
+              "type": "string",
+              "description": "Reference to the run metadata",
+              "pattern": "^perf-[0-9]{8}-[0-9]{6}-[a-f0-9]{8}$"
+            },
+            "testId": {
+              "$ref": "#/$defs/id"
+            },
+            "workload": {
+              "type": "object",
+              "required": [
+                "id",
+                "version",
+                "sha256"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/id"
+                },
+                "version": {
+                  "$ref": "#/$defs/version"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "sha256",
+        "purpose"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "purpose": {
+          "type": "string",
+          "enum": [
+            "integration",
+            "performance-comparison"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "sha256",
+        "fingerprint"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "clusterId",
+        "kubeSystemUid"
+      ],
+      "properties": {
+        "clusterId": {
+          "$ref": "#/$defs/id"
+        },
+        "kubeSystemUid": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false
+    },
+    "captureWindow": {
+      "type": "object",
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "end": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACCEPTED",
+        "REJECTED",
+        "UNKNOWN"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "cluster-identity",
+              "node-readiness",
+              "placement",
+              "capacity",
+              "resource-pressure",
+              "interference"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL",
+              "UNKNOWN"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "a string matching the pattern \\S",
+            "title": "minLength(1)",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false
+      },
+      "uniqueItems": true,
+      "description": "an array of at most 6 item(s)",
+      "title": "maxItems(6)",
+      "minItems": 1,
+      "maxItems": 6,
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "cluster-identity"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "node-readiness"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "placement"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "capacity"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "resource-pressure"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "interference"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "uid",
+          "kubernetesVersion",
+          "containerRuntimeVersion",
+          "architecture",
+          "allocatable"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "a string matching the pattern \\S",
+            "title": "minLength(1)",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kubernetesVersion": {
+            "type": "string",
+            "description": "a string matching the pattern \\S",
+            "title": "minLength(1)",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "containerRuntimeVersion": {
+            "type": "string",
+            "description": "a string matching the pattern \\S",
+            "title": "minLength(1)",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "architecture": {
+            "type": "string",
+            "enum": [
+              "amd64",
+              "arm64"
+            ]
+          },
+          "allocatable": {
+            "type": "object",
+            "required": [
+              "cpuMilliCores",
+              "memoryBytes"
+            ],
+            "properties": {
+              "cpuMilliCores": {
+                "type": "integer",
+                "description": "a number greater than or equal to 1",
+                "title": "greaterThanOrEqualTo(1)",
+                "minimum": 1
+              },
+              "memoryBytes": {
+                "type": "integer",
+                "description": "a number greater than or equal to 1",
+                "title": "greaterThanOrEqualTo(1)",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "an array of at most 256 item(s)",
+      "title": "maxItems(256)",
+      "maxItems": 256
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "nodeUid",
+          "observedAt",
+          "conditions",
+          "usage"
+        ],
+        "properties": {
+          "nodeUid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observedAt": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "conditions": {
+            "type": "object",
+            "required": [
+              "ready",
+              "memoryPressure",
+              "diskPressure",
+              "pidPressure"
+            ],
+            "properties": {
+              "ready": {
+                "type": "string",
+                "enum": [
+                  "TRUE",
+                  "FALSE",
+                  "UNKNOWN"
+                ]
+              },
+              "memoryPressure": {
+                "type": "string",
+                "enum": [
+                  "TRUE",
+                  "FALSE",
+                  "UNKNOWN"
+                ]
+              },
+              "diskPressure": {
+                "type": "string",
+                "enum": [
+                  "TRUE",
+                  "FALSE",
+                  "UNKNOWN"
+                ]
+              },
+              "pidPressure": {
+                "type": "string",
+                "enum": [
+                  "TRUE",
+                  "FALSE",
+                  "UNKNOWN"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "source",
+                  "windowStart",
+                  "windowEnd",
+                  "cpuMilliCores",
+                  "memoryBytes"
+                ],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "metrics-api"
+                    ]
+                  },
+                  "windowStart": {
+                    "$ref": "#/$defs/timestamp"
+                  },
+                  "windowEnd": {
+                    "$ref": "#/$defs/timestamp"
+                  },
+                  "cpuMilliCores": {
+                    "type": "integer",
+                    "description": "a non-negative number",
+                    "title": "greaterThanOrEqualTo(0)",
+                    "minimum": 0
+                  },
+                  "memoryBytes": {
+                    "type": "integer",
+                    "description": "a non-negative number",
+                    "title": "greaterThanOrEqualTo(0)",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "source",
+                  "reason"
+                ],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "unavailable"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "a string matching the pattern \\S",
+                    "title": "minLength(1)",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "an array of at most 4096 item(s)",
+      "title": "maxItems(4096)",
+      "maxItems": 4096
+    }
+  },
+  "additionalProperties": false,
+  "title": "Kubernetes benchmark qualification and interference evidence",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "checks": {
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "FAIL"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "REJECTED"
+          }
+        }
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "checks": {
+              "contains": {
+                "properties": {
+                  "status": {
+                    "const": "UNKNOWN"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "status": {
+              "const": "UNKNOWN"
+            }
+          }
+        },
+        "else": {
+          "properties": {
+            "status": {
+              "const": "ACCEPTED"
+            },
+            "nodes": {
+              "minItems": 1
+            },
+            "samples": {
+              "minItems": 1
+            }
+          }
+        }
+      }
+    }
+  ]
+}

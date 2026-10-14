@@ -2,6 +2,8 @@
 
 ## TL;DR
 
+- Use opt-in `task kubernetes:qualify` for [local Kubernetes benchmark preflight](docs/kubernetes-benchmark-qualification.md); it retains integration-only evidence without modifying the cluster.
+
 - This repository composes the local performance-platform workspace and its
   Kubernetes environment; it does not own component source code.
 - `Taskfile.yml` provides the supported high-level local operator commands while

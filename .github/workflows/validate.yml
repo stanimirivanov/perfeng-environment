@@ -30,6 +30,15 @@ jobs:
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: k8s-infrastructure
           persist-credentials: false
+      - name: Check out pinned Kubernetes benchmark contracts
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/perfeng-contracts
+          ref: 3b86afa18b468d831c7c2c176618180db18b2764
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+          path: perfeng-contracts
+          persist-credentials: false
       - name: Check out pinned control-plane deployment source
         if: runner.os == 'Linux'
         uses: actions/checkout@v7

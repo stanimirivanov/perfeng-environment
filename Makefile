@@ -1,6 +1,7 @@
 INFRASTRUCTURE_ROOT ?= ../k8s-infrastructure
 K8S_ROOT ?= ../perfeng-k8s
 CONTROL_PLANE_ROOT ?= ../perfeng-control-plane
+CONTRACTS_ROOT ?= ../perfeng-contracts
 NATIVE_TARGET_K8S_ROOT ?= $(K8S_ROOT)
 UV_RUN := uv run --locked --offline
 
@@ -49,6 +50,7 @@ check: fmt-check docs-check
 	$(UV_RUN) python scripts/browser_host.py validate
 	$(UV_RUN) python scripts/browser_host.py validate --profile profiles/browser/windows-four-core-4k.yaml
 	$(UV_RUN) python scripts/native_target.py validate
+	$(UV_RUN) python -m scripts.kubernetes_benchmark validate
 
 test:
 	$(UV_RUN) python -m unittest discover -s tests -v
@@ -65,6 +67,7 @@ native-target-image-check:
 	$(UV_RUN) python scripts/native_target.py build --execute
 
 release-selection-check:
+	$(UV_RUN) python -m scripts.kubernetes_benchmark validate --contracts-root "$(CONTRACTS_ROOT)"
 	$(UV_RUN) python scripts/infrastructure_release.py validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
 	$(UV_RUN) python scripts/infrastructure_runtime.py cluster ensure --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
 	$(UV_RUN) python scripts/infrastructure_runtime.py argocd validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"

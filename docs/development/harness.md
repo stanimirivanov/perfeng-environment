@@ -56,4 +56,10 @@ is a distinct explicit read-only GHCR/Kubernetes acceptance tier, not a CI gate.
 
 ## Extending the harness
 
+`make check` validates the Kubernetes benchmark profile and local schema checksum
+offline. `make release-selection-check` compares the snapshot with the exact
+contracts commit. `task kubernetes:qualify` is a separate explicit live read-only
+tier that creates ignored receipts, never telemetry or benchmark workloads.
+UNKNOWN/REJECTED captures cannot establish comparable qualification.
+
 Prefer extending an existing guide, target, or checker over adding a parallel entry point. Product-specific environment rules stay here even when mechanical policy checks later move to a versioned shared tool. Changes to live-operation boundaries, persistent ownership, or cross-repository release selection require the same architectural review as product changes.
