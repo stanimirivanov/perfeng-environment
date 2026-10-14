@@ -51,6 +51,11 @@ tasks:
     cmds:
       - uv run --locked python scripts/native_connectivity.py forward-api --execute
 
+  kubernetes:qualify:
+    desc: Read local benchmark prerequisites and retain a new integration qualification receipt
+    cmds:
+      - uv run --locked python -m scripts.kubernetes_benchmark check --execute
+
   native:setup:
     desc: Install the checksum-selected audited Windows gateway without PATH or trust writes
     cmds:

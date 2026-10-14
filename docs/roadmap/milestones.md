@@ -11,7 +11,7 @@
   local evidence path.
 - M02 — Declarative Local Operations completed the reversible migration of local
   workload composition to Argo CD.
-- M03 is in progress; M04 and M05 are planned. M06 remains deliberately deferred until a real
+- M03 is deferred pending a suitable laptop; M04 is in progress and M05 is planned. M06 remains deliberately deferred until a real
   non-local deployment is required.
 
 ## Ownership and update rules
@@ -39,8 +39,8 @@ only their local implementation and operating instructions.
 |:--|:--|:--|:--|
 | M01 — Local Performance Decision Loop | Complete | Execute k6, retain artifacts, normalize results, evaluate policies and baselines, and recover the control plane locally. | All current `perfeng-*` repositories |
 | M02 — Declarative Local Operations | Complete | Operate local workloads through reversible, observable GitOps ownership while preserving state and explicit recovery boundaries. | `perfeng-environment`, `perfeng-k8s`, `perfeng-control-plane` |
-| M03 — Native Browser Decision Loop | In progress | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
-| M04 — Kubernetes Benchmark Decision Loop | Planned | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
+| M03 — Native Browser Decision Loop | Deferred | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
+| M04 — Kubernetes Benchmark Decision Loop | In progress | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M05 — Operator Visibility and Diagnostics | Planned | Make runs, failures, decisions and correlated telemetry understandable without inspecting individual Pods or scripts. | Primarily `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis` |
 | M06 — Production Readiness | Deferred | Provide a secure, recoverable, upgradeable multi-user deployment when a non-local environment becomes an actual requirement. | All affected `perfeng-*` repositories and `k8s-infrastructure` |
 
@@ -122,6 +122,11 @@ local environment; see the
 
 ## M03 — Native Browser Decision Loop
 
+**Status:** Deferred at the owner's request pending a suitable laptop. Retain
+the implemented source, connectivity acceptance and rejected qualification
+reports. Resume its existing promotion and live acceptance gates once a host
+qualifies; do not relax Windows/cohort requirements to declare completion.
+
 Planned outcomes:
 
 - register and authenticate native Windows workers;
@@ -183,6 +188,28 @@ M03 remains incomplete until live acceptance passes. An operator-started
 Windows service is not required. Do not count mocks or readiness as completion.
 
 ## M04 — Kubernetes Benchmark Decision Loop
+
+**Status:** In progress, independently of deferred M03.
+
+The agreed sequence is nine coherent repository-sized slices:
+
+1. `perfeng-contracts`: Kubernetes admission/evidence semantics (bundle 0.22.0).
+2. `perfeng-environment`: read-only local integration qualification and immutable receipts.
+3. `perfeng-k8s`: contained kube-burner execution and verified publication.
+4. `perfeng-control-plane`: scoped dispatch with durable exclusive target reservations.
+5. `perfeng-analysis`: OCI provenance adoption and complete decision fixture coverage.
+6. `perfeng-control-plane`: owned workload cancellation, cleanup and restart recovery.
+7. `perfeng-k8s`: complete immutable Kubernetes runtime bundle promotion.
+8. `perfeng-environment`: reviewed runtime selection and GitOps deployment.
+9. `perfeng-environment`: automated decision-loop/cancellation/recovery acceptance.
+
+After contracts, qualification, execution packaging and analysis can proceed
+in parallel. Promotion waits for their integration and safe lifecycle support.
+Reuse existing dispatch/collection/normalization/reporting; do not duplicate them.
+The first target is bounded warm-image pod startup, not production capacity
+testing or cluster/CNI-upgrade comparison. The local cohort is integration-only.
+Missing metrics remain UNKNOWN and do not justify automatic telemetry installation.
+See [qualification](../kubernetes-benchmark-qualification.md).
 
 Planned outcomes:
 

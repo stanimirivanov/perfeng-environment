@@ -23,6 +23,14 @@
 
 ## Scope and command safety
 
+For M04 qualification, run **read-only** `task kubernetes:qualify` and follow the
+[benchmark qualification guide](kubernetes-benchmark-qualification.md). Missing,
+stale or denied Metrics API observations remain UNKNOWN, not zero load. Known
+pressure, placement/capacity failures or competing workloads reject the capture.
+Retain both result files and inspect the failed check. No metrics-server install,
+Docker restart, credential change or workload cancellation happens implicitly.
+Preflight is not a target reservation or production-performance qualification.
+
 For native gateway failures, start with **read-only** `task native:doctor`.
 It reports independent tool/checksum/build, private-state, Docker, dedicated API,
 resource, port and trust checks. `RELEASE_UNSELECTED` means the first audited

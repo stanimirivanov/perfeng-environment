@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/stanimirivanov/perfeng-contracts.git",
+  "revision": "3b86afa18b468d831c7c2c176618180db18b2764",
+  "contractsVersion": "0.22.0",
+  "sourcePath": "schemas/kubernetes-benchmark-evidence/v1/kubernetes-benchmark-evidence.schema.json",
+  "sha256": "aae5daa05c2be154c67227bddde99da3f4d9ad9c5b406c10395140d4d65737a1"
+}
