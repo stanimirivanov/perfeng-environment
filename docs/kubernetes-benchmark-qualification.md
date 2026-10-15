@@ -113,8 +113,9 @@ down and usage rounds up conservatively. Unavailable usage never becomes zero.
 - Unverified Docker/cluster/credentials: inspect `task status` and dedicated
   `.local/perfeng-local.kubeconfig`; no adoption, restart or recreation occurs.
 - UNKNOWN usage/interference: inspect node Metrics API availability/access,
-  provider timestamps and clock. Installing a service requires separately
-  reviewed GitOps ownership/security; no metrics-server or TLS bypass is installed here.
+  provider timestamps and clock. Check [the selected metrics prerequisite](local-resource-metrics.md)
+  with `task kubernetes:metrics-health`. Its separate restricted GitOps Application
+  supplies verified-TLS metrics; this collector still installs or repairs nothing.
 
 - FAIL readiness/pressure: inspect actual node conditions, without weakening gates.
 - FAIL placement/capacity: inspect names, labels, cordons, image, version,

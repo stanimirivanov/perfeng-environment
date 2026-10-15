@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-local-resource-metrics
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+    perfeng.io/workload: resource-metrics
+spec:
+  project: perfeng-local-resource-metrics
+  source:
+    repoURL: https://github.com/stanimirivanov/k8s-infrastructure.git
+    targetRevision: 5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7
+    path: charts/resource-metrics
+    helm:
+      releaseName: resource-metrics
+      valuesObject:
+        tls:
+          secretName: substrate-resource-metrics-tls
+          caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJZakNDQVFpZ0F3SUJBZ0lVUVRPSkk2T0I0TVJaWmpXMEZLeGVpZjd4UitBd0NnWUlLb1pJemowRUF3SXcKSlRFak1DRUdBMVVFQXd3YWMzVmljM1J5WVhSbExYSmxjMjkxY21ObExXMWxkSEpwWTNNd0hoY05Nall4TURFMApNakl4TVRVd1doY05NamN4TURFMU1qSXhOalV3V2pBbE1TTXdJUVlEVlFRRERCcHpkV0p6ZEhKaGRHVXRjbVZ6CmIzVnlZMlV0YldWMGNtbGpjekJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUFCUFcybDhaZ25oSVAKbk1Iak9JWlhtb3BBRVpmMERqWnd0NDdPZlYwZ05QOHFtaUMxUmtrTm4wZm9YRVpGc2U0YVJDTHUwdFBmbWkrWgpEUkh1dWRqUlcvU2pGakFVTUJJR0ExVWRFd0VCL3dRSU1BWUJBZjhDQVFBd0NnWUlLb1pJemowRUF3SURTQUF3ClJRSWdJeGdSTytQUUZoOVU1RE8xdytkWE5LcWM1cFZXS29MYXhmUnJBTDhPOXZNQ0lRQ29VMm1aeFJmMkIyVlEKOHlYb1BPTXVIRkJPUkVhWXRUR0JqTDA2aWVyTWNnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+        nodeSelector:
+          kubernetes.io/os: linux
+          workload: control-plane
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=false

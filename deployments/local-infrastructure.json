@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "source": {
     "repository": "https://github.com/stanimirivanov/k8s-infrastructure.git",
-    "revision": "65af7eaa655a4032cdcd9aab7db35f1ec36c1781"
+    "revision": "5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7"
   },
   "profile": {
     "name": "local-kind/perfeng-local",

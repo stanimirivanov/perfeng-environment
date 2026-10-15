@@ -19,6 +19,8 @@
 - The four established workload Applications synchronize and self-heal automatically.
   The new [native target](local-native-target.md) also synchronizes, but its initial
   self-healing is disabled. The root does not self-heal; pruning remains disabled everywhere.
+- [Resource metrics](local-resource-metrics.md) use a separate restricted Project and
+  immutable infrastructure chart with external verified TLS; initial self-healing is off.
 - Use the [troubleshooting runbook](troubleshooting.md) to distinguish delayed
   reconciliation, persistent drift and an unhealthy Argo CD controller.
 
@@ -33,6 +35,10 @@ as child Applications. It owns the existing PostgreSQL and re-adopted SeaweedFS
 Helm releases without replacing their StatefulSets, PVCs, PVs, external Secrets
 or data. Database migrations, runtime Secrets and ConfigMaps, and performance-Run
 resources are not migrated.
+
+The root also owns the separate resource-metrics Project/Application, without broadening
+the Perfeng workload Project. Its external serving Secret and kubelet certificate setup
+are not reconciled by Argo CD.
 
 The sample SUT and control plane no longer have second Helm deployment paths:
 Argo CD is their only workload reconciler, and release rollback uses a reviewed
@@ -72,13 +78,16 @@ consumer validation verifies:
   mounts, destination and sync policy against the reviewed deployment lock;
 - native-target chart commit, candidate digest/provenance and external pull
   Secret against its separate lock, with no initial self-healing;
+- metrics chart revision against the infrastructure lock, real public CA, external Secret
+  name, control-plane placement and separate kind/namespace-scoped Project;
 - exact ownership of the four reviewed local namespaces;
 - a least-privilege AppProject source allowlist containing exactly the
   repositories referenced by its child Applications.
 
 Workspace membership does not imply deployment authorization. In particular,
 the project-neutral `k8s-infrastructure` checkout is not a workload source for
-the Perfeng AppProject. Adding another child Application requires reviewing its
+the Perfeng workload AppProject. Metrics uses its own explicitly reviewed Project.
+Adding another child Application requires reviewing its
 repository access in the same change.
 
 The preview commands never read a credential or contact the cluster. There is
@@ -150,7 +159,8 @@ uv run --locked python scripts/control_plane_smoke.py --execute
 During the staged interval, `perfeng-local-control-plane` may be `Degraded`
 because its external Secrets, database schema and runtime ConfigMaps do not yet
 exist. The bootstrap command does not wait for or claim success for that
-Application. Final GitOps health remains fail-closed and requires the root plus all five workload
+Application. Metrics may likewise wait for its explicit certificate prerequisites;
+stateful bootstrap does not wait for it. Final GitOps health remains fail-closed and requires the root plus all six workload
 Applications and every workload acceptance check.
 
 Neither stateful bootstrap action creates a workload, PVC or bucket. Repeating
@@ -210,7 +220,7 @@ rollout and run GitOps health. The previous ConfigMaps remain available for a
 Git revert because pruning is disabled.
 
 Use the same private-repository token used by repository validation. Create a
-fine-grained personal access token restricted to the `perfeng-*` repositories,
+fine-grained personal access token restricted to the required `perfeng-*` repositories and `k8s-infrastructure`,
 with repository **Contents** set to **Read-only**; GitHub adds read-only Metadata
 access automatically. It needs no write permission and no Packages permission.
 The classic `PERFENG_REPOSITORIES_READ_TOKEN` with `read:packages` remains a
@@ -275,8 +285,10 @@ uv run --locked python scripts/gitops.py health --execute
 
 The executable consumer command validates namespace and Secret ownership,
 verifies the root Application identity, requires all
-five Applications to be both `Synced` and `Healthy`, and validates the sample
-SUT, PostgreSQL, SeaweedFS and control-plane workloads. Workload acceptance is
+six workload Applications to be both `Synced` and `Healthy`, and validates the sample
+SUT, PostgreSQL, SeaweedFS, control plane and selected resource metrics. Metrics validation
+delegates generic API/freshness checks to the pinned provider; it never provisions certificates.
+Workload acceptance is
 reconciler-neutral: it validates live resources and endpoints without expecting
 a Helm release record.
 

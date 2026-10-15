@@ -107,3 +107,4 @@ How will the assumptions and consequences be verified?
 | [0009](0009-select-image-backed-native-target.md) | Proposed | Select the image-backed target declaratively, reuse the owned pull identity and proxy only to its verified Pod without promoting native execution. |
 | [0010](0010-manage-native-connectivity-workflow.md) | Proposed | Acquire a reviewed serving binary, diagnose prerequisites and supervise one bounded foreground native session without implicit trust or state repair. |
 | [0011](0011-qualify-local-kubernetes-benchmarks.md) | Proposed | Qualify an explicitly integration-only local Kubernetes cohort through guarded reads and immutable receipts without changing infrastructure. |
+| [0012](0012-select-verified-resource-metrics.md) | Proposed | Select verified-TLS resource metrics in a separate restricted GitOps project, retaining explicit provider certificate operations and independent benchmark qualification. |

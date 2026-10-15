@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: stanimirivanov/k8s-infrastructure
-          ref: 65af7eaa655a4032cdcd9aab7db35f1ec36c1781
+          ref: 5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: k8s-infrastructure
           persist-credentials: false

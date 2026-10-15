@@ -211,6 +211,12 @@ testing or cluster/CNI-upgrade comparison. The local cohort is integration-only.
 Missing metrics remain UNKNOWN and do not justify automatic telemetry installation.
 See [qualification](../kubernetes-benchmark-qualification.md).
 
+Promotion prerequisite: the merged infrastructure package provides verified-TLS resource
+metrics and explicit certificate setup. The [environment selection](../local-resource-metrics.md)
+adds a separate restricted GitOps Project and pinned provider health. Live reconciliation,
+fresh node usage and a new all-PASS qualification remain acceptance gates before slice 7;
+this is not broad M05 telemetry or completion of the runtime decision loop.
+
 Planned outcomes:
 
 - schedule and execute reviewed kube-burner definitions through the control

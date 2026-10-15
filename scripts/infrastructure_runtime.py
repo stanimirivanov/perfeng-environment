@@ -24,10 +24,15 @@ else:
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE_LIMIT = 16 * 1024 * 1024
 PROVIDER_TIMEOUT = 10_800
-MODULES = {"cluster": "scripts.local_kind", "argocd": "scripts.argocd"}
+MODULES = {
+    "cluster": "scripts.local_kind",
+    "argocd": "scripts.argocd",
+    "metrics": "scripts.resource_metrics",
+}
 ACTIONS = {
     "cluster": {"up", "ensure", "health", "down"},
     "argocd": {"validate", "bootstrap", "health"},
+    "metrics": {"health"},
 }
 RUN_MODULE = (
     "import runpy,sys; "

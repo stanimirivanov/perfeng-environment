@@ -27,6 +27,19 @@ def archive_with(name: str, content: bytes = b"", *, symbolic_link: bool = False
 
 
 class InfrastructureRuntimeTests(unittest.TestCase):
+    def test_metrics_wrapper_exposes_only_read_only_health(self) -> None:
+        command = infrastructure_runtime.provider_command(
+            Path("selected-source"), "metrics", "health", execute=True
+        )
+        self.assertIn("scripts.resource_metrics", command)
+        self.assertIn("--execute", command)
+        self.assertNotIn("--confirm", command)
+        for action in ("approve", "serving-tls", "enable-serving", "bootstrap", "deploy"):
+            with self.subTest(action=action), self.assertRaisesRegex(ValueError, "Unsupported"):
+                infrastructure_runtime.provider_command(
+                    Path("selected-source"), "metrics", action, execute=True
+                )
+
     def test_archive_extraction_rejects_links_and_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary)

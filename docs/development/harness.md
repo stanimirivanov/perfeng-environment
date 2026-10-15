@@ -54,6 +54,12 @@ publisher record and exact fixture source, then renders it offline. CI uses a
 separate checkout from the older control-plane deployment pin. `task native:target-health`
 is a distinct explicit read-only GHCR/Kubernetes acceptance tier, not a CI gate.
 
+The same pinned integration tier renders the infrastructure-lock-selected metrics
+chart with the real public serving CA, enforcing TLS, control-plane placement and
+exact resource identities. Normal `make verify` checks its separate AppProject and
+Application without sibling or cluster access. `task kubernetes:metrics-health`
+is live read-only acceptance, not deployment or certificate provisioning.
+
 ## Extending the harness
 
 `make check` validates the Kubernetes benchmark profile and local schema checksum

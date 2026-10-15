@@ -106,7 +106,7 @@ class InfrastructureLockTests(unittest.TestCase):
     def test_loads_complete_immutable_selection(self) -> None:
         lock = self.load()
 
-        self.assertEqual(lock.revision, "65af7eaa655a4032cdcd9aab7db35f1ec36c1781")
+        self.assertEqual(lock.revision, "5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7")
         self.assertEqual(lock.profile, "local-kind/perfeng-local")
         self.assertEqual(lock.context, "kind-perfeng-local")
         self.assertEqual(lock.argocd_version, "v3.5.2")
