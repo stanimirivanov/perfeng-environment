@@ -23,6 +23,15 @@
 
 ## Scope and command safety
 
+For missing Kubernetes resource metrics, run **read-only** `task kubernetes:metrics-health`
+and follow [the resource-metrics guide](local-resource-metrics.md). The command checks the
+exact live Application/Project and public API CA, then delegates health to the pinned provider.
+Missing external TLS material or unissued kubelet serving CSRs need explicit provider setup,
+not Helm deployment, automatic approval or a TLS bypass. Ensure the Argo CD Contents-read
+credential includes `k8s-infrastructure`. Newly generated CA values need a reviewed selection;
+never rotate a Secret or edit evidence to make health pass. Final GitOps health includes
+this new prerequisite; staged stateful bootstrap deliberately does not wait for it.
+
 For M04 qualification, run **read-only** `task kubernetes:qualify` and follow the
 [benchmark qualification guide](kubernetes-benchmark-qualification.md). Missing,
 stale or denied Metrics API observations remain UNKNOWN, not zero load. Known

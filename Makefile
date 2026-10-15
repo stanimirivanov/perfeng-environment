@@ -71,6 +71,8 @@ release-selection-check:
 	$(UV_RUN) python scripts/infrastructure_release.py validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
 	$(UV_RUN) python scripts/infrastructure_runtime.py cluster ensure --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
 	$(UV_RUN) python scripts/infrastructure_runtime.py argocd validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
+	$(UV_RUN) python scripts/resource_metrics_release.py validate --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
+	$(UV_RUN) python scripts/infrastructure_runtime.py metrics health --infrastructure-root "$(INFRASTRUCTURE_ROOT)"
 	$(UV_RUN) python scripts/control_plane_release.py validate --k8s-root "$(K8S_ROOT)" --control-plane-root "$(CONTROL_PLANE_ROOT)"
 	$(UV_RUN) python scripts/control_plane_runtime.py validate
 	$(UV_RUN) python scripts/native_target_release.py validate --k8s-root "$(NATIVE_TARGET_K8S_ROOT)"

@@ -36,8 +36,11 @@ provider commit and records the compatibility values that Perfeng relies on:
 Argo CD validation, installation and controller readiness. This repository
 owns the four Perfeng namespaces, external credentials and durable inputs, the
 root and child Applications, workload health, smoke tests, and the roadmap.
-The infrastructure repository is not an Argo CD workload source and is not
-added to the Perfeng AppProject.
+The infrastructure repository is not added to the Perfeng workload AppProject.
+Its [resource-metrics chart](local-resource-metrics.md) is explicitly selected through
+a separate restricted add-on Project, never through workspace-derived authorization.
+The selected revision also exposes generic read-only metrics health through the
+isolated runtime wrapper; certificate mutation commands are not exposed there.
 
 `cluster.py` exposes only Perfeng namespace bootstrap and shared safe command
 utilities, while `gitops.py` manages consumer credentials, Applications and

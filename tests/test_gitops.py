@@ -222,6 +222,7 @@ class GitOpsTests(unittest.TestCase):
             patch("scripts.gitops.postgres.execute") as postgres_health,
             patch("scripts.gitops.object_store.execute") as object_store_health,
             patch("scripts.gitops.control_plane_health.verify") as control,
+            patch("scripts.gitops.resource_metrics_health.verify") as metrics,
         ):
             gitops.execute("bootstrap")
 
@@ -242,6 +243,7 @@ class GitOpsTests(unittest.TestCase):
         run.assert_not_called()
         object_store_health.assert_not_called()
         control.assert_not_called()
+        metrics.assert_not_called()
 
     def test_health_observes_without_applying_resources(self) -> None:
         kube = ["kubectl"]
@@ -257,6 +259,7 @@ class GitOpsTests(unittest.TestCase):
             patch("scripts.gitops.postgres.execute") as postgres_health,
             patch("scripts.gitops.object_store.execute") as object_store_health,
             patch("scripts.gitops.control_plane_health.verify") as control,
+            patch("scripts.gitops.resource_metrics_health.verify") as metrics,
         ):
             gitops.execute("health")
 
@@ -271,6 +274,11 @@ class GitOpsTests(unittest.TestCase):
         postgres_health.assert_called_once_with("health", gitops.cluster.ROOT)
         object_store_health.assert_called_once()
         control.assert_called_once_with(gitops.cluster.ROOT)
+        metrics.assert_called_once_with(gitops.cluster.ROOT)
+        self.assertIn(
+            gitops.resource_metrics_release.APPLICATION,
+            [call.args[1] for call in wait.call_args_list],
+        )
 
 
 if __name__ == "__main__":

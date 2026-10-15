@@ -3,6 +3,7 @@
 ## TL;DR
 
 - Use opt-in `task kubernetes:qualify` for [local Kubernetes benchmark preflight](docs/kubernetes-benchmark-qualification.md); it retains integration-only evidence without modifying the cluster.
+- [Verified-TLS resource metrics](docs/local-resource-metrics.md) are selected through a separate restricted GitOps project; `task kubernetes:metrics-health` checks the prerequisite without repairing it.
 
 - This repository composes the local performance-platform workspace and its
   Kubernetes environment; it does not own component source code.

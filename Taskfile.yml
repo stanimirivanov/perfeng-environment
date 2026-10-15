@@ -56,6 +56,11 @@ tasks:
     cmds:
       - uv run --locked python -m scripts.kubernetes_benchmark check --execute
 
+  kubernetes:metrics-health:
+    desc: Verify the selected metrics owner, TLS binding and fresh node usage without repair
+    cmds:
+      - uv run --locked python scripts/resource_metrics_health.py --execute
+
   native:setup:
     desc: Install the checksum-selected audited Windows gateway without PATH or trust writes
     cmds:

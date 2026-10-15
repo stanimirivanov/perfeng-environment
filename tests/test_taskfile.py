@@ -32,6 +32,7 @@ class TaskfileTests(unittest.TestCase):
                 "native:permissions",
                 "native:up",
                 "kubernetes:qualify",
+                "kubernetes:metrics-health",
             },
         )
 
@@ -58,6 +59,15 @@ class TaskfileTests(unittest.TestCase):
         )
         for name in ("bootstrap", "status", "smoke"):
             self.assertNotIn("kubernetes:qualify", str(self.tasks[name]))
+
+    def test_metrics_health_is_a_read_only_capability_not_certificate_setup(self) -> None:
+        self.assertEqual(
+            self.tasks["kubernetes:metrics-health"]["cmds"],
+            ["uv run --locked python scripts/resource_metrics_health.py --execute"],
+        )
+        for name in ("bootstrap", "status", "smoke", "kubernetes:metrics-health"):
+            for mutation in ("enable-serving", "serving-tls", "approve"):
+                self.assertNotIn(mutation, str(self.tasks[name]))
 
     def test_status_is_diagnostic_and_smoke_requires_it(self) -> None:
         status = self.tasks["status"]["cmds"]

@@ -20,6 +20,8 @@ if __package__:
         native_target_release,
         object_store,
         postgres,
+        resource_metrics_health,
+        resource_metrics_release,
     )
     from .control_plane_registry import valid_token
     from .control_plane_release import (
@@ -35,6 +37,8 @@ else:
     import native_target_release
     import object_store
     import postgres
+    import resource_metrics_health
+    import resource_metrics_release
     from control_plane_registry import valid_token
     from control_plane_release import (
         CONTROL_PLANE_HTTP_PORT,
@@ -279,11 +283,13 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
         != [
             "namespaces.yaml",
             "project.yaml",
+            "resource-metrics-project.yaml",
             "sample-sut-application.yaml",
             "postgres-application.yaml",
             "seaweedfs-application.yaml",
             "control-plane-application.yaml",
             "native-search-application.yaml",
+            "resource-metrics-application.yaml",
         ]
         or project.get("kind") != "AppProject"
         or project.get("metadata", {}).get("name") != "perfeng-local"
@@ -340,6 +346,7 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
     validate_control_plane_application(control_plane, release)
     native_target_release.validate_application(native_search, native_selection)
     native_target_release.expected_files(root)
+    resource_metrics_release.validate_configuration(root)
 
 
 def credential_document(token: str) -> dict[str, Any]:
@@ -471,6 +478,8 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
         return
     gitops_status.wait_for_application(kube, CONTROL_PLANE_APPLICATION)
     gitops_status.wait_for_application(kube, native_target_release.APPLICATION)
+    gitops_status.wait_for_application(kube, resource_metrics_release.APPLICATION)
+    resource_metrics_health.verify(root)
     cluster.run(
         [
             *kubectl(root, namespace="perf-sut"),

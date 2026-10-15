@@ -16,6 +16,13 @@ Every update preserves `uv.lock` and runs `make verify`. Security-sensitive or b
 
 ## External tools
 
+Verified resource-metrics selection locks `cryptography` 50.0.2 (Apache-2.0 OR
+BSD-3-Clause), plus CFFI (MIT-0) and pycparser (BSD-3-Clause), matching the selected
+provider's runtime requirement. It validates the public CA without custom ASN.1
+or shell parsing and supports isolated provider health execution. Private key
+generation/handling remains provider-owned. The adapter boundary is
+`scripts/resource_metrics_release.py`; existing dependencies are not upgraded.
+
 Kubernetes qualification uses maintained MIT-licensed `jsonschema` for the
 vendored Draft 2020-12 evidence schema, with remote resolution disabled. The
 local adapter is its replacement boundary. Only the required core graph is
