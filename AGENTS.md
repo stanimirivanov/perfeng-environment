@@ -6,6 +6,8 @@
 - Preserve existing work, local state, credentials and resource identities.
 - Keep validation offline and make live or external mutations explicit.
 - Run the exact repository checks and report their results honestly.
+- For authorized implementation, follow the issue-first GitHub CLI workflow,
+  then return the PR URL and wait for human review; never auto-merge.
 
 This file is the concise, tool-facing entry point for contributors and coding
 agents. [CONTRIBUTING.md](CONTRIBUTING.md) is the canonical workflow policy.
@@ -14,7 +16,7 @@ Normative terms such as MUST, SHOULD and MAY have the meanings defined there.
 ## Before changing anything
 
 1. You MUST read [CONTRIBUTING.md](CONTRIBUTING.md), especially its ambiguity,
-   issue-timing, verification and external-side-effect rules.
+   issue-timing, verification, external-side-effect and review-pause rules.
 2. You MUST inspect the branch and working tree and preserve pre-existing work.
 3. You MUST use the [documentation map](docs/README.md) to select the relevant
    engineering standard, operational guide, accepted ADR and roadmap material.
@@ -88,6 +90,14 @@ Follow the engineering standards and applicable operational or migration ADR.
 
 ## Completion
 
-The canonical required checks and completion-report format are defined in
-[CONTRIBUTING.md](CONTRIBUTING.md). Follow them after every work item; do not
-infer a different report shape from this summary.
+Follow the canonical [development workflow](CONTRIBUTING.md#development-workflow)
+and [review pause](CONTRIBUTING.md#completion-and-review-pause): use `gh` to create
+or reuse the issue before implementation, work on `feature/issue-N` or
+`fix/issue-N`, stage only task files, prefix commits and PR titles with `[#N]`,
+and begin the PR body with `Closes #N`. Put scope and verification evidence in
+GitHub, not chat drafts or committed handoff files.
+
+After PR creation, output only its URL and stop: no merge or further Git commands.
+For requested fixes or delivered CI failures, use new issue-prefixed commits on
+the same branch, push, add the structured `Fix Applied` comment and wait again.
+The workflow does not authorize unrelated writes or live infrastructure changes.

@@ -26,6 +26,20 @@ Unavailable checks follow the constrained-environment protocol in
 
 ## Harness principles
 
+GitHub delivery follows [CONTRIBUTING.md](../../CONTRIBUTING.md#development-workflow):
+use an authenticated `gh` executable to create/reuse the issue before implementation,
+then create the issue branch, verify, commit, push and open the PR. Keep actual
+verification evidence in the PR; return only its URL and wait for human review.
+Requested revisions or delivered CI failures use the same branch and the reusable
+[fix comment](../../.github/PR_FIX_COMMENT_TEMPLATE.md). Do not auto-merge.
+
+Git/GitHub delivery is an explicitly authorized external workflow, not a dependency
+of `make verify` or `make validate`. Repository checks MUST NOT create issues,
+push branches, post comments or require GitHub credentials/network access (except
+the documented advisory lookup in the separate supply-chain tier). Template
+regressions use local fixtures. Missing `gh` or authentication is a delivery
+blocker, not grounds for installing tools or changing credentials implicitly.
+
 The explicit `native-gateway.yml` Windows tier builds the serving binary from
 locked Go inputs, audits it and exercises real isolated TLS/Host/URI and child
 cleanup. It creates temporary loopback listeners/CA state but never changes a

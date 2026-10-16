@@ -32,6 +32,12 @@ dependency set. Existing dependencies are not upgraded with this admission.
 
 Helm, Git, Task, Docker, kind, kubectl, and Argo CD tools are operational prerequisites with different authority. `make doctor` reports the core engineering toolchain; focused operating guides define additional live prerequisites. Offline render checks may invoke Helm; cluster tools appear only in explicitly selected live paths. Tool acquisition, when automated, must use a reviewed version and repository-anchored integrity check. CI verifies Helm 4.1.4 against `.helm-linux-amd64.sha256` before extraction.
 
+The authorized contributor delivery workflow additionally requires GitHub CLI
+(`gh`) and an existing authenticated account with access to the target repository.
+It is not a Python dependency, validation prerequisite or cluster credential.
+Use an existing executable outside PATH when necessary; do not install, log in,
+change credential scopes or alter machine-wide PATH implicitly.
+
 ## GitHub Actions and immutable selections
 
 The opt-in native gateway uses Caddy 2.11.7 (Apache-2.0); see the

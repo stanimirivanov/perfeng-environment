@@ -456,6 +456,25 @@ After migration 0018, do not Git-revert and restart an old worker against the
 migrated database. Pause, preserve state and select forward repair or a separately
 reviewed coordinated backup restore. No automatic down migration is provided.
 
+## Contributor GitHub delivery failures
+
+The [automated contributor workflow](../CONTRIBUTING.md#development-workflow)
+requires an authenticated `gh` executable, but offline verification does not.
+If `gh` is absent from PATH, locate the installed executable and use its full
+path; do not reinstall or change machine configuration implicitly. Use
+`gh auth status` to inspect account/access without printing credentials. A
+missing login or denied permission needs owner action, not a token pasted into
+the issue, repository or command arguments.
+
+If issue/PR creation times out, inspect existing task records with read-only
+`gh issue list`, `gh issue view`, `gh pr list` or `gh pr view` before retrying.
+Reuse an already-created record instead of duplicating it. Preserve a local
+commit after a failed push and retry only after resolving the reported failure;
+do not force-push, amend history, bypass protection or switch to a chat draft.
+After PR creation, return the URL and wait for human review without further Git
+commands. Delivered CI failures or owner-requested fixes use the same branch
+and a structured `Fix Applied` PR comment. Never auto-merge.
+
 ## What to include in a defect report
 
 Include:

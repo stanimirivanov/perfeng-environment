@@ -213,6 +213,51 @@ def _template_violations(root: Path) -> list[Violation]:
                     "restore the exact milestone prompt",
                 )
             )
+        if path.name == "PULL_REQUEST_TEMPLATE.md":
+            requirements = [
+                (
+                    text.startswith("Closes #<issue-number>\n"),
+                    "begin with `Closes #<issue-number>`",
+                ),
+                (
+                    "[#<issue-number>]" in text,
+                    "document the mandatory `[#<issue-number>]` PR title prefix",
+                ),
+                (
+                    "- [ ] Human review and merge:" in text,
+                    "retain the human review/merge pause checklist item",
+                ),
+            ]
+            for satisfied, fix in requirements:
+                if not satisfied:
+                    violations.append(
+                        Violation(
+                            relative,
+                            1,
+                            "template.pull-request.workflow",
+                            "automated PR workflow requirement is missing",
+                            fix,
+                        )
+                    )
+
+    comment_path = root / ".github/PR_FIX_COMMENT_TEMPLATE.md"
+    comment_text = comment_path.read_text(encoding="utf-8") if comment_path.is_file() else ""
+    if not (
+        comment_text.startswith("### Fix Applied\n")
+        and all(
+            re.search(rf"^\*\*{field}:\*\*\s+\S", comment_text, re.MULTILINE)
+            for field in ("Issue", "Resolution", "Verification")
+        )
+    ):
+        violations.append(
+            Violation(
+                ".github/PR_FIX_COMMENT_TEMPLATE.md",
+                1,
+                "template.fix-comment",
+                "structured revision comment template is missing or incomplete",
+                "start with `### Fix Applied` and include Issue, Resolution and Verification fields",
+            )
+        )
     return violations
 
 
