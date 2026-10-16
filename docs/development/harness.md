@@ -76,6 +76,14 @@ is live read-only acceptance, not deployment or certificate provisioning.
 
 ## Extending the harness
 
+`task kubernetes:acceptance` previews the M04 decision-loop/recovery exercise
+without processes, network or writes. Its separately confirmed execution path
+can submit Runs, explicitly approve a selected baseline and gracefully restart
+one verified controller Pod. It MUST NOT become a bootstrap, status, smoke or CI
+dependency. Deterministic acceptance regressions are part of `make test`;
+real execution follows [the acceptance guide](../kubernetes-benchmark-acceptance.md)
+only after the deployment cutover. Source tests never complete the milestone.
+
 `make check` validates the Kubernetes benchmark profile and local schema checksum
 offline. `make release-selection-check` compares the snapshot with the exact
 contracts commit. `task kubernetes:qualify` is a separate explicit live read-only

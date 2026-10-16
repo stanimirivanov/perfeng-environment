@@ -456,6 +456,36 @@ After migration 0018, do not Git-revert and restart an old worker against the
 migrated database. Pause, preserve state and select forward repair or a separately
 reviewed coordinated backup restore. No automatic down migration is provided.
 
+## M04 benchmark acceptance
+
+Follow [the acceptance guide](kubernetes-benchmark-acceptance.md). The default
+`task kubernetes:acceptance` is an **offline preview**, not a healthy signal.
+Confirmed execution is **mutating**: Run submissions, optional explicitly
+authorized baseline transitions and one exact graceful controller Pod restart.
+First finish the [runtime cutover](kubernetes-runtime-deployment.md); never use
+acceptance as deployment, migration, image warming, certificate setup or repair.
+
+Use the last printed phase/Run ID and ignored results journal to find the failed
+boundary. Missing baseline consent fails before reference submission. Unknown or
+rejected measurement eligibility, missing samples/CV, checksum/metadata drift,
+wrong reference or INCONCLUSIVE report cannot count as a passing decision loop.
+An evaluated observe-mode regression FAIL can still prove the integration path;
+it does not mean performance passed.
+
+A missed cancellation window requires inspecting and resolving the actual Run,
+not injecting artificial delays or changing its workload. A stale Pod UID/RV,
+foreign owner chain or unrelated active Run refuses restart. An unreleased hold,
+missing cleanup proof, remaining workload/authority or open quota refuses
+success even if the API says ABORTED. Preserve the two-minute drain and retained
+namespace/quota barriers; never patch a reservation or force-delete to repair.
+
+On failure/interruption, the client Pod, journal, database rows and artifacts
+remain. Inspect the recorded idempotency intent before retrying an uncertain
+submission; no automatic retry or whole-session resume is promised. The guide
+describes explicit reuse of an exact completed source after baseline-transition
+interruption. A new PASSED receipt is the full healthy signal. Source-only
+verification leaves M04 live completion pending.
+
 ## Contributor GitHub delivery failures
 
 The [automated contributor workflow](../CONTRIBUTING.md#development-workflow)
