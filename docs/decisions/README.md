@@ -109,3 +109,4 @@ How will the assumptions and consequences be verified?
 | [0011](0011-qualify-local-kubernetes-benchmarks.md) | Proposed | Qualify an explicitly integration-only local Kubernetes cohort through guarded reads and immutable receipts without changing infrastructure. |
 | [0012](0012-select-verified-resource-metrics.md) | Proposed | Select verified-TLS resource metrics in a separate restricted GitOps project, retaining explicit provider certificate operations and independent benchmark qualification. |
 | [0013](0013-select-local-benchmark-runtime.md) | Proposed | Select the mixed-contract benchmark runtime with dedicated-cluster authority, independent pull credentials and an explicit quiescent migration/manual activation boundary. |
+| [0014](0014-separate-release-and-run-orchestration.md) | Proposed | Assign finite release operations to Argo Workflows while retaining Argo CD workload reconciliation and control-plane performance Run ownership. |

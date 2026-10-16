@@ -16,6 +16,7 @@
 | Workspace composition or sibling checkouts | [Repository README](../README.md) | `scripts/workspace.py`, `workspace.json` |
 | Local Kubernetes substrate or Argo CD bootstrap | [Local infrastructure release](local-infrastructure-release.md), [local Kubernetes](local-kubernetes.md) | [ADR index](decisions/README.md), specialized release-selection checks |
 | GitOps composition, ownership, or recovery | [Local GitOps](local-gitops.md), [migration completion](gitops-migration-completion.md) | [Troubleshooting](troubleshooting.md), `scripts/gitops.py` |
+| Release workflow ownership or deployment-script retirement | [ADR 0014](decisions/0014-separate-release-and-run-orchestration.md), [retirement baseline](deployment-script-retirement.md) | [Taskfile](../Taskfile.yml), [M04 cutover](kubernetes-runtime-deployment.md) |
 | PostgreSQL or object storage | [Local PostgreSQL](local-postgres.md), [local object store](local-object-store.md) | [Storage access](storage-access.md), [troubleshooting](troubleshooting.md) |
 | Control-plane deployment or runtime inputs | [Local control plane](local-control-plane.md) | Deployment lock and pinned sibling validation |
 | M04 runtime selection, migration or benchmark controller authority | [Kubernetes runtime deployment](kubernetes-runtime-deployment.md), [ADR 0013](decisions/0013-select-local-benchmark-runtime.md) | Explicit pause/prepare/manual sync; exact registry, cluster and execution credentials |
