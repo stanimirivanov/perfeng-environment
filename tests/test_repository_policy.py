@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,87 @@ from scripts import repository_policy
 
 
 class RepositoryPolicyTests(unittest.TestCase):
+    def test_pr_metadata_requires_one_issue_identity(self) -> None:
+        self.assertEqual(
+            repository_policy.check_pull_request_metadata(
+                "[#42] Improve pull request metadata checks",
+                "Closes #42\n\nVerified with make verify.",
+                "feature/issue-42",
+            ),
+            [],
+        )
+        for title, body, branch, expected in (
+            (
+                "Add PR validation",
+                "Closes #42\n\nDetails",
+                "feature/issue-42",
+                "PR title must start",
+            ),
+            (
+                "[#42] Add PR validation",
+                "Summary first\nCloses #42",
+                "feature/issue-42",
+                "PR body must begin",
+            ),
+            (
+                "[#42] Add PR validation",
+                "Closes #43\n\nDetails",
+                "feature/issue-42",
+                "must reference the same issue",
+            ),
+            (
+                "[#42] Add PR validation",
+                "Closes #42\n\nDetails",
+                "feature/issue-43",
+                "must reference the same issue",
+            ),
+        ):
+            with self.subTest(title=title, body=body, branch=branch):
+                errors = repository_policy.check_pull_request_metadata(title, body, branch)
+                self.assertTrue(any(expected in error for error in errors))
+
+    def test_pr_event_rejects_mismatch_without_disclosing_body(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "event.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "pull_request": {
+                            "title": "[#42] Check metadata",
+                            "body": "Closes #999\nsecret-looking text",
+                            "head": {"ref": "feature/issue-42"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errors = repository_policy.check_pull_request_event(path)
+            self.assertTrue(errors)
+            self.assertNotIn("secret-looking text", " ".join(errors))
+            path.write_text('{"pull_request": {"title": "[#42] Check metadata"}}', encoding="utf-8")
+            self.assertIn(
+                "branch metadata is missing",
+                " ".join(repository_policy.check_pull_request_event(path)),
+            )
+
+    def test_pr_event_preserves_dependabot_update_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "event.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "pull_request": {
+                            "user": {"login": "dependabot[bot]"},
+                            "title": "deps(actions): bump checkout",
+                            "body": "Automated dependency update",
+                            "head": {"ref": "dependabot/github_actions/checkout-7"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(repository_policy.check_pull_request_event(path), [])
+
     def write_templates(self, root: Path) -> None:
         """Provide only local forms; policy checks must never need gh or network access."""
         issue = root / ".github/ISSUE_TEMPLATE/work-item.md"

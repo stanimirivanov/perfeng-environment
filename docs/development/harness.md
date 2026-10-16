@@ -21,6 +21,14 @@
 | Pinned integration | `make release-selection-check` | Validate exact sibling revisions selected by deployment locks; requires the adjacent repositories and their selected commits. |
 | Live operation | `task bootstrap`, `task status`, `task smoke`, `task destroy` | Access or mutate the dedicated local environment; follow the operating guides and obtain required authority. |
 
+The metadata-only `pull_request_target` workflow checks a PR's title, leading
+closing reference, and issue branch against one issue number. It checks out the
+exact base commit and runs no code from the PR branch. The policy reads only
+GitHub's local event file, emits no PR body content, and has read-only repository
+permissions. Dependabot PRs are exempt because their generated branch and title
+follow the dependency-update policy. This event-specific check is separate from
+the offline `make verify` inner loop.
+
 Unavailable checks follow the constrained-environment protocol in
 [CONTRIBUTING.md](../../CONTRIBUTING.md#verification-and-constrained-environments).
 
