@@ -56,6 +56,16 @@ tasks:
     cmds:
       - uv run --locked python -m scripts.kubernetes_benchmark check --execute
 
+  kubernetes:acceptance:
+    desc: Preview M04 acceptance; explicit execution can submit Runs, approve the selected baseline and restart the controller
+    summary: |
+      Preview is offline. Follow docs/kubernetes-benchmark-acceptance.md before
+      adding --execute --confirm perfeng-local and the reviewed candidate source
+      revision. Baseline creation/approval additionally requires --approve-baseline.
+      This task is not a bootstrap, status, smoke or CI dependency.
+    cmds:
+      - uv run --locked --offline python -m scripts.kubernetes_acceptance {{.CLI_ARGS}}
+
   kubernetes:prepare:
     desc: Pause the control plane and explicitly prepare the selected M04 migration and external inputs
     summary: |

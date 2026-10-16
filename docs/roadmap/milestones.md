@@ -200,9 +200,10 @@ The agreed sequence is nine coherent repository-sized slices:
 5. `perfeng-analysis`: OCI provenance adoption and complete decision fixture coverage.
 6. `perfeng-control-plane`: owned workload cancellation, cleanup and restart recovery.
 7. `perfeng-k8s`: complete immutable Kubernetes runtime bundle promotion — merged.
-8. `perfeng-environment`: reviewed runtime selection and GitOps deployment — prepared;
+8. `perfeng-environment`: reviewed runtime selection and GitOps deployment — source merged;
    [explicit maintenance cutover and live acceptance](../kubernetes-runtime-deployment.md) pending.
-9. `perfeng-environment`: automated decision-loop/cancellation/recovery acceptance.
+9. `perfeng-environment`: [automated decision-loop/cancellation/recovery acceptance](../kubernetes-benchmark-acceptance.md)
+   — source implemented; live acceptance and reviewed success evidence remain pending.
 
 After contracts, qualification, execution packaging and analysis can proceed
 in parallel. Promotion waits for their integration and safe lifecycle support.

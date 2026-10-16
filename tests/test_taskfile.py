@@ -32,6 +32,7 @@ class TaskfileTests(unittest.TestCase):
                 "native:permissions",
                 "native:up",
                 "kubernetes:qualify",
+                "kubernetes:acceptance",
                 "kubernetes:metrics-health",
                 "kubernetes:prepare",
             },
@@ -60,6 +61,17 @@ class TaskfileTests(unittest.TestCase):
         )
         for name in ("bootstrap", "status", "smoke"):
             self.assertNotIn("kubernetes:qualify", str(self.tasks[name]))
+
+    def test_m04_acceptance_is_preview_first_with_explicit_arguments_not_an_aggregate(self):
+        task = self.tasks["kubernetes:acceptance"]
+        self.assertEqual(
+            task["cmds"],
+            ["uv run --locked --offline python -m scripts.kubernetes_acceptance {{.CLI_ARGS}}"],
+        )
+        self.assertNotIn("--execute", task["cmds"][0])
+        self.assertIn("--approve-baseline", task["summary"])
+        for name in ("bootstrap", "status", "smoke", "kubernetes:prepare"):
+            self.assertNotIn("kubernetes:acceptance", str(self.tasks[name]))
 
     def test_m04_preparation_pauses_before_migrations_and_does_not_activate(self) -> None:
         self.assertEqual(

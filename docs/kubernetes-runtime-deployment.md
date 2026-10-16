@@ -8,8 +8,9 @@
 - Publish the new pod-startup policy once, then merge the reviewed selection.
 - Resume the root with `gitops.py bootstrap --execute`, wait for benchmark authority,
   then manually Sync the control-plane child in Argo CD, with pruning disabled.
-- Run GitOps health and the existing checkout smoke. M04 decision-loop, cancellation
-  and recovery acceptance are the next slice; this deployment does not complete M04.
+- Run GitOps health and the existing checkout smoke, then follow
+  [M04 decision-loop, cancellation and recovery acceptance](kubernetes-benchmark-acceptance.md).
+  Deployment readiness alone does not complete M04.
 
 ## Selection and prerequisites
 

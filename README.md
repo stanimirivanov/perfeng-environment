@@ -4,7 +4,7 @@
 
 - Use opt-in `task kubernetes:qualify` for [local Kubernetes benchmark preflight](docs/kubernetes-benchmark-qualification.md); it retains integration-only evidence without modifying the cluster.
 - [Verified-TLS resource metrics](docs/local-resource-metrics.md) are selected through a separate restricted GitOps project; `task kubernetes:metrics-health` checks the prerequisite without repairing it.
-- For M04 deployment, follow the [runtime cutover guide](docs/kubernetes-runtime-deployment.md): explicit pause/preparation, then manual control-plane sync after merge.
+- For M04 deployment, follow the [runtime cutover guide](docs/kubernetes-runtime-deployment.md): explicit pause/preparation, then manual control-plane sync after merge. Continue with [decision-loop and recovery acceptance](docs/kubernetes-benchmark-acceptance.md); deployment readiness alone does not complete M04.
 
 - This repository composes the local performance-platform workspace and its
   Kubernetes environment; it does not own component source code.
@@ -161,6 +161,7 @@ task --list
 task bootstrap
 task status
 task smoke
+task kubernetes:acceptance
 task destroy
 ```
 
@@ -177,6 +178,11 @@ task destroy
   for inspection.
 - `task smoke` first requires complete platform health, then creates one retained
   end-to-end Run and its evidence.
+- `task kubernetes:acceptance` is an offline M04 plan by default. Its separately
+  confirmed execution submits benchmark Runs, can explicitly approve the selected
+  integration baseline, and restarts one verified controller Pod during cleanup.
+  Follow the [acceptance guide](docs/kubernetes-benchmark-acceptance.md) first;
+  it is not part of bootstrap, status or smoke.
 - `task destroy` displays an interactive warning before invoking the existing
   exact-name deletion boundary. It permanently deletes all cluster-local data.
 
