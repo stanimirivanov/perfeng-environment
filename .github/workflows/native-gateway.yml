@@ -3,9 +3,6 @@ name: Build and optionally publish verified native gateway
 on:
   pull_request:
     paths: [native-gateway/**, scripts/native_gateway*.py, scripts/native_connectivity.py, tests/test_native_gateway*.py, .github/workflows/native-gateway.yml]
-  push:
-    branches: [main]
-    paths: [native-gateway/**, scripts/native_gateway*.py, scripts/native_connectivity.py, .github/workflows/native-gateway.yml]
   workflow_dispatch:
     inputs:
       publish:
