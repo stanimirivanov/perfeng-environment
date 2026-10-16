@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-local-benchmark-authority
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+spec:
+  project: perfeng-local-benchmark-authority
+  source:
+    repoURL: https://github.com/stanimirivanov/perfeng-environment.git
+    targetRevision: main
+    path: gitops/benchmark-authority
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: perf-generators
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=false

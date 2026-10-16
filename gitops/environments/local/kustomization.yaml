@@ -4,9 +4,11 @@ resources:
   - namespaces.yaml
   - project.yaml
   - resource-metrics-project.yaml
+  - benchmark-authority-project.yaml
   - sample-sut-application.yaml
   - postgres-application.yaml
   - seaweedfs-application.yaml
   - control-plane-application.yaml
   - native-search-application.yaml
   - resource-metrics-application.yaml
+  - benchmark-authority-application.yaml

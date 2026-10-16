@@ -9,8 +9,8 @@
   runtime inputs in the order below; Argo CD does not own those resources yet.
 - The preferred workload reconciler is the control-plane child Application in
   [the local GitOps environment](local-gitops.md).
-- The superseded Helm deploy command has been removed; release rollback uses a
-  reviewed Git revert while Argo CD remains the sole workload reconciler.
+- The superseded Helm deploy command has been removed. Migration-bearing releases
+  need [coordinated cutover/recovery](kubernetes-runtime-deployment.md), not an image-only Git revert.
 - Smoke and persistence checks validate the live workload without depending on
   Helm release history.
 - Diagnose failures in dependency order with the
@@ -43,6 +43,11 @@ or that a cluster is healthy. It contains no credentials and does not create
 Kubernetes resources.
 
 ## Local infrastructure prerequisites
+
+The current M04 migration-bearing selection follows the
+[Kubernetes runtime deployment guide](kubernetes-runtime-deployment.md). It
+supersedes automatic activation: explicitly pause before migrations, prepare
+external inputs and execution pull credentials, then manually sync after merge.
 
 The source-workspace bootstrap does not create runtime infrastructure. On a
 fresh cluster, follow the complete
@@ -132,6 +137,7 @@ After database identities and registry access pass health checks, run the pinned
 control-plane migration image and establish the runtime grants:
 
 ```sh
+uv run --locked python scripts/control_plane_maintenance.py pause --execute
 uv run --locked python scripts/control_plane_migration.py deploy
 uv run --locked python scripts/control_plane_migration.py deploy --execute
 uv run --locked python scripts/control_plane_migration.py health --execute
@@ -144,6 +150,12 @@ matching successful Job; it never replaces a failed or foreign Job implicitly.
 After migration, the environment revokes public/runtime defaults and grants the
 runtime login only the table operations required by the API and trusted worker.
 Health verifies the Job and every required/forbidden privilege without writing.
+
+Migration deploy refuses until both root/child Applications are paused, the owned
+control-plane Deployment is stopped and no matching Pods remain. The runtime
+reservation grant is SELECT/INSERT/UPDATE, never DELETE. The pinned image also
+contains native schema history; this selection does not enable native acquisition
+or its credentials/grants.
 
 ## Runtime inputs
 
@@ -177,8 +189,10 @@ stable names because credential rotation is a separate explicit operation.
 When a reviewed change produces new runtime bytes, deploy the new runtime inputs
 before merging the Application reference. The new immutable ConfigMaps coexist
 with the current selection, so pre-staging does not affect the running workload.
-After the merge, Argo CD changes the Deployment reference and performs the
-rollout. Old ConfigMaps are deliberately retained while pruning is disabled;
+For the current migration-bearing selection, automatic child sync is disabled;
+after preparation and merge, resume the root then manually sync the child as
+described in the [cutover guide](kubernetes-runtime-deployment.md).
+Old ConfigMaps are deliberately retained while pruning is disabled;
 they support rollback and require a separate reviewed retention policy before
 cleanup.
 
@@ -190,8 +204,9 @@ Application renders the chart from the exact locked `perfeng-k8s` commit and
 supplies only non-secret resource names and the immutable image identity.
 Credentials remain in Kubernetes Secrets and do not enter Application values.
 
-After the GitOps change is merged to `main`, verify reconciliation and the live
-workload:
+After preparation, merge and explicit manual activation, verify reconciliation
+and the live workload. The separate benchmark authority and execution pull
+Secret are also required; see [the cutover guide](kubernetes-runtime-deployment.md).
 
 ```sh
 uv run --locked python scripts/gitops.py validate
@@ -214,10 +229,11 @@ uv run --locked python scripts/control_plane_health.py
 uv run --locked python scripts/control_plane_health.py --execute
 ```
 
-The check validates prerequisite identities, live Kubernetes resources and the
-operational endpoints without consulting Helm release history. Roll back a bad
-release by reverting the reviewed deployment selection in Git and allowing Argo
-CD to reconcile the prior state; do not create a competing Helm owner.
+The check validates prerequisite identities, execution pull access, static benchmark
+authority, live Kubernetes resources and operational endpoints without Helm history.
+Do not revert to a pre-cleanup worker after migration 0018. Pause and review forward
+repair or a coordinated backup recovery; a Git revert alone cannot undo schema
+semantics. Do not create a competing Helm owner.
 
 ## Authenticated k6-to-analysis smoke run
 

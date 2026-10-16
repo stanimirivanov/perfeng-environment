@@ -49,6 +49,7 @@ class DeploymentLock:
     contracts_version: str
     runtime_config_map: str
     registry_config_map: str
+    entry_contracts_versions: tuple[str, ...] = ()
 
 
 def mapping(value: Any, fields: set[str], location: str) -> Mapping[str, Any]:
@@ -111,16 +112,34 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
         raise ValueError("Invalid deployment repository")
     deployment_revision = string(deployment["revision"], REVISION, "deployment revision")
     chart = mapping(deployment["chart"], {"path", "version"}, "chart")
+    bundle_fields = {"path", "version", "contractsVersion"}
+    if (
+        isinstance(deployment["runtimeBundle"], Mapping)
+        and "entryContractsVersions" in deployment["runtimeBundle"]
+    ):
+        bundle_fields.add("entryContractsVersions")
     bundle = mapping(
         deployment["runtimeBundle"],
-        {"path", "version", "contractsVersion"},
+        bundle_fields,
         "runtime bundle",
     )
     chart_path = portable_path(chart["path"], "chart path")
     chart_version = string(chart["version"], VERSION, "chart version")
     bundle_path = portable_path(bundle["path"], "runtime-bundle path")
     bundle_version = string(bundle["version"], VERSION, "runtime-bundle version")
-    contracts_version = string(bundle["contractsVersion"], VERSION, "contracts version")
+    contracts_version = bundle["contractsVersion"]
+    versions: tuple[str, ...] = ()
+    if contracts_version == "registry":
+        selected = bundle.get("entryContractsVersions")
+        if not isinstance(selected, list) or not selected:
+            raise ValueError("Registry mode requires explicit entry contracts versions")
+        versions = tuple(string(item, VERSION, "entry contracts version") for item in selected)
+        if versions != tuple(sorted(set(versions))):
+            raise ValueError("Entry contracts versions must be sorted and unique")
+    else:
+        contracts_version = string(contracts_version, VERSION, "contracts version")
+        if "entryContractsVersions" in bundle:
+            raise ValueError("Uniform mode cannot select entry contracts versions")
     if PurePosixPath(bundle_path).name != bundle_version:
         raise ValueError("Runtime-bundle path and version differ")
     resources = mapping(
@@ -146,6 +165,7 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
         contracts_version=contracts_version,
         runtime_config_map=runtime_config_map,
         registry_config_map=registry_config_map,
+        entry_contracts_versions=versions,
     )
 
 
@@ -205,15 +225,26 @@ def validate_deployment_source(lock: DeploymentLock, read: Callable[[str], bytes
         raise ValueError("Pinned runtime bundle has no registry entries")
 
     required = {"registry.json", "jobs/analysis.yaml", "jobs/reporting.yaml"}
+    versions = set(lock.entry_contracts_versions or (lock.contracts_version,))
+    observed = set()
     for entry in entries:
         if (
             not isinstance(entry, Mapping)
-            or entry.get("contractsVersion") != lock.contracts_version
+            or not isinstance(entry.get("contractsVersion"), str)
+            or entry.get("contractsVersion") not in versions
         ):
             raise ValueError("Runtime entry differs from the locked contracts version")
+        observed.add(entry["contractsVersion"])
         for field in ("policy", "executionTemplate"):
             if field in entry:
                 required.add(portable_path(entry[field], f"runtime entry {field}"))
+        if "benchmark" in entry:
+            benchmark = entry["benchmark"]
+            if not isinstance(benchmark, Mapping):
+                raise ValueError("Invalid runtime benchmark selection")
+            required.add(portable_path(benchmark.get("environmentFile"), "benchmark environment"))
+    if observed != versions:
+        raise ValueError("Runtime entry contracts versions differ from the explicit selection")
     for relative in required:
         read(f"{lock.bundle_path}/{relative}")
 
@@ -232,6 +263,13 @@ def validate(
     )
     source("Dockerfile")
     source("cmd/control-plane/main.go")
+    if lock.contracts_version == "registry":
+        if b'RegistryContractsVersion = "registry"' not in source(
+            "internal/app/artifact_config.go"
+        ):
+            raise ValueError(
+                "Selected control-plane source does not support registry contracts mode"
+            )
     read = revision_reader(k8s_root, DEPLOYMENT_REPOSITORY, lock.deployment_revision)
     validate_deployment_source(lock, read)
     return lock

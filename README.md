@@ -4,6 +4,7 @@
 
 - Use opt-in `task kubernetes:qualify` for [local Kubernetes benchmark preflight](docs/kubernetes-benchmark-qualification.md); it retains integration-only evidence without modifying the cluster.
 - [Verified-TLS resource metrics](docs/local-resource-metrics.md) are selected through a separate restricted GitOps project; `task kubernetes:metrics-health` checks the prerequisite without repairing it.
+- For M04 deployment, follow the [runtime cutover guide](docs/kubernetes-runtime-deployment.md): explicit pause/preparation, then manual control-plane sync after merge.
 
 - This repository composes the local performance-platform workspace and its
   Kubernetes environment; it does not own component source code.
@@ -89,7 +90,8 @@ The [local GitOps environment](docs/local-gitops.md) manages its AppProject,
 namespaces, sample SUT, PostgreSQL, SeaweedFS and control-plane workloads.
 Remaining imperative commands bootstrap the cluster and reconciler, provision
 external credentials or durable inputs, perform explicit stateful rollback, or
-run acceptance workflows. Workload Applications self-heal reviewed drift.
+run acceptance workflows. Stateful foundation and sample-SUT Applications self-heal
+reviewed drift; the migration-bearing M04 control-plane child remains manually synced.
 Non-secret control-plane runtime inputs are content-addressed so multiple
 immutable selections can coexist; root self-healing and destructive pruning
 remain disabled.

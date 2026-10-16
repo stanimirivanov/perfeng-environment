@@ -1,5 +1,12 @@
 # Publish a reviewed reporting policy locally
 
+## TL;DR
+
+- Reporting fetches exact reviewed policy bytes from a versioned S3 key.
+- The current selection is `local-kind-integration/1.0.0`; publish pod-startup 1.1.0.
+- Reuse the unchanged checkout policy if already published; keys cannot be overwritten.
+- Preview is offline; publication is explicit and creates a private local receipt.
+
 Reporting Jobs fetch the exact policy selected by the control plane from
 `policies/<id>/<version>/performance-policy.json`. The source bytes remain owned
 by a reviewed `perfeng-k8s` runtime bundle. This repository only provides the
@@ -12,7 +19,7 @@ runtime bundle. Preview its exact destination and digest:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  ../perfeng-k8s/bundles/local-kind-integration/1.0.0 `
   --policy-id checkout-api `
   --version 1.0.0 `
   --receipt .local/checkout-api-policy-publication.json
@@ -22,7 +29,7 @@ After comparing the printed digest with the reviewed bundle, publish it:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  ../perfeng-k8s/bundles/local-kind-integration/1.0.0 `
   --policy-id checkout-api `
   --version 1.0.0 `
   --expected-sha256 e64925fbc0c95880be672687c123a182917d129bc472edff07cac3e1f699abf1 `
@@ -36,10 +43,10 @@ Preview the bundle-owned policy first:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  ../perfeng-k8s/bundles/local-kind-integration/1.0.0 `
   --policy-id pod-startup-k8s `
-  --version 1.0.0 `
-  --receipt .local/pod-startup-k8s-policy-publication.json
+  --version 1.1.0 `
+  --receipt .local/pod-startup-k8s-1.1.0-policy-publication.json
 ```
 
 The preview resolves the policy only through `registry.json`, rejects unsafe or
@@ -49,17 +56,17 @@ Validate the complete bundle using the pinned control-plane validator described
 in `perfeng-k8s/CONTRIBUTING.md` before accepting that digest.
 
 For the current local bundle, the reviewed policy SHA-256 is
-`45c9011b50b340fe00664a833235bf884c3656b3d5708eb07bf4701b94aa1008`.
+`46c5cbd28667e90b5fe09fdbcbfde37d6ebc573d5d6bdcb8447d4caf4acb88d2`.
 Publish only after comparing that value with both the preview and the reviewed
 bundle change:
 
 ```powershell
 uv run --locked python scripts/policy_publish.py `
-  ../perfeng-k8s/bundles/local-kind-windows/1.1.3 `
+  ../perfeng-k8s/bundles/local-kind-integration/1.0.0 `
   --policy-id pod-startup-k8s `
-  --version 1.0.0 `
-  --expected-sha256 45c9011b50b340fe00664a833235bf884c3656b3d5708eb07bf4701b94aa1008 `
-  --receipt .local/pod-startup-k8s-policy-publication.json `
+  --version 1.1.0 `
+  --expected-sha256 46c5cbd28667e90b5fe09fdbcbfde37d6ebc573d5d6bdcb8447d4caf4acb88d2 `
+  --receipt .local/pod-startup-k8s-1.1.0-policy-publication.json `
   --execute
 ```
 

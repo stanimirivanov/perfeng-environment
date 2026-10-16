@@ -16,7 +16,8 @@
   policy and control-plane preparation before `task status` or `task smoke`.
 - Set `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` to a fine-grained GitHub token
   with read-only Contents access to the private repositories before deployment.
-- The four established workload Applications synchronize and self-heal automatically.
+- The sample SUT, PostgreSQL and SeaweedFS synchronize and self-heal automatically.
+  The migration-bearing [M04 control plane](kubernetes-runtime-deployment.md) is manually synced.
   The new [native target](local-native-target.md) also synchronizes, but its initial
   self-healing is disabled. The root does not self-heal; pruning remains disabled everywhere.
 - [Resource metrics](local-resource-metrics.md) use a separate restricted Project and
@@ -41,8 +42,10 @@ the Perfeng workload Project. Its external serving Secret and kubelet certificat
 are not reconciled by Argo CD.
 
 The sample SUT and control plane no longer have second Helm deployment paths:
-Argo CD is their only workload reconciler, and release rollback uses a reviewed
-Git revert. PostgreSQL and SeaweedFS retain their explicit Helm rollback commands
+Argo CD is their only workload reconciler. A stateless release rollback uses a reviewed
+Git selection; the current control-plane schema boundary needs the coordinated
+[M04 recovery procedure](kubernetes-runtime-deployment.md#authority-failure-and-rollback).
+PostgreSQL and SeaweedFS retain their explicit Helm rollback commands
 under ADR 0002. The migration performed no data migration or credential rotation.
 
 Environment composition lives in Kustomize and Argo CD resources.
@@ -189,8 +192,11 @@ foundation before deployment so that Argo CD can find
 `gitops/environments/local` in the remote repository.
 
 If the GitOps foundation is already running, merging a child-Application change
-causes the root Application to reconcile it automatically. Run the health
-command afterward; there is no deploy command to reapply workload state.
+causes the root Application to reconcile its definition automatically unless
+the root is explicitly paused for maintenance. The current M04 control-plane
+child has automatic sync disabled: use the
+[maintenance cutover](kubernetes-runtime-deployment.md), then health. There is no
+deploy command to reapply workload state.
 
 The PostgreSQL child intentionally references, but does not own, the separately
 provisioned `perfeng-postgres-auth` Secret and StatefulSet-generated PVC. Use the
@@ -212,12 +218,13 @@ uv run --locked python scripts/control_plane_runtime.py health --execute
 The Application may report `Degraded` until these prerequisites exist. Argo CD
 does not replace, rotate or delete them.
 
-For a runtime-selection change, run the updated runtime `validate` and `deploy`
-commands from the reviewed branch before merging it. This creates only the new
-content-addressed ConfigMaps; it does not change the current Deployment. Merge
-the lock and Application reference together, then let Argo CD perform the
-rollout and run GitOps health. The previous ConfigMaps remain available for a
-Git revert because pruning is disabled.
+For the current runtime-selection change, run `task kubernetes:prepare` from the
+reviewed branch **before merging**. It stops the API/worker and pauses both root
+and child before the migration, then prepares external inputs without activating
+the new workload. Follow [the complete M04 cutover](kubernetes-runtime-deployment.md)
+to publish policy, merge, resume the root and manually sync the child. Previous
+ConfigMaps remain retained, but a Git revert alone is not a safe rollback across
+cleanup migration 0018.
 
 Use the same private-repository token used by repository validation. Create a
 fine-grained personal access token restricted to the required `perfeng-*` repositories and `k8s-infrastructure`,
@@ -333,8 +340,9 @@ password into an issue or diagnostic output.
 
 ## Controlled self-healing acceptance
 
-Self-healing is enabled for the sample-SUT, PostgreSQL, SeaweedFS and
-control-plane Applications. The root does not self-heal. Pruning remains
+Self-healing is enabled for the sample-SUT, PostgreSQL and SeaweedFS Applications.
+The current control-plane child is manually synced with self-healing disabled.
+The root does not self-heal. Pruning remains
 disabled everywhere.
 
 After this change reaches `main` and GitOps health passes, introduce one bounded,
@@ -463,13 +471,12 @@ immutable ConfigMap. Secret identities remain stable and credential rotation
 stays outside GitOps.
 
 The superseded control-plane Helm deployment command was removed after the
-GitOps path passed release, smoke and post-restart acceptance. Roll back a bad
-control-plane release by reverting its reviewed deployment selection in Git,
-allowing the existing child Application to reconcile the prior selection, and
-then running `task status` and `task smoke`. This keeps one workload owner and
-does not rotate or remove the external Secrets, runtime resources, migration Job,
-database data or object-store data. Removing the Application or returning it to
-Helm is no longer a supported routine rollback.
+GitOps path passed release, smoke and post-restart acceptance. The current M04
+selection adds a schema boundary: pause first and follow
+[coordinated recovery](kubernetes-runtime-deployment.md#authority-failure-and-rollback).
+Do not start a pre-cleanup worker against migration 0018 with a Git revert alone.
+Retain external Secrets, runtime resources, migration Jobs, database and object-store
+data. Removing the Application or returning it to Helm is not routine rollback.
 
 The control-plane child sets `CreateNamespace=false` deliberately. The
 externally provisioned prerequisites create and validate `perf-platform` before

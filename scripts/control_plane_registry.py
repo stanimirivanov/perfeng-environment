@@ -36,7 +36,7 @@ TOKEN_LIMIT = 16 * 1024
 MANIFEST_LIMIT = 1024 * 1024
 
 
-def kubectl(root: Path) -> list[str]:
+def kubectl(root: Path, *, namespace: str = NAMESPACE) -> list[str]:
     """Return the explicitly bound local-cluster command prefix."""
     return [
         "kubectl",
@@ -45,7 +45,7 @@ def kubectl(root: Path) -> list[str]:
         "--context",
         cluster.CONTEXT,
         "--namespace",
-        NAMESPACE,
+        namespace,
         "--request-timeout=30s",
     ]
 
@@ -76,17 +76,24 @@ def docker_config(username: str, token: str) -> dict[str, Any]:
     }
 
 
-def secret_document(username: str, token: str) -> dict[str, Any]:
+def secret_document(
+    username: str,
+    token: str,
+    *,
+    name: str = SECRET,
+    namespace: str = NAMESPACE,
+    purpose: str = "control-plane-image-pull",
+) -> dict[str, Any]:
     """Build the immutable, environment-owned Kubernetes pull Secret."""
     return {
         "apiVersion": "v1",
         "kind": "Secret",
         "metadata": {
-            "name": SECRET,
-            "namespace": NAMESPACE,
+            "name": name,
+            "namespace": namespace,
             "labels": {
                 "app.kubernetes.io/managed-by": OWNER,
-                "perfeng.io/purpose": "control-plane-image-pull",
+                "perfeng.io/purpose": purpose,
             },
         },
         "type": "kubernetes.io/dockerconfigjson",
@@ -95,18 +102,24 @@ def secret_document(username: str, token: str) -> dict[str, Any]:
     }
 
 
-def decode_secret(value: dict[str, Any]) -> tuple[str, str]:
+def decode_secret(
+    value: dict[str, Any],
+    *,
+    name: str = SECRET,
+    namespace: str = NAMESPACE,
+    purpose: str = "control-plane-image-pull",
+) -> tuple[str, str]:
     """Validate and return credentials from an existing owned pull Secret."""
     try:
         if (
             value["type"] != "kubernetes.io/dockerconfigjson"
             or value["immutable"] is not True
-            or value["metadata"]["name"] != SECRET
-            or value["metadata"]["namespace"] != NAMESPACE
+            or value["metadata"]["name"] != name
+            or value["metadata"]["namespace"] != namespace
             or value["metadata"]["labels"]
             != {
                 "app.kubernetes.io/managed-by": OWNER,
-                "perfeng.io/purpose": "control-plane-image-pull",
+                "perfeng.io/purpose": purpose,
             }
             or set(value["data"]) != {".dockerconfigjson"}
         ):
@@ -134,7 +147,7 @@ def decode_secret(value: dict[str, Any]) -> tuple[str, str]:
         docker_config(username, token)
     except (KeyError, TypeError, ValueError, UnicodeError, json.JSONDecodeError):
         raise ValueError(
-            f"Invalid owned immutable Secret {SECRET}; replace it through explicit recovery"
+            f"Invalid owned immutable Secret {name}; replace it through explicit recovery"
         ) from None
     return username, token
 
@@ -155,7 +168,8 @@ def verify_registry_credentials(
 ) -> bytes:
     """Verify a reviewed platform package digest and return its bounded manifest bytes."""
     selected = re.fullmatch(
-        r"ghcr\.io/(stanimirivanov/(?:perfeng-control-plane|perfeng-native-search))@sha256:([0-9a-f]{64})",
+        r"ghcr\.io/(stanimirivanov/(?:perfeng-control-plane|perfeng-native-search|"
+        r"perfeng-k6|perfeng-kube-burner|perfeng-analysis))@sha256:([0-9a-f]{64})",
         image,
     )
     if selected is None:

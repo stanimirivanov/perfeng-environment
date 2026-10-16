@@ -4,6 +4,7 @@ import copy
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -20,6 +21,53 @@ from scripts.control_plane_release import (
 
 
 class ControlPlaneReleaseTests(unittest.TestCase):
+    def test_registry_mode_requires_an_exact_explicit_version_set(self) -> None:
+        bundle = self.value["deployment"]["runtimeBundle"]
+        bundle["contractsVersion"] = "registry"
+        for versions in (None, [], ["latest"], ["0.22.0", "0.13.0"], ["0.13.0", "0.13.0"]):
+            with self.subTest(versions=versions):
+                bundle["entryContractsVersions"] = versions
+                with self.assertRaises(ValueError):
+                    self.load()
+        bundle["entryContractsVersions"] = ["0.13.0", "0.22.0"]
+        self.assertEqual(self.load().entry_contracts_versions, ("0.13.0", "0.22.0"))
+
+    def test_mixed_registry_validates_and_reads_benchmark_descriptor(self) -> None:
+        lock = replace(
+            self.load(), contracts_version="registry", entry_contracts_versions=("0.13.0", "0.22.0")
+        )
+        entries: list[dict[str, object]] = [
+            {"contractsVersion": "0.13.0", "policy": "policies/checkout.json"},
+            {
+                "contractsVersion": "0.22.0",
+                "policy": "policies/pod.json",
+                "benchmark": {"environmentFile": "identities/environment.json"},
+            },
+        ]
+        read_paths: list[str] = []
+
+        def read(path: str) -> bytes:
+            read_paths.append(path)
+            if path.endswith("Chart.yaml"):
+                return yaml.safe_dump(
+                    {"name": "perfeng-control-plane", "version": lock.chart_version}
+                ).encode()
+            if path.endswith("values.yaml"):
+                return b"httpPort: 8080"
+            if path.endswith("registry.json"):
+                return json.dumps({"schemaVersion": 1, "entries": entries}).encode()
+            return b"present"
+
+        validate_deployment_source(lock, read)
+        self.assertIn(f"{lock.bundle_path}/identities/environment.json", read_paths)
+        entries[1]["benchmark"] = {"environmentFile": "../outside.json"}
+        with self.assertRaises(ValueError):
+            validate_deployment_source(lock, read)
+        entries[1]["benchmark"] = {"environmentFile": "identities/environment.json"}
+        entries[1]["contractsVersion"] = "0.99.0"
+        with self.assertRaisesRegex(ValueError, "contracts version"):
+            validate_deployment_source(lock, read)
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

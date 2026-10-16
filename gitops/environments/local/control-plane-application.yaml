@@ -11,24 +11,28 @@ spec:
   project: perfeng-local
   source:
     repoURL: https://github.com/stanimirivanov/perfeng-k8s.git
-    targetRevision: 87837d49a4d90071b3fc47484f236e8de07d92d3
+    targetRevision: fa718c2b62f4f10b5e9da8dce7b00a3f51daae0b
     path: charts/control-plane
     helm:
       releaseName: control-plane
       valuesObject:
-        image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:ec073372f7a27620f7322fc74eb722dca6754ef8133888e79971c1514186f278
+        image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3
         imagePullSecret: perfeng-control-plane-registry
         executionNamespace: perf-generators
         httpPort: 8080
-        runtimeConfigMap: perfeng-control-plane-runtime-229648fd65d0
+        runtimeConfigMap: perfeng-control-plane-runtime-315a2eede8ff
         runtimeSecret: perfeng-control-plane-runtime
         authenticationSecret: perfeng-control-plane-authentication
-        registryConfigMap: perfeng-runtime-registry-ab0e16d589c4
+        registryConfigMap: perfeng-runtime-registry-7be1d749994e
         registryItems:
+          - key: identities--environment.json
+            path: identities/environment.json
           - key: jobs--analysis.yaml
             path: jobs/analysis.yaml
-          - key: jobs--execution.json
-            path: jobs/execution.json
+          - key: jobs--benchmark.json
+            path: jobs/benchmark.json
+          - key: jobs--checkout.json
+            path: jobs/checkout.json
           - key: jobs--reporting.yaml
             path: jobs/reporting.yaml
           - key: policies--checkout-smoke.json
@@ -42,8 +46,8 @@ spec:
     namespace: perf-platform
   syncPolicy:
     automated:
-      enabled: true
+      enabled: false
       prune: false
-      selfHeal: true
+      selfHeal: false
     syncOptions:
       - CreateNamespace=false

@@ -422,6 +422,40 @@ mismatch by editing or deleting an immutable ConfigMap in place. Create the new
 reviewed identity, select it in Git and retain the previous identity for
 rollback.
 
+## M04 runtime cutover
+
+Follow the [runtime deployment guide](kubernetes-runtime-deployment.md).
+**Mutating** `task kubernetes:prepare` deliberately pauses the root and child and
+stops the API/worker. A zero-replica Deployment and OutOfSync child are expected
+during this window; repeated `health` cannot activate it. After successful
+preparation, policy publication and merge, resume the root using **mutating**
+`gitops.py bootstrap --execute`, then manually Sync the control-plane child in
+Argo CD with pruning/force/replace off. Do not enable automatic sync as repair.
+
+“Pause Application” or “not quiescent” means the migration guard refused before
+Job/grant writes. Inspect active sync operations, replica counts and remaining
+Pods. Retry the explicit pause after the active operation finishes; never
+force-delete a stuck Pod to claim quiescence. Timeout leaves the paused state
+intact. A racing UID/resourceVersion requires re-inspection, not a blind patch.
+
+**Read-only** `scripts/execution_registry.py health --execute` verifies the three
+selected execution digests and immutable pull identity in `perf-generators`.
+Missing credentials need **mutating** `scripts/execution_registry.py deploy
+--execute` with the package-read environment token; a foreign/mutable Secret or
+denied package access needs deliberate credential recovery, not copying the
+control-plane Secret or granting registry write scope. Health never rotates.
+
+“Benchmark authority target incarnation differs” means `kube-system` UID does
+not match the promoted descriptor. Requalify and promote the new incarnation;
+never edit receipts or recreate the cluster to satisfy this lock. Authority
+drift requires review of the four static RBAC resources in the separate
+`perfeng-local-benchmark-authority` Application. Neither this workflow nor Argo
+prunes dynamic Run namespaces, quota tombstones, bindings or retained evidence.
+
+After migration 0018, do not Git-revert and restart an old worker against the
+migrated database. Pause, preserve state and select forward repair or a separately
+reviewed coordinated backup restore. No automatic down migration is provided.
+
 ## What to include in a defect report
 
 Include:

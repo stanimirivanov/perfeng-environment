@@ -148,7 +148,8 @@ class GitOpsTests(unittest.TestCase):
         self.assertIs(policies["sample-sut"]["selfHeal"], True)
         self.assertIs(policies["postgres"]["selfHeal"], True)
         self.assertIs(policies["seaweedfs"]["selfHeal"], True)
-        self.assertIs(policies["control-plane"]["selfHeal"], True)
+        self.assertIs(policies["control-plane"]["selfHeal"], False)
+        self.assertIs(policies["control-plane"]["enabled"], False)
         self.assertTrue(all(policy["prune"] is False for policy in policies.values()))
 
     def test_credentials_are_immutable_and_scoped_to_the_github_owner(self) -> None:
