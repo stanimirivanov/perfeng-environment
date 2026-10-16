@@ -146,7 +146,17 @@ class ControlPlaneHealthTests(unittest.TestCase):
     ) -> None:
         root = Path("workspace/perfeng-environment")
 
-        health.verify(root)
+        with (
+            patch(
+                "scripts.control_plane_health.execution_registry.selected_images",
+                return_value=("image",),
+            ),
+            patch("scripts.control_plane_health.execution_registry.ensure_secret") as execution,
+            patch("scripts.control_plane_health.benchmark_authority.verify") as authority,
+        ):
+            health.verify(root)
+        execution.assert_called_once_with(root, ("image",), create=False)
+        authority.assert_called_once_with(root, RELEASE)
 
         validate_release.assert_called_once_with(
             root / "deployments/local-control-plane.json",

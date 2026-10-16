@@ -8,14 +8,23 @@ from typing import Any
 import yaml
 
 if __package__:
-    from . import cluster, control_plane_migration, control_plane_runtime, postgres
+    from . import (
+        benchmark_authority,
+        cluster,
+        control_plane_migration,
+        control_plane_runtime,
+        execution_registry,
+        postgres,
+    )
     from .control_plane_registry import SECRET as IMAGE_PULL_SECRET
     from .control_plane_release import DeploymentLock
     from .control_plane_release import validate as validate_release
 else:
+    import benchmark_authority
     import cluster
     import control_plane_migration
     import control_plane_runtime
+    import execution_registry
     import postgres
     from control_plane_registry import SECRET as IMAGE_PULL_SECRET
     from control_plane_release import DeploymentLock
@@ -160,6 +169,10 @@ def verify(root: Path = cluster.ROOT) -> None:
     )
     control_plane_migration.execute("health", root)
     control_plane_runtime.execute("health", root)
+    execution_registry.ensure_secret(
+        root, execution_registry.selected_images(release), create=False
+    )
+    benchmark_authority.verify(root, release)
     verify_resources(postgres.kubectl(root), release)
 
 

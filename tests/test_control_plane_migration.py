@@ -68,6 +68,32 @@ class ControlPlaneMigrationTests(unittest.TestCase):
         self.assertIn(b"REVOKE ALL", sql)
         self.assertNotIn(b"GRANT ALL", sql)
         self.assertNotIn(b"DELETE", sql)
+        self.assertIn(
+            b"GRANT SELECT, INSERT, UPDATE ON perfeng_control.benchmark_target_reservations TO perfeng_runtime;",
+            sql,
+        )
+        self.assertEqual(migration.EXPECTED_RUNTIME_PRIVILEGES[-4:], (True, True, True, False))
+
+    def test_deploy_refuses_before_database_or_job_effects_when_not_quiescent(self) -> None:
+        with (
+            patch("scripts.control_plane_migration.validate_release", return_value=RELEASE),
+            patch("scripts.control_plane_migration.cluster.verify_local_docker"),
+            patch("scripts.control_plane_migration.cluster.verify_context"),
+            patch(
+                "scripts.control_plane_migration.control_plane_maintenance.verify_quiescent",
+                side_effect=ValueError("not quiescent"),
+            ),
+            patch(
+                "scripts.control_plane_migration.control_plane_database.ensure_identities"
+            ) as identities,
+            patch("scripts.control_plane_migration.cluster.run") as run,
+            patch("scripts.control_plane_migration.grant_runtime") as grant,
+            self.assertRaisesRegex(ValueError, "not quiescent"),
+        ):
+            migration.execute("deploy")
+        identities.assert_not_called()
+        run.assert_not_called()
+        grant.assert_not_called()
 
     def test_runtime_privilege_verification_accepts_only_exact_result(self) -> None:
         result = "|".join("t" if value else "f" for value in migration.EXPECTED_RUNTIME_PRIVILEGES)
@@ -80,6 +106,15 @@ class ControlPlaneMigrationTests(unittest.TestCase):
             patch(
                 "scripts.control_plane_migration.control_plane_database.psql",
                 return_value=result.replace("|f", "|t", 1),
+            ),
+            self.assertRaises(ValueError),
+        ):
+            migration.verify_runtime(cluster.ROOT)
+
+        with (
+            patch(
+                "scripts.control_plane_migration.control_plane_database.psql",
+                return_value=result[:-1] + "t",
             ),
             self.assertRaises(ValueError),
         ):

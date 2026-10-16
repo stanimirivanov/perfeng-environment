@@ -23,6 +23,37 @@ RELEASE = DeploymentLock(
 
 
 class ControlPlaneRuntimeTests(unittest.TestCase):
+    def test_registry_mode_mounts_exact_benchmark_environment_bytes(self) -> None:
+        manifest = json.dumps(
+            {
+                "entries": [
+                    {
+                        "policy": "policies/pod.json",
+                        "executionTemplate": "jobs/benchmark.json",
+                        "benchmark": {"environmentFile": "identities/environment.json"},
+                    }
+                ]
+            }
+        ).encode()
+        descriptor = b'{"cluster":"perfeng-local"}\n'
+
+        def read(path: str) -> bytes:
+            if path.endswith("registry.json"):
+                return manifest
+            if path.endswith("identities/environment.json"):
+                return descriptor
+            return b"fixture"
+
+        with patch("scripts.control_plane_runtime.revision_reader", return_value=read):
+            data = runtime.registry_files(RELEASE)
+        self.assertEqual(data["identities--environment.json"].encode(), descriptor)
+        selected = replace(
+            RELEASE, contracts_version="registry", entry_contracts_versions=("0.13.0", "0.22.0")
+        )
+        self.assertEqual(
+            runtime.runtime_configuration(selected)["PERFENG_CONTRACTS_VERSION"], "registry"
+        )
+
     def test_content_address_is_order_independent_and_changes_with_data(self) -> None:
         first = runtime.content_addressed_name("configuration", {"a": "1", "b": "2"})
         reordered = runtime.content_addressed_name("configuration", {"b": "2", "a": "1"})

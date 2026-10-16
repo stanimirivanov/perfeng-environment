@@ -33,6 +33,7 @@ class TaskfileTests(unittest.TestCase):
                 "native:up",
                 "kubernetes:qualify",
                 "kubernetes:metrics-health",
+                "kubernetes:prepare",
             },
         )
 
@@ -59,6 +60,22 @@ class TaskfileTests(unittest.TestCase):
         )
         for name in ("bootstrap", "status", "smoke"):
             self.assertNotIn("kubernetes:qualify", str(self.tasks[name]))
+
+    def test_m04_preparation_pauses_before_migrations_and_does_not_activate(self) -> None:
+        self.assertEqual(
+            self.tasks["kubernetes:prepare"]["cmds"],
+            [
+                "uv run --locked python scripts/control_plane_release.py validate",
+                "uv run --locked python scripts/control_plane_maintenance.py pause --execute",
+                "uv run --locked python scripts/control_plane_registry.py deploy --execute",
+                "uv run --locked python scripts/control_plane_database.py deploy --execute",
+                "uv run --locked python scripts/control_plane_migration.py deploy --execute",
+                "uv run --locked python scripts/control_plane_runtime.py deploy --execute",
+                "uv run --locked python scripts/execution_registry.py deploy --execute",
+            ],
+        )
+        for name in ("bootstrap", "status", "smoke"):
+            self.assertNotIn("kubernetes:prepare", str(self.tasks[name]))
 
     def test_metrics_health_is_a_read_only_capability_not_certificate_setup(self) -> None:
         self.assertEqual(

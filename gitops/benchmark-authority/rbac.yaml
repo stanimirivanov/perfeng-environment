@@ -1,0 +1,77 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: perfeng-local-benchmark-controller
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, create]
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [resourcequotas]
+    verbs: [get, create, update]
+  - apiGroups: [metrics.k8s.io]
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [get, create, delete]
+  - nonResourceURLs: [/api, /api/*, /apis, /apis/*, /version]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: perfeng-local-benchmark-controller
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: perfeng-local-benchmark-controller
+subjects:
+  - kind: ServiceAccount
+    name: control-plane
+    namespace: perf-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: perfeng-local-benchmark-controller
+  namespace: perf-generators
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+rules:
+  - apiGroups: [""]
+    resources: [serviceaccounts, configmaps]
+    verbs: [get, create, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: perfeng-local-benchmark-controller
+  namespace: perf-generators
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+    perfeng.io/environment: local
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: perfeng-local-benchmark-controller
+subjects:
+  - kind: ServiceAccount
+    name: control-plane
+    namespace: perf-platform

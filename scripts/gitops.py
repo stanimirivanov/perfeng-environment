@@ -14,6 +14,7 @@ import yaml
 
 if __package__:
     from . import (
+        benchmark_authority,
         cluster,
         control_plane_health,
         gitops_status,
@@ -31,6 +32,7 @@ if __package__:
         load_lock,
     )
 else:
+    import benchmark_authority
     import cluster
     import control_plane_health
     import gitops_status
@@ -62,8 +64,10 @@ REPOSITORY_PREFIX = "https://github.com/stanimirivanov"
 REPOSITORY_URL = REPOSITORY_PREFIX + "/perfeng-environment.git"
 TOKEN_ENVIRONMENT_VARIABLE = "PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN"
 CONTROL_PLANE_REGISTRY_ITEMS = [
+    {"key": "identities--environment.json", "path": "identities/environment.json"},
     {"key": "jobs--analysis.yaml", "path": "jobs/analysis.yaml"},
-    {"key": "jobs--execution.json", "path": "jobs/execution.json"},
+    {"key": "jobs--benchmark.json", "path": "jobs/benchmark.json"},
+    {"key": "jobs--checkout.json", "path": "jobs/checkout.json"},
     {"key": "jobs--reporting.yaml", "path": "jobs/reporting.yaml"},
     {"key": "policies--checkout-smoke.json", "path": "policies/checkout-smoke.json"},
     {"key": "policies--pod-startup.json", "path": "policies/pod-startup.json"},
@@ -139,7 +143,7 @@ def validate_control_plane_application(
             "namespace": CONTROL_PLANE_NAMESPACE,
         }
         or spec.get("syncPolicy", {}).get("automated")
-        != {"enabled": True, "prune": False, "selfHeal": True}
+        != {"enabled": False, "prune": False, "selfHeal": False}
         or set(spec.get("syncPolicy", {})) != {"automated", "syncOptions"}
         or spec.get("syncPolicy", {}).get("syncOptions") != ["CreateNamespace=false"]
     ):
@@ -284,12 +288,14 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
             "namespaces.yaml",
             "project.yaml",
             "resource-metrics-project.yaml",
+            "benchmark-authority-project.yaml",
             "sample-sut-application.yaml",
             "postgres-application.yaml",
             "seaweedfs-application.yaml",
             "control-plane-application.yaml",
             "native-search-application.yaml",
             "resource-metrics-application.yaml",
+            "benchmark-authority-application.yaml",
         ]
         or project.get("kind") != "AppProject"
         or project.get("metadata", {}).get("name") != "perfeng-local"
@@ -347,6 +353,7 @@ def validate_configuration(root: Path = cluster.ROOT) -> None:
     native_target_release.validate_application(native_search, native_selection)
     native_target_release.expected_files(root)
     resource_metrics_release.validate_configuration(root)
+    benchmark_authority.validate_configuration(root)
 
 
 def credential_document(token: str) -> dict[str, Any]:
@@ -477,6 +484,7 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
         print("Local Argo CD GitOps action completed: bootstrap", flush=True)
         return
     gitops_status.wait_for_application(kube, CONTROL_PLANE_APPLICATION)
+    gitops_status.wait_for_application(kube, benchmark_authority.APPLICATION)
     gitops_status.wait_for_application(kube, native_target_release.APPLICATION)
     gitops_status.wait_for_application(kube, resource_metrics_release.APPLICATION)
     resource_metrics_health.verify(root)

@@ -133,6 +133,8 @@ def selected_registry_paths(manifest_bytes: bytes) -> list[str]:
         paths.add(entry["policy"])
         if entry.get("executionTemplate"):
             paths.add(entry["executionTemplate"])
+        if entry.get("benchmark"):
+            paths.add(entry["benchmark"]["environmentFile"])
     return sorted(paths)
 
 

@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: stanimirivanov/perfeng-k8s
-          ref: 87837d49a4d90071b3fc47484f236e8de07d92d3
+          ref: fa718c2b62f4f10b5e9da8dce7b00a3f51daae0b
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-k8s
           persist-credentials: false
@@ -62,7 +62,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: stanimirivanov/perfeng-control-plane
-          ref: a9b3945ff3678362c29739fbf122727fe97348be
+          ref: 2a74a20f69773fd9d43072e41668087612cdbf9e
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-control-plane
           persist-credentials: false

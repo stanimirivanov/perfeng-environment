@@ -8,12 +8,21 @@ from typing import Any
 import yaml
 
 if __package__:
-    from . import cluster, control_plane_database, control_plane_registry, postgres
+    from . import (
+        benchmark_authority,
+        cluster,
+        control_plane_database,
+        control_plane_maintenance,
+        control_plane_registry,
+        postgres,
+    )
     from .control_plane_release import DeploymentLock
     from .control_plane_release import validate as validate_release
 else:
+    import benchmark_authority
     import cluster
     import control_plane_database
+    import control_plane_maintenance
     import control_plane_registry
     import postgres
     from control_plane_release import DeploymentLock
@@ -37,6 +46,10 @@ EXPECTED_RUNTIME_PRIVILEGES = (
     True,
     True,
     False,
+    False,
+    True,
+    True,
+    True,
     False,
     True,
     True,
@@ -192,6 +205,8 @@ def grant_runtime(root: Path) -> None:
         b"GRANT SELECT, INSERT ON perfeng_control.artifacts, "
         b"perfeng_control.kubernetes_executions TO perfeng_runtime;\n"
         b"GRANT SELECT, INSERT, UPDATE ON perfeng_control.reconciliation_leases "
+        b"TO perfeng_runtime;\n"
+        b"GRANT SELECT, INSERT, UPDATE ON perfeng_control.benchmark_target_reservations "
         b"TO perfeng_runtime;\nCOMMIT;\n",
     )
 
@@ -209,6 +224,7 @@ def verify_runtime(root: Path) -> None:
         ("kubernetes_executions", ("SELECT", "INSERT", "UPDATE", "DELETE")),
         ("reconciliation_leases", ("SELECT", "INSERT", "UPDATE", "DELETE")),
         ("baselines", ("SELECT", "INSERT", "UPDATE", "DELETE")),
+        ("benchmark_target_reservations", ("SELECT", "INSERT", "UPDATE", "DELETE")),
     ]:
         checks.extend(
             f"has_table_privilege('perfeng_runtime','perfeng_control.{table}','{privilege}')"
@@ -227,6 +243,10 @@ def execute(action: str, root: Path = cluster.ROOT) -> None:
     release = validate_release()
     cluster.verify_local_docker()
     cluster.verify_context(root)
+    if action == "deploy":
+        if release.contracts_version == "registry":
+            benchmark_authority.verify_target(root, release)
+        control_plane_maintenance.verify_quiescent(root)
     control_plane_database.ensure_identities(root, create=False)
     control_plane_registry.ensure_secret(root, release.image, create=False)
     kube = postgres.kubectl(root)

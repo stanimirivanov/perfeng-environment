@@ -56,6 +56,21 @@ tasks:
     cmds:
       - uv run --locked python -m scripts.kubernetes_benchmark check --execute
 
+  kubernetes:prepare:
+    desc: Pause the control plane and explicitly prepare the selected M04 migration and external inputs
+    summary: |
+      Requires the existing stateful foundation. This intentionally stops the API
+      and worker, pauses root/child sync and leaves them paused. It does not
+      publish policies or activate the new Deployment. Follow docs/kubernetes-runtime-deployment.md.
+    cmds:
+      - uv run --locked python scripts/control_plane_release.py validate
+      - uv run --locked python scripts/control_plane_maintenance.py pause --execute
+      - uv run --locked python scripts/control_plane_registry.py deploy --execute
+      - uv run --locked python scripts/control_plane_database.py deploy --execute
+      - uv run --locked python scripts/control_plane_migration.py deploy --execute
+      - uv run --locked python scripts/control_plane_runtime.py deploy --execute
+      - uv run --locked python scripts/execution_registry.py deploy --execute
+
   kubernetes:metrics-health:
     desc: Verify the selected metrics owner, TLS binding and fresh node usage without repair
     cmds:
