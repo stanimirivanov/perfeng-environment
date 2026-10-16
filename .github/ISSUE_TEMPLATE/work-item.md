@@ -6,6 +6,9 @@ labels: ""
 assignees: ""
 ---
 
+<!-- Create or reuse this issue with gh before implementation. Select an existing
+milestone using its exact GitHub title. See CONTRIBUTING.md#issue-timing. -->
+
 **Repository:** perfeng-environment
 **Milestone:** MNN — Outcome
 
@@ -32,6 +35,8 @@ Describe the problem and observable result.
 - [ ] Observable behavior and verification evidence.
 - [ ] Relevant failure or negative behavior is covered.
 - [ ] Documentation and operational effects are addressed.
+- [ ] The PR uses the issue-linked branch and [#N] title/commit format, closes this
+      issue, and waits for human review without automatic merge.
 
 ## Verification
 

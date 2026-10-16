@@ -1,3 +1,8 @@
+Closes #<issue-number>
+
+<!-- PR title: [#<issue-number>] <concise summary>. Replace placeholders and
+record actual verification below. Create with gh; do not print a chat draft. -->
+
 ## Linked work
 
 - Issue:
@@ -41,5 +46,7 @@ Checks not run, blocking reason and residual risk:
 - [ ] Documentation and troubleshooting are current
 - [ ] No secrets, local receipts, machine-specific paths or unrelated churn
 - [ ] No unapproved external side effects or destructive actions
+- [ ] Human review and merge: return the PR URL and wait; no automatic merge or
+      further Git commands after creation
 
 Known limitations and follow-up:

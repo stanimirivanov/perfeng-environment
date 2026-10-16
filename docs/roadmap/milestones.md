@@ -26,7 +26,7 @@ only their local implementation and operating instructions.
   membership.
 - This file is authoritative for planned outcome, dependency and repository
   participation.
-- Use exact published titles in issues and completion reports.
+- Use exact published titles in issues and pull requests.
 - Do not renumber a published milestone.
 - Update this file in the same planning change that moves a dependency or
   changes a milestone outcome.

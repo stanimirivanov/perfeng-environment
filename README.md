@@ -239,7 +239,10 @@ truth:
 - [Code of conduct](CODE_OF_CONDUCT.md)
 
 Contribution and documentation conventions include the required TL;DR for long
-documents and the exact completion-report format used for PR-sized work.
+documents and the issue-first GitHub CLI workflow used for PR-sized work.
+Authorized implementation creates or reuses the issue, uses an issue-linked
+branch and `[#N]` commits/PR title, and submits verification evidence in the PR.
+The contributor then returns only the PR URL and waits for human review and merge.
 
 Run `make bootstrap` once, `make verify` during implementation, and
 `make validate` before handoff. The [harness guide](docs/development/harness.md)
