@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
@@ -36,6 +39,9 @@ REFERENCE = re.compile(r"^\s*\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))", re.MULTILINE)
 ADR_NAME = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
 ADR_HEADING = re.compile(r"^# ADR(?:-| )(\d{4}):\s+\S")
 METADATA = re.compile(r"^- ([A-Za-z][A-Za-z ]+):\s*(.*)$", re.MULTILINE)
+PR_TITLE = re.compile(r"^\[#([1-9][0-9]*)\] \S")
+PR_CLOSING_LINE = re.compile(r"\ACloses #([1-9][0-9]*)(?:\r?\n|\Z)")
+PR_BRANCH = re.compile(r"(?:feature|fix)/issue-([1-9][0-9]*)\Z")
 
 
 @dataclass(frozen=True, order=True)
@@ -349,7 +355,66 @@ def check_repository(root: Path) -> list[Violation]:
     return sorted(set(violations))
 
 
+def check_pull_request_metadata(title: str, body: str, branch: str) -> list[str]:
+    """Require one issue identity across the PR title, closing line, and branch."""
+    errors: list[str] = []
+    title_match = PR_TITLE.match(title)
+    body_match = PR_CLOSING_LINE.match(body)
+    branch_match = PR_BRANCH.fullmatch(branch)
+    if title_match is None:
+        errors.append("PR title must start with [#N] followed by a summary")
+    if body_match is None:
+        errors.append("PR body must begin with a standalone Closes #N line")
+    if branch_match is None:
+        errors.append("PR branch must be feature/issue-N or fix/issue-N")
+    numbers = {
+        match.group(1) for match in (title_match, body_match, branch_match) if match is not None
+    }
+    if len(numbers) > 1:
+        errors.append("PR title, closing line, and branch must reference the same issue")
+    return errors
+
+
+def check_pull_request_event(path: Path) -> list[str]:
+    """Read GitHub's local event file without network access or PR body logging."""
+    try:
+        event = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ["pull request event file could not be read as JSON"]
+    if not isinstance(event, dict):
+        return ["pull request event object is missing"]
+    request = event.get("pull_request")
+    if not isinstance(request, dict):
+        return ["pull request metadata is missing from the event"]
+    author = request.get("user")
+    if isinstance(author, dict) and author.get("login") == "dependabot[bot]":
+        return []
+    head = request.get("head")
+    if not isinstance(head, dict):
+        return ["pull request branch metadata is missing from the event"]
+    title, body, branch = request.get("title"), request.get("body"), head.get("ref")
+    if not isinstance(title, str) or not isinstance(body, str) or not isinstance(branch, str):
+        return ["pull request title, body, or branch is missing from the event"]
+    return check_pull_request_metadata(title, body, branch)
+
+
 def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--pr-event":
+        event_path = os.environ.get("GITHUB_EVENT_PATH")
+        errors = (
+            check_pull_request_event(Path(event_path))
+            if event_path
+            else ["GITHUB_EVENT_PATH is missing"]
+        )
+        for error in errors:
+            print(f"pr-policy: {error}")
+        if errors:
+            return 1
+        print("pr-policy: issue-linked pull request metadata passed")
+        return 0
+    if len(sys.argv) != 1:
+        print("usage: repository_policy.py [--pr-event]")
+        return 2
     root = Path(__file__).resolve().parents[1]
     violations = check_repository(root)
     for violation in violations:

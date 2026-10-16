@@ -21,6 +21,13 @@
 | Pinned integration | `make release-selection-check` | Validate exact sibling revisions selected by deployment locks; requires the adjacent repositories and their selected commits. |
 | Live operation | `task bootstrap`, `task status`, `task smoke`, `task destroy` | Access or mutate the dedicated local environment; follow the operating guides and obtain required authority. |
 
+On pull requests, the existing `validate` CI job also checks that the event
+title, leading closing reference, and issue branch use the same issue number.
+It reads only GitHub's local event file, emits no PR body content, and needs no
+API token. Dependabot PRs are exempt because their generated branch and title
+follow the dependency-update policy. This event-specific check is separate from
+the offline `make verify` inner loop.
+
 Unavailable checks follow the constrained-environment protocol in
 [CONTRIBUTING.md](../../CONTRIBUTING.md#verification-and-constrained-environments).
 
