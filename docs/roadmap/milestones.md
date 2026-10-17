@@ -258,6 +258,19 @@ includes:
 - environment promotion, rollback and upgrades; and
 - disaster-recovery exercises.
 
+Preparatory release-architecture work can proceed before non-local deployment
+is required; it does not mark M06 active or production-ready. [ADR 0014](../decisions/0014-separate-release-and-run-orchestration.md)
+assigns finite release operations to Argo Workflows, keeps Argo CD as the sole
+workload reconciler, and leaves performance Runs with the control plane. The
+[deployment-script baseline](../deployment-script-retirement.md) measures the
+local `bootstrap` and M04 `kubernetes:prepare` Python surface and sets a
+greater-than-80% retirement gate. Sequence the implementation as an immutable
+release-input contract, a pinned disposable-kind workflow pilot, external-state
+and health parity, then separately proven M04 maintenance/recovery before any
+cutover. Tekton or Dagger remains an upstream artifact-producer choice behind
+the same input contract. The current M04 manual sync and rollback boundary
+remains in force throughout this preparatory work.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
