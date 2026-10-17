@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:perfeng:environment:release-request:1",
+  "title": "Perfeng environment release request v1",
+  "description": "Immutable input for one environment-scoped release attempt; validation does not authorize execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "environment", "selection", "promotion"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "PerfengReleaseRequest"},
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "clusterUID"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+        },
+        "clusterUID": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision", "gitopsPath", "lockDigests"],
+      "properties": {
+        "repository": {
+          "const": "https://github.com/stanimirivanov/perfeng-environment.git"
+        },
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "gitopsPath": {
+          "type": "string",
+          "pattern": "^gitops/environments/[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+        },
+        "lockDigests": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^deployments/[a-z][a-z0-9-]{0,62}\\.json$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedCurrent", "activation", "migration"],
+      "properties": {
+        "expectedCurrent": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          ]
+        },
+        "activation": {"enum": ["manual", "automated"]},
+        "migration": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode"],
+              "properties": {"mode": {"const": "none"}}
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "id"],
+              "properties": {
+                "mode": {"const": "forward-only"},
+                "id": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"}
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "migration": {
+                "properties": {"mode": {"const": "forward-only"}},
+                "required": ["mode"]
+              }
+            },
+            "required": ["migration"]
+          },
+          "then": {
+            "properties": {"activation": {"const": "manual"}}
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "environment": {
+            "properties": {"name": {"const": "perfeng-local"}},
+            "required": ["name"]
+          }
+        },
+        "required": ["environment"]
+      },
+      "then": {
+        "properties": {
+          "selection": {
+            "properties": {
+              "gitopsPath": {"const": "gitops/environments/local"},
+              "lockDigests": {
+                "required": [
+                  "deployments/local-control-plane.json",
+                  "deployments/local-infrastructure.json",
+                  "deployments/local-native-target.json"
+                ]
+              }
+            }
+          },
+          "promotion": {
+            "properties": {"activation": {"const": "manual"}}
+          }
+        }
+      }
+    }
+  ]
+}
