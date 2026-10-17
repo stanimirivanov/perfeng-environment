@@ -264,8 +264,9 @@ assigns finite release operations to Argo Workflows, keeps Argo CD as the sole
 workload reconciler, and leaves performance Runs with the control plane. The
 [deployment-script baseline](../deployment-script-retirement.md) measures the
 local `bootstrap` and M04 `kubernetes:prepare` Python surface and sets a
-greater-than-80% retirement gate. Sequence the implementation as an immutable
-release-input contract, a pinned disposable-kind workflow pilot, external-state
+greater-than-80% retirement gate. The [v1 release request](../release-request.md)
+defines the immutable input and promotion precondition. Sequence the remaining
+implementation as a pinned disposable-kind workflow pilot, external-state
 and health parity, then separately proven M04 maintenance/recovery before any
 cutover. Tekton or Dagger remains an upstream artifact-producer choice behind
 the same input contract. The current M04 manual sync and rollback boundary
