@@ -4,7 +4,7 @@
 
 - [ADR 0015](decisions/0015-bind-releases-to-reviewed-inputs.md) and the
   [v1 JSON Schema](../deployments/release-request-v1.schema.json) define the
-  request a future release workflow will consume.
+  request consumed by the staged [read-only preflight](release-preflight-workflow.md).
 - The request pins a reviewed environment Git commit and exact deployment-lock
   bytes; those locks continue to select images, charts and runtime bundles.
 - `expectedCurrent` prevents an upgrade from silently overtaking another
@@ -50,6 +50,9 @@ cluster, or a successful release.
 2. A reviewed `perfeng-environment` commit selects published artifacts through
    its existing lock files and GitOps manifests. The request names that commit
    and hashes the lock blobs read from it; a dirty checkout is not input.
+   For the staged preflight, commit the request at a later, separately reviewed
+   revision under `deployments/release-requests/`. A file cannot contain the
+   hash of its own commit; the preflight checks both Git revisions.
 3. A future release consumer validates the schema, exact Git origin and commit,
    each lock hash and lock-internal artifact pin, cluster UID, and approved
    environment policy. It then compares `expectedCurrent` to the durable prior
@@ -63,7 +66,8 @@ cluster, or a successful release.
    intended transition; the receipt and live observations establish what
    actually happened.
 
-There is no live consumer or receipt store in this PR. In particular, the
+There is no active release consumer or receipt store. The staged preflight
+checks identities only. In particular, the
 current root Application tracks `main`, so a request's full Git revision does
 not by itself pin what Argo CD has already observed. A future cutover must
 check or bind the exact root and child revisions before reporting promotion.

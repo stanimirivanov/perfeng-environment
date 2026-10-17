@@ -111,6 +111,21 @@ jobs:
         if: runner.os == 'Linux'
         run: make render-check
         working-directory: perfeng-environment
+      - name: Install checksum-verified Argo Workflows CLI for offline lint
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location https://github.com/argoproj/argo-workflows/releases/download/v4.1.5/argo-linux-amd64.gz --output "$RUNNER_TEMP/argo.gz"
+          expected="$(tr -d '\r\n' < perfeng-environment/.argo-linux-amd64.sha256)"
+          echo "${expected}  $RUNNER_TEMP/argo.gz" | sha256sum --check
+          gzip -dc "$RUNNER_TEMP/argo.gz" > "$RUNNER_TEMP/argo"
+          chmod +x "$RUNNER_TEMP/argo"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Lint staged release WorkflowTemplate offline
+        if: runner.os == 'Linux'
+        run: make workflow-lint
+        working-directory: perfeng-environment
       - name: Validate exact adjacent release selections
         if: runner.os == 'Linux'
         run: make release-selection-check

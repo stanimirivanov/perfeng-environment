@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: perfeng-release-workflows-local
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  project: perfeng-release-workflows-local
+  source:
+    repoURL: https://github.com/stanimirivanov/perfeng-environment.git
+    targetRevision: main
+    path: gitops/release-workflows
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-workflows
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

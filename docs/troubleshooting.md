@@ -486,6 +486,22 @@ describes explicit reuse of an exact completed source after baseline-transition
 interruption. A new PASSED receipt is the full healthy signal. Source-only
 verification leaves M04 live completion pending.
 
+## Release preflight pilot fails
+
+The staged Argo Workflows preflight is described in the
+[release preflight guide](release-preflight-workflow.md). Inspect only the named
+Workflow and its failing node in the disposable cluster. A Git artifact failure
+usually means the exact request/selection commit is unavailable or the
+namespaced `release-git-read` credential is absent or lacks repository read
+access. Do not copy Argo CD's credential Secret or print a token to diagnose it.
+
+A schema hash failure means the request delivery commit does not contain the
+reviewed v1 schema. A request, lock or cluster identity mismatch is a failed
+preflight, not a retryable controller glitch. Keep the failed Workflow and
+compare the named commits and exact request bytes; a changed request requires
+new review. The workflow has no repair, promotion or migration action. The
+retained M04 cutover continues through its existing operator guide.
+
 ## Contributor GitHub delivery failures
 
 The [automated contributor workflow](../CONTRIBUTING.md#development-workflow)

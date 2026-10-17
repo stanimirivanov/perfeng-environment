@@ -272,6 +272,11 @@ cutover. Tekton or Dagger remains an upstream artifact-producer choice behind
 the same input contract. The current M04 manual sync and rollback boundary
 remains in force throughout this preparatory work.
 
+The [read-only preflight pilot](../release-preflight-workflow.md) stages the
+first WorkflowTemplate and narrow RBAC separately from the active local root.
+Its offline checks do not satisfy the disposable-kind two-run gate or establish
+a promotion receipt.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
