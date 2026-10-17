@@ -325,8 +325,11 @@ failure is often only a consequence of an earlier missing service.
   its image, arguments, ownership labels and deployment revision have been
   compared with the lock.
 - If a selected content-addressed ConfigMap is missing, validate the release and
-  runtime selection first. For a reviewed promotion, pre-stage it with
-  `control_plane_runtime.py deploy --execute` before merging the Git selection.
+  runtime selection first. The control-plane child now selects both ConfigMaps
+  from a pinned Kustomize package. For the supported M04 preparation path,
+  pre-stage with `control_plane_runtime.py deploy --execute` before merging;
+  inspect the child Application diff before its manual sync. If the rendered
+  ConfigMap differs from a live immutable object, stop without Force or Replace.
 - If an existing Secret or immutable resource has unexpected ownership or data,
   treat it as a conflict. The tooling intentionally refuses automatic adoption,
   overwrite or rotation.

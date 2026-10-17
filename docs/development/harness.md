@@ -71,9 +71,10 @@ Checks should fail with the affected path, violated invariant, likely correction
 laptop cohort does not replace the mainstream CLI default; live qualification
 and assembly require the same explicit profile selection.
 
-`make release-selection-check` also verifies the native target's pinned chart,
-publisher record and exact fixture source, then renders it offline. CI uses a
-separate checkout from the older control-plane deployment pin. `task native:target-health`
+`make release-selection-check` also verifies the control-plane chart, bundle and
+versioned runtime package at one pinned deployment commit. It verifies the native
+target's pinned chart, publisher record and exact fixture source, then renders it
+offline. CI uses a separate checkout for the native target pin. `task native:target-health`
 is a distinct explicit read-only GHCR/Kubernetes acceptance tier, not a CI gate.
 
 The same pinned integration tier renders the infrastructure-lock-selected metrics

@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import secrets
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -152,6 +153,60 @@ def registry_files(release: DeploymentLock, k8s_root: Path = DEFAULT_K8S_ROOT) -
     return {path.replace("/", "--"): read(prefix + path).decode("utf-8") for path in paths}
 
 
+def validate_package_source(release: DeploymentLock, read: Callable[[str], bytes]) -> None:
+    """Bind the versioned Kustomize inputs to the reviewed bundle and lock."""
+    prefix = f"{release.package_path}/"
+    package = yaml.safe_load(read(prefix + "kustomization.yaml"))
+    paths = selected_registry_paths(read(f"{release.bundle_path}/registry.json"))
+    registry_data = {
+        path.replace("/", "--"): read(f"{release.bundle_path}/{path}").decode("utf-8")
+        for path in paths
+    }
+    expected = {
+        "apiVersion": "kustomize.config.k8s.io/v1beta1",
+        "kind": "Kustomization",
+        "namespace": postgres.NAMESPACE,
+        "generatorOptions": {
+            "disableNameSuffixHash": True,
+            "labels": {"app.kubernetes.io/managed-by": OWNER},
+            "annotations": {"perfeng.io/deployment-revision": release.package_provenance_revision},
+        },
+        "configMapGenerator": [
+            {"name": release.runtime_config_map, "envs": ["runtime.env"]},
+            {
+                "name": release.registry_config_map,
+                "files": [f"{path.replace('/', '--')}=files/{path}" for path in paths],
+            },
+        ],
+    }
+    patches = package.get("patches") if isinstance(package, dict) else None
+    if (
+        not isinstance(package, dict)
+        or {key: value for key, value in package.items() if key != "patches"} != expected
+        or not isinstance(patches, list)
+        or len(patches) != 1
+        or not isinstance(patches[0], dict)
+        or patches[0].get("target") != {"kind": "ConfigMap"}
+        or not isinstance(patches[0].get("patch"), str)
+        or yaml.safe_load(patches[0]["patch"])
+        != [{"op": "add", "path": "/immutable", "value": True}]
+    ):
+        raise ValueError("Pinned runtime package has an unexpected Kustomize definition")
+
+    runtime_data: dict[str, str] = {}
+    for line in read(prefix + "runtime.env").decode("utf-8").splitlines():
+        key, separator, value = line.partition("=")
+        if not separator or not key or key in runtime_data:
+            raise ValueError("Pinned runtime package has invalid runtime env data")
+        runtime_data[key] = value
+    if runtime_data != runtime_configuration(release):
+        raise ValueError("Pinned runtime package differs from reviewed runtime policy")
+    for path in paths:
+        if read(prefix + "files/" + path).decode("utf-8") != registry_data[path.replace("/", "--")]:
+            raise ValueError("Pinned runtime package differs from reviewed registry bytes")
+    validate_config_map_selection(release, runtime_data, registry_data)
+
+
 def object_document(
     kind: str, name: str, data: dict[str, str], release: DeploymentLock
 ) -> dict[str, Any]:
@@ -233,12 +288,21 @@ def validate_resource(value: dict[str, Any], expected: dict[str, Any]) -> None:
     provenance = (
         value.get("metadata", {}).get("annotations", {}).get("perfeng.io/deployment-revision")
     )
+    labels = value.get("metadata", {}).get("labels")
+    allowed_labels = [expected["metadata"]["labels"]]
+    if kind == "ConfigMap":
+        allowed_labels.append(
+            {
+                **expected["metadata"]["labels"],
+                "app.kubernetes.io/instance": "perfeng-local-control-plane",
+            }
+        )
     if (
         value.get("kind") != kind
         or value.get("immutable") is not True
         or value.get("metadata", {}).get("name") != expected["metadata"]["name"]
         or value.get("metadata", {}).get("namespace") != postgres.NAMESPACE
-        or value.get("metadata", {}).get("labels") != expected["metadata"]["labels"]
+        or labels not in allowed_labels
         or not isinstance(provenance, str)
         or REVISION.fullmatch(provenance) is None
         or stored_data(value, kind) != expected[source]

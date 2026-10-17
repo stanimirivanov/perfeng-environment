@@ -115,28 +115,35 @@ def validate_control_plane_application(
             "perfeng.io/environment": "local",
             "perfeng.io/workload": "control-plane",
         }
-        or set(spec) != {"project", "source", "destination", "syncPolicy"}
+        or set(spec) != {"project", "sources", "destination", "syncPolicy"}
         or spec.get("project") != "perfeng-local"
-        or spec.get("source")
-        != {
-            "repoURL": DEPLOYMENT_REPOSITORY,
-            "targetRevision": release.deployment_revision,
-            "path": release.chart_path,
-            "helm": {
-                "releaseName": control_plane_health.RELEASE,
-                "valuesObject": {
-                    "image": release.image,
-                    "imagePullSecret": control_plane_health.IMAGE_PULL_SECRET,
-                    "executionNamespace": control_plane_health.EXECUTION_NAMESPACE,
-                    "httpPort": CONTROL_PLANE_HTTP_PORT,
-                    "runtimeConfigMap": release.runtime_config_map,
-                    "runtimeSecret": "perfeng-control-plane-runtime",
-                    "authenticationSecret": "perfeng-control-plane-authentication",
-                    "registryConfigMap": release.registry_config_map,
-                    "registryItems": CONTROL_PLANE_REGISTRY_ITEMS,
+        or spec.get("sources")
+        != [
+            {
+                "repoURL": DEPLOYMENT_REPOSITORY,
+                "targetRevision": release.deployment_revision,
+                "path": release.chart_path,
+                "helm": {
+                    "releaseName": control_plane_health.RELEASE,
+                    "valuesObject": {
+                        "image": release.image,
+                        "imagePullSecret": control_plane_health.IMAGE_PULL_SECRET,
+                        "executionNamespace": control_plane_health.EXECUTION_NAMESPACE,
+                        "httpPort": CONTROL_PLANE_HTTP_PORT,
+                        "runtimeConfigMap": release.runtime_config_map,
+                        "runtimeSecret": "perfeng-control-plane-runtime",
+                        "authenticationSecret": "perfeng-control-plane-authentication",
+                        "registryConfigMap": release.registry_config_map,
+                        "registryItems": CONTROL_PLANE_REGISTRY_ITEMS,
+                    },
                 },
             },
-        }
+            {
+                "repoURL": DEPLOYMENT_REPOSITORY,
+                "targetRevision": release.deployment_revision,
+                "path": release.package_path,
+            },
+        ]
         or spec.get("destination")
         != {
             "server": "https://kubernetes.default.svc",
@@ -227,11 +234,16 @@ def validate_project_sources(
     expected: set[str] = set()
     for application in applications:
         spec = application.get("spec")
-        source = spec.get("source") if isinstance(spec, dict) else None
-        repository = source.get("repoURL") if isinstance(source, dict) else None
-        if not isinstance(repository, str):
+        if not isinstance(spec, dict) or ("source" in spec) == ("sources" in spec):
             raise ValueError("Invalid local Application source repository")
-        expected.add(repository)
+        sources = [spec["source"]] if "source" in spec else spec["sources"]
+        if not isinstance(sources, list) or not sources:
+            raise ValueError("Invalid local Application source repository")
+        for source in sources:
+            repository = source.get("repoURL") if isinstance(source, dict) else None
+            if not isinstance(repository, str):
+                raise ValueError("Invalid local Application source repository")
+            expected.add(repository)
 
     configured = project_spec.get("sourceRepos")
     if (

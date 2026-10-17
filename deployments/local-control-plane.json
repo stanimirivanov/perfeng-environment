@@ -7,7 +7,7 @@
   },
   "deployment": {
     "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
-    "revision": "fa718c2b62f4f10b5e9da8dce7b00a3f51daae0b",
+    "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
     "chart": {
       "path": "charts/control-plane",
       "version": "0.4.0"
@@ -17,6 +17,11 @@
       "version": "1.0.0",
       "contractsVersion": "registry",
       "entryContractsVersions": ["0.13.0", "0.22.0"]
+    },
+    "runtimePackage": {
+      "path": "packages/runtime-inputs/local-kind-integration-1.0.0",
+      "version": "1.0.0",
+      "provenanceRevision": "fa718c2b62f4f10b5e9da8dce7b00a3f51daae0b"
     },
     "runtimeResources": {
       "runtimeConfigMap": "perfeng-control-plane-runtime-315a2eede8ff",

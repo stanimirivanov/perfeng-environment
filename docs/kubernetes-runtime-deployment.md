@@ -103,9 +103,14 @@ kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-loca
 ```
 
 The root adopts the updated child definition with automatic sync **disabled**.
+The child has two sources pinned to the same `perfeng-k8s` commit: the chart and
+the versioned non-secret runtime-input package. Inspect the Argo CD diff for
+the complete child before sync; the two ConfigMaps must have the reviewed names,
+immutable bytes and existing ownership, with no unexpected Secret or persistent
+resource changes. Stop on any mismatch rather than forcing adoption.
 The Deployment is intentionally OutOfSync/zero until explicitly synced. In the
 [Argo CD UI](local-gitops.md#health-and-inspection), open
-`perfeng-local-control-plane`, refresh, confirm its source revision and image
+`perfeng-local-control-plane`, refresh, confirm both source revisions and image
 match the lock, then choose **Sync**. Leave **Prune**, **Force** and **Replace** off;
 sync the complete Application, not a selected subset. Do not enable auto-sync.
 The reviewed chart restores the single replica only after the migration window.

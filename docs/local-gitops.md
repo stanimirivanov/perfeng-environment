@@ -160,8 +160,8 @@ uv run --locked python scripts/control_plane_smoke.py --execute
 ```
 
 During the staged interval, `perfeng-local-control-plane` may be `Degraded`
-because its external Secrets, database schema and runtime ConfigMaps do not yet
-exist. The bootstrap command does not wait for or claim success for that
+because its external Secrets, database schema and selected runtime ConfigMaps do
+not yet exist. The bootstrap command does not wait for or claim success for that
 Application. Metrics may likewise wait for its explicit certificate prerequisites;
 stateful bootstrap does not wait for it. Final GitOps health remains fail-closed and requires the root plus all six workload
 Applications and every workload acceptance check.
@@ -203,8 +203,9 @@ provisioned `perfeng-postgres-auth` Secret and StatefulSet-generated PVC. Use th
 staged bootstrap above on a fresh cluster. Do not run the PostgreSQL Helm
 deployment command while its child Application is active.
 
-The control-plane child intentionally does not generate or own credentials,
-database state, migrations or runtime configuration. Before expecting complete
+The control-plane child owns the two versioned non-secret runtime ConfigMaps and
+the workload chart in one manually synced Application. It does not generate or
+own credentials, database state or migrations. Before expecting complete
 health, complete the provisioning sections in
 [the local control-plane guide](local-control-plane.md) through **Runtime
 inputs**. Use the staged `bootstrap` action on a fresh cluster. Verify the

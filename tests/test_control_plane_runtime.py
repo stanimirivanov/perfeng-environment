@@ -5,6 +5,8 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
+import yaml
+
 from scripts import control_plane_runtime as runtime
 from scripts.control_plane_release import DeploymentLock
 
@@ -23,6 +25,78 @@ RELEASE = DeploymentLock(
 
 
 class ControlPlaneRuntimeTests(unittest.TestCase):
+    def test_pinned_package_matches_reviewed_bundle_and_policy(self) -> None:
+        manifest = '{"entries":[]}\n'
+        files = {
+            "registry.json": manifest,
+            "jobs/analysis.yaml": "analysis\n",
+            "jobs/reporting.yaml": "reporting\n",
+        }
+        selected = replace(
+            RELEASE,
+            package_path="packages/runtime-inputs/test-1.0.0",
+            package_provenance_revision="a" * 40,
+            runtime_config_map=runtime.content_addressed_name(
+                runtime.RUNTIME_CONFIG_PREFIX, runtime.runtime_configuration(RELEASE)
+            ),
+            registry_config_map=runtime.content_addressed_name(
+                runtime.REGISTRY_CONFIG_PREFIX,
+                {path.replace("/", "--"): content for path, content in files.items()},
+            ),
+        )
+        kustomization = {
+            "apiVersion": "kustomize.config.k8s.io/v1beta1",
+            "kind": "Kustomization",
+            "namespace": "perf-platform",
+            "generatorOptions": {
+                "disableNameSuffixHash": True,
+                "labels": {"app.kubernetes.io/managed-by": "perfeng-environment"},
+                "annotations": {"perfeng.io/deployment-revision": "a" * 40},
+            },
+            "configMapGenerator": [
+                {"name": selected.runtime_config_map, "envs": ["runtime.env"]},
+                {
+                    "name": selected.registry_config_map,
+                    "files": [f"{path.replace('/', '--')}=files/{path}" for path in sorted(files)],
+                },
+            ],
+            "patches": [
+                {
+                    "target": {"kind": "ConfigMap"},
+                    "patch": "- op: add\n  path: /immutable\n  value: true",
+                }
+            ],
+        }
+        documents = {
+            f"{selected.bundle_path}/{path}": content.encode() for path, content in files.items()
+        }
+        documents[f"{selected.package_path}/kustomization.yaml"] = yaml.safe_dump(
+            kustomization
+        ).encode()
+        documents[f"{selected.package_path}/runtime.env"] = (
+            "\n".join(
+                f"{key}={value}" for key, value in runtime.runtime_configuration(selected).items()
+            )
+            + "\n"
+        ).encode()
+        documents.update(
+            {
+                f"{selected.package_path}/files/{path}": content.encode()
+                for path, content in files.items()
+            }
+        )
+        runtime.validate_package_source(selected, documents.__getitem__)
+        documents[f"{selected.package_path}/files/jobs/analysis.yaml"] = b"changed\n"
+        with self.assertRaisesRegex(ValueError, "registry bytes"):
+            runtime.validate_package_source(selected, documents.__getitem__)
+        documents[f"{selected.package_path}/files/jobs/analysis.yaml"] = b"analysis\n"
+        kustomization["secretGenerator"] = [{"name": "unsafe"}]
+        documents[f"{selected.package_path}/kustomization.yaml"] = yaml.safe_dump(
+            kustomization
+        ).encode()
+        with self.assertRaisesRegex(ValueError, "Kustomize definition"):
+            runtime.validate_package_source(selected, documents.__getitem__)
+
     def test_registry_mode_mounts_exact_benchmark_environment_bytes(self) -> None:
         manifest = json.dumps(
             {
@@ -105,6 +179,15 @@ class ControlPlaneRuntimeTests(unittest.TestCase):
         stored.pop("stringData")
         runtime.validate_resource(stored, expected)
         stored["immutable"] = False
+        with self.assertRaises(ValueError):
+            runtime.validate_resource(stored, expected)
+
+    def test_argocd_tracking_label_is_allowed_only_on_selected_configmaps(self) -> None:
+        expected = runtime.object_document("ConfigMap", "example", {"key": "value"}, RELEASE)
+        stored = json.loads(json.dumps(expected))
+        stored["metadata"]["labels"]["app.kubernetes.io/instance"] = "perfeng-local-control-plane"
+        runtime.validate_resource(stored, expected)
+        stored["metadata"]["labels"]["app.kubernetes.io/instance"] = "foreign"
         with self.assertRaises(ValueError):
             runtime.validate_resource(stored, expected)
 

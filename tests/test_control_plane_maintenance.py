@@ -46,6 +46,27 @@ def deployment() -> dict:
 
 
 class MaintenanceTests(unittest.TestCase):
+    def test_selected_two_source_application_remains_pauseable(self) -> None:
+        value = application(maintenance.APPLICATIONS[1])
+        release = maintenance.load_lock()
+        value["spec"].pop("source")
+        value["spec"]["sources"] = [
+            {
+                "repoURL": maintenance.REPOSITORIES[maintenance.APPLICATIONS[1]][0],
+                "path": release.chart_path,
+                "targetRevision": release.deployment_revision,
+            },
+            {
+                "repoURL": maintenance.REPOSITORIES[maintenance.APPLICATIONS[1]][0],
+                "path": release.package_path,
+                "targetRevision": release.deployment_revision,
+            },
+        ]
+        maintenance.validate_application(value, maintenance.APPLICATIONS[1])
+        value["spec"]["sources"][1]["targetRevision"] = "main"
+        with self.assertRaises(ValueError):
+            maintenance.validate_application(value, maintenance.APPLICATIONS[1])
+
     def test_wrong_cluster_refuses_before_any_pause_or_scale(self) -> None:
         with (
             patch.object(maintenance.cluster, "verify_local_docker"),
