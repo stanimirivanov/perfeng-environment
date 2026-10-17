@@ -10,6 +10,8 @@
   absent from the active local root. Use it only on a disposable kind cluster
   after the pinned Argo Workflows substrate and a dedicated private Git read
   credential are available. The retained M04 cutover remains manual.
+- The staged [external-state preparation](release-external-state.md) calls this
+  preflight before creating any Job and has a separate, bounded ServiceAccount.
 - A request is committed at a **different** revision from the release selection
   it names. One commit cannot contain its own Git hash.
 

@@ -63,6 +63,7 @@ render-check:
 
 workflow-lint:
 	argo lint --offline gitops/release-workflows/release-preflight.yaml
+	argo lint --offline gitops/release-workflows/release-external-state.yaml
 
 native-gateway-check:
 	$(UV_RUN) python scripts/native_connectivity.py validate --execute

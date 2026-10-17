@@ -3,3 +3,5 @@ kind: Kustomization
 resources:
   - preflight-rbac.yaml
   - release-preflight.yaml
+  - external-state-rbac.yaml
+  - release-external-state.yaml

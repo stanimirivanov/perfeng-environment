@@ -1,0 +1,28 @@
+# Staged external-state preparation
+
+## TL;DR
+
+- `perfeng-release-external-state-v1` runs the existing reviewed-input preflight, checks its control-plane lock against the v1 task selection, then prepares the artifact bucket, database roles and execution image pull access in three bounded Kubernetes Jobs.
+- The workflow consumes existing credential Secrets. Their initial issuance remains an explicit bootstrap operation; no Job creates, copies or rotates a Secret.
+- The WorkflowTemplate and namespace-scoped Job permissions are staged with the release-workflows Application. They are absent from the active local root and must be tested only on a disposable `kind` cluster before an operational switch.
+- A repeat creates new, retained Job evidence while preserving bucket, role and credential identities. A failed Job is not retried or deleted automatically.
+
+## Inputs and ownership
+
+The workflow accepts the same four exact Git inputs as [release preflight](release-preflight-workflow.md): reviewed request commit, request path, raw request digest and selected environment commit. It calls the preflight template before any Job. The v1 task selection accepts only `perfeng-local` with the reviewed `deployments/local-control-plane.json` SHA-256 `866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f`. That lock pins the runtime package whose three execution image digests are embedded in this versioned template. A changed control-plane lock needs a reviewed new task selection; it cannot silently reuse v1 image checks.
+
+Argo Workflows owns these finite Jobs. Argo CD owns the WorkflowTemplate and RBAC through the staged Application, and continues to own the persistent PostgreSQL and SeaweedFS workloads. The workflow does not apply those workloads, sync Argo CD, publish policies, migrate schema or activate the M04 release. A local Argo mutex serializes submissions of this template. It does not serialize against the still-supported host commands, so operators must not run both preparation paths concurrently.
+
+The AWS CLI Job in `perf-platform` uses `perfeng-s3-auth` to check or create only `perfeng-artifacts`. A lookup failure other than a reported 404 stops before creation. The PostgreSQL client Job in `perf-platform` uses the existing admin and control-plane database Secrets, creates only missing `perfeng_migration` and `perfeng_runtime` roles, rejects unsafe existing attributes, applies fixed database privileges and verifies both logins. The registry Job in `perf-generators` mounts `perfeng-execution-registry` as a Docker config and uses the pinned `crane` image to request the three reviewed digest images. Its success proves pull access at that moment, not future availability.
+
+Job Pods do not mount Kubernetes API tokens. The workflow ServiceAccount has Git-read and `kube-system` read rights for preflight plus create/get/watch on Jobs in the two named namespaces. It cannot create Secrets or manage Deployments/PVCs. Only trusted operators may submit Workflows in this namespace during the local pilot. M06 still needs submission admission, per-operator identity, external Secret delivery, backup/restore and durable workflow evidence for a shared environment.
+
+## Disposable-kind acceptance and recovery
+
+Use an isolated disposable `perfeng-local` cluster with the pinned Workflows substrate, the staged Application and a reviewed release request for that cluster UID. Provision the three existing credential identities through the approved bootstrap channel before submission. In particular, the database credential Secret must exist before the role Job; the supported `control_plane_database.py deploy` command currently creates both and is not yet retired. For an independent first-run proof, provision the Secret without pre-creating roles in the disposable cluster. Never copy credential bytes into Git or a Workflow argument.
+
+Submit `perfeng-release-external-state-v1` with the four parameters shown in the [preflight guide](release-preflight-workflow.md#disposable-kind-verification), replacing the `--from` template name. Record the Workflow UID, preflight result and three output Job names. Inspect only bounded, non-secret logs. Run the exact request twice and compare the bucket, role and Secret identities; Job names should differ and the earlier Jobs should remain for diagnosis. Inject a missing Secret, an unsafe existing role or denied registry pull on a separate disposable fixture. Each case must stop at its owning Job and leave the failure visible without a credential rotation, state deletion or automatic Job replacement.
+
+After a failure, inspect the named Job and its Pod events, restore the missing owned credential or correct the external prerequisite through an explicit recovery procedure, then submit a **new** Workflow with the same exact request bytes. A changed request or lock needs review and a new task selection. A failed Job is retained; do not delete it to conceal partial state. A completed Job is also retained for the local pilot, so cleanup/retention policy is an M06 follow-up before shared use.
+
+Offline gates are `make workflow-lint`, `make verify`, `make validate` and `kubectl kustomize gitops/release-workflows`. These do not establish live first-run, repeat or failure acceptance. The existing `task bootstrap` and `task kubernetes:prepare` remain the supported paths until that evidence and the remaining release workflow slices are accepted.

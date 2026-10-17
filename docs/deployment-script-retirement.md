@@ -51,6 +51,11 @@ change: the M04 host preparation path remains supported until the adopted
 Application and recovery path pass disposable-kind acceptance. No script is
 counted as retired solely because the declarative source is selected.
 
+PR 7 stages the bucket, database-role and execution-registry preparation Jobs.
+The same 13 files and 3,545 lines remain in the retirement baseline because
+the host commands are still supported. Count no script as retired until the
+first-run, repeat and failed-step recovery evidence permits a reviewed cutover.
+
 ## Deployment entrypoints and implementation
 
 | File | Task invocation(s) | Current responsibility | Target boundary | Physical lines |
