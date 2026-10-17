@@ -5,7 +5,7 @@ CONTRACTS_ROOT ?= ../perfeng-contracts
 NATIVE_TARGET_K8S_ROOT ?= $(K8S_ROOT)
 UV_RUN := uv run --locked --offline
 
-.PHONY: help bootstrap doctor fmt fmt-check docs-check check test verify render-check native-gateway-check native-target-image-check release-selection-check supply-chain validate
+.PHONY: help bootstrap doctor fmt fmt-check docs-check check test verify render-check workflow-lint native-gateway-check native-target-image-check release-selection-check supply-chain validate
 
 help:
 	@echo perfeng-environment engineering command surface
@@ -18,6 +18,7 @@ help:
 	@echo "  make test       Run the unit-test suite"
 	@echo "  make verify     Run the network-independent inner loop"
 	@echo "  make render-check  Validate Helm charts offline"
+	@echo "  make workflow-lint  Lint the staged release WorkflowTemplate offline with Argo v4.1.5"
 	@echo "  make native-gateway-check  Adapt the native HTTPS gateway with reviewed Caddy"
 	@echo "  make native-target-image-check  Build and verify an isolated development candidate"
 	@echo "  make release-selection-check  Validate exact adjacent release selections"
@@ -59,6 +60,9 @@ verify: check test
 
 render-check:
 	$(UV_RUN) python scripts/validate_cluster.py
+
+workflow-lint:
+	argo lint --offline gitops/release-workflows/release-preflight.yaml
 
 native-gateway-check:
 	$(UV_RUN) python scripts/native_connectivity.py validate --execute

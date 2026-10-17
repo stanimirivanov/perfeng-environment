@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: perfeng-release-workflows-local
+  namespace: argocd
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  description: Staged, read-only release preflight for the disposable local kind cluster
+  sourceRepos:
+    - https://github.com/stanimirivanov/perfeng-environment.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argo-workflows
+  clusterResourceWhitelist:
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ServiceAccount
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+    - group: argoproj.io
+      kind: WorkflowTemplate

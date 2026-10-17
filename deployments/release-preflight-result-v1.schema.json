@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:perfeng:environment:release-preflight-result:1",
+  "title": "Perfeng release preflight identity result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "requestDigest",
+    "requestRevision",
+    "requestPath",
+    "selectionRevision",
+    "environment",
+    "clusterUID",
+    "lockDigests",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "PerfengReleasePreflight"},
+    "requestDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "requestRevision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "requestPath": {
+      "type": "string",
+      "pattern": "^deployments/release-requests/[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.json$"
+    },
+    "selectionRevision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "environment": {"type": "string", "pattern": "^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$"},
+    "clusterUID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "lockDigests": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 32,
+      "propertyNames": {"pattern": "^deployments/[a-z][a-z0-9-]{0,62}\\.json$"},
+      "additionalProperties": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+    },
+    "status": {"const": "identity-verified"}
+  }
+}
