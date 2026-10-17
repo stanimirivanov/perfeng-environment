@@ -7,10 +7,12 @@ from typing import Any
 
 if __package__:
     from . import benchmark_authority, cluster
+    from .control_plane_release import load_lock
     from .control_plane_release import validate as validate_release
 else:
     import benchmark_authority
     import cluster
+    from control_plane_release import load_lock
     from control_plane_release import validate as validate_release
 
 APPLICATIONS = ("perfeng-local-root", "perfeng-local-control-plane")
@@ -56,13 +58,35 @@ def validate_application(value: dict[str, Any], name: str) -> None:
     metadata = value.get("metadata", {})
     spec = value.get("spec", {})
     source = spec.get("source", {})
+    sources = spec.get("sources")
+    if name == APPLICATIONS[1] and isinstance(sources, list):
+        release = load_lock()
+        source_matches = (
+            "source" not in spec
+            and len(sources) == 2
+            and all(isinstance(item, dict) for item in sources)
+            and [
+                (item.get("repoURL"), item.get("path"), item.get("targetRevision"))
+                for item in sources
+            ]
+            == [
+                (*REPOSITORIES[name], release.deployment_revision),
+                (REPOSITORIES[name][0], release.package_path, release.deployment_revision),
+            ]
+        )
+    else:
+        source_matches = (
+            sources is None
+            and isinstance(source, dict)
+            and (source.get("repoURL"), source.get("path")) == REPOSITORIES[name]
+        )
     if (
         metadata.get("name") != name
         or metadata.get("namespace") != "argocd"
         or metadata.get("labels", {}).get("app.kubernetes.io/managed-by") != "perfeng-environment"
         or metadata.get("ownerReferences")
         or metadata.get("deletionTimestamp")
-        or (source.get("repoURL"), source.get("path")) != REPOSITORIES[name]
+        or not source_matches
         or spec.get("destination")
         != {
             "server": "https://kubernetes.default.svc",

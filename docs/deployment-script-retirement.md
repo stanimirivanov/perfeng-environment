@@ -45,6 +45,12 @@ exception, but they remain in the residual count while their file exists.
 Deletion is a target for later PRs, not permission to remove the current
 recovery path before its replacement is accepted.
 
+PR 6 selects the versioned non-secret ConfigMaps in the control-plane Argo CD
+Application. The 13-file baseline and `control_plane_runtime.py` count do not
+change: the M04 host preparation path remains supported until the adopted
+Application and recovery path pass disposable-kind acceptance. No script is
+counted as retired solely because the declarative source is selected.
+
 ## Deployment entrypoints and implementation
 
 | File | Task invocation(s) | Current responsibility | Target boundary | Physical lines |

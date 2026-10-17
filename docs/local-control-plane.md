@@ -169,8 +169,12 @@ uv run --locked python scripts/control_plane_runtime.py deploy --execute
 uv run --locked python scripts/control_plane_runtime.py health --execute
 ```
 
-This creates immutable runtime configuration, runtime credentials, static API
-authentication and reviewed-registry resources. Registry bytes are read from the
+The host preparation command creates immutable runtime configuration, runtime
+credentials, static API authentication and reviewed-registry resources. It remains
+the M04 preparation path until adoption and recovery of the declarative package
+are accepted. The selected Argo CD control-plane Application includes the same
+two non-secret ConfigMaps from the versioned `perfeng-k8s` Kustomize package;
+its manual sync adopts them after preparation. Registry bytes are read from the
 exact locked `perfeng-k8s` commit, not its working tree. Database and restricted
 S3 credentials are copied from their validated environment-owned Secrets. The
 mounted authentication document contains only a SHA-256 token digest; the raw
@@ -189,6 +193,9 @@ stable names because credential rotation is a separate explicit operation.
 When a reviewed change produces new runtime bytes, deploy the new runtime inputs
 before merging the Application reference. The new immutable ConfigMaps coexist
 with the current selection, so pre-staging does not affect the running workload.
+Before manually syncing the two-source child, inspect its Argo CD diff and stop
+if either ConfigMap has unexpected ownership, immutable data or metadata. The
+package's source revision annotation remains historical provenance.
 For the current migration-bearing selection, automatic child sync is disabled;
 after preparation and merge, resume the root then manually sync the child as
 described in the [cutover guide](kubernetes-runtime-deployment.md).
@@ -200,8 +207,9 @@ cleanup.
 
 After all immutable runtime inputs pass health checks, use the control-plane
 child Application described in [the local GitOps guide](local-gitops.md). The
-Application renders the chart from the exact locked `perfeng-k8s` commit and
-supplies only non-secret resource names and the immutable image identity.
+Application renders the chart and versioned runtime-input package from the
+same exact locked `perfeng-k8s` commit. Its Helm values supply only non-secret
+resource names and the immutable image identity.
 Credentials remain in Kubernetes Secrets and do not enter Application values.
 
 After preparation, merge and explicit manual activation, verify reconciliation

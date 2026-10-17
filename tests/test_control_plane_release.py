@@ -89,6 +89,11 @@ class ControlPlaneReleaseTests(unittest.TestCase):
                     "version": "1.1.0",
                     "contractsVersion": "0.13.0",
                 },
+                "runtimePackage": {
+                    "path": "packages/runtime-inputs/local-kind-windows-1.1.0",
+                    "version": "1.1.0",
+                    "provenanceRevision": "3" * 40,
+                },
                 "runtimeResources": {
                     "runtimeConfigMap": "perfeng-control-plane-runtime-" + "4" * 12,
                     "registryConfigMap": "perfeng-runtime-registry-" + "5" * 12,
@@ -145,6 +150,8 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             ("sourceRevision", "main"),
             ("chartPath", "../control-plane"),
             ("bundleVersion", "1.2.0"),
+            ("packagePath", "packages/runtime-inputs/other-1.1.0"),
+            ("packageVersion", "1.2.0"),
             ("runtimeConfigMap", "perfeng-control-plane-runtime"),
             ("registryConfigMap", "perfeng-runtime-registry"),
         ]
@@ -157,6 +164,10 @@ class ControlPlaneReleaseTests(unittest.TestCase):
                     candidate["deployment"]["chart"]["path"] = value
                 elif field in {"runtimeConfigMap", "registryConfigMap"}:
                     candidate["deployment"]["runtimeResources"][field] = value
+                elif field == "packagePath":
+                    candidate["deployment"]["runtimePackage"]["path"] = value
+                elif field == "packageVersion":
+                    candidate["deployment"]["runtimePackage"]["version"] = value
                 else:
                     candidate["deployment"]["runtimeBundle"]["version"] = value
                 self.path.write_text(json.dumps(candidate), encoding="utf-8")

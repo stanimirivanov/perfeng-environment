@@ -50,6 +50,8 @@ class DeploymentLock:
     runtime_config_map: str
     registry_config_map: str
     entry_contracts_versions: tuple[str, ...] = ()
+    package_path: str = ""
+    package_provenance_revision: str = ""
 
 
 def mapping(value: Any, fields: set[str], location: str) -> Mapping[str, Any]:
@@ -105,7 +107,7 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
 
     deployment = mapping(
         root["deployment"],
-        {"repository", "revision", "chart", "runtimeBundle", "runtimeResources"},
+        {"repository", "revision", "chart", "runtimeBundle", "runtimePackage", "runtimeResources"},
         "deployment",
     )
     if deployment["repository"] != DEPLOYMENT_REPOSITORY:
@@ -142,6 +144,20 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
             raise ValueError("Uniform mode cannot select entry contracts versions")
     if PurePosixPath(bundle_path).name != bundle_version:
         raise ValueError("Runtime-bundle path and version differ")
+    package = mapping(
+        deployment["runtimePackage"],
+        {"path", "version", "provenanceRevision"},
+        "runtime package",
+    )
+    package_path = portable_path(package["path"], "runtime-package path")
+    package_version = string(package["version"], VERSION, "runtime-package version")
+    package_provenance_revision = string(
+        package["provenanceRevision"], REVISION, "runtime-package provenance revision"
+    )
+    if package_version != bundle_version or package_path != (
+        f"packages/runtime-inputs/{PurePosixPath(bundle_path).parent.name}-{package_version}"
+    ):
+        raise ValueError("Runtime package and bundle versions differ")
     resources = mapping(
         deployment["runtimeResources"],
         {"runtimeConfigMap", "registryConfigMap"},
@@ -166,6 +182,8 @@ def load_lock(path: Path = DEFAULT_LOCK) -> DeploymentLock:
         runtime_config_map=runtime_config_map,
         registry_config_map=registry_config_map,
         entry_contracts_versions=versions,
+        package_path=package_path,
+        package_provenance_revision=package_provenance_revision,
     )
 
 
@@ -254,7 +272,7 @@ def validate(
     k8s_root: Path = DEFAULT_K8S_ROOT,
     control_plane_root: Path = DEFAULT_CONTROL_PLANE_ROOT,
 ) -> DeploymentLock:
-    """Validate the lock and its exact deployment-source commit."""
+    """Validate the lock, chart, bundle and package at one deployment commit."""
     lock = load_lock(lock_path)
     source = revision_reader(
         control_plane_root,
@@ -272,6 +290,13 @@ def validate(
             )
     read = revision_reader(k8s_root, DEPLOYMENT_REPOSITORY, lock.deployment_revision)
     validate_deployment_source(lock, read)
+    if lock.package_path:
+        if __package__:
+            from . import control_plane_runtime
+        else:
+            import control_plane_runtime
+
+        control_plane_runtime.validate_package_source(lock, read)
     return lock
 
 
@@ -284,7 +309,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         validate(args.lock, args.k8s_root, args.control_plane_root)
-        print("Validated immutable control-plane image, chart and runtime-bundle selection.")
+        print("Validated immutable control-plane image, chart, bundle and runtime package.")
     except (
         UnicodeError,
         ValueError,

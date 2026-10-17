@@ -58,7 +58,13 @@ class GitOpsTests(unittest.TestCase):
         release = gitops.load_lock(root / "deployments/local-control-plane.json")
 
         gitops.validate_control_plane_application(application, release)
-        application["spec"]["source"]["targetRevision"] = "main"
+        for source in application["spec"]["sources"]:
+            original = source["targetRevision"]
+            source["targetRevision"] = "main"
+            with self.assertRaisesRegex(ValueError, "control-plane Application"):
+                gitops.validate_control_plane_application(application, release)
+            source["targetRevision"] = original
+        application["spec"]["sources"][1]["path"] = "packages/runtime-inputs/latest"
         with self.assertRaisesRegex(ValueError, "control-plane Application"):
             gitops.validate_control_plane_application(application, release)
 
