@@ -296,6 +296,14 @@ current pointer without overwrite. It does not advance a pointer, execute a
 promotion or establish full platform acceptance. Guarded advancement,
 maintenance writes, live recovery/export and measured retirement remain open.
 
+The staged [v2 verifier package](../release-verifier-package.md) consolidates
+preflight, selection, readiness, quiescence and adoption into two modules
+(708 physical lines total). Hash-audited source retirement removes superseded
+helper copies from the active tree without pruning installed resources. This
+is a prerequisite budget correction, not operational cutover or retirement
+credit against the original 13 host entrypoints. Pointer advancement and the
+remaining live acceptance/recovery gates are still open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

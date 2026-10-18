@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- Use `perfeng-release-adopt-existing-v1` only for a deliberately reviewed adoption of an existing local selection.
+- Use `perfeng-release-adopt-existing-v2` only for a deliberately reviewed adoption of an existing local selection.
 - Native Argo operations create immutable receipt bytes and the initial current pointer in `perfeng-release-ledger`; exact retries preserve the original record.
 - Conflicting, foreign, changed or dangling state is refused. This entrypoint cannot advance, patch or delete a current pointer.
 - The result is an adopted baseline, not executed promotion, full platform acceptance, migration authorization or backup/recovery proof.
@@ -18,7 +18,7 @@ Apply the separately reviewed bootstrap resources, including `ledger-namespace.y
 
 ## Submission and observed revision
 
-Use the [preflight submission procedure](release-preflight-workflow.md#disposable-kind-verification) with `--from workflowtemplate/perfeng-release-adopt-existing-v1` and the same four pinned inputs. The request must select `perfeng-local`, manual activation and `expectedCurrent: null`; in this distinct adoption entrypoint, those bytes identify the baseline, not permission to deploy over an existing environment. Requests larger than 64 KiB are refused by the local ledger profile.
+Use the [preflight submission procedure](release-preflight-workflow.md#disposable-kind-verification) with `--from workflowtemplate/perfeng-release-adopt-existing-v2` and the same four pinned inputs. The request must select `perfeng-local`, manual activation and `expectedCurrent: null`; in this distinct adoption entrypoint, those bytes identify the baseline, not permission to deploy over an existing environment. Requests larger than 64 KiB are refused by the local ledger profile.
 
 The root must report the exact selected Git commit, `Synced`/`Healthy`, the existing owned root source/project/destination and no active operation or condition. Fresh [readiness](release-readiness.md) must match that request/cluster/selection. Its scope remains control-plane/foundation readiness, not full platform acceptance. The root tracks `main`: if a later request commit is merged there before adoption, the root's resolved revision may no longer match the selection. Keep the request at a separately reviewed pinned Git commit/branch and exclude concurrent merges and operator syncs during adoption. The workflow never pins, pauses or syncs the root to make a mismatch pass.
 
@@ -59,3 +59,12 @@ Cluster deletion also deletes this ledger. Preserve records outside the cluster 
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.
+
+## Verifier package lifecycle
+
+The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
+Request and result data schemas remain v1. Published v1 source is recoverable
+from the retirement index; installed v1 objects are retained with pruning off.
+Use a fresh Workflow after upgrading; do not resume successful v1 nodes as v2
+verification. The active operator path and outstanding live acceptance gates
+remain unchanged.

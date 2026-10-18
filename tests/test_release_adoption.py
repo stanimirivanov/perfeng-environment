@@ -2,7 +2,6 @@
 
 import base64
 import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -17,12 +16,11 @@ from unittest.mock import patch
 import yaml
 from jsonschema import Draft202012Validator
 
+from tests.release_verifier_support import policy, runtime
+
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "gitops/release-workflows"
-SPEC = importlib.util.spec_from_file_location("adoption", DIRECTORY / "scripts/plan-adoption.py")
-assert SPEC and SPEC.loader
-planner = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(planner)
+planner = runtime
 
 
 class ReleaseAdoptionTests(unittest.TestCase):
@@ -62,7 +60,7 @@ class ReleaseAdoptionTests(unittest.TestCase):
         pointer: dict[str, Any] | None = None,
         after: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return planner.plan(self.raw, self.readiness, self.root, receipt, pointer, after)
+        return policy.plan_adoption(self.raw, self.readiness, self.root, receipt, pointer, after)
 
     def records(self) -> tuple[dict[str, Any], dict[str, Any]]:
         value = self.plan()
@@ -71,10 +69,10 @@ class ReleaseAdoptionTests(unittest.TestCase):
             "kind": "ConfigMap",
             "metadata": {
                 "name": value["name"],
-                "namespace": planner.NAMESPACE,
+                "namespace": policy.NAMESPACE,
                 "uid": "receipt-uid",
                 "resourceVersion": "20",
-                "labels": planner.labels("release-adoption"),
+                "labels": policy.labels("release-adoption"),
                 "annotations": {
                     "perfeng.io/first-workflow-uid": "00000000-0000-0000-0000-000000000001",
                     "perfeng.io/first-request-revision": "a" * 40,
@@ -90,11 +88,11 @@ class ReleaseAdoptionTests(unittest.TestCase):
             "apiVersion": "v1",
             "kind": "ConfigMap",
             "metadata": {
-                "name": planner.POINTER,
-                "namespace": planner.NAMESPACE,
+                "name": policy.POINTER,
+                "namespace": policy.NAMESPACE,
                 "uid": "pointer-uid",
                 "resourceVersion": "30",
-                "labels": planner.labels("current-release"),
+                "labels": policy.labels("current-release"),
             },
             "data": {
                 "requestDigest": value["request-digest"],
@@ -143,13 +141,13 @@ class ReleaseAdoptionTests(unittest.TestCase):
         self.request["promotion"]["expectedCurrent"] = "sha256:" + "c" * 64
         raw = json.dumps(self.request).encode()
         with self.assertRaises(ValueError):
-            planner.plan(raw, self.readiness, self.root, None, None)
+            policy.plan_adoption(raw, self.readiness, self.root, None, None)
         with self.assertRaises(ValueError):
-            planner.plan(self.raw + b"\n", self.readiness, self.root, None, None)
+            policy.plan_adoption(self.raw + b"\n", self.readiness, self.root, None, None)
         with self.assertRaises(ValueError):
-            planner.plan(b"x" * 65537, self.readiness, self.root, None, None)
+            policy.plan_adoption(b"x" * 65537, self.readiness, self.root, None, None)
         with self.assertRaisesRegex(ValueError, "duplicate"):
-            json.loads('{"name":1,"name":2}', object_pairs_hook=planner.unique)
+            json.loads('{"name":1,"name":2}', object_pairs_hook=policy.unique)
 
     def test_foreign_stale_unhealthy_or_running_root_is_refused(self) -> None:
         for change in (
@@ -239,12 +237,12 @@ class ReleaseAdoptionTests(unittest.TestCase):
                 patch.dict(os.environ, environment),
                 patch.object(planner, "Path", side_effect=location),
             ):
-                planner.main()
+                planner.run_adoption()
                 result = Path(temporary) / "result"
                 self.assertIsNone(json.loads(result.read_text()))
                 with patch.dict(os.environ, {"PHASE": "finish"}):
                     with self.assertRaises(ValueError):
-                        planner.main()
+                        planner.run_adoption()
                 self.assertIsNone(json.loads(result.read_text()))
                 with patch.dict(
                     os.environ,
@@ -255,13 +253,13 @@ class ReleaseAdoptionTests(unittest.TestCase):
                         "ROOT_AFTER": json.dumps(self.root),
                     },
                 ):
-                    planner.main()
+                    planner.run_adoption()
                 self.assertEqual(json.loads(result.read_text())["status"], "adopted-baseline")
         with (
-            patch.object(planner, "main", side_effect=ValueError("sensitive-vendor-input")),
+            patch.object(planner, "run_adoption", side_effect=ValueError("sensitive-vendor-input")),
             redirect_stderr(io.StringIO()) as stderr,
         ):
-            self.assertEqual(planner.cli(), 2)
+            self.assertEqual(planner.cli("adoption"), 2)
         self.assertNotIn("sensitive-vendor-input", stderr.getvalue())
 
     def test_native_operations_are_create_only_isolated_and_not_workflow_owned(self) -> None:
@@ -272,7 +270,7 @@ class ReleaseAdoptionTests(unittest.TestCase):
             if resource["action"] == "create":
                 obj = yaml.safe_load(resource["manifest"])
                 self.assertEqual(obj["kind"], "ConfigMap")
-                self.assertEqual(obj["metadata"]["namespace"], planner.NAMESPACE)
+                self.assertEqual(obj["metadata"]["namespace"], policy.NAMESPACE)
                 self.assertIs(resource["setOwnerReference"], False)
                 self.assertNotIn("ownerReferences", obj["metadata"])
         role = next(
@@ -286,10 +284,10 @@ class ReleaseAdoptionTests(unittest.TestCase):
             role["rules"],
             [{"apiGroups": [""], "resources": ["configmaps"], "verbs": ["get", "create"]}],
         )
-        self.assertEqual(role["metadata"]["namespace"], planner.NAMESPACE)
-        parent = yaml.safe_load((DIRECTORY / "release-adopt-existing.yaml").read_text())
+        self.assertEqual(role["metadata"]["namespace"], policy.NAMESPACE)
+        parent = yaml.safe_load((DIRECTORY / "release-adopt-existing-v2.yaml").read_text())
         steps = [group[0] for group in parent["spec"]["templates"][0]["steps"]]
-        self.assertEqual(steps[0]["templateRef"]["name"], "perfeng-release-readiness-v1")
+        self.assertEqual(steps[0]["templateRef"]["name"], "perfeng-release-readiness-v2")
         self.assertEqual(steps[-1]["name"], "finish")
         self.assertEqual(
             [s["name"] for s in steps[-4:]],

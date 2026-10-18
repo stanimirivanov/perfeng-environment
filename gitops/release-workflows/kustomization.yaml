@@ -4,13 +4,13 @@ resources:
   - rbac/preflight/serviceaccount.yaml
   - rbac/preflight/workflow-access.yaml
   - rbac/preflight/cluster-identity.yaml
-  - release-preflight.yaml
+  - release-preflight-v2.yaml
   - rbac/external-state/serviceaccount.yaml
   - rbac/external-state/workflow-access.yaml
   - rbac/external-state/cluster-identity.yaml
   - rbac/external-state/platform-jobs.yaml
   - rbac/external-state/generator-jobs.yaml
-  - release-task-selection.yaml
+  - release-task-selection-v2.yaml
   - prepare-bucket.yaml
   - prepare-database-roles.yaml
   - prepare-execution-registry.yaml
@@ -20,21 +20,21 @@ resources:
   - rbac/readiness/cluster-identity.yaml
   - rbac/readiness/platform-observation.yaml
   - observe-release-readiness.yaml
-  - verify-release-readiness.yaml
-  - release-readiness.yaml
+  - verify-release-readiness-v2.yaml
+  - release-readiness-v2.yaml
   - rbac/maintenance/serviceaccount.yaml
   - rbac/maintenance/workflow-access.yaml
   - rbac/maintenance/cluster-identity.yaml
   - rbac/maintenance/platform-observation.yaml
-  - verify-release-quiescence.yaml
-  - release-maintenance-checkpoint.yaml
+  - verify-release-quiescence-v2.yaml
+  - release-maintenance-checkpoint-v2.yaml
   - rbac/adoption/serviceaccount.yaml
   - rbac/adoption/workflow-access.yaml
   - rbac/adoption/cluster-identity.yaml
   - rbac/adoption/platform-observation.yaml
-  - plan-release-adoption.yaml
+  - plan-release-adoption-v2.yaml
   - adoption-records.yaml
-  - release-adopt-existing.yaml
+  - release-adopt-existing-v2.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform
@@ -44,31 +44,16 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
       annotations:
-        argocd.argoproj.io/sync-wave: "-2"
-  - name: perfeng-readiness-verifier-v1
+        argocd.argoproj.io/sync-wave: '-2'
+  - name: perfeng-release-verifiers-v2
     namespace: argo-workflows
     files:
-      - scripts/verify-readiness.py
+      - verifiers-v2/release_policy_v2.py
+      - verifiers-v2/release_runtime_v2.py
     options:
       disableNameSuffixHash: true
       annotations:
-        argocd.argoproj.io/sync-wave: "-2"
-  - name: perfeng-quiescence-verifier-v1
-    namespace: argo-workflows
-    files:
-      - scripts/verify-quiescence.py
-    options:
-      disableNameSuffixHash: true
-      annotations:
-        argocd.argoproj.io/sync-wave: "-2"
-  - name: perfeng-adoption-planner-v1
-    namespace: argo-workflows
-    files:
-      - scripts/plan-adoption.py
-    options:
-      disableNameSuffixHash: true
-      annotations:
-        argocd.argoproj.io/sync-wave: "-2"
+        argocd.argoproj.io/sync-wave: '-2'
 patches:
   - target:
       kind: ConfigMap
@@ -79,21 +64,7 @@ patches:
         value: true
   - target:
       kind: ConfigMap
-      name: perfeng-readiness-verifier-v1
-    patch: |-
-      - op: add
-        path: /immutable
-        value: true
-  - target:
-      kind: ConfigMap
-      name: perfeng-quiescence-verifier-v1
-    patch: |-
-      - op: add
-        path: /immutable
-        value: true
-  - target:
-      kind: ConfigMap
-      name: perfeng-adoption-planner-v1
+      name: perfeng-release-verifiers-v2
     patch: |-
       - op: add
         path: /immutable

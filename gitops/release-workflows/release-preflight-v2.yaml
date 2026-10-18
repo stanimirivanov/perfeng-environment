@@ -1,0 +1,177 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-preflight-v2
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-preflight
+  entrypoint: preflight
+  activeDeadlineSeconds: 600
+  arguments:
+    parameters:
+      - name: request-revision
+        description: Full Git commit containing the reviewed request file, separate from selection.revision.
+      - name: request-path
+        description: Repository-relative deployments/release-requests/<name>.json path.
+      - name: request-sha256
+        description: SHA-256 of the exact UTF-8 request bytes, including final newline.
+      - name: selection-revision
+        description: Full Git commit selected by the release request.
+  templates:
+    - name: preflight
+      steps:
+        - - name: validate-schema
+            template: validate-schema
+        - - name: cluster-uid
+            template: cluster-uid
+        - - name: verify-identities
+            template: verify-identities
+            arguments:
+              parameters:
+                - name: observed-cluster-uid
+                  value: '{{steps.cluster-uid.outputs.parameters.uid}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.verify-identities.outputs.parameters.result}}'
+    - name: validate-schema
+      inputs:
+        artifacts:
+          - name: request-source
+            path: /inputs/request
+            git:
+              repo: https://github.com/stanimirivanov/perfeng-environment.git
+              revision: '{{workflow.parameters.request-revision}}'
+              disableSubmodules: true
+              usernameSecret:
+                name: release-git-read
+                key: username
+              passwordSecret:
+                name: release-git-read
+                key: password
+      container:
+        image: ghcr.io/sourcemeta/jsonschema:v17.2.0@sha256:8466fb557d241ec0a8e5b20056bafc0e6d23affc72bb223402dc9657bfb8f40d
+        command:
+          - /bin/sh
+          - -ec
+        env:
+          - name: REQUEST_PATH
+            value: '{{workflow.parameters.request-path}}'
+        args:
+          - |
+            case "$REQUEST_PATH" in
+              deployments/release-requests/*.json) ;;
+              *) echo 'Invalid request path' >&2; exit 2 ;;
+            esac
+            case "${REQUEST_PATH#deployments/release-requests/}" in
+              *[!a-zA-Z0-9._-]*|.*|*..*|*/*) echo 'Invalid request name' >&2; exit 2 ;;
+            esac
+            printf '%s  %s\n' \
+              'e9166c6eb2bd2d2468ec8af2286ae61ae6d3db6987b26075d1955821da11385d' \
+              /inputs/request/deployments/release-request-v1.schema.json | sha256sum -c - >/dev/null
+            /usr/local/bin/jsonschema validate \
+              /inputs/request/deployments/release-request-v1.schema.json \
+              "/inputs/request/$REQUEST_PATH"
+    - name: cluster-uid
+      resource:
+        action: get
+        manifest: |
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: kube-system
+      outputs:
+        parameters:
+          - name: uid
+            valueFrom:
+              jsonPath: '{.metadata.uid}'
+    - name: verify-identities
+      inputs:
+        parameters:
+          - name: observed-cluster-uid
+        artifacts:
+          - name: request-source
+            path: /inputs/request
+            git:
+              repo: https://github.com/stanimirivanov/perfeng-environment.git
+              revision: '{{workflow.parameters.request-revision}}'
+              disableSubmodules: true
+              usernameSecret:
+                name: release-git-read
+                key: username
+              passwordSecret:
+                name: release-git-read
+                key: password
+          - name: selected-source
+            path: /inputs/selection
+            git:
+              repo: https://github.com/stanimirivanov/perfeng-environment.git
+              revision: '{{workflow.parameters.selection-revision}}'
+              disableSubmodules: true
+              usernameSecret:
+                name: release-git-read
+                key: username
+              passwordSecret:
+                name: release-git-read
+                key: password
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              path: /tmp/preflight-result.json
+      container:
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+        command:
+          - python
+          - /opt/release/release_runtime_v2.py
+        args:
+          - preflight
+        env:
+          - name: REQUEST_REVISION
+            value: '{{workflow.parameters.request-revision}}'
+          - name: REQUEST_PATH
+            value: '{{workflow.parameters.request-path}}'
+          - name: REQUEST_SHA256
+            value: '{{workflow.parameters.request-sha256}}'
+          - name: SELECTION_REVISION
+            value: '{{workflow.parameters.selection-revision}}'
+          - name: OBSERVED_CLUSTER_UID
+            value: '{{inputs.parameters.observed-cluster-uid}}'
+        volumeMounts:
+          - name: verifier
+            mountPath: /opt/release
+            readOnly: true
+          - name: scratch
+            mountPath: /tmp
+      volumes:
+        - name: verifier
+          configMap:
+            name: perfeng-release-verifiers-v2
+            items:
+              - key: release_policy_v2.py
+                path: release_policy_v2.py
+              - key: release_runtime_v2.py
+                path: release_runtime_v2.py
+        - name: scratch
+          emptyDir: {}
+      podSpecPatch: '{"securityContext":{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch"}}'

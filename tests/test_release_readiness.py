@@ -1,7 +1,6 @@
 """Readiness contract failures are offline and never create workload state."""
 
 import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -15,14 +14,11 @@ from unittest.mock import MagicMock, patch
 import yaml
 from jsonschema import Draft202012Validator
 
+from tests.release_verifier_support import policy, runtime
+
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "gitops/release-workflows"
-SPEC = importlib.util.spec_from_file_location(
-    "readiness_verifier", DIRECTORY / "scripts/verify-readiness.py"
-)
-assert SPEC is not None and SPEC.loader is not None
-verifier = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(verifier)
+verifier = runtime
 REVISION = "a" * 40
 
 
@@ -48,7 +44,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         }
 
     def test_selected_converged_release_emits_strict_versioned_evidence(self) -> None:
-        result = verifier.verify(self.preflight, self.raw_lock, self.observations, REVISION)
+        result = policy.verify_readiness(self.preflight, self.raw_lock, self.observations, REVISION)
         schema = json.loads(
             (ROOT / "deployments/release-readiness-result-v1.schema.json").read_text()
         )
@@ -70,7 +66,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             changed = deepcopy(self.observations)
             changed[key][field] = value
             with self.subTest(key=key, field=field), self.assertRaises(ValueError):
-                verifier.verify(self.preflight, self.raw_lock, changed, REVISION)
+                policy.verify_readiness(self.preflight, self.raw_lock, changed, REVISION)
 
     def test_wrong_runtime_source_service_and_application_status_are_rejected(self) -> None:
         for key, field, value in (
@@ -90,7 +86,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             changed = deepcopy(self.observations)
             changed[key][field] = value
             with self.subTest(key=key, field=field), self.assertRaises(ValueError):
-                verifier.verify(self.preflight, self.raw_lock, changed, REVISION)
+                policy.verify_readiness(self.preflight, self.raw_lock, changed, REVISION)
 
     def test_preflight_and_lock_mismatches_fail_closed(self) -> None:
         for field, value in (
@@ -100,11 +96,13 @@ class ReleaseReadinessTests(unittest.TestCase):
         ):
             changed = {**self.preflight, field: value}
             with self.subTest(field=field), self.assertRaises(ValueError):
-                verifier.verify(changed, self.raw_lock, self.observations, REVISION)
+                policy.verify_readiness(changed, self.raw_lock, self.observations, REVISION)
         with self.assertRaisesRegex(ValueError, "lock differs"):
-            verifier.verify(self.preflight, self.raw_lock + b"\n", self.observations, REVISION)
+            policy.verify_readiness(
+                self.preflight, self.raw_lock + b"\n", self.observations, REVISION
+            )
         with self.assertRaisesRegex(ValueError, "duplicate"):
-            json.loads('{"image":1,"image":2}', object_pairs_hook=verifier.unique)
+            json.loads('{"image":1,"image":2}', object_pairs_hook=policy.unique)
         lock = json.loads(self.raw_lock)
         lock["schemaVersion"] = 2
         raw = json.dumps(lock).encode()
@@ -115,16 +113,19 @@ class ReleaseReadinessTests(unittest.TestCase):
             },
         }
         with self.assertRaisesRegex(ValueError, "lock version"):
-            verifier.verify(changed, raw, self.observations, REVISION)
+            policy.verify_readiness(changed, raw, self.observations, REVISION)
 
     def test_cli_reports_controlled_failures_without_vendor_details(self) -> None:
         for error, expected in (
-            (verifier.ReadinessRefused("Deployment differs"), "Deployment differs"),
+            (policy.ReadinessRefused("Deployment differs"), "Deployment differs"),
             (ValueError("secret-vendor-body"), "invalid selection"),
         ):
             output = io.StringIO()
-            with patch.object(verifier, "main", side_effect=error), redirect_stderr(output):
-                self.assertEqual(verifier.cli(), 2)
+            with (
+                patch.object(verifier, "run_readiness", side_effect=error),
+                redirect_stderr(output),
+            ):
+                self.assertEqual(verifier.cli("readiness"), 2)
             self.assertIn(expected, output.getvalue())
             self.assertNotIn("secret-vendor-body", output.getvalue())
 
@@ -150,17 +151,17 @@ class ReleaseReadinessTests(unittest.TestCase):
                     verifier, "probe_endpoints", side_effect=ValueError("probe failed")
                 ):
                     with self.assertRaisesRegex(ValueError, "probe failed"):
-                        verifier.main()
+                        verifier.run_readiness()
                     self.assertFalse(output.exists())
                 with patch.object(verifier, "probe_endpoints") as probe:
-                    verifier.main()
+                    verifier.run_readiness()
                     probe.assert_called_once()
                     self.assertEqual(json.loads(output.read_text())["status"], "readiness-verified")
                 output.unlink()
                 (root / ".git/HEAD").write_text("main\n")
                 with patch.object(verifier, "probe_endpoints") as probe:
                     with self.assertRaisesRegex(ValueError, "checkout"):
-                        verifier.main()
+                        verifier.run_readiness()
                     probe.assert_not_called()
                     self.assertFalse(output.exists())
 
@@ -199,7 +200,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             verifier.NoRedirect().redirect_request(None, None, 302, "", {}, "http://foreign")
 
     def test_workflow_uses_native_waits_and_named_read_only_authority(self) -> None:
-        workflow = yaml.safe_load((DIRECTORY / "release-readiness.yaml").read_text())
+        workflow = yaml.safe_load((DIRECTORY / "release-readiness-v2.yaml").read_text())
         observer = yaml.safe_load((DIRECTORY / "observe-release-readiness.yaml").read_text())
         bootstrap = yaml.safe_load(
             (ROOT / "gitops/release-workflows-bootstrap/project.yaml").read_text()
@@ -208,7 +209,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             "argocd", [item["namespace"] for item in bootstrap["spec"]["destinations"]]
         )
         verifier_template = yaml.safe_load(
-            (DIRECTORY / "verify-release-readiness.yaml").read_text()
+            (DIRECTORY / "verify-release-readiness-v2.yaml").read_text()
         )["spec"]["templates"][0]
         self.assertEqual(
             json.loads(verifier_template["podSpecPatch"])["securityContext"]["fsGroup"], 10001
@@ -222,7 +223,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertEqual(workflow["spec"]["activeDeadlineSeconds"], 1200)
         self.assertEqual(
             workflow["spec"]["templates"][0]["steps"][0][0]["templateRef"]["name"],
-            "perfeng-release-preflight-v1",
+            "perfeng-release-preflight-v2",
         )
         for template in observer["spec"]["templates"]:
             self.assertEqual(template["resource"]["action"], "get")
@@ -243,7 +244,7 @@ class ReleaseReadinessTests(unittest.TestCase):
                         self.assertEqual(rule["verbs"], ["get"])
                         self.assertTrue(rule["resourceNames"])
         root = yaml.safe_load((ROOT / "gitops/environments/local/kustomization.yaml").read_text())
-        self.assertNotIn("release-readiness.yaml", str(root))
+        self.assertNotIn("release-readiness-v2.yaml", str(root))
 
 
 if __name__ == "__main__":

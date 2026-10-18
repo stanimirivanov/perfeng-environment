@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- `perfeng-release-readiness-v1` observes the selected control-plane release and the PostgreSQL/SeaweedFS foundation using native Argo resource conditions.
+- `perfeng-release-readiness-v2` observes the selected control-plane release and the PostgreSQL/SeaweedFS foundation using native Argo resource conditions.
 - It reuses reviewed-input preflight, verifies the selected lock again, checks release identity/fresh rollout observations and probes the three existing operational endpoints.
 - A successful `result` is versioned readiness evidence, not promotion approval, complete platform health or benchmark qualification.
 - The workflow is staged in the separately synced release-workflows Application. Existing `task status`, `task smoke` and the manual M04 cutover remain supported.
@@ -24,7 +24,7 @@ The dedicated `release-readiness` identity has only named-resource reads: the co
 
 The Application-read Role/Binding is in `release-workflows-bootstrap/readiness-application-access.yaml` and is applied through the explicit bootstrap channel. The staged Application cannot create RBAC in `argocd`; its Project destinations remain unchanged. Apply that bootstrap grant before submitting readiness. The other permissions remain under the staged Application's existing namespaces. The GET behavior is implemented by the [pinned executor](https://github.com/argoproj/argo-workflows/blob/v4.1.5/workflow/executor/resource.go).
 
-The verifier is a standalone standard-library program mounted from immutable `perfeng-readiness-verifier-v1` in `argo-workflows`. It runs in the already pinned Python image as a non-root user with dropped capabilities, a read-only root filesystem and scratch `/tmp`. It performs no Kubernetes calls, subprocess orchestration or wait loops. The ConfigMap is applied before versioned child templates, then the parent. Its file is covered by the published-version guard; changing it after publication requires a new versioned file/ConfigMap/template reference.
+The verifier uses the shared two-module standard-library package mounted from immutable `perfeng-release-verifiers-v2` in `argo-workflows`. It runs in the already pinned Python image as a non-root user with dropped capabilities, a read-only root filesystem and scratch `/tmp`. It performs no Kubernetes calls, subprocess orchestration or wait loops. The ConfigMap is applied before versioned child templates, then the parent. Its file is covered by the published-version guard; changing it after publication requires a new versioned file/ConfigMap/template reference.
 
 ## Evidence and limits
 
@@ -36,10 +36,19 @@ These are sequential observations over a bounded interval, not an atomic release
 
 ## Disposable-kind acceptance and recovery
 
-Use an isolated disposable fixture with the pinned Workflows substrate, bootstrap Project and staged Application. Complete the explicit M04 preparation/manual sync first; this workflow will not enable a paused control plane or trigger Argo CD refresh/sync. Submit using the [preflight command](release-preflight-workflow.md#disposable-kind-verification), replacing its `--from` value with `workflowtemplate/perfeng-release-readiness-v1` and retaining the exact reviewed request bytes for that cluster.
+Use an isolated disposable fixture with the pinned Workflows substrate, bootstrap Project and staged Application. Complete the explicit M04 preparation/manual sync first; this workflow will not enable a paused control plane or trigger Argo CD refresh/sync. Submit using the [preflight command](release-preflight-workflow.md#disposable-kind-verification), replacing its `--from` value with `workflowtemplate/perfeng-release-readiness-v2` and retaining the exact reviewed request bytes for that cluster.
 
 Record the Workflow UID and final `result`. Repeat the same input and compare request/release identity; new Workflow evidence may observe later generations or UIDs after an explicitly authorized rollout. Exercise an unhealthy/missing Application, stale observed generation, wrong image/configuration reference and failing operational response on separate disposable fixtures. Each must stop without success evidence or repair. Prove the dedicated identity cannot patch/sync an Application, create Jobs/Secrets or modify workloads.
 
 After failure, inspect the named failing step and existing owner diagnostics. Correct the confirmed prerequisite through its owning deployment/recovery procedure, then submit a new Workflow. Do not relax the release input, mutate a published verifier, delete retained evidence or let this workflow repair the cluster.
 
 Offline gates are `make workflow-lint` and `make validate`; the latter renders and checks both Workflow and Job ConfigMap references against the staged Project. Unit tests cover identity/freshness failures, endpoint bounds/redirect rejection and output publication after successful verification. These checks do not establish live parity or retire the host path.
+
+## Verifier package lifecycle
+
+The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
+Request and result data schemas remain v1. Published v1 source is recoverable
+from the retirement index; installed v1 objects are retained with pruning off.
+Use a fresh Workflow after upgrading; do not resume successful v1 nodes as v2
+verification. The active operator path and outstanding live acceptance gates
+remain unchanged.
