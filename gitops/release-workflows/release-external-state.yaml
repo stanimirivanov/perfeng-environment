@@ -3,6 +3,8 @@ kind: WorkflowTemplate
 metadata:
   name: perfeng-release-external-state-v1
   namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/managed-by: perfeng-environment
 spec:
@@ -26,17 +28,31 @@ spec:
               name: perfeng-release-preflight-v1
               template: preflight
         - - name: task-selection
-            template: task-selection
+            templateRef:
+              name: perfeng-release-task-selection-v1
+              template: run
             arguments:
               parameters:
                 - name: preflight-result
                   value: "{{steps.preflight.outputs.parameters.result}}"
+                - name: expected-environment
+                  value: perfeng-local
+                - name: expected-lock-path
+                  value: deployments/local-control-plane.json
+                - name: expected-lock-digest
+                  value: sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f
         - - name: bucket
-            template: bucket
+            templateRef:
+              name: perfeng-prepare-bucket-v1
+              template: run
         - - name: database-roles
-            template: database-roles
+            templateRef:
+              name: perfeng-prepare-database-roles-v1
+              template: run
         - - name: execution-registry
-            template: execution-registry
+            templateRef:
+              name: perfeng-prepare-execution-registry-v1
+              template: run
       outputs:
         parameters:
           - name: preflight-result
@@ -51,253 +67,3 @@ spec:
           - name: registry-job
             valueFrom:
               parameter: "{{steps.execution-registry.outputs.parameters.job-name}}"
-    - name: task-selection
-      inputs:
-        parameters:
-          - name: preflight-result
-      script:
-        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
-        command: [python]
-        env:
-          - name: PREFLIGHT_RESULT
-            value: "{{inputs.parameters.preflight-result}}"
-        source: |
-          import json
-          import os
-
-          result = json.loads(os.environ["PREFLIGHT_RESULT"])
-          if result["environment"] != "perfeng-local" or result["lockDigests"].get(
-              "deployments/local-control-plane.json"
-          ) != "sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f":
-              raise SystemExit("External-state v1 does not match the reviewed control-plane selection")
-    - name: bucket
-      resource:
-        action: create
-        successCondition: status.succeeded > 0
-        failureCondition: status.failed > 0
-        manifest: |
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            generateName: perfeng-prepare-bucket-v1-
-            namespace: perf-platform
-            labels:
-              app.kubernetes.io/managed-by: perfeng-environment
-              perfeng.io/purpose: release-external-state
-          spec:
-            backoffLimit: 0
-            activeDeadlineSeconds: 180
-            template:
-              spec:
-                restartPolicy: Never
-                automountServiceAccountToken: false
-                containers:
-                  - name: aws-cli
-                    image: amazon/aws-cli:2.36.37@sha256:be6228bd99b4b0b9787543952aebfe93c66b5503121b68a724647c523c957a9d
-                    resources:
-                      requests: {cpu: 25m, memory: 64Mi}
-                      limits: {cpu: 200m, memory: 256Mi}
-                    command: [/bin/sh, -ec]
-                    args:
-                      - |
-                        printf '[default]\ns3 =\n    addressing_style = path\n' > /tmp/awsconfig
-                        aws_s3() {
-                          aws --endpoint-url http://seaweedfs.perf-platform.svc.cluster.local:8333 \
-                            --cli-connect-timeout 10 --cli-read-timeout 30 s3api "$@"
-                        }
-                        if ! aws_s3 head-bucket --bucket perfeng-artifacts 2>/tmp/head-error; then
-                          if ! grep -Eq '\(404\)|Not Found' /tmp/head-error; then
-                            echo 'Bucket lookup failed for a reason other than absence' >&2
-                            exit 1
-                          fi
-                          aws_s3 create-bucket --bucket perfeng-artifacts >/dev/null
-                        fi
-                        aws_s3 head-bucket --bucket perfeng-artifacts >/dev/null
-                        echo 'Artifact bucket exists and is accessible'
-                    env:
-                      - name: AWS_ACCESS_KEY_ID
-                        valueFrom:
-                          secretKeyRef:
-                            name: perfeng-s3-auth
-                            key: access-key
-                      - name: AWS_SECRET_ACCESS_KEY
-                        valueFrom:
-                          secretKeyRef:
-                            name: perfeng-s3-auth
-                            key: secret-key
-                      - name: AWS_CONFIG_FILE
-                        value: /tmp/awsconfig
-                      - name: AWS_DEFAULT_REGION
-                        value: us-east-1
-                      - name: AWS_EC2_METADATA_DISABLED
-                        value: "true"
-                      - name: AWS_PAGER
-                        value: ""
-                      - name: AWS_MAX_ATTEMPTS
-                        value: "2"
-      outputs:
-        parameters:
-          - name: job-name
-            valueFrom:
-              jsonPath: '{.metadata.name}'
-    - name: database-roles
-      resource:
-        action: create
-        successCondition: status.succeeded > 0
-        failureCondition: status.failed > 0
-        manifest: |
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            generateName: perfeng-prepare-db-v1-
-            namespace: perf-platform
-            labels:
-              app.kubernetes.io/managed-by: perfeng-environment
-              perfeng.io/purpose: release-external-state
-          spec:
-            backoffLimit: 0
-            activeDeadlineSeconds: 240
-            template:
-              spec:
-                restartPolicy: Never
-                automountServiceAccountToken: false
-                containers:
-                  - name: psql
-                    image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
-                    resources:
-                      requests: {cpu: 25m, memory: 64Mi}
-                      limits: {cpu: 200m, memory: 256Mi}
-                    command: [/bin/sh, -ec]
-                    args:
-                      - |
-                        host=postgres.perf-platform.svc.cluster.local
-                        migration_password=${MIGRATION_URL#postgresql://perfeng_migration:}
-                        migration_password=${migration_password%@postgres.perf-platform.svc.cluster.local:5432/perfeng?sslmode=disable}
-                        runtime_password=${RUNTIME_URL#postgresql://perfeng_runtime:}
-                        runtime_password=${runtime_password%@postgres.perf-platform.svc.cluster.local:5432/perfeng?sslmode=disable}
-                        test "$MIGRATION_URL" = "postgresql://perfeng_migration:${migration_password}@${host}:5432/perfeng?sslmode=disable"
-                        test "$RUNTIME_URL" = "postgresql://perfeng_runtime:${runtime_password}@${host}:5432/perfeng?sslmode=disable"
-                        for password in "$migration_password" "$runtime_password"; do
-                          test "${#password}" -eq 43
-                          case "$password" in *[!A-Za-z0-9_-]*) exit 1;; esac
-                        done
-                        export PGHOST="$host" PGUSER=postgres PGDATABASE=perfeng
-                        unsafe=$(psql -X -w -At -v ON_ERROR_STOP=1 -c \
-                          "SELECT count(*) FROM pg_roles WHERE rolname IN ('perfeng_migration','perfeng_runtime') AND (NOT rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)")
-                        test "$unsafe" = 0 || { echo 'Existing database role has unsafe attributes' >&2; exit 1; }
-                        psql -X -w -q -v ON_ERROR_STOP=1 <<SQL
-                        BEGIN;
-                        SELECT format('CREATE ROLE perfeng_migration LOGIN PASSWORD %L', '${migration_password}')
-                          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'perfeng_migration') \gexec
-                        SELECT format('CREATE ROLE perfeng_runtime LOGIN PASSWORD %L', '${runtime_password}')
-                          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'perfeng_runtime') \gexec
-                        REVOKE CREATE ON DATABASE perfeng FROM PUBLIC;
-                        GRANT CONNECT ON DATABASE perfeng TO perfeng_migration, perfeng_runtime;
-                        GRANT CREATE ON DATABASE perfeng TO perfeng_migration;
-                        REVOKE CREATE ON DATABASE perfeng FROM perfeng_runtime;
-                        COMMIT;
-                        SQL
-                        roles=$(psql -X -w -At -v ON_ERROR_STOP=1 -c \
-                          "SELECT count(*) FROM pg_roles WHERE rolname IN ('perfeng_migration','perfeng_runtime') AND rolcanlogin AND NOT (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)")
-                        test "$roles" = 2
-                        privileges=$(psql -X -w -At -v ON_ERROR_STOP=1 -c \
-                          "SELECT has_database_privilege('perfeng_migration','perfeng','CONNECT'), has_database_privilege('perfeng_migration','perfeng','CREATE'), has_database_privilege('perfeng_runtime','perfeng','CONNECT'), has_database_privilege('perfeng_runtime','perfeng','CREATE')")
-                        test "$privileges" = 't|t|t|f'
-                        unset PGPASSWORD
-                        test "$(PGPASSWORD="$migration_password" psql -X -w -At -h "$host" -U perfeng_migration -d perfeng -v ON_ERROR_STOP=1 -c 'SELECT 1')" = 1
-                        test "$(PGPASSWORD="$runtime_password" psql -X -w -At -h "$host" -U perfeng_runtime -d perfeng -v ON_ERROR_STOP=1 -c 'SELECT 1')" = 1
-                        echo 'Database roles and logins verified without credential rotation'
-                    env:
-                      - name: PGPASSWORD
-                        valueFrom:
-                          secretKeyRef:
-                            name: perfeng-postgres-auth
-                            key: password
-                      - name: MIGRATION_URL
-                        valueFrom:
-                          secretKeyRef:
-                            name: perfeng-control-plane-database
-                            key: migration-url
-                      - name: RUNTIME_URL
-                        valueFrom:
-                          secretKeyRef:
-                            name: perfeng-control-plane-database
-                            key: runtime-url
-      outputs:
-        parameters:
-          - name: job-name
-            valueFrom:
-              jsonPath: '{.metadata.name}'
-    - name: execution-registry
-      resource:
-        action: create
-        successCondition: status.succeeded > 0
-        failureCondition: status.failed > 0
-        manifest: |
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            generateName: perfeng-prepare-registry-v1-
-            namespace: perf-generators
-            labels:
-              app.kubernetes.io/managed-by: perfeng-environment
-              perfeng.io/purpose: release-external-state
-          spec:
-            backoffLimit: 0
-            activeDeadlineSeconds: 240
-            template:
-              spec:
-                restartPolicy: Never
-                automountServiceAccountToken: false
-                volumes:
-                  - name: registry-auth
-                    secret:
-                      secretName: perfeng-execution-registry
-                      items:
-                        - key: .dockerconfigjson
-                          path: config.json
-                containers:
-                  - name: k6
-                    image: gcr.io/go-containerregistry/crane@sha256:fbdf6d55c5ae90d9ae637b9bd9f10119496fdf18a3b5f9cd3078ae6044161c18
-                    resources:
-                      requests: {cpu: 25m, memory: 64Mi}
-                      limits: {cpu: 200m, memory: 256Mi}
-                    args: [digest, 'ghcr.io/stanimirivanov/perfeng-k6@sha256:f40f15780dd4eb8124a327c5d7a051848276494bec77f2c18590520be5c5c962']
-                    env:
-                      - name: DOCKER_CONFIG
-                        value: /credentials
-                    volumeMounts:
-                      - name: registry-auth
-                        mountPath: /credentials
-                        readOnly: true
-                  - name: kube-burner
-                    image: gcr.io/go-containerregistry/crane@sha256:fbdf6d55c5ae90d9ae637b9bd9f10119496fdf18a3b5f9cd3078ae6044161c18
-                    resources:
-                      requests: {cpu: 25m, memory: 64Mi}
-                      limits: {cpu: 200m, memory: 256Mi}
-                    args: [digest, 'ghcr.io/stanimirivanov/perfeng-kube-burner@sha256:b4f6a90225e14f67c5c2fa0bc2657eb871e92f7543b6b1027eb618cff633d612']
-                    env:
-                      - name: DOCKER_CONFIG
-                        value: /credentials
-                    volumeMounts:
-                      - name: registry-auth
-                        mountPath: /credentials
-                        readOnly: true
-                  - name: analysis
-                    image: gcr.io/go-containerregistry/crane@sha256:fbdf6d55c5ae90d9ae637b9bd9f10119496fdf18a3b5f9cd3078ae6044161c18
-                    resources:
-                      requests: {cpu: 25m, memory: 64Mi}
-                      limits: {cpu: 200m, memory: 256Mi}
-                    args: [digest, 'ghcr.io/stanimirivanov/perfeng-analysis@sha256:450de3e28fe4b61627d49e053549c94e7f0a6bb4dc3df8d53bbabe5474f02ed9']
-                    env:
-                      - name: DOCKER_CONFIG
-                        value: /credentials
-                    volumeMounts:
-                      - name: registry-auth
-                        mountPath: /credentials
-                        readOnly: true
-      outputs:
-        parameters:
-          - name: job-name
-            valueFrom:
-              jsonPath: '{.metadata.name}'

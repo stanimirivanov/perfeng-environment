@@ -1,0 +1,84 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-prepare-execution-registry-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      resource:
+        action: create
+        successCondition: status.succeeded > 0
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            generateName: perfeng-prepare-registry-v1-
+            namespace: perf-generators
+            labels:
+              app.kubernetes.io/managed-by: perfeng-environment
+              perfeng.io/purpose: release-external-state
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 240
+            template:
+              spec:
+                restartPolicy: Never
+                automountServiceAccountToken: false
+                volumes:
+                  - name: registry-auth
+                    secret:
+                      secretName: perfeng-execution-registry
+                      items:
+                        - key: .dockerconfigjson
+                          path: config.json
+                containers:
+                  - name: k6
+                    image: gcr.io/go-containerregistry/crane@sha256:fbdf6d55c5ae90d9ae637b9bd9f10119496fdf18a3b5f9cd3078ae6044161c18
+                    resources:
+                      requests: {cpu: 25m, memory: 64Mi}
+                      limits: {cpu: 200m, memory: 256Mi}
+                    args: [digest, 'ghcr.io/stanimirivanov/perfeng-k6@sha256:f40f15780dd4eb8124a327c5d7a051848276494bec77f2c18590520be5c5c962']
+                    env:
+                      - name: DOCKER_CONFIG
+                        value: /credentials
+                    volumeMounts:
+                      - name: registry-auth
+                        mountPath: /credentials
+                        readOnly: true
+                  - name: kube-burner
+                    image: gcr.io/go-containerregistry/crane@sha256:fbdf6d55c5ae90d9ae637b9bd9f10119496fdf18a3b5f9cd3078ae6044161c18
+                    resources:
+                      requests: {cpu: 25m, memory: 64Mi}
+                      limits: {cpu: 200m, memory: 256Mi}
+                    args: [digest, 'ghcr.io/stanimirivanov/perfeng-kube-burner@sha256:b4f6a90225e14f67c5c2fa0bc2657eb871e92f7543b6b1027eb618cff633d612']
+                    env:
+                      - name: DOCKER_CONFIG
+                        value: /credentials
+                    volumeMounts:
+                      - name: registry-auth
+                        mountPath: /credentials
+                        readOnly: true
+                  - name: analysis
+                    image: gcr.io/go-containerregistry/crane@sha256:fbdf6d55c5ae90d9ae637b9bd9f10119496fdf18a3b5f9cd3078ae6044161c18
+                    resources:
+                      requests: {cpu: 25m, memory: 64Mi}
+                      limits: {cpu: 200m, memory: 256Mi}
+                    args: [digest, 'ghcr.io/stanimirivanov/perfeng-analysis@sha256:450de3e28fe4b61627d49e053549c94e7f0a6bb4dc3df8d53bbabe5474f02ed9']
+                    env:
+                      - name: DOCKER_CONFIG
+                        value: /credentials
+                    volumeMounts:
+                      - name: registry-auth
+                        mountPath: /credentials
+                        readOnly: true
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              jsonPath: '{.metadata.name}'

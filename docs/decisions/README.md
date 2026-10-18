@@ -111,3 +111,4 @@ How will the assumptions and consequences be verified?
 | [0013](0013-select-local-benchmark-runtime.md) | Proposed | Select the mixed-contract benchmark runtime with dedicated-cluster authority, independent pull credentials and an explicit quiescent migration/manual activation boundary. |
 | [0014](0014-separate-release-and-run-orchestration.md) | Proposed | Assign finite release operations to Argo Workflows while retaining Argo CD workload reconciliation and control-plane performance Run ownership. |
 | [0015](0015-bind-releases-to-reviewed-inputs.md) | Proposed | Bind each release request to an exact environment Git commit, deployment-lock digests, cluster incarnation and compare-and-swap promotion precondition. |
+| [0016](0016-compose-versioned-release-templates.md) | Proposed | Compose external-state preparation from versioned namespaced WorkflowTemplates and an immutable script ConfigMap while preserving the v1 parent contract. |
