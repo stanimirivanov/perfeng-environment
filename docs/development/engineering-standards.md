@@ -104,6 +104,15 @@ variation, ownership boundary or test seam requires it.
 - Self-healing is enabled one workload at a time after drift and rollback
   acceptance.
 
+Prefer one Kubernetes resource per resource-producing file. Small Role/Binding
+pairs may share a file when they implement one capability with the same
+lifecycle. Helpers and conditionally omitted Helm templates do not have an
+exactly-one-object requirement. Group manifests by ownership and operational
+purpose; retain explicit security and release differences. Check the rendered
+API group/kind/namespace/name inventory, permissions and references rather than
+enforcing a file count. The [GitOps layout guide](../../gitops/README.md) records
+the current composition roots and deliberate grouping exceptions.
+
 ## Configuration, locks and compatibility
 
 Treat CLI behavior, workspace manifests, deployment locks, Helm values,

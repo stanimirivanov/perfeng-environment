@@ -23,6 +23,18 @@
 
 ## Scope and command safety
 
+For a staged release-workflows sync denied by its AppProject, run **offline**
+`make render-check`. The rendered script ConfigMap needs core `ConfigMap` in
+`release-workflows-bootstrap/project.yaml`'s namespaced allowlist and
+`perf-platform` in its destinations. Keep the explicit allowlists; do not grant
+wildcard access to bypass the failure. The gate also reports duplicate GitOps
+identities and Job ConfigMap references missing from the Job's namespace or
+missing required data keys. Review the owned source, synchronize the separately
+applied bootstrap Project through its approved channel, then manually synchronize
+the staged Application before submitting a Workflow. See the
+[layout and validation guide](../gitops/README.md). Rendering does not apply a
+Project or change cluster state.
+
 For the staged external-state Workflow on a **disposable kind cluster**, inspect
 the Workflow UID, failing step and the Job name in its output or node status.
 `task-selection` failure means the reviewed control-plane lock differs from the
