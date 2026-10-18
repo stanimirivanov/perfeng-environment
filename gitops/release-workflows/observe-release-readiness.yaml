@@ -1,0 +1,136 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-observe-release-readiness-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: application
+      activeDeadlineSeconds: 300
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: perfeng-local-control-plane
+            namespace: argocd
+        successCondition: status.sync.status = Synced, status.health.status = Healthy
+        failureCondition: status.health.status in (Degraded,Missing)
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {
+                  name:.metadata.name,
+                  namespace:.metadata.namespace,
+                  uid:.metadata.uid,
+                  generation:.metadata.generation,
+                  project:.spec.project,
+                  destination:.spec.destination,
+                  sources:[(.spec.sources // [.spec.source])[] | {repository:.repoURL,revision:.targetRevision,path:.path,image:(.helm.valuesObject.image // null),runtimeConfigMap:(.helm.valuesObject.runtimeConfigMap // null),registryConfigMap:(.helm.valuesObject.registryConfigMap // null)}],
+                  comparedSources:[(.status.sync.comparedTo.sources // [.status.sync.comparedTo.source])[] | {repository:.repoURL,revision:.targetRevision,path:.path,image:(.helm.valuesObject.image // null),runtimeConfigMap:(.helm.valuesObject.runtimeConfigMap // null),registryConfigMap:(.helm.valuesObject.registryConfigMap // null)}],
+                  revisions:(.status.sync.revisions // [.status.sync.revision]),
+                  sync:.status.sync.status,
+                  health:.status.health.status,
+                  conditions:[.status.conditions[]? | .type],
+                  operation:(.status.operationState.phase // null)
+                }
+    - name: statefulset
+      activeDeadlineSeconds: 300
+      resource:
+        action: get
+        manifest: |
+          apiVersion: apps/v1
+          kind: StatefulSet
+          metadata:
+            name: {{inputs.parameters.name}}
+            namespace: perf-platform
+        successCondition: spec.replicas = 1, status.replicas = 1, status.readyReplicas = 1, status.updatedReplicas
+          = 1
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {
+                  name:.metadata.name,
+                  namespace:.metadata.namespace,
+                  uid:.metadata.uid,
+                  generation:.metadata.generation,
+                  observedGeneration:.status.observedGeneration,
+                  desired:.spec.replicas,
+                  replicas:.status.replicas,
+                  ready:.status.readyReplicas,
+                  updated:.status.updatedReplicas,
+                  currentRevision:.status.currentRevision,
+                  updateRevision:.status.updateRevision
+                }
+      inputs:
+        parameters:
+          - name: name
+    - name: deployment
+      activeDeadlineSeconds: 300
+      resource:
+        action: get
+        manifest: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: control-plane
+            namespace: perf-platform
+        successCondition: spec.replicas = 1, status.replicas = 1, status.availableReplicas = 1, status.readyReplicas
+          = 1, status.updatedReplicas = 1
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {
+                  name:.metadata.name,
+                  namespace:.metadata.namespace,
+                  uid:.metadata.uid,
+                  generation:.metadata.generation,
+                  observedGeneration:.status.observedGeneration,
+                  desired:.spec.replicas,
+                  replicas:.status.replicas,
+                  ready:.status.readyReplicas,
+                  updated:.status.updatedReplicas,
+                  available:.status.availableReplicas,
+                  unavailable:(.status.unavailableReplicas // 0),
+                  images:[.spec.template.spec.containers[].image],
+                  runtimeConfigMaps:[.spec.template.spec.containers[].envFrom[]? | .configMapRef.name // empty],
+                  runtimeSecrets:[.spec.template.spec.containers[].envFrom[]? | .secretRef.name // empty],
+                  registryConfigMaps:[.spec.template.spec.volumes[]? | select(.name == "registry") | .configMap.name],
+                  authenticationSecrets:[.spec.template.spec.volumes[]? | select(.name == "authentication") | .secret.secretName],
+                  imagePullSecrets:[.spec.template.spec.imagePullSecrets[]?.name]
+                }
+    - name: service
+      activeDeadlineSeconds: 300
+      resource:
+        action: get
+        manifest: |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: control-plane
+            namespace: perf-platform
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {
+                  name:.metadata.name,
+                  namespace:.metadata.namespace,
+                  uid:.metadata.uid,
+                  generation:.metadata.generation,
+                  type:.spec.type,
+                  selector:.spec.selector,
+                  ports:.spec.ports
+                }

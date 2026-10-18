@@ -277,6 +277,12 @@ first WorkflowTemplate and narrow RBAC separately from the active local root.
 Its offline checks do not satisfy the disposable-kind two-run gate or establish
 a promotion receipt.
 
+The [staged readiness gate](../release-readiness.md) adds native rollout waits,
+selected control-plane identity checks and bounded operational endpoint probes.
+Its versioned evidence covers control-plane/foundation readiness only; complete
+platform health, live parity, M04 maintenance/recovery and script retirement
+remain separate gates.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

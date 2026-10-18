@@ -15,6 +15,13 @@ resources:
   - prepare-database-roles.yaml
   - prepare-execution-registry.yaml
   - release-external-state.yaml
+  - rbac/readiness/serviceaccount.yaml
+  - rbac/readiness/workflow-access.yaml
+  - rbac/readiness/cluster-identity.yaml
+  - rbac/readiness/platform-observation.yaml
+  - observe-release-readiness.yaml
+  - verify-release-readiness.yaml
+  - release-readiness.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform
@@ -25,10 +32,25 @@ configMapGenerator:
       disableNameSuffixHash: true
       annotations:
         argocd.argoproj.io/sync-wave: "-2"
+  - name: perfeng-readiness-verifier-v1
+    namespace: argo-workflows
+    files:
+      - scripts/verify-readiness.py
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        argocd.argoproj.io/sync-wave: "-2"
 patches:
   - target:
       kind: ConfigMap
       name: perfeng-external-state-scripts-v1
+    patch: |-
+      - op: add
+        path: /immutable
+        value: true
+  - target:
+      kind: ConfigMap
+      name: perfeng-readiness-verifier-v1
     patch: |-
       - op: add
         path: /immutable

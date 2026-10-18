@@ -16,9 +16,11 @@
 | `environments/local/` | Active local namespaces, AppProjects and child Applications. |
 | `benchmark-authority/` | Explicit authority approved only for the dedicated local benchmark cluster. |
 | `release-workflows-bootstrap/` | Separately applied, manually synced release-workflows Project/Application. |
+| `release-workflows-bootstrap/readiness-application-access.yaml` | Explicit bootstrap grant for named Application reads in `argocd`; the staged Project cannot grant that namespace itself. |
 | `release-workflows/` | Staged versioned WorkflowTemplates and immutable script ConfigMap generation. |
 | `release-workflows/rbac/preflight/` | Standalone read-only preflight identity, workflow execution and cluster-identity read permissions. |
 | `release-workflows/rbac/external-state/` | Composed preflight permissions plus Job creation in the two external-state namespaces. |
+| `release-workflows/rbac/readiness/` | Composed preflight permissions and named resource reads for staged readiness; no workload writes. |
 | `../charts/` | Existing reusable workload packages; Applications select these packages explicitly. |
 
 The existing source paths are operational contracts. A file can move within a Kustomize root without moving an Application to a different source path or changing which Application owns an object. The release-workflows bootstrap stays outside the active local root. Do not pull it into an umbrella chart or active root as an organizational shortcut.
@@ -40,7 +42,7 @@ Keep security-sensitive differences explicit: source revisions, AppProject allow
 - reject duplicate API group/kind/namespace/name identities across those ownership roots, including duplicates expressed with different API versions;
 - reject rendered Secret objects, which must remain externally supplied;
 - check the staged release Application's Project identity and every rendered resource against its explicit namespaced/cluster kind allowlists and destinations; and
-- check that Job ConfigMap volumes resolve to generated ConfigMaps and requested keys in the Job's namespace.
+- check that Workflow and Job ConfigMap volumes resolve to generated ConfigMaps and requested keys in their own namespace.
 
 The release Project explicitly allows core ConfigMaps so its immutable script ConfigMap can synchronize. External credential Secrets remain references, not generated resources. These checks cover the current release resource kinds; they do not implement the complete Argo CD authorization engine. Keep `make workflow-lint` for Argo references and run disposable-kind acceptance before operational cutover. The supported workload render and release-selection checks remain separate.
 

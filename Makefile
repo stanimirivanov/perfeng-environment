@@ -62,7 +62,7 @@ render-check:
 	$(UV_RUN) python scripts/validate_cluster.py
 
 workflow-lint:
-	argo lint --offline gitops/release-workflows/release-preflight.yaml gitops/release-workflows/release-task-selection.yaml gitops/release-workflows/prepare-bucket.yaml gitops/release-workflows/prepare-database-roles.yaml gitops/release-workflows/prepare-execution-registry.yaml gitops/release-workflows/release-external-state.yaml
+	argo lint --offline --kinds=workflowtemplates gitops/release-workflows
 
 native-gateway-check:
 	$(UV_RUN) python scripts/native_connectivity.py validate --execute

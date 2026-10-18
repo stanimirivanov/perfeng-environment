@@ -144,7 +144,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         kustomization = yaml.safe_load((DIRECTORY / "kustomization.yaml").read_text())
         self.assertEqual(
             [item["name"] for item in kustomization["configMapGenerator"]],
-            ["perfeng-external-state-scripts-v1"],
+            ["perfeng-external-state-scripts-v1", "perfeng-readiness-verifier-v1"],
         )
         generator = kustomization["configMapGenerator"][0]
         self.assertEqual(generator["namespace"], "perf-platform")
@@ -185,8 +185,11 @@ class ReleaseExternalStateTests(unittest.TestCase):
             if line.startswith("\targo lint --offline")
         ]
         self.assertEqual(len(lint_lines), 1)
-        for file in workflow_files:
-            self.assertIn(file, lint_lines[0])
+        self.assertTrue(workflow_files)
+        self.assertEqual(
+            lint_lines[0].strip(),
+            "argo lint --offline --kinds=workflowtemplates gitops/release-workflows",
+        )
 
     @unittest.skipUnless(os.environ.get("GITHUB_BASE_REF"), "PR-only immutable child check")
     def test_published_child_and_script_versions_are_not_edited_in_place(self) -> None:
@@ -209,6 +212,10 @@ class ReleaseExternalStateTests(unittest.TestCase):
                     "prepare-execution-registry.yaml",
                     "scripts/bucket.sh",
                     "scripts/database-roles.sh",
+                    "observe-release-readiness.yaml",
+                    "verify-release-readiness.yaml",
+                    "release-readiness.yaml",
+                    "scripts/verify-readiness.py",
                 )
             ),
         ]
