@@ -28,6 +28,13 @@ resources:
   - rbac/maintenance/platform-observation.yaml
   - verify-release-quiescence.yaml
   - release-maintenance-checkpoint.yaml
+  - rbac/adoption/serviceaccount.yaml
+  - rbac/adoption/workflow-access.yaml
+  - rbac/adoption/cluster-identity.yaml
+  - rbac/adoption/platform-observation.yaml
+  - plan-release-adoption.yaml
+  - adoption-records.yaml
+  - release-adopt-existing.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform
@@ -54,6 +61,14 @@ configMapGenerator:
       disableNameSuffixHash: true
       annotations:
         argocd.argoproj.io/sync-wave: "-2"
+  - name: perfeng-adoption-planner-v1
+    namespace: argo-workflows
+    files:
+      - scripts/plan-adoption.py
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        argocd.argoproj.io/sync-wave: "-2"
 patches:
   - target:
       kind: ConfigMap
@@ -72,6 +87,13 @@ patches:
   - target:
       kind: ConfigMap
       name: perfeng-quiescence-verifier-v1
+    patch: |-
+      - op: add
+        path: /immutable
+        value: true
+  - target:
+      kind: ConfigMap
+      name: perfeng-adoption-planner-v1
     patch: |-
       - op: add
         path: /immutable

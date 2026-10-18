@@ -148,6 +148,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
                 "perfeng-external-state-scripts-v1",
                 "perfeng-readiness-verifier-v1",
                 "perfeng-quiescence-verifier-v1",
+                "perfeng-adoption-planner-v1",
             ],
         )
         generator = kustomization["configMapGenerator"][0]
@@ -223,6 +224,10 @@ class ReleaseExternalStateTests(unittest.TestCase):
                     "release-maintenance-checkpoint.yaml",
                     "verify-release-quiescence.yaml",
                     "scripts/verify-quiescence.py",
+                    "plan-release-adoption.yaml",
+                    "adoption-records.yaml",
+                    "release-adopt-existing.yaml",
+                    "scripts/plan-adoption.py",
                 )
             ),
         ]

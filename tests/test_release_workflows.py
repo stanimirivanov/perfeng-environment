@@ -113,6 +113,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 {"server": "https://kubernetes.default.svc", "namespace": "argo-workflows"},
                 {"server": "https://kubernetes.default.svc", "namespace": "perf-platform"},
                 {"server": "https://kubernetes.default.svc", "namespace": "perf-generators"},
+                {"server": "https://kubernetes.default.svc", "namespace": "perfeng-release-ledger"},
             ],
         )
 

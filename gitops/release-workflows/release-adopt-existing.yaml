@@ -1,0 +1,159 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-adopt-existing-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-adoption
+  entrypoint: adopt-existing
+  activeDeadlineSeconds: 1800
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: adopt-existing
+      steps:
+        - - name: readiness
+            templateRef:
+              name: perfeng-release-readiness-v1
+              template: verify-readiness
+        - - name: root
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: root
+        - - name: current
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: pointer
+        - - name: existing-receipt
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{= ''receipt.'' + sprig.substr(7, 39, workflow.parameters[''request-sha256''])
+                    + ''.'' + sprig.substr(39, 71, workflow.parameters[''request-sha256'']) }}'
+        - - name: plan
+            templateRef:
+              name: perfeng-plan-release-adoption-v1
+              template: run
+            arguments:
+              parameters:
+                - name: phase
+                  value: plan
+                - name: readiness
+                  value: '{{steps.readiness.outputs.parameters.result}}'
+                - name: root
+                  value: '{{steps.root.outputs.parameters.observation}}'
+                - name: receipt
+                  value: '{{steps.existing-receipt.outputs.parameters.observation}}'
+                - name: pointer
+                  value: '{{steps.current.outputs.parameters.observation}}'
+        - - name: create-receipt
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: create-receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{steps.plan.outputs.parameters.name}}'
+                - name: request-b64
+                  value: '{{steps.plan.outputs.parameters.request-b64}}'
+                - name: receipt-b64
+                  value: '{{steps.plan.outputs.parameters.receipt-b64}}'
+            when: '{{steps.plan.outputs.parameters.create-receipt}} == true'
+        - - name: stored-receipt
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{steps.plan.outputs.parameters.name}}'
+        - - name: root-after
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: root
+        - - name: pointer-plan
+            templateRef:
+              name: perfeng-plan-release-adoption-v1
+              template: run
+            arguments:
+              parameters:
+                - name: phase
+                  value: pointer
+                - name: readiness
+                  value: '{{steps.readiness.outputs.parameters.result}}'
+                - name: root
+                  value: '{{steps.root.outputs.parameters.observation}}'
+                - name: receipt
+                  value: '{{steps.stored-receipt.outputs.parameters.observation}}'
+                - name: pointer
+                  value: '{{steps.current.outputs.parameters.observation}}'
+                - name: root-after
+                  value: '{{steps.root-after.outputs.parameters.observation}}'
+        - - name: create-pointer
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: create-pointer
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{steps.pointer-plan.outputs.parameters.name}}'
+                - name: request-digest
+                  value: '{{steps.pointer-plan.outputs.parameters.request-digest}}'
+                - name: cluster-uid
+                  value: '{{steps.pointer-plan.outputs.parameters.cluster-uid}}'
+                - name: receipt-uid
+                  value: '{{steps.pointer-plan.outputs.parameters.receipt-uid}}'
+            when: '{{steps.pointer-plan.outputs.parameters.create-pointer}} == true'
+        - - name: stored-pointer
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: pointer
+        - - name: final-receipt
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{steps.plan.outputs.parameters.name}}'
+        - - name: final-root
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: root
+        - - name: finish
+            templateRef:
+              name: perfeng-plan-release-adoption-v1
+              template: run
+            arguments:
+              parameters:
+                - name: phase
+                  value: finish
+                - name: readiness
+                  value: '{{steps.readiness.outputs.parameters.result}}'
+                - name: root
+                  value: '{{steps.root.outputs.parameters.observation}}'
+                - name: receipt
+                  value: '{{steps.final-receipt.outputs.parameters.observation}}'
+                - name: pointer
+                  value: '{{steps.stored-pointer.outputs.parameters.observation}}'
+                - name: root-after
+                  value: '{{steps.final-root.outputs.parameters.observation}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.finish.outputs.parameters.result}}'

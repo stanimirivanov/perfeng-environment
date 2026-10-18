@@ -1,0 +1,121 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-plan-release-adoption-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: phase
+          - name: readiness
+          - name: root
+          - name: receipt
+          - name: pointer
+          - name: root-after
+            default: 'null'
+        artifacts:
+          - name: request-source
+            path: /inputs/request
+            git:
+              repo: https://github.com/stanimirivanov/perfeng-environment.git
+              revision: '{{workflow.parameters.request-revision}}'
+              disableSubmodules: true
+              usernameSecret:
+                name: release-git-read
+                key: username
+              passwordSecret:
+                name: release-git-read
+                key: password
+      volumes:
+        - name: verifier
+          configMap:
+            name: perfeng-adoption-planner-v1
+            items:
+              - key: plan-adoption.py
+                path: plan-adoption.py
+        - name: scratch
+          emptyDir: {}
+      container:
+        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+        command:
+          - python
+          - /opt/checkpoint/plan-adoption.py
+        env:
+          - name: PHASE
+            value: '{{inputs.parameters.phase}}'
+          - name: READINESS
+            value: '{{inputs.parameters.readiness}}'
+          - name: ROOT
+            value: '{{inputs.parameters.root}}'
+          - name: RECEIPT
+            value: '{{inputs.parameters.receipt}}'
+          - name: POINTER
+            value: '{{inputs.parameters.pointer}}'
+          - name: ROOT_AFTER
+            value: '{{inputs.parameters.root-after}}'
+          - name: REQUEST_REVISION
+            value: '{{workflow.parameters.request-revision}}'
+          - name: REQUEST_PATH
+            value: '{{workflow.parameters.request-path}}'
+          - name: REQUEST_DIGEST
+            value: '{{workflow.parameters.request-sha256}}'
+        volumeMounts:
+          - name: verifier
+            mountPath: /opt/checkpoint
+            readOnly: true
+          - name: scratch
+            mountPath: /tmp
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      outputs:
+        parameters:
+          - name: name
+            valueFrom:
+              path: /tmp/name
+          - name: request-b64
+            valueFrom:
+              path: /tmp/request-b64
+          - name: receipt-b64
+            valueFrom:
+              path: /tmp/receipt-b64
+          - name: create-receipt
+            valueFrom:
+              path: /tmp/create-receipt
+          - name: create-pointer
+            valueFrom:
+              path: /tmp/create-pointer
+          - name: receipt-uid
+            valueFrom:
+              path: /tmp/receipt-uid
+          - name: cluster-uid
+            valueFrom:
+              path: /tmp/cluster-uid
+          - name: request-digest
+            valueFrom:
+              path: /tmp/request-digest
+          - name: result
+            valueFrom:
+              path: /tmp/result
+      podSpecPatch: '{"securityContext":{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch"}}'
+      activeDeadlineSeconds: 180

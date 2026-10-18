@@ -1,0 +1,151 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "status",
+    "environment",
+    "requestDigest",
+    "selectionRevision",
+    "rootUID",
+    "controlPlaneApplicationUID",
+    "deploymentRevision",
+    "image"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "PerfengReleaseAdoptionReceipt"
+    },
+    "status": {
+      "const": "adopted-baseline"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "clusterUID"
+      ],
+      "properties": {
+        "name": {
+          "const": "perfeng-local"
+        },
+        "clusterUID": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requestDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "selectionRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "rootUID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "controlPlaneApplicationUID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deploymentRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^ghcr.io/stanimirivanov/perfeng-control-plane@sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:perfeng:release-adoption:1",
+  "title": "Explicit local release adoption v1",
+  "$defs": {
+    "pointer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestDigest",
+        "clusterUID",
+        "receiptName",
+        "receiptUID"
+      ],
+      "properties": {
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "clusterUID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiptName": {
+          "type": "string",
+          "pattern": "^receipt\\.[0-9a-f]{32}\\.[0-9a-f]{32}$"
+        },
+        "receiptUID": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "status",
+        "requestDigest",
+        "selectionRevision",
+        "clusterUID",
+        "receiptName",
+        "receiptUID",
+        "pointerUID"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "const": "PerfengReleaseAdoptionResult"
+        },
+        "status": {
+          "const": "adopted-baseline"
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "selectionRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "clusterUID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiptName": {
+          "type": "string",
+          "pattern": "^receipt\\.[0-9a-f]{32}\\.[0-9a-f]{32}$"
+        },
+        "receiptUID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointerUID": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

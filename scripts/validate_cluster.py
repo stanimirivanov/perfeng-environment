@@ -90,6 +90,38 @@ def validate_release_project(
             if resource.get("action") != "create":
                 continue
             job = yaml.safe_load(resource["manifest"])
+            if job.get("kind") == "ConfigMap":
+                namespace = job["metadata"]["namespace"]
+                receipt = template["name"] == "create-receipt"
+                expected_name = "{{inputs.parameters.name}}" if receipt else "perfeng-local-current"
+                purpose = "release-adoption" if receipt else "current-release"
+                data_key = "binaryData" if receipt else "data"
+                keys = (
+                    {"request.json", "receipt.json"}
+                    if receipt
+                    else {"requestDigest", "clusterUID", "receiptName", "receiptUID"}
+                )
+                if (
+                    namespace != "perfeng-release-ledger"
+                    or (server, namespace) not in destinations
+                    or template["name"] not in {"create-receipt", "create-pointer"}
+                    or job["metadata"]["name"] != expected_name
+                    or job["metadata"].get("labels")
+                    != {
+                        "app.kubernetes.io/managed-by": "perfeng-environment",
+                        "perfeng.io/purpose": purpose,
+                    }
+                    or resource.get("setOwnerReference") is not False
+                    or job["metadata"].get("ownerReferences")
+                    or job["metadata"].get("finalizers")
+                    or job.get("immutable", False) is not receipt
+                    or set(job.get(data_key, {})) != keys
+                    or ("data" if receipt else "binaryData") in job
+                ):
+                    raise ValueError(
+                        "Release ledger ConfigMap creation differs from its reviewed boundary"
+                    )
+                continue
             if job.get("kind") != "Job":
                 raise ValueError("Release workflow creates an unexpected resource")
             job_namespace = job["metadata"]["namespace"]

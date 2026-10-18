@@ -125,6 +125,30 @@ class GitOpsManifestTests(unittest.TestCase):
             with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
                 validate_cluster.manifest_inventory([obj])
 
+    def test_native_ledger_creates_are_limited_to_the_reviewed_configmap_shape(self) -> None:
+        workflow = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/adoption-records.yaml").read_text()
+        )
+        validate_cluster.validate_release_project(self.project, self.application, [workflow])
+        for change in ("namespace", "immutable", "owner", "data"):
+            changed = deepcopy(workflow)
+            resource = changed["spec"]["templates"][3]["resource"]
+            obj = yaml.safe_load(resource["manifest"])
+            if change == "namespace":
+                obj["metadata"]["namespace"] = "argo-workflows"
+            elif change == "immutable":
+                obj["immutable"] = False
+            elif change == "owner":
+                resource["setOwnerReference"] = True
+            else:
+                obj["binaryData"]["unexpected"] = "value"
+            resource["manifest"] = yaml.safe_dump(obj)
+            with (
+                self.subTest(change=change),
+                self.assertRaisesRegex(ValueError, "ledger ConfigMap"),
+            ):
+                validate_cluster.validate_release_project(self.project, self.application, [changed])
+
 
 if __name__ == "__main__":
     unittest.main()

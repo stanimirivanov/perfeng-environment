@@ -138,6 +138,15 @@ retires no baseline file and does not satisfy that limit while old paths remain.
 The checkpoint makes bounded observations without subprocesses, custom waiting
 or maintenance writes. Argo owns sequencing, deadlines and serialization.
 
+The staged [adoption ledger](release-adoption.md) adds a 251-line pure planner
+at `gitops/release-workflows/scripts/plan-adoption.py`. It performs no Kubernetes
+calls, subprocess operations or waiting; Argo native resources own persistence.
+The three new deployment helpers now total **757 lines across three files**,
+which exceeds both the 708-line and two-file residual exit limits even before
+retained baseline scripts. This is staged implementation, not retirement credit.
+Consolidation or retirement of active verification implementations is required
+before cutover; do not increase the original denominator or hide embedded code.
+
 ## Retirement and verification gate
 
 | Measure | Baseline | Exit criterion |
