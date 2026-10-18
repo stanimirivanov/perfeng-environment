@@ -26,7 +26,13 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.workflow = yaml.safe_load((DIRECTORY / "release-preflight.yaml").read_text())
         cls.templates = {item["name"]: item for item in cls.workflow["spec"]["templates"]}
-        cls.rbac = list(yaml.safe_load_all((DIRECTORY / "preflight-rbac.yaml").read_text()))
+        cls.rbac = [
+            obj
+            for name in ("serviceaccount", "workflow-access", "cluster-identity")
+            for obj in yaml.safe_load_all(
+                (DIRECTORY / "rbac/preflight" / f"{name}.yaml").read_text(encoding="utf-8")
+            )
+        ]
 
     def test_template_is_staged_read_only_and_pins_dependencies(self) -> None:
         self.assertEqual(self.workflow["metadata"]["namespace"], "argo-workflows")

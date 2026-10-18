@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-external-state-jobs
+  namespace: perf-platform
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [create, get, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-external-state-jobs
+  namespace: perf-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-external-state-jobs
+subjects:
+  - kind: ServiceAccount
+    name: release-external-state
+    namespace: argo-workflows

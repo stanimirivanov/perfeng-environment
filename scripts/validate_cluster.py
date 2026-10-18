@@ -4,10 +4,116 @@ import hashlib
 import re
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+GITOPS_ROOTS = (
+    "gitops/environments/local",
+    "gitops/benchmark-authority",
+    "gitops/release-workflows-bootstrap",
+    "gitops/release-workflows",
+)
+
+
+def manifest_inventory(objects: list[Any]) -> dict[tuple[str, str, str, str], dict[str, Any]]:
+    """Index rendered ownership by API group/kind/namespace/name, rejecting collisions."""
+    inventory = {}
+    for obj in objects:
+        if not isinstance(obj, dict) or not isinstance(obj.get("metadata"), dict):
+            raise ValueError("Invalid GitOps object metadata")
+        version, kind = obj.get("apiVersion"), obj.get("kind")
+        name = obj["metadata"].get("name")
+        namespace = obj["metadata"].get("namespace", "")
+        if not all(
+            isinstance(item, str) and item for item in (version, kind, name)
+        ) or not isinstance(namespace, str):
+            raise ValueError("Invalid GitOps object identity")
+        if kind == "Secret":
+            raise ValueError(
+                "GitOps must reference externally supplied Secrets, not render a Secret"
+            )
+        identity = (version.rpartition("/")[0], kind, namespace, name)
+        if identity in inventory:
+            raise ValueError(f"Duplicate GitOps object: {identity}")
+        inventory[identity] = obj
+    return inventory
+
+
+def validate_release_project(
+    project: dict[str, Any], application: dict[str, Any], objects: list[Any]
+) -> None:
+    """Check the staged release render against its explicit Project and Job config inputs."""
+    if project["metadata"]["name"] != application["spec"]["project"]:
+        raise ValueError("Release AppProject identity differs from the Application")
+    spec = project["spec"]
+    server = application["spec"]["destination"]["server"]
+    destinations = {(item["server"], item["namespace"]) for item in spec["destinations"]}
+    inventory = manifest_inventory(objects)
+    cluster_kinds = {
+        ("rbac.authorization.k8s.io", "ClusterRole"),
+        ("rbac.authorization.k8s.io", "ClusterRoleBinding"),
+        ("", "Namespace"),
+    }
+    for (group, kind, namespace, _name), obj in inventory.items():
+        cluster_scoped = (group, kind) in cluster_kinds
+        allowlist = spec.get(
+            "clusterResourceWhitelist" if cluster_scoped else "namespaceResourceWhitelist", []
+        )
+        if {"group": group, "kind": kind} not in allowlist:
+            raise ValueError(f"Release AppProject does not allow {group}/{kind}")
+        if cluster_scoped:
+            if namespace:
+                raise ValueError(f"Cluster-scoped GitOps object has a namespace: {kind}")
+        elif not namespace or (server, namespace) not in destinations:
+            raise ValueError(f"Release AppProject does not allow destination {namespace}")
+        if kind != "WorkflowTemplate":
+            continue
+        for template in obj["spec"]["templates"]:
+            resource = template.get("resource", {})
+            if resource.get("action") != "create":
+                continue
+            job = yaml.safe_load(resource["manifest"])
+            if job.get("kind") != "Job":
+                raise ValueError("Release workflow creates an unexpected resource")
+            job_namespace = job["metadata"]["namespace"]
+            if (server, job_namespace) not in destinations:
+                raise ValueError(f"Release Job has an unreviewed destination {job_namespace}")
+            for volume in job["spec"]["template"]["spec"].get("volumes", []):
+                if "configMap" not in volume:
+                    continue
+                reference = volume["configMap"]
+                configmap = inventory.get(("", "ConfigMap", job_namespace, reference["name"]))
+                if configmap is None or any(
+                    item["key"] not in configmap.get("data", {})
+                    for item in reference.get("items", [])
+                ):
+                    raise ValueError(
+                        f"Release Job ConfigMap is missing required data in {job_namespace}: {reference['name']}"
+                    )
+
+
+def validate_gitops() -> None:
+    """Render existing Kustomize roots offline and check ownership and staged permissions."""
+    bundles = {}
+    for directory in GITOPS_ROOTS:
+        rendered = subprocess.run(
+            ["kubectl", "kustomize", str(ROOT / directory)],
+            check=True,
+            capture_output=True,
+            encoding="utf-8",
+            timeout=60,
+        ).stdout
+        bundles[directory] = [obj for obj in yaml.safe_load_all(rendered) if obj is not None]
+    manifest_inventory([obj for bundle in bundles.values() for obj in bundle])
+    bootstrap = bundles["gitops/release-workflows-bootstrap"]
+    project = next(obj for obj in bootstrap if obj["kind"] == "AppProject")
+    application = next(obj for obj in bootstrap if obj["kind"] == "Application")
+    validate_release_project(project, application, bundles["gitops/release-workflows"])
+    print(
+        "Validated four GitOps renders, unique ownership and release Project/Job configuration (offline)."
+    )
 
 
 def validate_object_store() -> None:
@@ -176,6 +282,7 @@ def validate_postgres() -> None:
 
 
 def validate() -> None:
+    validate_gitops()
     namespaces = list(
         yaml.safe_load_all(
             (ROOT / "gitops/environments/local/namespaces.yaml").read_text(encoding="utf-8")

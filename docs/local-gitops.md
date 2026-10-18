@@ -49,6 +49,11 @@ PostgreSQL and SeaweedFS retain their explicit Helm rollback commands
 under ADR 0002. The migration performed no data migration or credential rotation.
 
 Environment composition lives in Kustomize and Argo CD resources.
+The [manifest layout guide](../gitops/README.md) explains the existing ownership
+roots, capability-based RBAC grouping and local trust-model limitations.
+`make render-check` renders all four Kustomize roots offline, rejects duplicate
+ownership and rendered Secrets, and checks the staged release Project permissions
+and Job ConfigMap references. Workload Helm rendering remains in the same gate.
 The consumer Python boundary does not generate those resources: it requires the
 infrastructure-owned `argocd` namespace, protects consumer ownership, supplies
 private credentials over stdin, applies only the root Application, and performs

@@ -1,9 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - preflight-rbac.yaml
+  - rbac/preflight/serviceaccount.yaml
+  - rbac/preflight/workflow-access.yaml
+  - rbac/preflight/cluster-identity.yaml
   - release-preflight.yaml
-  - external-state-rbac.yaml
+  - rbac/external-state/serviceaccount.yaml
+  - rbac/external-state/workflow-access.yaml
+  - rbac/external-state/cluster-identity.yaml
+  - rbac/external-state/platform-jobs.yaml
+  - rbac/external-state/generator-jobs.yaml
   - release-task-selection.yaml
   - prepare-bucket.yaml
   - prepare-database-roles.yaml

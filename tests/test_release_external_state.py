@@ -29,7 +29,19 @@ class ReleaseExternalStateTests(unittest.TestCase):
                 ("execution-registry", "prepare-execution-registry.yaml"),
             )
         }
-        cls.rbac = list(yaml.safe_load_all((DIRECTORY / "external-state-rbac.yaml").read_text()))
+        cls.rbac = [
+            obj
+            for name in (
+                "serviceaccount",
+                "workflow-access",
+                "cluster-identity",
+                "platform-jobs",
+                "generator-jobs",
+            )
+            for obj in yaml.safe_load_all(
+                (DIRECTORY / "rbac/external-state" / f"{name}.yaml").read_text(encoding="utf-8")
+            )
+        ]
 
     def test_preflight_precedes_all_mutation_and_selection_is_bound(self) -> None:
         spec = self.workflow["spec"]
