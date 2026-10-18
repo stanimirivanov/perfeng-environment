@@ -144,7 +144,11 @@ class ReleaseExternalStateTests(unittest.TestCase):
         kustomization = yaml.safe_load((DIRECTORY / "kustomization.yaml").read_text())
         self.assertEqual(
             [item["name"] for item in kustomization["configMapGenerator"]],
-            ["perfeng-external-state-scripts-v1", "perfeng-readiness-verifier-v1"],
+            [
+                "perfeng-external-state-scripts-v1",
+                "perfeng-readiness-verifier-v1",
+                "perfeng-quiescence-verifier-v1",
+            ],
         )
         generator = kustomization["configMapGenerator"][0]
         self.assertEqual(generator["namespace"], "perf-platform")
@@ -216,6 +220,9 @@ class ReleaseExternalStateTests(unittest.TestCase):
                     "verify-release-readiness.yaml",
                     "release-readiness.yaml",
                     "scripts/verify-readiness.py",
+                    "release-maintenance-checkpoint.yaml",
+                    "verify-release-quiescence.yaml",
+                    "scripts/verify-quiescence.py",
                 )
             ),
         ]

@@ -22,6 +22,12 @@ resources:
   - observe-release-readiness.yaml
   - verify-release-readiness.yaml
   - release-readiness.yaml
+  - rbac/maintenance/serviceaccount.yaml
+  - rbac/maintenance/workflow-access.yaml
+  - rbac/maintenance/cluster-identity.yaml
+  - rbac/maintenance/platform-observation.yaml
+  - verify-release-quiescence.yaml
+  - release-maintenance-checkpoint.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform
@@ -40,6 +46,14 @@ configMapGenerator:
       disableNameSuffixHash: true
       annotations:
         argocd.argoproj.io/sync-wave: "-2"
+  - name: perfeng-quiescence-verifier-v1
+    namespace: argo-workflows
+    files:
+      - scripts/verify-quiescence.py
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        argocd.argoproj.io/sync-wave: "-2"
 patches:
   - target:
       kind: ConfigMap
@@ -51,6 +65,13 @@ patches:
   - target:
       kind: ConfigMap
       name: perfeng-readiness-verifier-v1
+    patch: |-
+      - op: add
+        path: /immutable
+        value: true
+  - target:
+      kind: ConfigMap
+      name: perfeng-quiescence-verifier-v1
     patch: |-
       - op: add
         path: /immutable

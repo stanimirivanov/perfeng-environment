@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-maintenance-checkpoint-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-maintenance-checkpoint
+  entrypoint: checkpoint
+  activeDeadlineSeconds: 900
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: checkpoint
+      steps:
+        - - name: preflight
+            templateRef:
+              name: perfeng-release-preflight-v1
+              template: preflight
+        - - name: observe
+            templateRef:
+              name: perfeng-verify-release-quiescence-v1
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: '{{steps.preflight.outputs.parameters.result}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.observe.outputs.parameters.result}}'

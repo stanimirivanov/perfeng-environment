@@ -20,6 +20,8 @@
 | `release-workflows/` | Staged versioned WorkflowTemplates and immutable script ConfigMap generation. |
 | `release-workflows/rbac/preflight/` | Standalone read-only preflight identity, workflow execution and cluster-identity read permissions. |
 | `release-workflows/rbac/external-state/` | Composed preflight permissions plus Job creation in the two external-state namespaces. |
+| `release-workflows-bootstrap/maintenance-application-access.yaml` | Explicit bootstrap read grant for the two maintenance Applications; no Application writes. |
+| `release-workflows/rbac/maintenance/` | Staged read-only M04 checkpoint, including namespace-local Pod listing to prove absence. |
 | `release-workflows/rbac/readiness/` | Composed preflight permissions and named resource reads for staged readiness; no workload writes. |
 | `../charts/` | Existing reusable workload packages; Applications select these packages explicitly. |
 

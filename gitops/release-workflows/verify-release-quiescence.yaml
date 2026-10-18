@@ -1,0 +1,77 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-verify-release-quiescence-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: preflight-result
+        artifacts:
+          - name: selected-source
+            path: /inputs/selection
+            git:
+              repo: https://github.com/stanimirivanov/perfeng-environment.git
+              revision: '{{workflow.parameters.selection-revision}}'
+              disableSubmodules: true
+              usernameSecret:
+                name: release-git-read
+                key: username
+              passwordSecret:
+                name: release-git-read
+                key: password
+      volumes:
+        - name: verifier
+          configMap:
+            name: perfeng-quiescence-verifier-v1
+            items:
+              - key: verify-quiescence.py
+                path: verify-quiescence.py
+        - name: scratch
+          emptyDir: {}
+      container:
+        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+        command:
+          - python
+          - /opt/checkpoint/verify-quiescence.py
+        env:
+          - name: PREFLIGHT_RESULT
+            value: '{{inputs.parameters.preflight-result}}'
+          - name: SELECTION_REVISION
+            value: '{{workflow.parameters.selection-revision}}'
+        volumeMounts:
+          - name: verifier
+            mountPath: /opt/checkpoint
+            readOnly: true
+          - name: scratch
+            mountPath: /tmp
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              path: /tmp/checkpoint.json
+      podSpecPatch: '{"securityContext":{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch"}}'
+      activeDeadlineSeconds: 180
