@@ -129,6 +129,15 @@ task invocation total. They remain in the functional parity checklist for
 any file that is deleted. `postgres.py` and `object_store.py` also contain
 dormant Helm rollback actions protected by [ADR 0002](decisions/0002-stateful-gitops-ownership.md).
 
+PR 9 stages the read-only [M04 maintenance checkpoint](release-maintenance-checkpoint.md).
+`gitops/release-workflows/scripts/verify-quiescence.py` adds 266 physical Python
+lines and one deployment helper. Together with the 240-line readiness verifier,
+the two new helpers account for 506 residual lines before any retained baseline
+code. Both files count toward the at-most-two-file/708-line exit limit; this PR
+retires no baseline file and does not satisfy that limit while old paths remain.
+The checkpoint makes bounded observations without subprocesses, custom waiting
+or maintenance writes. Argo owns sequencing, deadlines and serialization.
+
 ## Retirement and verification gate
 
 | Measure | Baseline | Exit criterion |

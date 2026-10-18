@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:perfeng:maintenance-checkpoint:1",
+  "title": "Observed M04 maintenance quiescence v1",
+  "description": "Bounded read-only observations; not migration authorization or a promotion receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "requestDigest",
+    "requestRevision",
+    "selectionRevision",
+    "clusterUID",
+    "kind",
+    "status",
+    "environment",
+    "podListResourceVersion",
+    "resources"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "requestDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "requestRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "selectionRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "clusterUID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "PerfengMaintenanceCheckpoint"
+    },
+    "status": {
+      "const": "quiescence-observed"
+    },
+    "environment": {
+      "const": "perfeng-local"
+    },
+    "podListResourceVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": false,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "namespace",
+            "name",
+            "uid",
+            "resourceVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Application"
+            },
+            "namespace": {
+              "const": "argocd"
+            },
+            "name": {
+              "const": "perfeng-local-root"
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "namespace",
+            "name",
+            "uid",
+            "resourceVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Application"
+            },
+            "namespace": {
+              "const": "argocd"
+            },
+            "name": {
+              "const": "perfeng-local-control-plane"
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "namespace",
+            "name",
+            "uid",
+            "resourceVersion"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Deployment"
+            },
+            "namespace": {
+              "const": "perf-platform"
+            },
+            "name": {
+              "const": "control-plane"
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  }
+}

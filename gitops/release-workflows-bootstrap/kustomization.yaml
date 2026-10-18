@@ -4,3 +4,4 @@ resources:
   - project.yaml
   - application.yaml
   - readiness-application-access.yaml
+  - maintenance-application-access.yaml

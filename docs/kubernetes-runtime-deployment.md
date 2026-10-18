@@ -42,6 +42,12 @@ edited evidence file. Do not recreate the cluster to repair deployment.
 
 ## Prepare the maintenance window before merging
 
+The [staged Argo maintenance checkpoint](release-maintenance-checkpoint.md) can
+observe an already paused current selection on a disposable fixture. It does
+not replace this pause, authorize migration, create a backup or resume the
+service. Keep the following supported operator path until live parity and
+recovery acceptance permit a reviewed cutover.
+
 Stop new submissions and let current Runs finish; inspect retained active Runs
 and Jobs before stopping the worker. Schedule downtime and retain an appropriate
 database backup before applying migrations. No automatic backup/restore is provided.

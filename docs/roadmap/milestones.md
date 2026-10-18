@@ -283,6 +283,13 @@ Its versioned evidence covers control-plane/foundation readiness only; complete
 platform health, live parity, M04 maintenance/recovery and script retirement
 remain separate gates.
 
+The [staged M04 maintenance checkpoint](../release-maintenance-checkpoint.md)
+observes an already paused current selection and records bounded quiescence
+evidence. It does not automate pause, migration or recovery, establish a
+promotion receipt, or replace the independent live check before mutation.
+Prior-release receipt/adoption, maintenance writes, complete health parity and
+disposable-kind recovery acceptance still precede operational cutover.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

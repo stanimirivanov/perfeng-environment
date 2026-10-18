@@ -6,6 +6,10 @@
   [native connectivity checklist](native-worker-connectivity.md#failure-and-recovery).
   TLS/readiness is not proof of signed upload, internal read-back or acquisition.
 
+- For a failed staged maintenance checkpoint, follow the
+  [quiescence recovery boundary](release-maintenance-checkpoint.md#evidence-failure-and-recovery).
+  It repairs nothing; keep manual pause/migration/sync and retained evidence.
+
 - Run every command from the `perfeng-environment` repository and use
   `.local/perfeng-local.kubeconfig`; the similarly named context in the global
   kubeconfig may point to an earlier kind API-server port.
