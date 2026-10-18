@@ -56,6 +56,16 @@ The same 13 files and 3,545 lines remain in the retirement baseline because
 the host commands are still supported. Count no script as retired until the
 first-run, repeat and failed-step recovery evidence permits a reviewed cutover.
 
+PR 8 stages native resource readiness waits and bounded operational probes in
+`perfeng-release-readiness-v1`. The host status/health path is still supported;
+no baseline file is retired. The new
+`gitops/release-workflows/scripts/verify-readiness.py` is a 240-line deployment
+verification helper and must be included in the residual file/line accounting.
+It performs semantic checks and bounded HTTP probes, with no Kubernetes calls,
+subprocess orchestration or custom waiting loops. The fixed 13-file/3,545-line
+denominator remains unchanged; the added helper is not hidden from the 708-line
+residual ceiling or the residual-file limit.
+
 ## Deployment entrypoints and implementation
 
 | File | Task invocation(s) | Current responsibility | Target boundary | Physical lines |

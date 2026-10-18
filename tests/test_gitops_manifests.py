@@ -100,6 +100,23 @@ class GitOpsManifestTests(unittest.TestCase):
             len(validate_cluster.manifest_inventory([self.configmap, other_namespace])), 2
         )
 
+    def test_verifier_template_requires_its_own_namespaced_configmap_key(self) -> None:
+        workflow = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/verify-release-readiness.yaml").read_text()
+        )
+        configmap = deepcopy(self.configmap)
+        configmap["metadata"].update(
+            name="perfeng-readiness-verifier-v1", namespace="argo-workflows"
+        )
+        with self.assertRaisesRegex(ValueError, "Workflow ConfigMap"):
+            validate_cluster.validate_release_project(
+                self.project, self.application, [workflow, configmap]
+            )
+        configmap["data"] = {"verify-readiness.py": "# fixture"}
+        validate_cluster.validate_release_project(
+            self.project, self.application, [workflow, configmap]
+        )
+
     def test_secret_objects_and_malformed_yaml_are_rejected(self) -> None:
         for obj, error in (
             ({**self.configmap, "kind": "Secret"}, "Secret"),

@@ -1,0 +1,133 @@
+{
+  "application": {
+    "name": "perfeng-local-control-plane",
+    "namespace": "argocd",
+    "uid": "application-uid",
+    "generation": 3,
+    "project": "perfeng-local",
+    "destination": {
+      "server": "https://kubernetes.default.svc",
+      "namespace": "perf-platform"
+    },
+    "sources": [
+      {
+        "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
+        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
+        "path": "charts/control-plane",
+        "image": "ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3",
+        "runtimeConfigMap": "perfeng-control-plane-runtime-315a2eede8ff",
+        "registryConfigMap": "perfeng-runtime-registry-7be1d749994e"
+      },
+      {
+        "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
+        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
+        "path": "packages/runtime-inputs/local-kind-integration-1.0.0",
+        "image": null,
+        "runtimeConfigMap": null,
+        "registryConfigMap": null
+      }
+    ],
+    "comparedSources": [
+      {
+        "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
+        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
+        "path": "charts/control-plane",
+        "image": "ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3",
+        "runtimeConfigMap": "perfeng-control-plane-runtime-315a2eede8ff",
+        "registryConfigMap": "perfeng-runtime-registry-7be1d749994e"
+      },
+      {
+        "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
+        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
+        "path": "packages/runtime-inputs/local-kind-integration-1.0.0",
+        "image": null,
+        "runtimeConfigMap": null,
+        "registryConfigMap": null
+      }
+    ],
+    "revisions": [
+      "b4499997cc4653f7a28bac7b242f8db421877f9a",
+      "b4499997cc4653f7a28bac7b242f8db421877f9a"
+    ],
+    "sync": "Synced",
+    "health": "Healthy",
+    "conditions": [],
+    "operation": "Succeeded"
+  },
+  "postgres": {
+    "name": "postgres",
+    "namespace": "perf-platform",
+    "uid": "postgres-uid",
+    "generation": 7,
+    "observedGeneration": 7,
+    "desired": 1,
+    "replicas": 1,
+    "ready": 1,
+    "updated": 1,
+    "currentRevision": "postgres-revision",
+    "updateRevision": "postgres-revision"
+  },
+  "seaweedfs": {
+    "name": "seaweedfs",
+    "namespace": "perf-platform",
+    "uid": "seaweedfs-uid",
+    "generation": 7,
+    "observedGeneration": 7,
+    "desired": 1,
+    "replicas": 1,
+    "ready": 1,
+    "updated": 1,
+    "currentRevision": "seaweedfs-revision",
+    "updateRevision": "seaweedfs-revision"
+  },
+  "deployment": {
+    "name": "control-plane",
+    "namespace": "perf-platform",
+    "uid": "deployment-uid",
+    "generation": 7,
+    "observedGeneration": 7,
+    "desired": 1,
+    "replicas": 1,
+    "ready": 1,
+    "updated": 1,
+    "available": 1,
+    "unavailable": 0,
+    "images": [
+      "ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3"
+    ],
+    "runtimeConfigMaps": [
+      "perfeng-control-plane-runtime-315a2eede8ff"
+    ],
+    "registryConfigMaps": [
+      "perfeng-runtime-registry-7be1d749994e"
+    ],
+    "runtimeSecrets": [
+      "perfeng-control-plane-runtime"
+    ],
+    "imagePullSecrets": [
+      "perfeng-control-plane-registry"
+    ],
+    "authenticationSecrets": [
+      "perfeng-control-plane-authentication"
+    ]
+  },
+  "service": {
+    "name": "control-plane",
+    "namespace": "perf-platform",
+    "uid": "service-uid",
+    "generation": null,
+    "type": "ClusterIP",
+    "selector": {
+      "app.kubernetes.io/name": "perfeng-control-plane",
+      "app.kubernetes.io/instance": "control-plane"
+    },
+    "ports": [
+      {
+        "name": "http",
+        "port": 8080,
+        "protocol": "TCP",
+        "targetPort": "http"
+      }
+    ]
+  }
+}

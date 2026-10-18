@@ -23,6 +23,16 @@
 
 ## Scope and command safety
 
+For the staged release-readiness Workflow, inspect the failing observation or
+verification node. Native waits stop at their deadlines; a missing resource
+fails immediately. A final verification failure can mean stale generations,
+wrong release/configuration or an invalid operational endpoint response even
+when Kubernetes reports ready replicas. Use the existing owner diagnostics and
+M04 recovery procedure, then resubmit the same exact request only after the
+prerequisite is corrected. This gate cannot refresh/sync Argo CD, change a
+workload or issue a successful result before its HTTP probes pass. See
+[release readiness and evidence limits](release-readiness.md).
+
 For a staged release-workflows sync denied by its AppProject, run **offline**
 `make render-check`. The rendered script ConfigMap needs core `ConfigMap` in
 `release-workflows-bootstrap/project.yaml`'s namespaced allowlist and

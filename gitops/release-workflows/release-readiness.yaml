@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-readiness-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-readiness
+  entrypoint: verify-readiness
+  activeDeadlineSeconds: 1200
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: verify-readiness
+      steps:
+        - - name: preflight
+            templateRef:
+              name: perfeng-release-preflight-v1
+              template: preflight
+        - - name: postgres
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: postgres
+        - - name: seaweedfs
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: seaweedfs
+        - - name: application
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: application
+        - - name: deployment
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: deployment
+        - - name: service
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: service
+        - - name: verify
+            templateRef:
+              name: perfeng-verify-release-readiness-v1
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: '{{steps.preflight.outputs.parameters.result}}'
+                - name: application
+                  value: '{{steps.application.outputs.parameters.observation}}'
+                - name: postgres
+                  value: '{{steps.postgres.outputs.parameters.observation}}'
+                - name: seaweedfs
+                  value: '{{steps.seaweedfs.outputs.parameters.observation}}'
+                - name: deployment
+                  value: '{{steps.deployment.outputs.parameters.observation}}'
+                - name: service
+                  value: '{{steps.service.outputs.parameters.observation}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.verify.outputs.parameters.result}}'

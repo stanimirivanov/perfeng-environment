@@ -51,6 +51,20 @@ def validate_release_project(
     server = application["spec"]["destination"]["server"]
     destinations = {(item["server"], item["namespace"]) for item in spec["destinations"]}
     inventory = manifest_inventory(objects)
+
+    def check_volumes(volumes: list[dict[str, Any]], namespace: str, owner: str) -> None:
+        for volume in volumes:
+            if "configMap" not in volume:
+                continue
+            reference = volume["configMap"]
+            configmap = inventory.get(("", "ConfigMap", namespace, reference["name"]))
+            if configmap is None or any(
+                item["key"] not in configmap.get("data", {}) for item in reference.get("items", [])
+            ):
+                raise ValueError(
+                    f"Release {owner} ConfigMap is missing required data in {namespace}: {reference['name']}"
+                )
+
     cluster_kinds = {
         ("rbac.authorization.k8s.io", "ClusterRole"),
         ("rbac.authorization.k8s.io", "ClusterRoleBinding"),
@@ -71,6 +85,7 @@ def validate_release_project(
         if kind != "WorkflowTemplate":
             continue
         for template in obj["spec"]["templates"]:
+            check_volumes(template.get("volumes", []), namespace, "Workflow")
             resource = template.get("resource", {})
             if resource.get("action") != "create":
                 continue
@@ -80,18 +95,7 @@ def validate_release_project(
             job_namespace = job["metadata"]["namespace"]
             if (server, job_namespace) not in destinations:
                 raise ValueError(f"Release Job has an unreviewed destination {job_namespace}")
-            for volume in job["spec"]["template"]["spec"].get("volumes", []):
-                if "configMap" not in volume:
-                    continue
-                reference = volume["configMap"]
-                configmap = inventory.get(("", "ConfigMap", job_namespace, reference["name"]))
-                if configmap is None or any(
-                    item["key"] not in configmap.get("data", {})
-                    for item in reference.get("items", [])
-                ):
-                    raise ValueError(
-                        f"Release Job ConfigMap is missing required data in {job_namespace}: {reference['name']}"
-                    )
+            check_volumes(job["spec"]["template"]["spec"].get("volumes", []), job_namespace, "Job")
 
 
 def validate_gitops() -> None:

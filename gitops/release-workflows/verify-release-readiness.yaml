@@ -1,0 +1,91 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-verify-release-readiness-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: preflight-result
+          - name: application
+          - name: postgres
+          - name: seaweedfs
+          - name: deployment
+          - name: service
+        artifacts:
+          - name: selected-source
+            path: /inputs/selection
+            git:
+              repo: https://github.com/stanimirivanov/perfeng-environment.git
+              revision: '{{workflow.parameters.selection-revision}}'
+              disableSubmodules: true
+              usernameSecret:
+                name: release-git-read
+                key: username
+              passwordSecret:
+                name: release-git-read
+                key: password
+      volumes:
+        - name: verifier
+          configMap:
+            name: perfeng-readiness-verifier-v1
+            items:
+              - key: verify-readiness.py
+                path: verify-readiness.py
+        - name: scratch
+          emptyDir: {}
+      container:
+        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+        command:
+          - python
+          - /opt/readiness/verify-readiness.py
+        env:
+          - name: PREFLIGHT_RESULT
+            value: '{{inputs.parameters.preflight-result}}'
+          - name: APPLICATION
+            value: '{{inputs.parameters.application}}'
+          - name: POSTGRES
+            value: '{{inputs.parameters.postgres}}'
+          - name: SEAWEEDFS
+            value: '{{inputs.parameters.seaweedfs}}'
+          - name: DEPLOYMENT
+            value: '{{inputs.parameters.deployment}}'
+          - name: SERVICE
+            value: '{{inputs.parameters.service}}'
+          - name: SELECTION_REVISION
+            value: '{{workflow.parameters.selection-revision}}'
+        volumeMounts:
+          - name: verifier
+            mountPath: /opt/readiness
+            readOnly: true
+          - name: scratch
+            mountPath: /tmp
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              path: /tmp/readiness-result.json
+      podSpecPatch: '{"securityContext":{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch"}}'

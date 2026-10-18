@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PerfengReleaseReadiness v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "scope",
+    "status",
+    "requestRevision",
+    "selectionRevision",
+    "deploymentRevision",
+    "requestDigest",
+    "clusterUID",
+    "applicationUID",
+    "serviceUID",
+    "image",
+    "resources",
+    "checkedEndpoints"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "PerfengReleaseReadiness"
+    },
+    "scope": {
+      "const": "control-plane-foundation"
+    },
+    "status": {
+      "const": "readiness-verified"
+    },
+    "requestRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "selectionRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "deploymentRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "requestDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "clusterUID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "applicationUID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "serviceUID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^ghcr.io/stanimirivanov/perfeng-control-plane@sha256:[0-9a-f]{64}$"
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name",
+            "namespace",
+            "uid",
+            "generation",
+            "observedGeneration"
+          ],
+          "properties": {
+            "kind": {
+              "const": "StatefulSet"
+            },
+            "name": {
+              "const": "postgres"
+            },
+            "namespace": {
+              "const": "perf-platform"
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "observedGeneration": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name",
+            "namespace",
+            "uid",
+            "generation",
+            "observedGeneration"
+          ],
+          "properties": {
+            "kind": {
+              "const": "StatefulSet"
+            },
+            "name": {
+              "const": "seaweedfs"
+            },
+            "namespace": {
+              "const": "perf-platform"
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "observedGeneration": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name",
+            "namespace",
+            "uid",
+            "generation",
+            "observedGeneration"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Deployment"
+            },
+            "name": {
+              "const": "control-plane"
+            },
+            "namespace": {
+              "const": "perf-platform"
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "observedGeneration": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ],
+      "items": false
+    },
+    "checkedEndpoints": {
+      "const": [
+        "livez",
+        "readyz",
+        "metrics"
+      ]
+    }
+  }
+}
