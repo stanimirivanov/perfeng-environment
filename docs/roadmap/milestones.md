@@ -290,6 +290,12 @@ promotion receipt, or replace the independent live check before mutation.
 Prior-release receipt/adoption, maintenance writes, complete health parity and
 disposable-kind recovery acceptance still precede operational cutover.
 
+The [staged adoption ledger](../release-adoption.md) records an explicitly
+reviewed existing baseline in immutable ConfigMaps and creates its initial
+current pointer without overwrite. It does not advance a pointer, execute a
+promotion or establish full platform acceptance. Guarded advancement,
+maintenance writes, live recovery/export and measured retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

@@ -21,6 +21,8 @@
 | `release-workflows/rbac/preflight/` | Standalone read-only preflight identity, workflow execution and cluster-identity read permissions. |
 | `release-workflows/rbac/external-state/` | Composed preflight permissions plus Job creation in the two external-state namespaces. |
 | `release-workflows-bootstrap/maintenance-application-access.yaml` | Explicit bootstrap read grant for the two maintenance Applications; no Application writes. |
+| `release-workflows-bootstrap/ledger-namespace.yaml`, `ledger-access.yaml` | Explicit retained runtime ledger namespace and isolated ConfigMap get/create grant; no patch/delete. |
+| `release-workflows/rbac/adoption/` | Staged adoption readiness/preflight identity; root read is an explicit bootstrap grant. |
 | `release-workflows/rbac/maintenance/` | Staged read-only M04 checkpoint, including namespace-local Pod listing to prove absence. |
 | `release-workflows/rbac/readiness/` | Composed preflight permissions and named resource reads for staged readiness; no workload writes. |
 | `../charts/` | Existing reusable workload packages; Applications select these packages explicitly. |
@@ -57,3 +59,9 @@ Benchmark authority follows `main` with automatic synchronization, without pruni
 The workload AppProject's destination and kind permissions should be narrowed against the complete pinned workload renders, including their execution-namespace RBAC. Pod Security Admission, Job security contexts and NetworkPolicy need image and benchmark compatibility tests. Job retention deliberately preserves failure evidence; adding a TTL requires an accepted evidence-retention policy. The resource-metrics CA has a provider-owned lifecycle and needs planned rotation. These are behavioral hardening changes, rather than automatic consequences of manifest reorganization.
 
 The selected Argo CD version supports the current `automated.enabled` policy. Continue checking the selected version and explicit manual control-plane gate rather than changing synchronization semantics during layout cleanup. Workflow input contracts, registry proof against the selected runtime artifact and versioned child/script updates belong to the release migration and retain their [v1 compatibility boundary](../docs/decisions/0016-compose-versioned-release-templates.md).
+
+Runtime adoption receipts and the current pointer are not rendered by these roots.
+The staged Project adds only their dedicated ledger destination; do not broaden
+`argocd` permissions or manage runtime history with Helm/Kustomize. See
+[release adoption](../docs/release-adoption.md) for create-only initialization,
+retention and the separate future pointer-advancement boundary.

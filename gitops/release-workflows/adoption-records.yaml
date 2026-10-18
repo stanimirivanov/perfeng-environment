@@ -1,0 +1,116 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-adoption-records-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: root
+      activeDeadlineSeconds: 60
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: perfeng-local-root
+            namespace: argocd
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: .
+    - name: receipt
+      activeDeadlineSeconds: 60
+      resource:
+        action: get
+        manifest: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: '{{inputs.parameters.name}}'
+            namespace: perfeng-release-ledger
+        flags:
+          - --ignore-not-found
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: .
+              default: 'null'
+      inputs:
+        parameters:
+          - name: name
+    - name: pointer
+      activeDeadlineSeconds: 60
+      resource:
+        action: get
+        manifest: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: perfeng-local-current
+            namespace: perfeng-release-ledger
+        flags:
+          - --ignore-not-found
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: .
+              default: 'null'
+    - name: create-receipt
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: name
+          - name: request-b64
+          - name: receipt-b64
+      resource:
+        action: create
+        setOwnerReference: false
+        manifest: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: '{{inputs.parameters.name}}'
+            namespace: perfeng-release-ledger
+            labels:
+              app.kubernetes.io/managed-by: perfeng-environment
+              perfeng.io/purpose: release-adoption
+            annotations:
+              perfeng.io/first-workflow-uid: '{{workflow.uid}}'
+              perfeng.io/first-request-revision: '{{workflow.parameters.request-revision}}'
+          immutable: true
+          binaryData:
+            request.json: '{{inputs.parameters.request-b64}}'
+            receipt.json: '{{inputs.parameters.receipt-b64}}'
+    - name: create-pointer
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: name
+          - name: request-digest
+          - name: cluster-uid
+          - name: receipt-uid
+      resource:
+        action: create
+        setOwnerReference: false
+        manifest: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: perfeng-local-current
+            namespace: perfeng-release-ledger
+            labels:
+              app.kubernetes.io/managed-by: perfeng-environment
+              perfeng.io/purpose: current-release
+          data:
+            requestDigest: '{{inputs.parameters.request-digest}}'
+            clusterUID: '{{inputs.parameters.cluster-uid}}'
+            receiptName: '{{inputs.parameters.name}}'
+            receiptUID: '{{inputs.parameters.receipt-uid}}'

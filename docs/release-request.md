@@ -66,8 +66,10 @@ cluster, or a successful release.
    intended transition; the receipt and live observations establish what
    actually happened.
 
-There is no active release consumer or receipt store. The staged preflight
-checks identities only. In particular, the
+There is no active promotion consumer. The separately staged
+[adoption ledger](release-adoption.md) can record an explicitly reviewed existing
+baseline; it cannot advance a current pointer or authorize normal deployment.
+The staged preflight checks identities only. In particular, the
 current root Application tracks `main`, so a request's full Git revision does
 not by itself pin what Argo CD has already observed. A future cutover must
 check or bind the exact root and child revisions before reporting promotion.

@@ -93,9 +93,11 @@ by an offline pass.
 
 ## Result, recovery and limits
 
-Workflow status and logs are operational evidence in the cluster. There is no
-durable release receipt or adoption protocol yet, and a cluster deletion
-removes this evidence. A preflight success proves the named bytes and observed
+Workflow status and logs are operational evidence in the cluster. The separately
+staged [adoption ledger](release-adoption.md) can record an explicitly reviewed
+baseline; this preflight neither writes that ledger nor adopts an environment.
+Cluster deletion removes both Workflow evidence and the cluster-local ledger
+unless separately backed up. A preflight success proves the named bytes and observed
 UID at that moment; it does not validate artifact registry provenance,
 approve promotion, compare a prior receipt with Argo CD state, authorize
 migration, or activate a workload. Existing lock-specific semantic validators

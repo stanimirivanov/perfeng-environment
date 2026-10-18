@@ -2,6 +2,10 @@
 
 ## TL;DR
 
+- For adoption ledger conflicts or interrupted creation, use
+  [release adoption recovery](release-adoption.md#partial-failure-and-recovery).
+  Preserve receipts and pointer; do not apply, patch, delete or infer empty state.
+
 - For trusted Windows-worker API/S3 access or search-target failures, follow the
   [native connectivity checklist](native-worker-connectivity.md#failure-and-recovery).
   TLS/readiness is not proof of signed upload, internal read-back or acquisition.
