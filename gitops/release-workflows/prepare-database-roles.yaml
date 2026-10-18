@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-prepare-database-roles-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      resource:
+        action: create
+        successCondition: status.succeeded > 0
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            generateName: perfeng-prepare-db-v1-
+            namespace: perf-platform
+            labels:
+              app.kubernetes.io/managed-by: perfeng-environment
+              perfeng.io/purpose: release-external-state
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 240
+            template:
+              spec:
+                restartPolicy: Never
+                automountServiceAccountToken: false
+                volumes:
+                  - name: release-scripts
+                    configMap:
+                      name: perfeng-external-state-scripts-v1
+                      items:
+                        - key: database-roles.sh
+                          path: database-roles.sh
+                containers:
+                  - name: psql
+                    image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+                    resources:
+                      requests: {cpu: 25m, memory: 64Mi}
+                      limits: {cpu: 200m, memory: 256Mi}
+                    command: [/bin/sh, -e, /opt/perfeng-release/database-roles.sh]
+                    volumeMounts:
+                      - name: release-scripts
+                        mountPath: /opt/perfeng-release
+                        readOnly: true
+                    env:
+                      - name: PGPASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-postgres-auth
+                            key: password
+                      - name: MIGRATION_URL
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-control-plane-database
+                            key: migration-url
+                      - name: RUNTIME_URL
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-control-plane-database
+                            key: runtime-url
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              jsonPath: '{.metadata.name}'

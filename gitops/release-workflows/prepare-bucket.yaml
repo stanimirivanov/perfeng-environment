@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-prepare-bucket-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      resource:
+        action: create
+        successCondition: status.succeeded > 0
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            generateName: perfeng-prepare-bucket-v1-
+            namespace: perf-platform
+            labels:
+              app.kubernetes.io/managed-by: perfeng-environment
+              perfeng.io/purpose: release-external-state
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 180
+            template:
+              spec:
+                restartPolicy: Never
+                automountServiceAccountToken: false
+                volumes:
+                  - name: release-scripts
+                    configMap:
+                      name: perfeng-external-state-scripts-v1
+                      items:
+                        - key: bucket.sh
+                          path: bucket.sh
+                containers:
+                  - name: aws-cli
+                    image: amazon/aws-cli:2.36.37@sha256:be6228bd99b4b0b9787543952aebfe93c66b5503121b68a724647c523c957a9d
+                    resources:
+                      requests: {cpu: 25m, memory: 64Mi}
+                      limits: {cpu: 200m, memory: 256Mi}
+                    command: [/bin/sh, -e, /opt/perfeng-release/bucket.sh]
+                    volumeMounts:
+                      - name: release-scripts
+                        mountPath: /opt/perfeng-release
+                        readOnly: true
+                    env:
+                      - name: AWS_ACCESS_KEY_ID
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-s3-auth
+                            key: access-key
+                      - name: AWS_SECRET_ACCESS_KEY
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-s3-auth
+                            key: secret-key
+                      - name: AWS_CONFIG_FILE
+                        value: /tmp/awsconfig
+                      - name: AWS_DEFAULT_REGION
+                        value: us-east-1
+                      - name: AWS_EC2_METADATA_DISABLED
+                        value: "true"
+                      - name: AWS_PAGER
+                        value: ""
+                      - name: AWS_MAX_ATTEMPTS
+                        value: "2"
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              jsonPath: '{.metadata.name}'

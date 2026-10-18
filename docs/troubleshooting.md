@@ -23,6 +23,19 @@
 
 ## Scope and command safety
 
+For the staged external-state Workflow on a **disposable kind cluster**, inspect
+the Workflow UID, failing step and the Job name in its output or node status.
+`task-selection` failure means the reviewed control-plane lock differs from the
+v1 task selection; submit a reviewed new selection instead of bypassing the
+gate. A bucket Job failure may mean a denied lookup rather than an absent
+bucket; do not treat all `head-bucket` errors as permission to create. A role
+Job failure can indicate an unsafe existing role, a missing credential Secret
+or a password mismatch; restore the matching Secret and inspect role state
+without rotating credentials. A registry Job failure can indicate a missing
+pull Secret, denied GHCR access or an unavailable digest. Retain failed Jobs,
+repair only the confirmed prerequisite and submit a new Workflow with the same
+request bytes. See [staged preparation and recovery](release-external-state.md).
+
 For missing Kubernetes resource metrics, run **read-only** `task kubernetes:metrics-health`
 and follow [the resource-metrics guide](local-resource-metrics.md). The command checks the
 exact live Application/Project and public API CA, then delegates health to the pinned provider.

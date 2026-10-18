@@ -6,12 +6,16 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: perfeng-environment
 spec:
-  description: Staged, read-only release preflight for the disposable local kind cluster
+  description: Staged release preflight and external-state preparation for disposable local kind
   sourceRepos:
     - https://github.com/stanimirivanov/perfeng-environment.git
   destinations:
     - server: https://kubernetes.default.svc
       namespace: argo-workflows
+    - server: https://kubernetes.default.svc
+      namespace: perf-platform
+    - server: https://kubernetes.default.svc
+      namespace: perf-generators
   clusterResourceWhitelist:
     - group: rbac.authorization.k8s.io
       kind: ClusterRole

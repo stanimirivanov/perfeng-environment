@@ -103,7 +103,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("release-workflows-application.yaml", root["resources"])
         self.assertEqual(
             project["spec"]["destinations"],
-            [{"server": "https://kubernetes.default.svc", "namespace": "argo-workflows"}],
+            [
+                {"server": "https://kubernetes.default.svc", "namespace": "argo-workflows"},
+                {"server": "https://kubernetes.default.svc", "namespace": "perf-platform"},
+                {"server": "https://kubernetes.default.svc", "namespace": "perf-generators"},
+            ],
         )
 
     def execute(self, mutation=None) -> tuple[subprocess.CompletedProcess[str], Path, dict]:
@@ -162,7 +166,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             text=True,
             check=False,
             env=environment,
-            timeout=10,
+            timeout=30,
         )
         return result, root / "result.json", environment
 

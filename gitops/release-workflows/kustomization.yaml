@@ -3,3 +3,27 @@ kind: Kustomization
 resources:
   - preflight-rbac.yaml
   - release-preflight.yaml
+  - external-state-rbac.yaml
+  - release-task-selection.yaml
+  - prepare-bucket.yaml
+  - prepare-database-roles.yaml
+  - prepare-execution-registry.yaml
+  - release-external-state.yaml
+configMapGenerator:
+  - name: perfeng-external-state-scripts-v1
+    namespace: perf-platform
+    files:
+      - scripts/bucket.sh
+      - scripts/database-roles.sh
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        argocd.argoproj.io/sync-wave: "-2"
+patches:
+  - target:
+      kind: ConfigMap
+      name: perfeng-external-state-scripts-v1
+    patch: |-
+      - op: add
+        path: /immutable
+        value: true

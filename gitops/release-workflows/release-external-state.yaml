@@ -1,0 +1,69 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-external-state-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-external-state
+  entrypoint: prepare
+  activeDeadlineSeconds: 900
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: prepare
+      steps:
+        - - name: preflight
+            templateRef:
+              name: perfeng-release-preflight-v1
+              template: preflight
+        - - name: task-selection
+            templateRef:
+              name: perfeng-release-task-selection-v1
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: "{{steps.preflight.outputs.parameters.result}}"
+                - name: expected-environment
+                  value: perfeng-local
+                - name: expected-lock-path
+                  value: deployments/local-control-plane.json
+                - name: expected-lock-digest
+                  value: sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f
+        - - name: bucket
+            templateRef:
+              name: perfeng-prepare-bucket-v1
+              template: run
+        - - name: database-roles
+            templateRef:
+              name: perfeng-prepare-database-roles-v1
+              template: run
+        - - name: execution-registry
+            templateRef:
+              name: perfeng-prepare-execution-registry-v1
+              template: run
+      outputs:
+        parameters:
+          - name: preflight-result
+            valueFrom:
+              parameter: "{{steps.preflight.outputs.parameters.result}}"
+          - name: bucket-job
+            valueFrom:
+              parameter: "{{steps.bucket.outputs.parameters.job-name}}"
+          - name: database-job
+            valueFrom:
+              parameter: "{{steps.database-roles.outputs.parameters.job-name}}"
+          - name: registry-job
+            valueFrom:
+              parameter: "{{steps.execution-registry.outputs.parameters.job-name}}"
