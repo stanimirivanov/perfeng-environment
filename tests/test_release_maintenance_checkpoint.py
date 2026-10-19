@@ -1,6 +1,5 @@
 """Read-only maintenance evidence rejects incomplete, changing or active state."""
 
-import importlib.util
 import io
 import json
 import os
@@ -15,14 +14,11 @@ from unittest.mock import MagicMock, patch
 import yaml
 from jsonschema import Draft202012Validator
 
+from tests.release_verifier_support import policy, runtime
+
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "gitops/release-workflows"
-SPEC = importlib.util.spec_from_file_location(
-    "quiescence", DIRECTORY / "scripts/verify-quiescence.py"
-)
-assert SPEC and SPEC.loader
-verifier = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(verifier)
+verifier = runtime
 REVISION = "a" * 40
 
 
@@ -97,7 +93,7 @@ class MaintenanceCheckpointTests(unittest.TestCase):
         }
 
     def verify(self) -> dict[str, Any]:
-        return verifier.verify(
+        return policy.verify_quiescence(
             self.preflight, self.raw, REVISION, self.before, self.pods, self.after, self.namespace
         )
 
@@ -166,7 +162,7 @@ class MaintenanceCheckpointTests(unittest.TestCase):
             {**self.pods, "kind": "List"},
         ):
             with self.subTest(pods=pods), self.assertRaises((ValueError, KeyError)):
-                verifier.verify(
+                policy.verify_quiescence(
                     self.preflight,
                     self.raw,
                     REVISION,
@@ -186,7 +182,7 @@ class MaintenanceCheckpointTests(unittest.TestCase):
             self.verify()
         self.preflight["selectionRevision"] = REVISION
         with self.assertRaisesRegex(ValueError, "lock differs"):
-            verifier.verify(
+            policy.verify_quiescence(
                 self.preflight,
                 self.raw + b"\n",
                 REVISION,
@@ -256,7 +252,7 @@ class MaintenanceCheckpointTests(unittest.TestCase):
             ):
                 read = MagicMock(side_effect=[*self.before, self.pods, *self.after, self.namespace])
                 with patch.object(verifier, "reader", return_value=read):
-                    verifier.main()
+                    verifier.run_quiescence()
                 self.assertEqual(read.call_count, 8)
                 self.assertEqual(json.loads(output.read_text())["status"], "quiescence-observed")
                 output.unlink()
@@ -268,19 +264,19 @@ class MaintenanceCheckpointTests(unittest.TestCase):
                         patch.object(verifier, "reader", side_effect=error),
                         redirect_stderr(io.StringIO()) as stderr,
                     ):
-                        self.assertEqual(verifier.cli(), 2)
+                        self.assertEqual(verifier.cli("quiescence"), 2)
                     self.assertFalse(output.exists())
                     self.assertNotIn("private-token", stderr.getvalue())
 
     def test_staged_workflow_and_rbac_preserve_read_only_boundary(self) -> None:
-        parent = yaml.safe_load((DIRECTORY / "release-maintenance-checkpoint.yaml").read_text())
-        child = yaml.safe_load((DIRECTORY / "verify-release-quiescence.yaml").read_text())
+        parent = yaml.safe_load((DIRECTORY / "release-maintenance-checkpoint-v2.yaml").read_text())
+        child = yaml.safe_load((DIRECTORY / "verify-release-quiescence-v2.yaml").read_text())
         self.assertEqual(parent["spec"]["serviceAccountName"], "release-maintenance-checkpoint")
         self.assertEqual(
             parent["spec"]["synchronization"]["mutexes"], [{"name": "perfeng-local-external-state"}]
         )
         steps = parent["spec"]["templates"][0]["steps"]
-        self.assertEqual(steps[0][0]["templateRef"]["name"], "perfeng-release-preflight-v1")
+        self.assertEqual(steps[0][0]["templateRef"]["name"], "perfeng-release-preflight-v2")
         self.assertEqual(child["spec"]["templates"][0]["activeDeadlineSeconds"], 180)
         for path in [
             *(DIRECTORY / "rbac/maintenance").glob("*.yaml"),

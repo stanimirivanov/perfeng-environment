@@ -1,0 +1,69 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-task-selection-v2
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: preflight-result
+          - name: expected-environment
+          - name: expected-lock-path
+          - name: expected-lock-digest
+      container:
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+        command:
+          - python
+          - /opt/release/release_runtime_v2.py
+        args:
+          - selection
+        env:
+          - name: PREFLIGHT_RESULT
+            value: '{{inputs.parameters.preflight-result}}'
+          - name: EXPECTED_ENVIRONMENT
+            value: '{{inputs.parameters.expected-environment}}'
+          - name: EXPECTED_LOCK_PATH
+            value: '{{inputs.parameters.expected-lock-path}}'
+          - name: EXPECTED_LOCK_DIGEST
+            value: '{{inputs.parameters.expected-lock-digest}}'
+        volumeMounts:
+          - name: verifier
+            mountPath: /opt/release
+            readOnly: true
+          - name: scratch
+            mountPath: /tmp
+      volumes:
+        - name: verifier
+          configMap:
+            name: perfeng-release-verifiers-v2
+            items:
+              - key: release_policy_v2.py
+                path: release_policy_v2.py
+              - key: release_runtime_v2.py
+                path: release_runtime_v2.py
+        - name: scratch
+          emptyDir: {}
+      podSpecPatch: '{"securityContext":{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch"}}'

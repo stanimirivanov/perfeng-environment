@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- The staged [WorkflowTemplate](../gitops/release-workflows/release-preflight.yaml)
+- The staged [WorkflowTemplate](../gitops/release-workflows/release-preflight-v2.yaml)
   checks a reviewed v1 request against exact Git checkouts, deployment-lock
   bytes and the observed `kube-system` UID. Its output is a versioned Workflow
   parameter, not a release receipt or permission to deploy.
@@ -69,7 +69,7 @@ request and selection commits:
 ```powershell
 $env:KUBECONFIG = (Resolve-Path .local/perfeng-local.kubeconfig).Path
 argo --context kind-perfeng-local -n argo-workflows submit `
-  --from workflowtemplate/perfeng-release-preflight-v1 `
+  --from workflowtemplate/perfeng-release-preflight-v2 `
   -p request-revision=<reviewed-request-commit> `
   -p request-path=deployments/release-requests/<name>.json `
   -p request-sha256=sha256:<exact-request-bytes-hash> `
@@ -86,7 +86,7 @@ create no workload changes. Submit a modified lock digest or wrong cluster
 UID as a negative test; it must fail with no result. Do not submit against the
 retained cluster to satisfy this pilot gate.
 
-`argo lint --offline gitops/release-workflows/release-preflight.yaml`,
+`make workflow-lint`,
 `make verify` and `make validate` are the offline gates. The live two-run gate
 requires Docker and a disposable kind cluster. No live acceptance is implied
 by an offline pass.
@@ -109,3 +109,12 @@ then submit a new Workflow using the same exact bytes for an exact retry. A
 changed request is a new release identity. Do not weaken the schema, alter a
 submitted request, grant broad permissions or use `expectedCurrent: null` to
 adopt a running environment.
+
+## Verifier package lifecycle
+
+The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
+Request and result data schemas remain v1. Published v1 source is recoverable
+from the retirement index; installed v1 objects are retained with pruning off.
+Use a fresh Workflow after upgrading; do not resume successful v1 nodes as v2
+verification. The active operator path and outstanding live acceptance gates
+remain unchanged.

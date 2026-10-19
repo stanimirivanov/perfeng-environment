@@ -113,3 +113,4 @@ How will the assumptions and consequences be verified?
 | [0015](0015-bind-releases-to-reviewed-inputs.md) | Proposed | Bind each release request to an exact environment Git commit, deployment-lock digests, cluster incarnation and compare-and-swap promotion precondition. |
 | [0016](0016-compose-versioned-release-templates.md) | Proposed | Compose external-state preparation from versioned namespaced WorkflowTemplates and an immutable script ConfigMap while preserving the v1 parent contract. |
 | [0017](0017-record-explicit-local-release-adoption.md) | Proposed | Isolate immutable local adoption receipts and a create-only initial current pointer, keeping adoption distinct from release promotion and cluster recovery. |
+| [0018](0018-bound-and-retire-release-verifier-sources.md) | Proposed | Consolidate staged Python in a bounded immutable package and permit audited source retirement while retaining installed versions. |

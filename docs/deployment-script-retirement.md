@@ -147,6 +147,25 @@ retained baseline scripts. This is staged implementation, not retirement credit.
 Consolidation or retirement of active verification implementations is required
 before cutover; do not increase the original denominator or hide embedded code.
 
+## Current staged verifier accounting
+
+The [v2 package](release-verifier-package.md) supersedes the three historical
+helpers above and both embedded preflight/selection Python bodies. The active
+staged inventory is now **two files, 708 physical lines**: 438 lines of pure
+policy and 270 of bounded I/O. The inventory gate includes every staged `.py`
+and refuses embedded Python. Superseded source paths have exact Git revision,
+content hashes and active replacements in the
+[retirement index](../deployments/release-workflow-retirements.json); installed
+v1 resources remain retained without pruning.
+
+This package correction removes no original host entrypoint. All 13 baseline
+files and their supported task paths still exist; they must be replaced and
+accepted before claiming the original greater-than-80% retirement. These two
+modules already consume the full residual budget, so additional retained
+host code or deployment helpers require further reduction or an explicitly
+reviewed exception. The historical 757-line subtotal above excluded 87 embedded preflight lines
+and eight embedded selection lines; the full before measurement was 852 lines.
+
 ## Retirement and verification gate
 
 | Measure | Baseline | Exit criterion |

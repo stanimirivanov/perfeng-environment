@@ -23,7 +23,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         cls.children = {
             name: yaml.safe_load((DIRECTORY / filename).read_text())
             for name, filename in (
-                ("task-selection", "release-task-selection.yaml"),
+                ("task-selection", "release-task-selection-v2.yaml"),
                 ("bucket", "prepare-bucket.yaml"),
                 ("database-roles", "prepare-database-roles.yaml"),
                 ("execution-registry", "prepare-execution-registry.yaml"),
@@ -56,7 +56,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         )
         self.assertEqual(
             steps[0]["templateRef"],
-            {"name": "perfeng-release-preflight-v1", "template": "preflight"},
+            {"name": "perfeng-release-preflight-v2", "template": "preflight"},
         )
         self.assertEqual(set(self.templates), {"prepare"})
         self.assertEqual(
@@ -73,7 +73,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         self.assertEqual(
             self.workflow["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"], "1"
         )
-        script = self.children["task-selection"]["spec"]["templates"][0]["script"]["source"]
+        script = str(DIRECTORY / "verifiers-v2/release_runtime_v2.py")
         lock_digest = "sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f"
         selection_args = {
             item["name"]: item["value"] for item in steps[1]["arguments"]["parameters"]
@@ -90,7 +90,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         ):
             with self.subTest(environment=environment, digest=digest):
                 result = subprocess.run(
-                    [sys.executable, "-c", script],
+                    [sys.executable, script, "selection"],
                     env={
                         **os.environ,
                         "PREFLIGHT_RESULT": json.dumps(
@@ -146,9 +146,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
             [item["name"] for item in kustomization["configMapGenerator"]],
             [
                 "perfeng-external-state-scripts-v1",
-                "perfeng-readiness-verifier-v1",
-                "perfeng-quiescence-verifier-v1",
-                "perfeng-adoption-planner-v1",
+                "perfeng-release-verifiers-v2",
             ],
         )
         generator = kustomization["configMapGenerator"][0]
@@ -195,54 +193,6 @@ class ReleaseExternalStateTests(unittest.TestCase):
             lint_lines[0].strip(),
             "argo lint --offline --kinds=workflowtemplates gitops/release-workflows",
         )
-
-    @unittest.skipUnless(os.environ.get("GITHUB_BASE_REF"), "PR-only immutable child check")
-    def test_published_child_and_script_versions_are_not_edited_in_place(self) -> None:
-        base_ref = "origin/" + os.environ["GITHUB_BASE_REF"]
-        base = subprocess.run(
-            ["git", "merge-base", "HEAD", base_ref],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        versioned = [
-            "gitops/release-workflows/release-preflight.yaml",
-            *(
-                "gitops/release-workflows/" + name
-                for name in (
-                    "release-task-selection.yaml",
-                    "prepare-bucket.yaml",
-                    "prepare-database-roles.yaml",
-                    "prepare-execution-registry.yaml",
-                    "scripts/bucket.sh",
-                    "scripts/database-roles.sh",
-                    "observe-release-readiness.yaml",
-                    "verify-release-readiness.yaml",
-                    "release-readiness.yaml",
-                    "scripts/verify-readiness.py",
-                    "release-maintenance-checkpoint.yaml",
-                    "verify-release-quiescence.yaml",
-                    "scripts/verify-quiescence.py",
-                    "plan-release-adoption.yaml",
-                    "adoption-records.yaml",
-                    "release-adopt-existing.yaml",
-                    "scripts/plan-adoption.py",
-                )
-            ),
-        ]
-        for file in versioned:
-            original = subprocess.run(
-                ["git", "show", f"{base}:{file}"], cwd=ROOT, capture_output=True, check=False
-            )
-            if original.returncode:
-                continue  # A new versioned object may be introduced in this PR.
-            current = subprocess.run(
-                ["git", "show", f"HEAD:{file}"], cwd=ROOT, capture_output=True, check=True
-            )
-            self.assertEqual(
-                original.stdout, current.stdout, f"Versioned release object changed: {file}"
-            )
 
     def test_rbac_is_namespaced_for_job_writes(self) -> None:
         self.assertEqual(

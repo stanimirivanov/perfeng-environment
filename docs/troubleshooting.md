@@ -595,3 +595,19 @@ command, prerequisite, healthy signal, failure classification or recovery path.
 New diagnostics default to read-only, use the dedicated kubeconfig and identify
 their exact target. New mutations and destructive operations must be labeled and
 linked to the document that defines their ownership and rollback boundary.
+
+## Staged verifier package upgrade or retirement failure
+
+The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
+remain v1. If a Pod cannot mount the package, inspect the staged Application
+revision and the immutable ConfigMap in `argo-workflows`. Both Python files
+must be present before syncing the v2 child templates and parents. Do not edit
+a published ConfigMap or copy code into a template. See the
+[package upgrade and rollback procedure](release-verifier-package.md).
+
+A source-retirement guard failure requires matching Git revision/content hashes
+and active replacements in `deployments/release-workflow-retirements.json`.
+Changing an existing published file or retirement entry is refused. Make a new
+version; retain old installed objects and in-flight Workflows. A missing v1
+source path in the current checkout does not authorize deleting that resource
+or replaying completed nodes.

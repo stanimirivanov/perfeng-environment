@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "retired": [
+    {
+      "path": "gitops/release-workflows/release-preflight.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "882e845ba54050366acdcb9cc9d465638975bad3e33578426529766a50c598d7",
+      "kubernetesName": "perfeng-release-preflight-v1",
+      "replacedBy": [
+        "gitops/release-workflows/release-preflight-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-task-selection.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "6b61564bffbe25968ef5432edc3fbd30268ee59431a72e924a3e8ee361527910",
+      "kubernetesName": "perfeng-release-task-selection-v1",
+      "replacedBy": [
+        "gitops/release-workflows/release-task-selection-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/verify-release-readiness.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "c4b5ee324f7e1825b1fcb38308bacdbae6bdf6a1698db54a17a46e1970910741",
+      "kubernetesName": "perfeng-verify-release-readiness-v1",
+      "replacedBy": [
+        "gitops/release-workflows/verify-release-readiness-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-readiness.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "9e6118d893500d5038c4264ee73d28f3278e52d6809fe154666858359b37c091",
+      "kubernetesName": "perfeng-release-readiness-v1",
+      "replacedBy": [
+        "gitops/release-workflows/release-readiness-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/verify-release-quiescence.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "ceef10cc0dc9cee53e46dd6f9af51f3f7a6211f3f06dc95ab81ff9e0e7eb177a",
+      "kubernetesName": "perfeng-verify-release-quiescence-v1",
+      "replacedBy": [
+        "gitops/release-workflows/verify-release-quiescence-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-maintenance-checkpoint.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "9b7bdcbcfd844a7ff3cb0deb353d99b304e9a8aeaae0a852522953975062e9b0",
+      "kubernetesName": "perfeng-release-maintenance-checkpoint-v1",
+      "replacedBy": [
+        "gitops/release-workflows/release-maintenance-checkpoint-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/plan-release-adoption.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "b7a70f2724be3545ad05451d459001cc6b01fd025b47246f3802ebd14f15132b",
+      "kubernetesName": "perfeng-plan-release-adoption-v1",
+      "replacedBy": [
+        "gitops/release-workflows/plan-release-adoption-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-adopt-existing.yaml",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "75d2903833a2436f0589b47157e7eb9454fcb7bbb8067c81e9b7fa604508ef4a",
+      "kubernetesName": "perfeng-release-adopt-existing-v1",
+      "replacedBy": [
+        "gitops/release-workflows/release-adopt-existing-v2.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/scripts/verify-readiness.py",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "bdf3e2cce48818f460f91948cc51fe7e8caf0737244468ab7b1cb4c281fcf197",
+      "replacedBy": [
+        "gitops/release-workflows/verifiers-v2/release_policy_v2.py",
+        "gitops/release-workflows/verifiers-v2/release_runtime_v2.py"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/scripts/verify-quiescence.py",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "b9057a4f2f4db2223e942f899aa06853a2ab450b4b9f34b2fbf724d44c926d56",
+      "replacedBy": [
+        "gitops/release-workflows/verifiers-v2/release_policy_v2.py",
+        "gitops/release-workflows/verifiers-v2/release_runtime_v2.py"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/scripts/plan-adoption.py",
+      "sourceRevision": "d79ba1f218f9c17df1b05233e88c33252a6f371b",
+      "sha256": "21739dd7a5c9a366cd3db70b172850f8e761a38d6b7e78a122bcb5f6a154c3be",
+      "replacedBy": [
+        "gitops/release-workflows/verifiers-v2/release_policy_v2.py",
+        "gitops/release-workflows/verifiers-v2/release_runtime_v2.py"
+      ]
+    }
+  ]
+}
