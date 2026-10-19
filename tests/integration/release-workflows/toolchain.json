@@ -1,0 +1,22 @@
+{
+  "kind": {
+    "version": "v0.31.0",
+    "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64",
+    "sha256": "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa"
+  },
+  "kubectl": {
+    "version": "v1.35.0",
+    "url": "https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl",
+    "sha256": "a2e984a18a0c063279d692533031c1eff93a262afcc0afdc517375432d060989"
+  },
+  "argo": {
+    "version": "v4.1.5",
+    "url": "https://github.com/argoproj/argo-workflows/releases/download/v4.1.5/argo-linux-amd64.gz",
+    "checksumFile": ".argo-linux-amd64.sha256"
+  },
+  "workflows": {
+    "version": "v4.1.5",
+    "url": "https://github.com/argoproj/argo-workflows/releases/download/v4.1.5/namespace-install.yaml",
+    "sha256": "02427502f17e98de5fdfb8028523978e86f5481070645d84f991b6d31388bd51"
+  }
+}

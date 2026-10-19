@@ -304,6 +304,12 @@ is a prerequisite budget correction, not operational cutover or retirement
 credit against the original 13 host entrypoints. Pointer advancement and the
 remaining live acceptance/recovery gates are still open.
 
+The [disposable-kind integration gate](../release-workflows-integration.md)
+exercises the unchanged maintenance child with actual Argo execution, package
+mounts and API permissions. Synthetic preflight/Application fixtures make this
+an installed-runtime integration tier, not full release acceptance or evidence
+that a retained environment may switch to the staged workflow.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

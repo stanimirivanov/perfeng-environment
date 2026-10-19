@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-plane
+  namespace: perf-platform
+  labels:
+    app.kubernetes.io/name: perfeng-control-plane
+    app.kubernetes.io/instance: control-plane
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: perfeng-control-plane
+      app.kubernetes.io/instance: control-plane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: perfeng-control-plane
+        app.kubernetes.io/instance: control-plane
+    spec:
+      serviceAccountName: control-plane
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: never-started-fixture
+          image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+          command: [sleep, "600"]
+          resources:
+            requests:
+              cpu: 5m
+              memory: 8Mi
+            limits:
+              cpu: 25m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

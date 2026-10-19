@@ -598,6 +598,17 @@ linked to the document that defines their ownership and rollback boundary.
 
 ## Staged verifier package upgrade or retirement failure
 
+For `release-workflows-kind.yml` failures, use the
+[isolated CI fixture guide](release-workflows-integration.md). The fixture
+requires GitHub-hosted Linux, the default local Docker socket and no existing
+kind cluster; refusal on a local/self-hosted host is expected. Do not redirect
+it to the retained environment or supply an environment credential. A Git
+artifact failure is a fixture failure, not a successful negative assertion:
+negative cases must prove the verifier itself exited with code 2. Inspect only
+the case Workflow/checkpoint JSON and Pod summary. Correct the test or its
+owning template/grant through review, then use a fresh CI run; do not broaden
+production permissions or delete retained resources to fix a fixture.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files
