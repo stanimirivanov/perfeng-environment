@@ -2,8 +2,9 @@
 
 ## TL;DR
 
-- The `release-workflows-kind.yml` CI job exercises unchanged maintenance and
-  native adoption persistence templates on an isolated GitHub-hosted Linux runner.
+- The `release-workflows-kind.yml` CI job exercises unchanged maintenance,
+  adoption persistence and database-role preparation templates on an isolated
+  GitHub-hosted Linux runner.
 - It installs checksum-pinned kind, kubectl, Argo CLI and the official
   namespace-scoped Argo v4.1.5 asset; production selections are unchanged.
 - It checks actual package mounts, Git artifact checkout, authenticated API
@@ -13,6 +14,8 @@
   request delivery, Argo CD reconciliation, migration or deployment parity.
 - Ledger fixture bytes are schema-valid test data, not accepted adoption records
   or promotion authority. Native create-only storage is tested separately.
+- Database parity uses transient PostgreSQL and generated credentials; it does
+  not deploy the production chart, test retained storage or execute migrations.
 - The test refuses local/self-hosted execution. No retained cluster or
   environment credential is used; only non-secret results are uploaded.
 
@@ -42,8 +45,9 @@ pins and compatibility together; production infrastructure locks are independent
 
 The job renders the real staged Kustomize root, extracts only the immutable
 `perfeng-release-verifiers-v2` ConfigMap and
-`perfeng-verify-release-quiescence-v2` and `perfeng-adoption-records-v1`
-WorkflowTemplates, then installs the unchanged maintenance RBAC and its named
+`perfeng-verify-release-quiescence-v2`, `perfeng-adoption-records-v1` and
+`perfeng-prepare-database-roles-v1` WorkflowTemplates, plus the immutable
+`perfeng-external-state-scripts-v1` ConfigMap, then installs the unchanged maintenance RBAC and its named
 Application read grant. No fixture
 copy of the Python package or child template is maintained. The controller
 creates real restricted Pods; their Git artifact is the exact checked-out
@@ -61,7 +65,7 @@ accepted release. No self-referential request commit is created or published.
 Consequently this gate tests the child execution and Kubernetes API boundary,
 including its real Git artifact adapter. It does not test private release-request
 publication/preflight, the full maintenance parent or mutex, production
-Application CRD validation, Argo CD drift/sync, adoption, external-state Jobs,
+Application CRD validation, Argo CD drift/sync, full adoption or external-state parent execution,
 database migration, full health parity or non-local admission.
 
 ## Cases and evidence
@@ -163,6 +167,47 @@ the job-owned kind cluster. Cleanup failure fails an otherwise successful test.
 If a runner is forcibly terminated, GitHub discards the ephemeral host; this is
 not a cleanup/recovery policy for a retained or remote environment.
 
+## Database-role preparation parity
+
+After the maintenance and ledger phases, the same owned cluster installs only
+the production external-state ServiceAccount, Workflow-result/Git-read Role and
+platform Job Role. A step-only fixture calls `perfeng-prepare-database-roles-v1`
+and exposes its actual `job-name` output. The published script ConfigMap and
+child template are unchanged. No reviewed-request preflight is bypassed in a
+production parent: the fixture invokes only this child capability.
+
+A separate restricted PostgreSQL Pod uses the same pinned image as the child
+client and an emptyDir, with a fixture Service at the expected database address.
+This tests SQL operations, not the production chart, PVC retention, backup or
+Argo CD reconciliation. Private fixture files generate the existing admin and
+control-plane Secret shapes without pre-creating either application role.
+Credentials use the production URL/password profile; Secrets are immutable.
+
+| Case | Required behavior |
+|:--|:--|
+| Empty database, first child invocation | Native Job succeeds; both login roles exist with safe attributes, migration CONNECT/CREATE and runtime CONNECT without CREATE. The script verifies both TCP logins. |
+| Same child invoked again | A different retained Job succeeds. Role OIDs, password hashes and complete Secret objects remain unchanged. |
+| Fixture administrator marks runtime role SUPERUSER | Owning Job exits 1 with the exact unsafe-role diagnostic. No role repair or credential rotation occurs. Explicit admin correction followed by a fresh Workflow succeeds. |
+| Administrator changes the existing runtime password | Owning Job exits 1 with runtime password authentication failure. The Job does not reset the password or change a Secret. After explicit admin restoration a fresh Workflow succeeds. |
+| Final evidence inventory | All six successful/failed Jobs retain their original UIDs. Existing role OIDs/privileges and immutable Secrets are preserved. |
+
+An Argo failure alone is insufficient. Refusals require an actual failed Job,
+a terminated `psql` container with exit 1 and the bounded expected diagnostic;
+image, mount, scheduling, executor and transport errors fail the fixture.
+Waits, SQL execs and API operations have explicit bounds. The Workflow identity
+must have actual create/get/watch Job permissions, with Job deletion, Secret
+enumeration/create/patch, workload patching and PVC deletion denied.
+
+Password hashes are compared only in private files, never uploaded. Public
+artifacts include Workflow/Job JSON containing Secret references, non-secret
+role OIDs/privileges, retained Job names and filtered refusal diagnostics.
+Generated passwords and SQL reset commands never enter process arguments or
+uploaded evidence. PostgreSQL generates a new salted hash on explicit password
+restoration, so the final comparison checks all non-password role state; the
+first repeat and each refusal compare the hashes exactly. The private runner
+directory is not an artifact path and is discarded with the ephemeral host,
+including on failure. This fixture is not an operator bootstrap path.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool
@@ -171,7 +216,7 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helpers `ledger.sh` and `recovery.sh` can only be sourced by the isolated
+The helpers `ledger.sh`, `recovery.sh` and `database.sh` can only be sourced by the isolated
 harness with its ownership marker, private kubeconfig and command functions.
 They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are

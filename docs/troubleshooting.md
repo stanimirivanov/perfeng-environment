@@ -630,6 +630,17 @@ exception fails the test. The runner's pure-planner reports use synthetic
 readiness/root status; they are not adoption results or packet-level API-response
 loss evidence. Do not copy these test-only recovery helpers into an operator path.
 
+For database parity failures, inspect `database-*.workflow.json`, the named Job
+JSON, the non-secret role summary and filtered refusal diagnostics. An expected
+unsafe-role/password refusal must have a failed Job and `psql` exit 1; a pending
+Pod, mount/image failure, timeout or controller error cannot count. Compare the
+fresh correction case rather than resuming successful nodes. The fixture admin
+intentionally changes only disposable role state and corrects it explicitly;
+the Job must not repair unsafe attributes or rotate credentials. Never upload
+its private Secret snapshots, password hashes or SQL reset files. This child
+test does not authorize running the host fixture against retained PostgreSQL
+or replacing the supported preparation path.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files

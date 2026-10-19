@@ -1,11 +1,13 @@
 """Keep the live CI fixture isolated from offline checks and retained environments."""
 
 import ast
+import base64
 import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -129,7 +131,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
                     self.assertEqual(required, supplied)
                     seen.add(ref["template"])
         self.assertEqual(seen, {"root", "receipt", "pointer", "create-receipt", "create-pointer"})
-        for script in ("ledger.sh", "recovery.sh"):
+        for script in ("ledger.sh", "recovery.sh", "database.sh"):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
                 ast.parse(python, filename=f"{script} fixture Python {index}")
@@ -139,16 +141,99 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         self.assertIn('a terminate "$interrupted"', source)
         self.assertIn("barrier_deadline=$((SECONDS + 120))", source)
 
+    def test_database_fixture_uses_the_published_child_and_an_isolated_server(self):
+        workflow = yaml.safe_load((FIXTURE / "database-workflow.yaml").read_text())
+        production = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/prepare-database-roles.yaml").read_text()
+        )
+        spec = workflow["spec"]
+        self.assertEqual(spec["serviceAccountName"], "release-external-state")
+        self.assertLessEqual(spec["activeDeadlineSeconds"], 300)
+        self.assertEqual(
+            spec["templates"][0]["steps"],
+            [
+                [
+                    {
+                        "name": "roles",
+                        "templateRef": {"name": production["metadata"]["name"], "template": "run"},
+                    }
+                ]
+            ],
+        )
+        self.assertEqual(set(spec["templates"][0]), {"name", "steps", "outputs"})
+        job = yaml.safe_load(production["spec"]["templates"][0]["resource"]["manifest"])
+        pod = yaml.safe_load((FIXTURE / "postgres-pod.yaml").read_text())
+        self.assertEqual(
+            pod["spec"]["containers"][0]["image"],
+            job["spec"]["template"]["spec"]["containers"][0]["image"],
+        )
+        self.assertFalse(pod["spec"]["automountServiceAccountToken"])
+        self.assertTrue(pod["spec"]["securityContext"]["runAsNonRoot"])
+        self.assertTrue(pod["spec"]["containers"][0]["securityContext"]["readOnlyRootFilesystem"])
+        self.assertTrue(all("emptyDir" in v or "secret" in v for v in pod["spec"]["volumes"]))
+        service = yaml.safe_load((FIXTURE / "postgres-service.yaml").read_text())
+        self.assertEqual(service["metadata"], {"name": "postgres", "namespace": "perf-platform"})
+        self.assertEqual(service["spec"]["selector"], pod["metadata"]["labels"])
+        self.assertIn('source "$source_dir/database.sh"', SCRIPT.read_text())
+
+    def test_database_credentials_are_private_generated_secret_inputs(self):
+        source = (FIXTURE / "database.sh").read_text()
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]
+        with tempfile.TemporaryDirectory() as temporary:
+            result = subprocess.run(
+                [sys.executable, "-", temporary],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            directory = Path(temporary)
+            secrets = json.loads((directory / "database-secrets.json").read_text())["items"]
+            self.assertEqual(
+                {s["metadata"]["name"] for s in secrets},
+                {"perfeng-postgres-auth", "perfeng-control-plane-database"},
+            )
+            for secret in secrets:
+                self.assertTrue(secret["immutable"])
+                self.assertEqual(secret["metadata"]["namespace"], "perf-platform")
+                self.assertEqual(
+                    secret["metadata"]["labels"]["app.kubernetes.io/managed-by"],
+                    "perfeng-environment",
+                )
+            urls = secrets[1]["data"]
+            for key, role in (
+                ("migration-url", "perfeng_migration"),
+                ("runtime-url", "perfeng_runtime"),
+            ):
+                value = base64.b64decode(urls[key]).decode()
+                self.assertRegex(
+                    value,
+                    rf"^postgresql://{role}:[A-Za-z0-9_-]{{43}}@postgres\.perf-platform\.svc\.cluster\.local:5432/perfeng\?sslmode=disable$",
+                )
+            runtime = (
+                base64.b64decode(urls["runtime-url"]).decode().split(":", 2)[2].split("@", 1)[0]
+            )
+            restore = (directory / "database-restore-password.sql").read_text()
+            self.assertIn(runtime, restore)
+            self.assertNotIn(runtime, (directory / "database-break-password.sql").read_text())
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
-        for script in (SCRIPT, FIXTURE / "ledger.sh", FIXTURE / "recovery.sh"):
+        for script in (
+            SCRIPT,
+            FIXTURE / "ledger.sh",
+            FIXTURE / "recovery.sh",
+            FIXTURE / "database.sh",
+        ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
             )
             self.assertEqual(syntax.returncode, 0, syntax.stderr)
             self.assertNotIn(b"\r", script.read_bytes())
-        for script in ("ledger.sh", "recovery.sh"):
+        for script in ("ledger.sh", "recovery.sh", "database.sh"):
             standalone = subprocess.run(
                 [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20
             )

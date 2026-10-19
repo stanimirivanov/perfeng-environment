@@ -19,7 +19,7 @@
 | Supply chain | `make supply-chain` | Check the lock and known vulnerabilities; vulnerability data may require network access. |
 | Complete non-live acceptance | `make validate` | Aggregate verification, rendering, and supply-chain checks; advisory lookup may require network access. |
 | Pinned integration | `make release-selection-check` | Validate exact sibling revisions selected by deployment locks; requires the adjacent repositories and their selected commits. |
-| Disposable-kind release integration | `make release-workflows-integration` | Separate GitHub-hosted Linux CI tier; actual maintenance child and ledger storage operations with synthetic inputs. Refuses local/self-hosted runners and is absent from offline aggregates. See the [fixture guide](../release-workflows-integration.md). |
+| Disposable-kind release integration | `make release-workflows-integration` | Separate GitHub-hosted Linux CI tier; maintenance child, ledger storage/recovery and database-role preparation parity with synthetic inputs. Refuses local/self-hosted runners and is absent from offline aggregates. See the [fixture guide](../release-workflows-integration.md). |
 | Live operation | `task bootstrap`, `task status`, `task smoke`, `task destroy` | Access or mutate the dedicated local environment; follow the operating guides and obtain required authority. |
 
 The metadata-only `pull_request_target` workflow checks a PR's title, leading
