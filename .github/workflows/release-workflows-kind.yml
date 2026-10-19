@@ -22,6 +22,8 @@ on:
       - tests/fixtures/release-request-v1.json
       - tests/integration/release-workflows/**
       - tests/test_release_workflows_integration.py
+      - tests/test_release_adoption.py
+      - tests/release_verifier_support.py
 
 permissions:
   contents: read

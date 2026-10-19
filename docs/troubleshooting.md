@@ -616,8 +616,19 @@ stored winner must remain unchanged. Inspect `ledger-*.workflow.json`, record
 snapshots and filtered conflict/immutability diagnostics in the same artifact.
 Missing-read defaults, unexpected create authority, accepted immutable patches
 or changed/deleted records are failed assertions, not permission to repair a
-retained ledger. The fixture deletes only its labelled Workflows with foreground
-propagation; namespace/records are removed later with its disposable cluster.
+retained ledger. The fixture deletes its labelled Workflows with foreground
+propagation to test retention. After those assertions, its administrator deletes
+and recreates only the test receipt to verify dangling/replaced-UID refusals;
+the adoption identity cannot repair it. All fixture records disappear with the
+owned disposable cluster.
+
+For interrupted-recovery cases, inspect the suspension-barrier and terminated
+Workflow artifacts plus `ledger-recovery-*.json`. The receipt create must have
+succeeded before termination, and a fresh observation must preserve its bytes
+and first-attempt provenance. A missing barrier, timeout or unrelated policy
+exception fails the test. The runner's pure-planner reports use synthetic
+readiness/root status; they are not adoption results or packet-level API-response
+loss evidence. Do not copy these test-only recovery helpers into an operator path.
 
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application

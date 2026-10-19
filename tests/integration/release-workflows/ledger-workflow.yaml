@@ -1,4 +1,4 @@
-# Persistence-layer fixture only: no preflight, readiness or adoption decision.
+# Native storage fixture; recovery policy consumes its observations separately.
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
@@ -22,6 +22,10 @@ spec:
   templates:
     - name: observe
       steps:
+        - - name: root
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: root
         - - name: receipt
             templateRef:
               name: perfeng-adoption-records-v1
@@ -36,6 +40,9 @@ spec:
               template: pointer
       outputs:
         parameters:
+          - name: root
+            valueFrom:
+              parameter: "{{steps.root.outputs.parameters.observation}}"
           - name: receipt
             valueFrom:
               parameter: "{{steps.receipt.outputs.parameters.observation}}"
@@ -56,6 +63,14 @@ spec:
                   value: "{{workflow.parameters.request-b64}}"
                 - name: receipt-b64
                   value: "{{workflow.parameters.receipt-b64}}"
+    - name: receipt-interrupted
+      steps:
+        - - name: write
+            template: receipt-create
+        - - name: barrier
+            template: interruption-barrier
+    - name: interruption-barrier
+      suspend: {}
     - name: pointer-create
       steps:
         - - name: create

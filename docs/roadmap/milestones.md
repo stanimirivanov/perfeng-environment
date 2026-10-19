@@ -316,6 +316,13 @@ uses generated schema-valid bytes rather than an approved Git request or full
 adoption-parent execution. Promotion guards, ambiguous-outcome recovery and
 operational adoption/cutover remain separate requirements.
 
+The CI recovery slice terminates a fixture coordinator after its confirmed
+receipt write, then checks fresh native reads with the unchanged pure adoption
+planner on the runner. Partial/exact retry, changed-root and missing/recreated
+receipt refusals are covered with synthetic readiness/root status. This does
+not establish full-parent recovery or an ambiguous API-response outcome;
+those gates still precede operational use.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

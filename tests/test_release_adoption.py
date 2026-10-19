@@ -5,6 +5,9 @@ import hashlib
 import io
 import json
 import os
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
@@ -124,6 +127,68 @@ class ReleaseAdoptionTests(unittest.TestCase):
         validator = Draft202012Validator(schema["$defs"]["result"])
         validator.validate(complete["result"])
         self.assertFalse(validator.is_valid({**complete["result"], "promoted": True}))
+
+    def test_ci_recovery_reports_require_the_expected_production_policy_decision(self) -> None:
+        source = (ROOT / "tests/integration/release-workflows/recovery.sh").read_text()
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]
+        receipt, pointer = self.records()
+        records = {"root": self.root, "receipt": receipt, "pointer": pointer}
+        payload = base64.b64decode(receipt["binaryData"]["receipt.json"])
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "ledger-request.json").write_bytes(self.raw)
+            (directory / "ledger-receipt.json").write_bytes(payload)
+            for case in (
+                "partial",
+                "complete",
+                "retained",
+                "changed-root",
+                "dangling",
+                "replaced",
+                "unexpected",
+            ):
+                observed, after = deepcopy(records), deepcopy(records)
+                if case == "partial":
+                    observed["pointer"] = None
+                elif case == "changed-root":
+                    after["root"]["metadata"]["resourceVersion"] = "11"
+                elif case == "dangling":
+                    observed["receipt"] = None
+                elif case == "replaced":
+                    observed["receipt"]["metadata"]["uid"] = "recreated-uid"
+                elif case == "unexpected":
+                    observed["receipt"]["metadata"]["labels"] = {}
+                path, fresh = directory / "observed.json", directory / "fresh.json"
+                path.write_text(json.dumps(observed))
+                fresh.write_text(json.dumps(after if case == "changed-root" else observed))
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-",
+                        case if case != "unexpected" else "dangling",
+                        str(path),
+                        temporary,
+                        str(fresh),
+                    ],
+                    input=code,
+                    text=True,
+                    capture_output=True,
+                    cwd=ROOT,
+                    timeout=20,
+                )
+                with self.subTest(case=case):
+                    if case == "unexpected":
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(result.stdout, "")
+                        continue
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    report = json.loads(result.stdout)
+                    self.assertNotIn("result", report)
+                    if case in {"partial", "complete", "retained"}:
+                        self.assertEqual(report["createReceipt"], False)
+                        self.assertEqual(report["createPointer"], case == "partial")
+                    else:
+                        self.assertEqual(report["decision"], "refused")
 
     def test_readiness_request_and_cluster_binding_refuse_before_any_creation(self) -> None:
         for key, value in (
