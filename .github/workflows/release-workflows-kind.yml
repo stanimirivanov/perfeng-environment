@@ -1,0 +1,51 @@
+name: Staged release verifier kind integration
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release-workflows-kind.yml
+      - .argo-linux-amd64.sha256
+      - Makefile
+      - pyproject.toml
+      - uv.lock
+      - deployments/local-control-plane.json
+      - deployments/local-infrastructure.json
+      - deployments/maintenance-checkpoint-v1.schema.json
+      - gitops/release-workflows/**
+      - gitops/release-workflows-bootstrap/maintenance-application-access.yaml
+      - tests/integration/release-workflows/**
+      - tests/test_release_workflows_integration.py
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance-verifier:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.5"
+      - run: uv sync --locked
+      - name: Exercise the unmodified maintenance child on ephemeral kind
+        run: make release-workflows-integration
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Retain only non-secret fixture evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-workflows-kind-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-workflows-results/
+          if-no-files-found: ignore
+          retention-days: 3

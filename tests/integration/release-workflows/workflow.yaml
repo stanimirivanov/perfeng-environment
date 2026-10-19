@@ -1,0 +1,30 @@
+# Synthetic preflight input: this tests the child, not release admission.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: maintenance-ci-
+  namespace: argo-workflows
+spec:
+  serviceAccountName: release-maintenance-checkpoint
+  entrypoint: check
+  activeDeadlineSeconds: 300
+  arguments:
+    parameters:
+      - name: selection-revision
+      - name: preflight-result
+  templates:
+    - name: check
+      steps:
+        - - name: observe
+            templateRef:
+              name: perfeng-verify-release-quiescence-v2
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: "{{workflow.parameters.preflight-result}}"
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: "{{steps.observe.outputs.parameters.result}}"

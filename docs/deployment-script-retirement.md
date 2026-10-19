@@ -168,6 +168,11 @@ and eight embedded selection lines; the full before measurement was 852 lines.
 
 ## Retirement and verification gate
 
+The [disposable-kind verifier integration](release-workflows-integration.md)
+adds only CI test orchestration and fixtures. It changes no production Python
+or supported host task: the active staged package remains two files/708 lines,
+all 13 original host entrypoints remain, and no retirement credit is claimed.
+
 | Measure | Baseline | Exit criterion |
 |:--|--:|:--|
 | Unique deployment Python entrypoint files | 13 | At least 11 deleted; at most 2 residual deployment Python files, including any replacements. |

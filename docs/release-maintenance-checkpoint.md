@@ -46,6 +46,12 @@ Before operational replacement, use an isolated disposable kind fixture to prove
 
 ## Verifier package lifecycle
 
+The separate [kind integration gate](release-workflows-integration.md) exercises
+this unchanged verifier child under the real Argo controller and Kubernetes
+RBAC, including refusal and fresh-attempt recovery. Its synthetic preflight
+and Application fixtures do not satisfy full maintenance-parent, release
+admission or operational-cutover acceptance.
+
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
 Request and result data schemas remain v1. Published v1 source is recoverable
 from the retirement index; installed v1 objects are retained with pruning off.
