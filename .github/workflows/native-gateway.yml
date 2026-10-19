@@ -50,7 +50,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Gateway locks changed during build' }
       - name: Exercise actual isolated Windows TLS startup and shutdown
         run: uv run --locked --offline python -m scripts.native_gateway_smoke --binary .local/gateway-package/caddy.exe --execute
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: verified-windows-gateway
           path: .local/gateway-package/
@@ -86,7 +86,7 @@ jobs:
           $selection = [ordered]@{ schemaVersion = 1; platform = 'windows/amd64'; caddyVersion = $record.caddyVersion; goVersion = $record.goVersion; release = [ordered]@{ tag = $tag; assetId = [long]$assetId; sha256 = $record.sha256; sizeBytes = $record.sizeBytes; sourceRevision = $record.sourceRevision } }
           $selection | ConvertTo-Json -Depth 5 | Set-Content release-selection.json -Encoding utf8NoBOM
           "Verified gateway SHA-256: $($record.sha256)`n`nSource revision: $($record.sourceRevision)`n`nRelease: $tag`n`nDownload the selection artifact, review it, then run python -m scripts.native_gateway_release select --file <path-to-release-selection.json> --execute and commit the lock. No local/cluster/trust state is changed by selection." | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: gateway-release-selection
           path: release-selection.json
