@@ -1,0 +1,72 @@
+# Disposable SQL fixture, not the production PostgreSQL chart or retained storage.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: database-ci-postgres
+  namespace: perf-platform
+  labels:
+    perfeng.io/fixture: database
+spec:
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: postgres
+      image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      env:
+        - name: POSTGRES_DB
+          value: perfeng
+        - name: POSTGRES_PASSWORD_FILE
+          value: /run/postgres-auth/password
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: scram-sha-256
+        - name: POSTGRES_INITDB_ARGS
+          value: --auth-host=scram-sha-256 --auth-local=trust
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+      readinessProbe:
+        exec:
+          # initdb's temporary server accepts only sockets; wait for TCP service.
+          command: [pg_isready, -h, 127.0.0.1, -U, postgres, -d, perfeng]
+        periodSeconds: 2
+        failureThreshold: 60
+      volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: auth
+          mountPath: /run/postgres-auth
+          readOnly: true
+        - name: socket
+          mountPath: /var/run/postgresql
+        - name: tmp
+          mountPath: /tmp
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: data
+      emptyDir: {}
+    - name: auth
+      secret:
+        secretName: perfeng-postgres-auth
+        defaultMode: 0440
+    - name: socket
+      emptyDir: {}
+    - name: tmp
+      emptyDir: {}
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 128Mi

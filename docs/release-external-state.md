@@ -28,3 +28,13 @@ Submit `perfeng-release-external-state-v1` with the four parameters shown in the
 After a failure, inspect the named Job and its Pod events, restore the missing owned credential or correct the external prerequisite through an explicit recovery procedure, then submit a **new** Workflow with the same exact request bytes. A changed request or lock needs review and a new task selection. A failed Job is retained; do not delete it to conceal partial state. A completed Job is also retained for the local pilot, so cleanup/retention policy is an M06 follow-up before shared use.
 
 Offline gates are `make workflow-lint`, `make verify`, `make validate` and `kubectl kustomize gitops/release-workflows`. These do not establish live first-run, repeat or failure acceptance. The existing `task bootstrap` and `task kubernetes:prepare` remain the supported paths until that evidence and the remaining release workflow slices are accepted.
+
+The separate [database-role CI parity fixture](release-workflows-integration.md#database-role-preparation-parity)
+invokes the unchanged native database child against transient PostgreSQL and
+generated immutable Secrets. It checks first/repeat role creation and login
+privileges, retained Job and role identities, unchanged passwords/Secrets,
+unsafe-role and mismatched-login refusal, and fresh execution after explicit
+fixture-admin correction. It does not run this parent or its reviewed-request
+preflight, test bucket/registry preparation, execute schema migrations or prove
+production storage/backup. A successful CI job is child-level parity evidence;
+full release acceptance and host-script retirement remain separate gates.

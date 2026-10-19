@@ -1,0 +1,24 @@
+# Child-level parity only; reviewed-request preflight is a separate gate.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: database-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: database
+spec:
+  serviceAccountName: release-external-state
+  entrypoint: prepare
+  activeDeadlineSeconds: 300
+  templates:
+    - name: prepare
+      steps:
+        - - name: roles
+            templateRef:
+              name: perfeng-prepare-database-roles-v1
+              template: run
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              parameter: '{{steps.roles.outputs.parameters.job-name}}'

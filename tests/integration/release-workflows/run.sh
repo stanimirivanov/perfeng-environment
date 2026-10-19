@@ -57,7 +57,7 @@ for tool in kind kubectl argo; do
   fi
   chmod 700 "$fixture/bin/$tool"
 done
-argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml"
+argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml"
 # Refuse any pre-existing kind cluster; cleanup is armed only after this check.
 clusters=$(kind get clusters)
 [[ -z $clusters ]] || refuse 'pre-existing kind clusters are not owned by this test.'
@@ -76,7 +76,7 @@ k wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 # Select the actual rendered package and child; do not maintain fixture copies.
 k kustomize gitops/release-workflows | uv run --locked --offline python -c '
 import json, sys, yaml
-names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1")}
+names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1")}
 items = [o for o in yaml.safe_load_all(sys.stdin) if (o["kind"], o["metadata"]["name"]) in names]
 assert len(items) == len(names)
 print(json.dumps({"apiVersion": "v1", "kind": "List", "items": items}))
@@ -175,3 +175,4 @@ done
 echo 'Maintenance child integration passed; synthetic input is not release acceptance.'
 # Reuse this exact private cluster/context; the sourced phase has no bootstrap CLI.
 source "$source_dir/ledger.sh"
+source "$source_dir/database.sh"

@@ -323,6 +323,13 @@ receipt refusals are covered with synthetic readiness/root status. This does
 not establish full-parent recovery or an ambiguous API-response outcome;
 those gates still precede operational use.
 
+The same isolated CI tier adds native database-role child parity against
+transient PostgreSQL: first/repeat creation and privilege/login verification,
+stable role/Secret identity, retained Jobs, unsafe-role/password refusal and
+fresh execution after explicit fixture correction. It does not run the complete
+external-state parent or bucket/registry preparation, apply schema migrations,
+prove persistent-storage recovery or retire host scripts.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
