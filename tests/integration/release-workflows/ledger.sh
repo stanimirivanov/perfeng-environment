@@ -59,6 +59,12 @@ ledger_case() {
   ledger_phase=$(jq -r .status.phase "$results/ledger-$case_label.workflow.json")
   if [[ $expected == success || ( $expected == race && $ledger_phase == Succeeded ) ]]; then
     [[ $ledger_rc == 0 && $ledger_phase == Succeeded ]]
+  elif [[ $expected == interrupted ]]; then
+    [[ $ledger_rc != 0 && $ledger_rc != 124 && $ledger_rc != 137 && $ledger_phase == Failed ]]
+    jq -e '.spec.shutdown == "Terminate" and
+      any(.status.nodes[]; .displayName == "create" and .phase == "Succeeded") and
+      ([.status.nodes[].outputs.parameters[]? | select(.name == "result")] | length == 0)' \
+      "$results/ledger-$case_label.workflow.json" > /dev/null
   else
     [[ $expected == conflict || $expected == race ]]
     [[ $ledger_rc != 0 && $ledger_rc != 124 && $ledger_rc != 137 && ( $ledger_phase == Failed || $ledger_phase == Error ) ]]
@@ -74,12 +80,25 @@ snapshot() {
   k -n "$ledger_namespace" get configmap "$receipt_name" perfeng-local-current -o json \
     | jq -S '.items | sort_by(.metadata.name)' > "$1"
 }
+source "$source_dir/recovery.sh"
 ledger_case missing observe success
 observations "$results/ledger-missing.workflow.json" | jq -e '.receipt == null and .pointer == null'
-ledger_case receipt receipt-create success
+# Interrupt after the persisted write, before any coordinator completion result.
+interrupted=$(ledger_submit receipt-interrupted)
+barrier_deadline=$((SECONDS + 120))
+while :; do
+  a get "$interrupted" -o json > "$results/ledger-interruption-barrier.workflow.json"
+  if jq -e 'any(.status.nodes[]?; .type == "Suspend" and .phase == "Running")' \
+    "$results/ledger-interruption-barrier.workflow.json" > /dev/null; then break; fi
+  [[ $SECONDS -lt $barrier_deadline ]] || { echo 'Receipt suspension barrier timed out' >&2; exit 1; }
+  sleep 2
+done
+a terminate "$interrupted"
+ledger_case receipt receipt-interrupted interrupted "$interrupted"
 ledger_case partial observe success
 observations "$results/ledger-partial.workflow.json" > "$fixture/ledger-partial.json"
 jq -e --arg name "$receipt_name" '.receipt.metadata.name == $name and .pointer == null' "$fixture/ledger-partial.json"
+recovery_check partial "$fixture/ledger-partial.json"
 receipt_uid=$(jq -er '.receipt.metadata.uid' "$fixture/ledger-partial.json")
 jq --arg uid "$receipt_uid" '.["receipt-uid"] = $uid' "$fixture/ledger-parameters.json" > "$fixture/ledger-parameters.next"
 mv "$fixture/ledger-parameters.next" "$fixture/ledger-parameters.json"
@@ -94,6 +113,7 @@ if [[ $ledger_phase == Succeeded ]]; then winners=$((winners + 1)); fi
 [[ $winners == 1 ]]
 ledger_case complete observe success
 observations "$results/ledger-complete.workflow.json" > "$results/ledger-complete.records.json"
+recovery_check complete "$results/ledger-complete.records.json"
 uv run --locked --offline python - "$results/ledger-complete.records.json" "$fixture/ledger-parameters.json" \
   "$results/ledger-receipt.workflow.json" <<'PY'
 import json, sys
@@ -145,6 +165,8 @@ ledger_case retained observe success
 observations "$results/ledger-retained.workflow.json" | jq -S . > "$results/ledger-retained.records.json"
 jq -S . "$results/ledger-complete.records.json" > "$fixture/ledger-complete.sorted.json"
 cmp "$fixture/ledger-complete.sorted.json" "$results/ledger-retained.records.json"
+recovery_check retained "$results/ledger-retained.records.json"
+recovery_refusals
 ledger_identity=system:serviceaccount:argo-workflows:release-adoption
 for permission in 'get configmaps perfeng-release-ledger yes' 'create configmaps perfeng-release-ledger yes' \
   'patch configmaps perfeng-release-ledger no' 'delete configmaps perfeng-release-ledger no' \

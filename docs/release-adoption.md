@@ -60,9 +60,14 @@ The separate [kind integration fixture](release-workflows-integration.md#native-
 now exercises the unchanged native storage templates: missing reads, receipt-only
 partial state, competing and repeated creates, exact stored bytes/UID binding,
 immutable-data rejection, denied authority and retention after fixture Workflow
-deletion. Its generated test bytes bypass the parent/planner and are not an
-approved Git request or readiness proof. These persistence assertions do not
-replace full adoption, ambiguous-response recovery or operational cutover gates.
+deletion. A suspension/termination fixture also exercises an interrupted receipt
+write and fresh observations. The unchanged pure planner runs on the CI runner
+against real ledger records plus synthetic readiness/root status, checking
+partial/exact retry and changed-root/dangling/replaced-receipt refusals. It does
+not run the planner container, request adapter or complete adoption parent.
+These test bytes are not an approved Git request or readiness proof; coordinator
+interruption does not simulate loss of the API response. Full adoption,
+ambiguous-response recovery and operational cutover remain separate gates.
 
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 

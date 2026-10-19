@@ -108,9 +108,16 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         self.assertLessEqual(workflow["spec"]["activeDeadlineSeconds"], 240)
         seen = set()
         for template in workflow["spec"]["templates"]:
+            if template["name"] == "interruption-barrier":
+                self.assertEqual(template, {"name": "interruption-barrier", "suspend": {}})
+                continue
             self.assertEqual(set(template) - {"name", "steps", "outputs"}, set())
             for group in template["steps"]:
                 for step in group:
+                    if "template" in step:
+                        self.assertEqual(template["name"], "receipt-interrupted")
+                        self.assertIn(step["template"], {"receipt-create", "interruption-barrier"})
+                        continue
                     ref = step["templateRef"]
                     self.assertEqual(ref["name"], production["metadata"]["name"])
                     operation = operations[ref["template"]]
@@ -121,27 +128,31 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
                     supplied = {p["name"] for p in step.get("arguments", {}).get("parameters", [])}
                     self.assertEqual(required, supplied)
                     seen.add(ref["template"])
-        self.assertEqual(seen, {"receipt", "pointer", "create-receipt", "create-pointer"})
-        source = (FIXTURE / "ledger.sh").read_text()
-        for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
-            ast.parse(python, filename=f"ledger fixture Python {index}")
+        self.assertEqual(seen, {"root", "receipt", "pointer", "create-receipt", "create-pointer"})
+        for script in ("ledger.sh", "recovery.sh"):
+            source = (FIXTURE / script).read_text()
+            for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
+                ast.parse(python, filename=f"{script} fixture Python {index}")
         self.assertIn('source "$source_dir/ledger.sh"', SCRIPT.read_text())
+        source = (FIXTURE / "ledger.sh").read_text()
+        self.assertIn('source "$source_dir/recovery.sh"', source)
+        self.assertIn('a terminate "$interrupted"', source)
+        self.assertIn("barrier_deadline=$((SECONDS + 120))", source)
 
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
-        for script in (SCRIPT, FIXTURE / "ledger.sh"):
+        for script in (SCRIPT, FIXTURE / "ledger.sh", FIXTURE / "recovery.sh"):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
             )
             self.assertEqual(syntax.returncode, 0, syntax.stderr)
             self.assertNotIn(b"\r", script.read_bytes())
-        standalone = subprocess.run(
-            [BASH, (FIXTURE / "ledger.sh").as_posix()],
-            capture_output=True,
-            timeout=20,
-        )
-        self.assertEqual(standalone.returncode, 2, standalone.stderr)
+        for script in ("ledger.sh", "recovery.sh"):
+            standalone = subprocess.run(
+                [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20
+            )
+            self.assertEqual(standalone.returncode, 2, standalone.stderr)
         for authority in (
             {},
             {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "self-hosted", "RUNNER_OS": "Linux"},

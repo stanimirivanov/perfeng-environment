@@ -7,7 +7,8 @@
 - It installs checksum-pinned kind, kubectl, Argo CLI and the official
   namespace-scoped Argo v4.1.5 asset; production selections are unchanged.
 - It checks actual package mounts, Git artifact checkout, authenticated API
-  reads, successful evidence, controlled refusals, create conflicts and retention.
+  reads, successful evidence, controlled refusals, create conflicts, retention
+  and interrupted-coordinator recovery decisions.
 - Applications and preflight input are synthetic. This does not prove release
   request delivery, Argo CD reconciliation, migration or deployment parity.
 - Ledger fixture bytes are schema-valid test data, not accepted adoption records
@@ -86,7 +87,9 @@ do not count as denied authority.
 After maintenance verification, the same isolated cluster installs the production
 ledger namespace/grants and adoption ServiceAccount/RBAC. A step-only fixture
 Workflow references the existing native record operations; it contains no copied
-resource manifests and does not invoke the adoption parent or planner.
+resource manifests and does not invoke the adoption parent. A separate test-only
+adapter calls the unchanged pure adoption planner on the runner with native
+observations; it does not execute the planner's Argo container or request adapter.
 
 The test generates schema-valid request/receipt bytes with current lock digests,
 the actual fixture cluster/Application UIDs and the exact checkout revision. It
@@ -104,15 +107,51 @@ not evidence that the full adoption protocol has succeeded.
 | Fixture administrator attempts receipt-data patch | Kubernetes rejects immutable-data mutation independently of the ServiceAccount's denied patch permission. |
 | Foreground deletion of ledger-fixture Workflows | Both records survive unchanged with no Workflow owner reference, finalizer or Argo CD tracking; a fresh native read returns them. |
 
+### Interrupted coordinator and recovery decisions
+
+The receipt fixture invokes the unchanged native create step, then reaches a
+[suspension barrier](https://argo-workflows.readthedocs.io/en/release-4.0/walk-through/suspending/).
+The harness waits at most 120 seconds for that barrier and
+[terminates](https://argo-workflows.readthedocs.io/en/latest/cli/argo_terminate/)
+the fixture Workflow. The case requires a successful create node, a failed
+terminated Workflow and no adoption-result output. A fresh native observation
+must still read the original receipt and its first-attempt provenance.
+
+The runner calls the production `plan_adoption` predicate with those real
+Kubernetes records and explicitly synthetic readiness fields. The fake root
+Application receives synthetic healthy status because no Argo CD controller is
+installed. These samples exercise policy/storage compatibility, not readiness
+attestation or full-parent recovery.
+
+| Recovery case | Required policy decision |
+|:--|:--|
+| Interrupted after receipt creation, pointer absent | Reuse the receipt; only the absent pointer may be created. |
+| Complete record pair, including after fixture Workflow deletion | Exact retry needs neither create; bytes, first provenance and UID binding are preserved. |
+| Root changes between observations | Refuse the changed root rather than accepting the earlier healthy observation. |
+| Fixture administrator deletes the receipt | Refuse the dangling pointer. |
+| Administrator recreates identical receipt bytes under the same name | Refuse the new receipt UID; leave the pointer unchanged. |
+
+Destructive test setup occurs only in the owned disposable cluster, after the
+separate retention assertions. The adoption identity gains no repair permission.
+Recovery reports contain test decisions, not accepted-release results. Expected
+refusals must come from the production predicate with the specific conflict;
+unrelated exceptions fail the case. The dangling/recreated test states are left
+for cluster teardown, never silently repaired.
+
+The barrier establishes coordinator interruption after a confirmed API write.
+It does not drop a Kubernetes response, prove recovery from an unknown transport
+outcome, or run a complete adoption parent against a reviewed Git request.
+
 The adoption identity must have actual get/create authority in the ledger only,
 with patch/delete and cross-namespace create denied. Workload/Application writes
 and Secret enumeration are also denied. API transport failures cannot satisfy
 these checks. The fixture deliberately has no adoption-parent mutex so competing
 creates exercise the storage boundary itself. It proves neither caller approval,
-planner conflict decisions, full-parent retry behavior nor pointer advancement.
+full-parent retry behavior nor pointer advancement.
 
 The job saves case Workflow JSON, successful checkpoint JSON and a Pod summary
-plus non-secret ledger snapshots and filtered, bounded create-conflict/immutability
+plus non-secret ledger snapshots, recovery decision reports, suspension/termination
+evidence and filtered, bounded create-conflict/immutability
 diagnostics under `release-workflows-results`, retained for three days. It uploads no Secret,
 kubeconfig, node export, controller log or temporary credential file. GitHub's
 read-only token reaches the Git artifact driver through the named temporary
@@ -132,11 +171,12 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helper `ledger.sh` can only be sourced by the isolated harness with its
-ownership marker, private kubeconfig and command functions. It has no separate
-bootstrap or operator entrypoint. Both shell files receive offline syntax checks;
+The helpers `ledger.sh` and `recovery.sh` can only be sourced by the isolated
+harness with its ownership marker, private kubeconfig and command functions.
+They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are
-schema/byte checked during CI execution.
+schema/byte checked during CI execution. Offline tests execute the recovery
+adapter against policy fixtures, including unexpected-refusal rejection.
 
 Inspect the CI job and its case artifacts during explicit review. A successful
 job establishes only the integration boundary above. Do not infer live success
