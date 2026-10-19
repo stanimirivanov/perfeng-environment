@@ -38,3 +38,12 @@ fixture-admin correction. It does not run this parent or its reviewed-request
 preflight, test bucket/registry preparation, execute schema migrations or prove
 production storage/backup. A successful CI job is child-level parity evidence;
 full release acceptance and host-script retirement remain separate gates.
+
+The same tier adds [artifact-bucket child parity](release-workflows-integration.md#artifact-bucket-preparation-parity)
+against transient authenticated SeaweedFS. Explicit 404/403 probes distinguish
+absence from denial; the native denied-credential Job must fail without
+changing Secrets or creating the bucket. After explicit correction of the
+deliberately incorrect fixture credential, fresh first/repeat Jobs preserve
+the bucket, a sentinel object and the good Secrets. This uses a direct internal
+S3 listener and emptyDir, not the production proxy/PVC topology. It does not
+establish full-parent execution, registry parity, backup or operational cutover.

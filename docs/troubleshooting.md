@@ -641,6 +641,18 @@ its private Secret snapshots, password hashes or SQL reset files. This child
 test does not authorize running the host fixture against retained PostgreSQL
 or replacing the supported preparation path.
 
+For bucket parity, inspect `bucket-*.workflow.json`, Job JSON, the fixed probe
+summary, filtered refusal and bucket/object metadata. The observer must prove
+404 with approved credentials and 403 with the denied pair before the native
+refusal case; a network error cannot substitute for those outcomes. The owning
+Job must exit 1 with the non-absence diagnostic and leave the bucket absent.
+Only the fixture administrator replaces the deliberately wrong initial client
+Secret; the new UID is expected, while good Secrets must remain unchanged
+through first/repeat preparation. Never upload private credentials, profile
+files, Secret snapshots or raw auth errors. The direct internal S3 listener is
+not proof of production HAProxy, PVC, network isolation or complete release
+acceptance, and this helper must not run against retained SeaweedFS.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files

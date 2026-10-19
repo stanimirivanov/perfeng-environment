@@ -25,6 +25,7 @@ on:
       - tests/test_release_adoption.py
       - tests/test_release_external_state.py
       - tests/release_verifier_support.py
+      - charts/seaweedfs/values.yaml
 
 permissions:
   contents: read
@@ -46,7 +47,7 @@ jobs:
         with:
           version: "0.12.5"
       - run: uv sync --locked
-      - name: Exercise maintenance, ledger and database boundaries on ephemeral kind
+      - name: Exercise release boundaries on ephemeral kind
         run: make release-workflows-integration
         env:
           GITHUB_TOKEN: ${{ github.token }}

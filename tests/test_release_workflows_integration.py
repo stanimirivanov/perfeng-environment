@@ -2,6 +2,7 @@
 
 import ast
 import base64
+import configparser
 import json
 import os
 import re
@@ -131,7 +132,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
                     self.assertEqual(required, supplied)
                     seen.add(ref["template"])
         self.assertEqual(seen, {"root", "receipt", "pointer", "create-receipt", "create-pointer"})
-        for script in ("ledger.sh", "recovery.sh", "database.sh"):
+        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh"):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
                 ast.parse(python, filename=f"{script} fixture Python {index}")
@@ -219,6 +220,94 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             self.assertIn(runtime, restore)
             self.assertNotIn(runtime, (directory / "database-break-password.sql").read_text())
 
+    def test_bucket_fixture_reuses_the_native_child_and_pinned_s3_images(self):
+        workflow = yaml.safe_load((FIXTURE / "bucket-workflow.yaml").read_text())
+        production = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/prepare-bucket.yaml").read_text()
+        )
+        spec = workflow["spec"]
+        self.assertEqual(spec["serviceAccountName"], "release-external-state")
+        self.assertLessEqual(spec["activeDeadlineSeconds"], 240)
+        self.assertEqual(
+            spec["templates"][0]["steps"][0][0]["templateRef"],
+            {"name": production["metadata"]["name"], "template": "run"},
+        )
+        self.assertEqual(set(spec["templates"][0]), {"name", "steps", "outputs"})
+        job = yaml.safe_load(production["spec"]["templates"][0]["resource"]["manifest"])
+        server = yaml.safe_load((FIXTURE / "seaweedfs-pod.yaml").read_text())
+        observer = yaml.safe_load((FIXTURE / "bucket-observer.yaml").read_text())
+        values = yaml.safe_load((ROOT / "charts/seaweedfs/values.yaml").read_text())
+        self.assertEqual(server["spec"]["containers"][0]["image"], values["image"])
+        self.assertEqual(
+            observer["spec"]["containers"][0]["image"],
+            job["spec"]["template"]["spec"]["containers"][0]["image"],
+        )
+        for pod in (server, observer):
+            self.assertFalse(pod["spec"]["automountServiceAccountToken"])
+            self.assertTrue(pod["spec"]["securityContext"]["runAsNonRoot"])
+            self.assertTrue(
+                pod["spec"]["containers"][0]["securityContext"]["readOnlyRootFilesystem"]
+            )
+            self.assertTrue(
+                all("emptyDir" in volume or "secret" in volume for volume in pod["spec"]["volumes"])
+            )
+        service = yaml.safe_load((FIXTURE / "seaweedfs-service.yaml").read_text())
+        self.assertEqual(service["metadata"], {"name": "seaweedfs", "namespace": "perf-platform"})
+        self.assertEqual(service["spec"]["selector"], server["metadata"]["labels"])
+        self.assertEqual(service["spec"]["ports"][0]["port"], 8333)
+        self.assertIn('source "$source_dir/bucket.sh"', SCRIPT.read_text())
+
+    def test_bucket_profiles_match_private_client_secrets_and_only_approved_server_identity(self):
+        source = (FIXTURE / "bucket.sh").read_text()
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]
+        with tempfile.TemporaryDirectory() as temporary:
+            result = subprocess.run(
+                [sys.executable, "-", temporary],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            directory = Path(temporary)
+            documents = {
+                label: json.loads((directory / f"bucket-{label}.json").read_text())
+                for label in ("server-auth", "client-approved", "client-denied")
+            }
+            for document in documents.values():
+                self.assertTrue(document["immutable"])
+                self.assertEqual(document["metadata"]["namespace"], "perf-platform")
+                self.assertEqual(
+                    document["metadata"]["labels"]["app.kubernetes.io/managed-by"],
+                    "perfeng-environment",
+                )
+            server_data = documents["server-auth"]["data"]
+            profiles = configparser.ConfigParser()
+            profiles.read_string(base64.b64decode(server_data["credentials"]).decode())
+            credentials = []
+            for label, profile in (("approved", "default"), ("denied", "denied")):
+                client = documents[f"client-{label}"]
+                self.assertEqual(client["metadata"]["name"], "perfeng-s3-auth")
+                data = {
+                    key: base64.b64decode(value).decode() for key, value in client["data"].items()
+                }
+                self.assertRegex(data["access-key"], r"^[0-9a-f]{32}$")
+                self.assertRegex(data["secret-key"], r"^[0-9a-f]{64}$")
+                self.assertEqual(profiles[profile]["aws_access_key_id"], data["access-key"])
+                self.assertEqual(profiles[profile]["aws_secret_access_key"], data["secret-key"])
+                credentials.append(
+                    {"accessKey": data["access-key"], "secretKey": data["secret-key"]}
+                )
+                self.assertEqual(
+                    json.loads(data["s3.json"])["identities"][0]["credentials"], [credentials[-1]]
+                )
+            identities = json.loads(base64.b64decode(server_data["s3.json"]))["identities"]
+            self.assertEqual(len(identities), 1)
+            self.assertEqual(identities[0]["credentials"], [credentials[0]])
+            self.assertEqual(identities[0]["actions"], ["Admin", "Read", "Write", "List"])
+            self.assertNotEqual(credentials[0], credentials[1])
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
@@ -227,13 +316,14 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             FIXTURE / "ledger.sh",
             FIXTURE / "recovery.sh",
             FIXTURE / "database.sh",
+            FIXTURE / "bucket.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
             )
             self.assertEqual(syntax.returncode, 0, syntax.stderr)
             self.assertNotIn(b"\r", script.read_bytes())
-        for script in ("ledger.sh", "recovery.sh", "database.sh"):
+        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh"):
             standalone = subprocess.run(
                 [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20
             )
