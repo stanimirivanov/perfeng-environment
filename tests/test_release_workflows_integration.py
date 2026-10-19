@@ -1,5 +1,6 @@
 """Keep the live CI fixture isolated from offline checks and retained environments."""
 
+import ast
 import json
 import os
 import re
@@ -96,11 +97,51 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             ],
         )
 
+    def test_ledger_fixture_reuses_native_operations_without_adding_writes(self):
+        workflow = yaml.safe_load((FIXTURE / "ledger-workflow.yaml").read_text())
+        production = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/adoption-records.yaml").read_text()
+        )
+        operations = {t["name"]: t for t in production["spec"]["templates"]}
+        self.assertEqual(workflow["spec"]["serviceAccountName"], "release-adoption")
+        self.assertEqual(workflow["metadata"]["labels"], {"perfeng.io/fixture": "ledger"})
+        self.assertLessEqual(workflow["spec"]["activeDeadlineSeconds"], 240)
+        seen = set()
+        for template in workflow["spec"]["templates"]:
+            self.assertEqual(set(template) - {"name", "steps", "outputs"}, set())
+            for group in template["steps"]:
+                for step in group:
+                    ref = step["templateRef"]
+                    self.assertEqual(ref["name"], production["metadata"]["name"])
+                    operation = operations[ref["template"]]
+                    self.assertIn(operation["resource"]["action"], {"get", "create"})
+                    required = {
+                        p["name"] for p in operation.get("inputs", {}).get("parameters", [])
+                    }
+                    supplied = {p["name"] for p in step.get("arguments", {}).get("parameters", [])}
+                    self.assertEqual(required, supplied)
+                    seen.add(ref["template"])
+        self.assertEqual(seen, {"receipt", "pointer", "create-receipt", "create-pointer"})
+        source = (FIXTURE / "ledger.sh").read_text()
+        for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
+            ast.parse(python, filename=f"ledger fixture Python {index}")
+        self.assertIn('source "$source_dir/ledger.sh"', SCRIPT.read_text())
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
-        syntax = subprocess.run([BASH, "-n", SCRIPT.as_posix()], capture_output=True, timeout=20)
-        self.assertEqual(syntax.returncode, 0, syntax.stderr)
+        for script in (SCRIPT, FIXTURE / "ledger.sh"):
+            syntax = subprocess.run(
+                [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
+            )
+            self.assertEqual(syntax.returncode, 0, syntax.stderr)
+            self.assertNotIn(b"\r", script.read_bytes())
+        standalone = subprocess.run(
+            [BASH, (FIXTURE / "ledger.sh").as_posix()],
+            capture_output=True,
+            timeout=20,
+        )
+        self.assertEqual(standalone.returncode, 2, standalone.stderr)
         for authority in (
             {},
             {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "self-hosted", "RUNNER_OS": "Linux"},

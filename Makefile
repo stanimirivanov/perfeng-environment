@@ -19,7 +19,7 @@ help:
 	@echo "  make verify     Run the network-independent inner loop"
 	@echo "  make render-check  Validate Helm charts offline"
 	@echo "  make workflow-lint  Lint the staged release WorkflowTemplate offline with Argo v4.1.5"
-	@echo "  make release-workflows-integration  Exercise the maintenance child on isolated GitHub-hosted kind"
+	@echo "  make release-workflows-integration  Exercise maintenance and ledger boundaries on isolated GitHub-hosted kind"
 	@echo "  make native-gateway-check  Adapt the native HTTPS gateway with reviewed Caddy"
 	@echo "  make native-target-image-check  Build and verify an isolated development candidate"
 	@echo "  make release-selection-check  Validate exact adjacent release selections"

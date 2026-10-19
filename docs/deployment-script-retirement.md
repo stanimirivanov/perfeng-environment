@@ -172,6 +172,8 @@ The [disposable-kind verifier integration](release-workflows-integration.md)
 adds only CI test orchestration and fixtures. It changes no production Python
 or supported host task: the active staged package remains two files/708 lines,
 all 13 original host entrypoints remain, and no retirement credit is claimed.
+Its ledger extension also reuses existing native templates without introducing
+production Python or changing the 708-line/two-file residual accounting.
 
 | Measure | Baseline | Exit criterion |
 |:--|--:|:--|

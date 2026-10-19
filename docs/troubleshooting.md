@@ -609,6 +609,16 @@ the case Workflow/checkpoint JSON and Pod summary. Correct the test or its
 owning template/grant through review, then use a fresh CI run; do not broaden
 production permissions or delete retained resources to fix a fixture.
 
+The ledger phase uses generated fixture records and the production native
+create/get templates. A failed Workflow alone does not prove an expected
+conflict: its bounded resource-Pod diagnostic must report AlreadyExists and the
+stored winner must remain unchanged. Inspect `ledger-*.workflow.json`, record
+snapshots and filtered conflict/immutability diagnostics in the same artifact.
+Missing-read defaults, unexpected create authority, accepted immutable patches
+or changed/deleted records are failed assertions, not permission to repair a
+retained ledger. The fixture deletes only its labelled Workflows with foreground
+propagation; namespace/records are removed later with its disposable cluster.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files
