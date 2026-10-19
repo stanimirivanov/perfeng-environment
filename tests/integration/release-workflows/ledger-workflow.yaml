@@ -1,0 +1,74 @@
+# Persistence-layer fixture only: no preflight, readiness or adoption decision.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ledger-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: ledger
+spec:
+  serviceAccountName: release-adoption
+  entrypoint: observe
+  activeDeadlineSeconds: 240
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: name
+      - name: request-b64
+      - name: receipt-b64
+      - name: request-digest
+      - name: cluster-uid
+      - name: receipt-uid
+  templates:
+    - name: observe
+      steps:
+        - - name: receipt
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: "{{workflow.parameters.name}}"
+        - - name: pointer
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: pointer
+      outputs:
+        parameters:
+          - name: receipt
+            valueFrom:
+              parameter: "{{steps.receipt.outputs.parameters.observation}}"
+          - name: pointer
+            valueFrom:
+              parameter: "{{steps.pointer.outputs.parameters.observation}}"
+    - name: receipt-create
+      steps:
+        - - name: create
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: create-receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: "{{workflow.parameters.name}}"
+                - name: request-b64
+                  value: "{{workflow.parameters.request-b64}}"
+                - name: receipt-b64
+                  value: "{{workflow.parameters.receipt-b64}}"
+    - name: pointer-create
+      steps:
+        - - name: create
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: create-pointer
+            arguments:
+              parameters:
+                - name: name
+                  value: "{{workflow.parameters.name}}"
+                - name: request-digest
+                  value: "{{workflow.parameters.request-digest}}"
+                - name: cluster-uid
+                  value: "{{workflow.parameters.cluster-uid}}"
+                - name: receipt-uid
+                  value: "{{workflow.parameters.receipt-uid}}"

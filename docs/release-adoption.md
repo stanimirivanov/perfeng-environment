@@ -56,6 +56,14 @@ Cluster deletion also deletes this ledger. Preserve records outside the cluster 
 
 ## Verification and cutover gate
 
+The separate [kind integration fixture](release-workflows-integration.md#native-ledger-persistence)
+now exercises the unchanged native storage templates: missing reads, receipt-only
+partial state, competing and repeated creates, exact stored bytes/UID binding,
+immutable-data rejection, denied authority and retention after fixture Workflow
+deletion. Its generated test bytes bypass the parent/planner and are not an
+approved Git request or readiness proof. These persistence assertions do not
+replace full adoption, ambiguous-response recovery or operational cutover gates.
+
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.

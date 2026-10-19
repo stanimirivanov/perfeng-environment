@@ -310,6 +310,12 @@ mounts and API permissions. Synthetic preflight/Application fixtures make this
 an installed-runtime integration tier, not full release acceptance or evidence
 that a retained environment may switch to the staged workflow.
 
+The same gate also exercises native adoption-ledger reads, immutable writes,
+competing create conflicts and retention after fixture Workflow deletion. It
+uses generated schema-valid bytes rather than an approved Git request or full
+adoption-parent execution. Promotion guards, ambiguous-outcome recovery and
+operational adoption/cutover remain separate requirements.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
