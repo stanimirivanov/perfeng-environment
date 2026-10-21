@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: observer-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: observer
+spec:
+  serviceAccountName: release-readiness
+  entrypoint: observe
+  activeDeadlineSeconds: 600
+  templates:
+    - name: observe
+      steps:
+        - - name: postgres
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: postgres
+        - - name: seaweedfs
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: seaweedfs
+        - - name: application
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: application
+        - - name: deployment
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: deployment
+        - - name: service
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: service
+      outputs:
+        parameters:
+          - name: application
+            valueFrom:
+              parameter: '{{steps.application.outputs.parameters.observation}}'
+          - name: postgres
+            valueFrom:
+              parameter: '{{steps.postgres.outputs.parameters.observation}}'
+          - name: seaweedfs
+            valueFrom:
+              parameter: '{{steps.seaweedfs.outputs.parameters.observation}}'
+          - name: deployment
+            valueFrom:
+              parameter: '{{steps.deployment.outputs.parameters.observation}}'
+          - name: service
+            valueFrom:
+              parameter: '{{steps.service.outputs.parameters.observation}}'
+    - name: deployment
+      steps:
+        - - name: deployment
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: deployment
+      outputs:
+        parameters:
+          - name: deployment
+            valueFrom:
+              parameter: '{{steps.deployment.outputs.parameters.observation}}'

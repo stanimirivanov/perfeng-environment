@@ -53,9 +53,19 @@ Service exercises first/repeat success, image refusal before any HTTP request,
 503, redirect and invalid metrics refusal, then a fresh corrected execution.
 Exact verifier exit/refusal, absent failure output, request counts, retained
 Workflow identities and denied mutation/exec authority are required.
-This establishes installed verifier/HTTP parity only. Native resource
-observation, full reviewed-request parent execution and actual control-plane
-health still require separate acceptance before host-path retirement.
+This establishes installed verifier/HTTP parity only. Native observation is
+covered separately below. Full reviewed-request parent execution and actual
+control-plane health still require acceptance before host-path retirement.
+
+The same CI tier also exercises the unchanged
+[native resource observer](release-workflows-integration.md#native-readiness-resource-observation)
+against Kubernetes-managed synthetic sleeper workloads, the fixture Service
+and administered Application status. It checks repeat projections against API
+snapshots, degraded/forbidden refusal, fresh correction and a paused Deployment
+whose native wait completes only after explicit scale-up. Resource and Workflow
+UIDs remain stable/retained. This adds installed observer parity; real workload
+health, Argo CD reconciliation and full reviewed-request parent acceptance
+remain open.
 
 ## Verifier package lifecycle
 
