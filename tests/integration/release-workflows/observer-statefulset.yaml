@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: observer-ci-placeholder
+  namespace: perf-platform
+  labels:
+    perfeng.io/fixture: observer
+spec:
+  serviceName: observer-ci-placeholder
+  replicas: 1
+  selector:
+    matchLabels:
+      perfeng.io/observer-workload: observer-ci-placeholder
+  template:
+    metadata:
+      labels:
+        perfeng.io/observer-workload: observer-ci-placeholder
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: synthetic-sleeper
+          image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+          command: [sleep, "600"]
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {cpu: 25m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

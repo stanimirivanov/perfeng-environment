@@ -20,6 +20,7 @@ on:
       - gitops/release-workflows-bootstrap/ledger-namespace.yaml
       - gitops/release-workflows-bootstrap/ledger-access.yaml
       - gitops/release-workflows-bootstrap/adoption-application-access.yaml
+      - gitops/release-workflows-bootstrap/readiness-application-access.yaml
       - tests/fixtures/release-request-v1.json
       - tests/fixtures/release-readiness-observations.json
       - tests/fixtures/readiness-refused-workflow.json

@@ -695,6 +695,18 @@ retain an output parameter's `valueFrom` declaration without publishing a
 materialized `result.value`, including empty/null values, while retaining the
 exit-code, exact-refusal and probe-count requirements.
 
+For native observer CI, inspect `observer-*.workflow.json`, observation JSON and
+constant refusal/pending markers. Degraded status must fail at the Application
+resource's evaluated condition. Missing read access must produce Forbidden for
+`release-readiness` on `applications`; an arbitrary failed Pod is insufficient.
+Only fixture administration restores its disposable RoleBinding/status. The
+paused Deployment case requires a logged false condition and a still-running
+Workflow before scaling up; missing evidence fails after a bounded wait. Check
+executor startup and native condition logs privately rather than shortening
+the assertions or scaling early. Preserve resource UIDs and use a fresh Workflow
+for refused cases. These synthetic workloads/status do not prove real services
+healthy, and raw executor logs/API snapshots must remain outside artifacts.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files

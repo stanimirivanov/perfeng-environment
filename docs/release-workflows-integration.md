@@ -353,9 +353,50 @@ output's `valueFrom` path on failure; the absence check rejects a materialized
 Correct prerequisites through
 their owner and submit a fresh Workflow; the verifier repairs nothing.
 
-The production package remains two files/708 lines. Full readiness-parent and
-native resource-observer acceptance, real service health, M04 recovery,
-promotion and script retirement remain open.
+The production package remains two files/708 lines. Native observation is
+covered separately below. Full readiness-parent acceptance, real service health,
+M04 recovery, promotion and script retirement remain open.
+
+## Native readiness resource observation
+
+After HTTP parity, `observer.sh` invokes the unchanged
+`perfeng-observe-release-readiness-v1` resource templates using
+`release-readiness`. Real Deployment and StatefulSet controllers manage pinned
+synthetic sleeper Pods. Their names match the observer's fixed read contract;
+the two StatefulSets have distinct fixture selectors and no PVCs. The existing
+fixture Service remains separate from those sleepers. Application status is
+explicitly administered on the minimal test CRD, which has no Argo CD controller
+or status subresource.
+
+The step-only wrapper collects both StatefulSets, Application, Deployment and
+Service through native GET operations and their production success/failure
+conditions. First/repeat observations must be identical. Their UIDs, names,
+generations, rollout/revision fields, image and source/configuration references
+are checked against fresh native API snapshots. This tests the observer's
+installed resource polling and jq projections; synthetic workload readiness and
+Application status do not establish actual service health or reconciliation.
+
+| Case | Required behavior |
+|:--|:--|
+| First/repeat observation | Five successful projections match native identities/controller state, with stable output. |
+| Degraded Application | Owning Application resource step fails with its evaluated failure condition; no finalized observation set. |
+| Revoked Application read | Fixture administrator removes only the disposable RoleBinding; owning step fails with API Forbidden evidence for the readiness identity. |
+| Explicit correction | Administrator restores healthy status/read binding; a new Workflow observes the original resource UIDs successfully. |
+| Pending Deployment | With zero replicas, require an executor log recording an evaluated false native condition and a still-running Workflow. Only then scale up explicitly; the same Workflow completes with fresh generation and unchanged Deployment UID. |
+
+The existing named-read identity cannot list/watch observed resources, patch
+workloads or Applications, or create Jobs/Secrets. Fixture administration alone
+changes status, scale or its test RoleBinding. All six Workflow UIDs and the
+observed resource UIDs are retained until owned-cluster teardown. Raw worker
+logs and private native snapshots stay outside artifacts; artifacts contain
+Workflow/projection JSON and constant refusal/pending markers. An unrelated
+controller, image, transport or timeout error cannot satisfy an expected
+refusal. The pending evidence loop is bounded CI observation of the native
+executor, not a production readiness loop.
+
+Full reviewed-request/preflight and readiness-parent execution, actual workload
+health, Argo CD reconciliation, promotion and host-script retirement remain
+separate. Production verifier code remains two files/708 physical lines.
 
 ## Verification and remaining gates
 
@@ -365,7 +406,7 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh`, `registry.sh` and `readiness.sh` can only be sourced by the isolated
+The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh`, `registry.sh`, `readiness.sh` and `observer.sh` can only be sourced by the isolated
 harness with its ownership marker, private kubeconfig and command functions.
 They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are

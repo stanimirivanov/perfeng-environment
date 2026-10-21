@@ -353,6 +353,15 @@ invalid-metrics refusal and restricted authority are checked in disposable kind.
 This does not establish native resource-observer or full readiness-parent
 execution, actual control-plane health, promotion or host-script retirement.
 
+Native readiness-observer parity adds real Deployment/StatefulSet controller
+state for synthetic sleepers, a fixture Service and explicitly administered
+Application status. The unchanged Argo resource children collect first/repeat
+projections, reject degraded status and revoked named-read access, recover after
+fixture correction and complete a pending Deployment wait after explicit
+scale-up. API snapshots and retained UIDs bound this installed-observer proof.
+Actual workload health, Argo CD reconciliation, full reviewed-request parent
+acceptance, promotion and host-script retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

@@ -140,6 +140,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "bucket.sh",
             "registry.sh",
             "readiness.sh",
+            "observer.sh",
         ):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
@@ -507,6 +508,107 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
         self.assertEqual(service["spec"]["ports"][0]["port"], 8080)
         self.assertIn('source "$source_dir/readiness.sh"', SCRIPT.read_text())
 
+    def test_observer_fixture_reuses_every_native_operation_without_copying_resources(self):
+        workflow = yaml.safe_load((FIXTURE / "observer-workflow.yaml").read_text())
+        child = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/observe-release-readiness.yaml").read_text()
+        )
+        operations = {t["name"]: t for t in child["spec"]["templates"]}
+        spec = workflow["spec"]
+        self.assertEqual(spec["serviceAccountName"], "release-readiness")
+        self.assertEqual(spec["activeDeadlineSeconds"], 600)
+        seen = []
+        for template in spec["templates"]:
+            self.assertEqual(set(template), {"name", "steps", "outputs"})
+            for group in template["steps"]:
+                for step in group:
+                    ref = step["templateRef"]
+                    self.assertEqual(ref["name"], child["metadata"]["name"])
+                    operation = operations[ref["template"]]
+                    self.assertEqual(operation["resource"]["action"], "get")
+                    required = {
+                        p["name"] for p in operation.get("inputs", {}).get("parameters", [])
+                    }
+                    arguments = step.get("arguments", {}).get("parameters", [])
+                    self.assertEqual({p["name"] for p in arguments}, required)
+                    seen.append((step["name"], ref["template"]))
+        self.assertEqual(
+            seen,
+            [
+                ("postgres", "statefulset"),
+                ("seaweedfs", "statefulset"),
+                ("application", "application"),
+                ("deployment", "deployment"),
+                ("service", "service"),
+                ("deployment", "deployment"),
+            ],
+        )
+        source = SCRIPT.read_text()
+        self.assertLess(
+            source.index('source "$source_dir/readiness.sh"'),
+            source.index('source "$source_dir/observer.sh"'),
+        )
+
+    def test_observer_statefulset_adapter_keeps_synthetic_workloads_distinct_and_pinned(self):
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", (FIXTURE / "observer.sh").read_text(), re.S)[0]
+        expected = yaml.safe_load((FIXTURE / "deployment.yaml").read_text())["spec"]["template"][
+            "spec"
+        ]["containers"][0]["image"]
+        for name in ("postgres", "seaweedfs", "foreign"):
+            result = subprocess.run(
+                [sys.executable, "-", str(FIXTURE / "observer-statefulset.yaml"), name],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            if name == "foreign":
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+                continue
+            self.assertEqual(result.returncode, 0, result.stderr)
+            value = json.loads(result.stdout)
+            self.assertEqual(value["metadata"]["name"], name)
+            self.assertEqual(value["spec"]["serviceName"], name)
+            pod = value["spec"]["template"]
+            self.assertEqual(pod["metadata"]["labels"], {"perfeng.io/observer-workload": name})
+            self.assertEqual(value["spec"]["selector"]["matchLabels"], pod["metadata"]["labels"])
+            self.assertEqual(pod["spec"]["containers"][0]["image"], expected)
+            self.assertFalse(pod["spec"]["automountServiceAccountToken"])
+            self.assertTrue(pod["spec"]["securityContext"]["runAsNonRoot"])
+            self.assertTrue(
+                pod["spec"]["containers"][0]["securityContext"]["readOnlyRootFilesystem"]
+            )
+            self.assertNotIn("volumeClaimTemplates", value["spec"])
+
+    @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks pending-condition evidence")
+    def test_observer_pending_gate_requires_an_evaluated_false_native_condition(self):
+        source = (FIXTURE / "observer.sh").read_text()
+        function = re.search(r"^observer_pending_seen\(\) \{\n.*?^\}", source, re.M | re.S)
+        assert function is not None and BASH is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "resource.log"
+            for log, expected in (
+                (
+                    'msg="success condition evaluated" condition="spec.replicas = 1" matched=false',
+                    0,
+                ),
+                ('{"matched":false,"msg":"success condition evaluated"}', 0),
+                ('msg="success condition evaluated" matched=true', 1),
+                ('msg="Waiting for conditions" unrelated=false', 1),
+                ('msg="other event" matched=false', 1),
+            ):
+                with self.subTest(log=log):
+                    path.write_text(log)
+                    result = subprocess.run(
+                        [BASH, "-s", "--", path.as_posix()],
+                        input=function[0] + '\nobserver_pending_seen "$1"\n',
+                        text=True,
+                        capture_output=True,
+                        timeout=20,
+                    )
+                    self.assertEqual(result.returncode, expected, result.stderr)
+
     @unittest.skipIf(
         os.name == "nt" and shutil.which("jq") is None,
         "jq unavailable on Windows; Linux CI checks the native predicate",
@@ -552,6 +654,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "bucket.sh",
             FIXTURE / "registry.sh",
             FIXTURE / "readiness.sh",
+            FIXTURE / "observer.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
@@ -565,6 +668,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             "bucket.sh",
             "registry.sh",
             "readiness.sh",
+            "observer.sh",
         ):
             standalone = subprocess.run(
                 [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20
