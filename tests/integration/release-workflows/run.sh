@@ -31,7 +31,7 @@ finish() {
     cleanup_rc=$?
     if [[ $rc == 0 && $cleanup_rc != 0 ]]; then rc=$cleanup_rc; fi
   fi
-  rm -f "$fixture/token" "$fixture/username"
+  rm -f "$fixture/token" "$fixture/username" "$fixture/registry-approved.secret.json" "$fixture/registry-denied.secret.json"
   exit "$rc"
 }
 trap finish EXIT
@@ -57,7 +57,7 @@ for tool in kind kubectl argo; do
   fi
   chmod 700 "$fixture/bin/$tool"
 done
-argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml" "$source_dir/bucket-workflow.yaml"
+argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml" "$source_dir/bucket-workflow.yaml" "$source_dir/registry-workflow.yaml"
 # Refuse any pre-existing kind cluster; cleanup is armed only after this check.
 clusters=$(kind get clusters)
 [[ -z $clusters ]] || refuse 'pre-existing kind clusters are not owned by this test.'
@@ -76,7 +76,7 @@ k wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 # Select the actual rendered package and child; do not maintain fixture copies.
 k kustomize gitops/release-workflows | uv run --locked --offline python -c '
 import json, sys, yaml
-names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1")}
+names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1"), ("WorkflowTemplate", "perfeng-prepare-execution-registry-v1")}
 items = [o for o in yaml.safe_load_all(sys.stdin) if (o["kind"], o["metadata"]["name"]) in names]
 assert len(items) == len(names)
 print(json.dumps({"apiVersion": "v1", "kind": "List", "items": items}))
@@ -87,6 +87,8 @@ printf '%s' x-access-token > "$fixture/username"
 printf '%s' "$GITHUB_TOKEN" > "$fixture/token"
 k -n argo-workflows create secret generic release-git-read \
   --from-file="username=$fixture/username" --from-file="password=$fixture/token"
+source "$source_dir/registry.sh"
+registry_credentials
 rm -f "$fixture/token" "$fixture/username"
 unset GITHUB_TOKEN
 for application in gitops/bootstrap/local-root-application.yaml gitops/environments/local/control-plane-application.yaml; do
@@ -177,3 +179,4 @@ echo 'Maintenance child integration passed; synthetic input is not release accep
 source "$source_dir/ledger.sh"
 source "$source_dir/database.sh"
 source "$source_dir/bucket.sh"
+registry_cases

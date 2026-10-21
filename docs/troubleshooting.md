@@ -663,6 +663,23 @@ failure status preserved. An empty diagnostic file does not establish the cause;
 other S3 failures still require investigation. Do not upload raw server logs or
 relax the sentinel write/retention assertions.
 
+For registry CI, inspect `registry-*.workflow.json`, Job JSON, digest evidence
+and `registry-*.exit-codes.json` plus per-worker signal categories. Categories
+cover authorization (including lowercase denials), missing manifests, TLS,
+network and command errors. `unclassified` means the bounded private log did
+not match a known category; it does not establish a package-access problem.
+Only constant category names are published, never raw error context.
+A first-access authorization signal requires checking
+the package's **Manage Actions access** repository **Read** grant as well as the
+job's `packages: read`; a successful Git checkout does not establish package
+authorization. Confirm exact selected references and connectivity too. The
+fixture does not alter package settings or host credentials. Do not upload raw
+worker logs, token files or encoded Docker-config Secret snapshots. Denial must
+come from the owning Job with a failed kube-burner worker and a specific auth
+signal, not arbitrary image/controller/network failure. Only fixture admin
+corrects the deliberately invalid test Secret before a fresh Workflow. Digest
+access is not proof of layer downloads or complete manifest-byte validation.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files

@@ -1,0 +1,24 @@
+# Native manifest-access child only; no release admission or layer download claim.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: registry-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: registry
+spec:
+  serviceAccountName: release-external-state
+  entrypoint: verify
+  activeDeadlineSeconds: 300
+  templates:
+    - name: verify
+      steps:
+        - - name: registry
+            templateRef:
+              name: perfeng-prepare-execution-registry-v1
+              template: run
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              parameter: '{{steps.registry.outputs.parameters.job-name}}'
