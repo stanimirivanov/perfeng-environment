@@ -507,6 +507,40 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
         self.assertEqual(service["spec"]["ports"][0]["port"], 8080)
         self.assertIn('source "$source_dir/readiness.sh"', SCRIPT.read_text())
 
+    @unittest.skipIf(
+        os.name == "nt" and shutil.which("jq") is None,
+        "jq unavailable on Windows; Linux CI checks the native predicate",
+    )
+    def test_readiness_refusal_allows_unresolved_declaration_but_rejects_any_result_value(self):
+        jq = shutil.which("jq")
+        self.assertIsNotNone(jq, "Linux CI requires jq for its native Workflow status checks")
+        assert jq is not None
+        source = (FIXTURE / "readiness.sh").read_text()
+        predicate = next(
+            expression
+            for expression in re.findall(r"jq -e '([^']+)'", source)
+            if ".status.nodes" in expression and ".outputs.parameters" in expression
+        )
+        fixture = json.loads((ROOT / "tests/fixtures/readiness-refused-workflow.json").read_text())
+        variants = [(fixture, 0)]
+        for node in ("readiness-ci-refused", "readiness-ci-refused-child"):
+            for value in (None, "", "{}", '{"status":"readiness-verified"}'):
+                changed = json.loads(json.dumps(fixture))
+                changed["status"]["nodes"][node]["outputs"] = {
+                    "parameters": [{"name": "result", "value": value}]
+                }
+                variants.append((changed, 1))
+        for workflow, expected in variants:
+            with self.subTest(workflow=workflow):
+                result = subprocess.run(
+                    [jq, "-e", predicate],
+                    input=json.dumps(workflow),
+                    text=True,
+                    capture_output=True,
+                    timeout=20,
+                )
+                self.assertEqual(result.returncode, expected, result.stderr)
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None

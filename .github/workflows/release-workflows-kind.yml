@@ -22,6 +22,7 @@ on:
       - gitops/release-workflows-bootstrap/adoption-application-access.yaml
       - tests/fixtures/release-request-v1.json
       - tests/fixtures/release-readiness-observations.json
+      - tests/fixtures/readiness-refused-workflow.json
       - tests/integration/release-workflows/**
       - tests/test_release_workflows_integration.py
       - tests/test_readiness_http_fixture.py

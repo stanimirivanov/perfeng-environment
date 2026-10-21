@@ -77,7 +77,8 @@ PY
       "$results/readiness-$readiness_label.workflow.json" > /dev/null
     jq -e '[.items[].status.containerStatuses[]? | select(.name == "main")] |
       length == 1 and .[0].state.terminated.exitCode == 2' "$fixture/readiness-pods.json" > /dev/null
-    jq -e '[.status.nodes[] | .outputs.parameters[]? | select(.name == "result")] | length == 0' \
+    # Argo retains valueFrom declarations after failure; only a value is output.
+    jq -e '[.status.nodes[] | .outputs.parameters[]? | select(.name == "result" and has("value"))] | length == 0' \
       "$results/readiness-$readiness_label.workflow.json" > /dev/null
     k -n argo-workflows logs -l "workflows.argoproj.io/workflow=$readiness_workflow" \
       -c main --tail=20 --limit-bytes=8192 > "$fixture/readiness-worker.log"

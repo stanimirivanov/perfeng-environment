@@ -347,7 +347,10 @@ Artifacts include Workflow/result JSON, constant refusal lines and endpoint
 counts. Raw worker logs, Git credential context and HTTP response bodies are
 excluded. Negative cases require exit 2 from the verifier's main container and
 the exact owning refusal; Git checkout, image pull, controller and timeout
-failures cannot count as an expected rejection. Correct prerequisites through
+failures cannot count as an expected rejection. Argo may retain the declared
+output's `valueFrom` path on failure; the absence check rejects a materialized
+`result.value` at any node, including empty/null, rather than the declaration.
+Correct prerequisites through
 their owner and submit a fresh Workflow; the verifier repairs nothing.
 
 The production package remains two files/708 lines. Full readiness-parent and
