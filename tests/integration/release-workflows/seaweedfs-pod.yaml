@@ -1,0 +1,67 @@
+# Transient S3 fixture: no production HAProxy, PVC or reconciliation acceptance.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bucket-ci-seaweedfs
+  namespace: perf-platform
+  labels:
+    perfeng.io/fixture: bucket-server
+spec:
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: seaweedfs
+      image: chrislusf/seaweedfs:4.45@sha256:fc9f76fa993ad69966ffeb2f65d0318fcae39c6f8e20cf68ef7b3a5cb97769e5
+      command: [/bin/sh, -ec]
+      args:
+        - |
+          mkdir -p /data/master /data/volumes
+          exec /usr/bin/weed -logtostderr=true server \
+            -ip=127.0.0.1 -ip.bind=127.0.0.1 \
+            -dir=/data/volumes -master.dir=/data/master \
+            -master.volumeSizeLimitMB=128 -volume.max=16 \
+            -master.telemetry=false -filer=true -s3=true \
+            -s3.ip.bind=0.0.0.0 -s3.port=8333 \
+            -s3.config=/run/bucket-auth/s3.json -s3.iam=false \
+            -s3.port.iceberg=0 -s3.port.lance=0 \
+            -s3.allowDeleteBucketNotEmpty=false -s3.autoCreateBucket=false
+      workingDir: /data
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: "1", memory: 1Gi}
+      readinessProbe:
+        tcpSocket:
+          port: 8333
+        periodSeconds: 2
+        failureThreshold: 60
+      volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: auth
+          mountPath: /run/bucket-auth
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: data
+      emptyDir: {}
+    - name: auth
+      secret:
+        secretName: bucket-ci-auth
+        defaultMode: 0440
+        items:
+          - key: s3.json
+            path: s3.json
+    - name: tmp
+      emptyDir: {}

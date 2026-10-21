@@ -330,6 +330,13 @@ fresh execution after explicit fixture correction. It does not run the complete
 external-state parent or bucket/registry preparation, apply schema migrations,
 prove persistent-storage recovery or retire host scripts.
 
+Native bucket-child parity adds first/repeat preparation against authenticated
+transient SeaweedFS, preserved bucket/object/Secret state and denied-credential
+refusal after explicit 404/403 probes. Only the fixture administrator corrects
+its deliberately wrong initial credential. Direct internal S3/emptyDir does not
+prove production proxy/storage behavior. Registry and full-parent release
+acceptance, migration and operational cutover remain separate gates.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

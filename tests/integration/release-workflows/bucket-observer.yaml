@@ -1,0 +1,69 @@
+# Fixture administration only; the release identity does not receive this Pod's exec rights.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bucket-ci-observer
+  namespace: perf-platform
+  labels:
+    perfeng.io/fixture: bucket-observer
+spec:
+  automountServiceAccountToken: false
+  activeDeadlineSeconds: 900
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: aws
+      image: amazon/aws-cli:2.36.37@sha256:be6228bd99b4b0b9787543952aebfe93c66b5503121b68a724647c523c957a9d
+      command: [/bin/sh, -ec]
+      args:
+        - |
+          printf '[default]\ns3 =\n    addressing_style = path\n[profile denied]\ns3 =\n    addressing_style = path\n' > /tmp/awsconfig
+          sleep 900
+      env:
+        - name: HOME
+          value: /tmp
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: /run/bucket-auth/credentials
+        - name: AWS_CONFIG_FILE
+          value: /tmp/awsconfig
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+        - name: AWS_EC2_METADATA_DISABLED
+          value: 'true'
+        - name: AWS_PAGER
+          value: ''
+        - name: AWS_MAX_ATTEMPTS
+          value: '2'
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      resources:
+        requests: {cpu: 25m, memory: 64Mi}
+        limits: {cpu: 200m, memory: 256Mi}
+      readinessProbe:
+        exec:
+          command: [/bin/sh, -ec, 'test -s /tmp/awsconfig']
+        periodSeconds: 2
+      volumeMounts:
+        - name: auth
+          mountPath: /run/bucket-auth
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: auth
+      secret:
+        secretName: bucket-ci-auth
+        defaultMode: 0440
+        items:
+          - key: credentials
+            path: credentials
+    - name: tmp
+      emptyDir: {}

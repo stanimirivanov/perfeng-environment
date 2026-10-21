@@ -3,7 +3,7 @@
 ## TL;DR
 
 - The `release-workflows-kind.yml` CI job exercises unchanged maintenance,
-  adoption persistence and database-role preparation templates on an isolated
+  adoption persistence, database-role and bucket preparation templates on an isolated
   GitHub-hosted Linux runner.
 - It installs checksum-pinned kind, kubectl, Argo CLI and the official
   namespace-scoped Argo v4.1.5 asset; production selections are unchanged.
@@ -14,8 +14,9 @@
   request delivery, Argo CD reconciliation, migration or deployment parity.
 - Ledger fixture bytes are schema-valid test data, not accepted adoption records
   or promotion authority. Native create-only storage is tested separately.
-- Database parity uses transient PostgreSQL and generated credentials; it does
-  not deploy the production chart, test retained storage or execute migrations.
+- Database/bucket parity uses transient PostgreSQL/SeaweedFS and generated
+  credentials; it does not deploy production charts, test retained storage,
+  prove the production S3 proxy boundary or execute migrations.
 - The test refuses local/self-hosted execution. No retained cluster or
   environment credential is used; only non-secret results are uploaded.
 
@@ -46,7 +47,8 @@ pins and compatibility together; production infrastructure locks are independent
 The job renders the real staged Kustomize root, extracts only the immutable
 `perfeng-release-verifiers-v2` ConfigMap and
 `perfeng-verify-release-quiescence-v2`, `perfeng-adoption-records-v1` and
-`perfeng-prepare-database-roles-v1` WorkflowTemplates, plus the immutable
+`perfeng-prepare-database-roles-v1` and `perfeng-prepare-bucket-v1`
+WorkflowTemplates, plus the immutable
 `perfeng-external-state-scripts-v1` ConfigMap, then installs the unchanged maintenance RBAC and its named
 Application read grant. No fixture
 copy of the Python package or child template is maintained. The controller
@@ -208,6 +210,62 @@ first repeat and each refusal compare the hashes exactly. The private runner
 directory is not an artifact path and is discarded with the ephemeral host,
 including on failure. This fixture is not an operator bootstrap path.
 
+## Artifact-bucket preparation parity
+
+The next phase installs the unchanged `perfeng-prepare-bucket-v1` child from
+the rendered staged root, using the same production script ConfigMap and
+external-state Job permissions. A step-only Workflow exposes its actual
+`job-name`. It does not invoke the release parent or its reviewed-input preflight.
+
+A transient SeaweedFS Pod uses the chart's pinned image and local-bootstrap
+authentication profile. Its emptyDir and direct, internal S3 listener deliberately
+differ from the production PVC/HAProxy topology. Other server listeners remain
+on loopback. This proves child-level S3 behavior, not production ingress,
+network isolation, chart reconciliation, persistence or backup.
+
+Keep the fixture's `-volume.max=16` aligned with the production chart. Pinned
+[SeaweedFS 4.45 grows single-copy volumes in batches of seven](https://github.com/seaweedfs/seaweedfs/blob/4.45/weed/topology/volume_growth.go#L47-L54).
+Metadata and artifact collections share the server capacity. A two-volume cap
+can allow bucket creation yet starve the first object allocation; increasing
+AWS retries does not provide capacity. The regression gate reserves room for
+two growth batches and checks agreement with the production setting.
+
+A separate AWS CLI observer uses the same pinned image as the native Job,
+private approved/denied credential profiles and no Kubernetes token. The fixture
+administrator alone can exec into it; the release ServiceAccount cannot. Its
+approved profile matches the server identity, while its denied profile matches
+the initially incorrect immutable `perfeng-s3-auth` fixture. Secret/config/profile
+bytes stay in private files or mounted Secrets, never CLI arguments or artifacts.
+
+| Case | Required behavior |
+|:--|:--|
+| Initial API probes | Approved profile proves absence with 404; denied profile returns 403. Transport errors cannot satisfy either assertion. |
+| Native child with denied credentials | Owning Job exits 1 with the non-absence refusal diagnostic. Approved profile still proves no bucket exists; both Secret objects are unchanged. |
+| Explicit fixture-admin correction | Administrator deletes/recreates only the deliberately wrong disposable client Secret. The UID changes explicitly; the child never repairs credentials. |
+| Fresh first preparation | A new Workflow/Job creates `perfeng-artifacts`; approved bucket metadata is recorded. |
+| Repeat after a sentinel upload | A different successful Job leaves creation metadata, complete good Secret objects and the sentinel's metadata/bytes unchanged. |
+| Retained evidence | All three successful/failed Jobs retain their original UIDs. |
+
+The native script keeps its head-bucket error inside the failed container. The
+fixture therefore pairs the observer's explicit 403 proof for the same denied
+credential pair with the native Job's generic non-absence diagnostic; it does
+not claim to extract that container's raw HTTP error. Image/mount/executor errors,
+timeouts and arbitrary Workflow failures cannot replace a failed Job with an
+`aws-cli` exit 1 and that diagnostic. All API, client, readiness and Workflow
+waits remain bounded.
+
+The release identity must have actual create/get/watch Job rights while Job
+deletion, Secret create/patch/delete/enumeration, workload patch and Pod exec are
+denied. Test-administrator credential replacement is restricted to this owned
+fixture and is not an operator recovery procedure. Public evidence includes
+Workflow/Job JSON with Secret references, fixed probe summaries, bucket/object
+metadata, non-secret sentinel bytes and retained Job names. No Secret snapshots,
+credential profiles or raw auth-error files are uploaded. A failed sentinel PUT
+also saves `bucket-allocation.txt`: only allowlisted allocation phrases/counts
+from a bounded server-log tail, never raw lines or identifiers. The original
+PUT exit status still fails the fixture. The existing teardown removes the
+job-owned cluster; private files disappear with the ephemeral host.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool
@@ -216,7 +274,7 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helpers `ledger.sh`, `recovery.sh` and `database.sh` can only be sourced by the isolated
+The helpers `ledger.sh`, `recovery.sh`, `database.sh` and `bucket.sh` can only be sourced by the isolated
 harness with its ownership marker, private kubeconfig and command functions.
 They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are

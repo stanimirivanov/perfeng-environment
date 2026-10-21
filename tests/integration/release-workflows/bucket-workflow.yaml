@@ -1,0 +1,24 @@
+# Child-level parity only; the reviewed-request parent remains a separate gate.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: bucket-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: bucket
+spec:
+  serviceAccountName: release-external-state
+  entrypoint: prepare
+  activeDeadlineSeconds: 240
+  templates:
+    - name: prepare
+      steps:
+        - - name: bucket
+            templateRef:
+              name: perfeng-prepare-bucket-v1
+              template: run
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              parameter: '{{steps.bucket.outputs.parameters.job-name}}'
