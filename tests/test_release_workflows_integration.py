@@ -257,6 +257,49 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         self.assertEqual(service["spec"]["ports"][0]["port"], 8333)
         self.assertIn('source "$source_dir/bucket.sh"', SCRIPT.read_text())
 
+    def test_bucket_fixture_capacity_covers_metadata_and_artifact_volume_growth(self):
+        fixture = yaml.safe_load((FIXTURE / "seaweedfs-pod.yaml").read_text())
+        command = fixture["spec"]["containers"][0]["args"][0]
+        production = (ROOT / "charts/seaweedfs/templates/statefulset.yaml").read_text()
+        capacity = re.search(r"-volume\.max=(\d+)", command)
+        production_capacity = re.search(r"-volume\.max=(\d+)", production)
+        self.assertIsNotNone(capacity)
+        self.assertIsNotNone(production_capacity)
+        assert capacity is not None and production_capacity is not None
+        # Pinned SeaweedFS 4.45 grows seven single-copy volumes per collection.
+        self.assertGreaterEqual(int(capacity[1]), 2 * 7)
+        self.assertEqual(capacity[1], production_capacity[1])
+
+    @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
+    def test_bucket_allocation_diagnostics_exclude_raw_server_log_values(self):
+        source = (FIXTURE / "bucket.sh").read_text()
+        function = re.search(r"^bucket_allocation_diagnostics\(\) \{\n.*?^\}", source, re.M | re.S)
+        assert function is not None and BASH is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            code = """set -euo pipefail
+results=$1
+k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret-collection' 'create 7 volume, created 0: No matching data node found' 'unrelated-private-log'; }
+"""
+            code += function[0] + "\nbucket_allocation_diagnostics\n"
+            result = subprocess.run(
+                [BASH, "-s", "--", Path(temporary).as_posix()],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            report = (Path(temporary) / "bucket-allocation.txt").read_text()
+            self.assertEqual(
+                set(report.splitlines()),
+                {
+                    "No writable volumes",
+                    "No matching data node found",
+                    "create 7 volume, created 0",
+                },
+            )
+
     def test_bucket_profiles_match_private_client_secrets_and_only_approved_server_identity(self):
         source = (FIXTURE / "bucket.sh").read_text()
         code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]

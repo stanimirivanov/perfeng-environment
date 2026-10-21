@@ -223,6 +223,13 @@ differ from the production PVC/HAProxy topology. Other server listeners remain
 on loopback. This proves child-level S3 behavior, not production ingress,
 network isolation, chart reconciliation, persistence or backup.
 
+Keep the fixture's `-volume.max=16` aligned with the production chart. Pinned
+[SeaweedFS 4.45 grows single-copy volumes in batches of seven](https://github.com/seaweedfs/seaweedfs/blob/4.45/weed/topology/volume_growth.go#L47-L54).
+Metadata and artifact collections share the server capacity. A two-volume cap
+can allow bucket creation yet starve the first object allocation; increasing
+AWS retries does not provide capacity. The regression gate reserves room for
+two growth batches and checks agreement with the production setting.
+
 A separate AWS CLI observer uses the same pinned image as the native Job,
 private approved/denied credential profiles and no Kubernetes token. The fixture
 administrator alone can exec into it; the release ServiceAccount cannot. Its
@@ -253,8 +260,11 @@ denied. Test-administrator credential replacement is restricted to this owned
 fixture and is not an operator recovery procedure. Public evidence includes
 Workflow/Job JSON with Secret references, fixed probe summaries, bucket/object
 metadata, non-secret sentinel bytes and retained Job names. No Secret snapshots,
-credential profiles or raw auth-error files are uploaded. The existing teardown
-removes the job-owned cluster; private files disappear with the ephemeral host.
+credential profiles or raw auth-error files are uploaded. A failed sentinel PUT
+also saves `bucket-allocation.txt`: only allowlisted allocation phrases/counts
+from a bounded server-log tail, never raw lines or identifiers. The original
+PUT exit status still fails the fixture. The existing teardown removes the
+job-owned cluster; private files disappear with the ephemeral host.
 
 ## Verification and remaining gates
 

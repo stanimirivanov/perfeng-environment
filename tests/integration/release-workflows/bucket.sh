@@ -52,6 +52,12 @@ bucket_absence() {
   fi
   grep -Eq '\(404\)|Not Found' "$fixture/bucket-head.error"
 }
+bucket_allocation_diagnostics() {
+  # Emit only known allocation signals/counts, never raw server logs or keys.
+  k -n perf-platform logs bucket-ci-seaweedfs -c seaweedfs --tail=120 --limit-bytes=32768 2>/dev/null \
+    | grep -Eo 'No writable volumes|no free volumes|No matching data node found|Not enough data nodes found|create [0-9]+ volume, created [0-9]+' \
+    | sort -u > "$results/bucket-allocation.txt" || :
+}
 bucket_case() {
   bucket_label=$1 bucket_expected=$2
   echo "Bucket case: $bucket_label ($bucket_expected)"
@@ -109,8 +115,14 @@ s3 default list-buckets | jq -S '[.Buckets[] | select(.Name == "perfeng-artifact
 jq -e 'length == 1 and (.[0].CreationDate | type == "string")' "$results/bucket-first.json"
 printf '%s\n' 'perfeng-bucket-parity-sentinel-v1' > "$fixture/bucket-sentinel.bin"
 observer /bin/sh -ec 'cat > /tmp/bucket-sentinel.bin' < "$fixture/bucket-sentinel.bin"
-s3 default put-object --bucket perfeng-artifacts --key ci/parity-sentinel.bin \
-  --body /tmp/bucket-sentinel.bin --if-none-match '*' > "$results/bucket-sentinel-created.json"
+if s3 default put-object --bucket perfeng-artifacts --key ci/parity-sentinel.bin \
+  --body /tmp/bucket-sentinel.bin --if-none-match '*' > "$results/bucket-sentinel-created.json"; then
+  :
+else
+  bucket_put_rc=$?
+  bucket_allocation_diagnostics
+  exit "$bucket_put_rc"
+fi
 s3 default head-object --bucket perfeng-artifacts --key ci/parity-sentinel.bin > "$results/bucket-object-before.json"
 bucket_case repeat success
 s3 default list-buckets | jq -S '[.Buckets[] | select(.Name == "perfeng-artifacts")]' > "$results/bucket-repeat.json"
