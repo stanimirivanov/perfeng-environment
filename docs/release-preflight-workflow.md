@@ -2,6 +2,11 @@
 
 ## TL;DR
 
+- The separate [trusted-main acceptance job](release-workflows-integration.md#complete-preflight-on-trusted-main)
+  generates a request for its real disposable kind UID and runs this unchanged
+  complete parent twice. It is CI test input, not deployment approval; live
+  acceptance remains pending until the post-merge job passes.
+
 - The staged [WorkflowTemplate](../gitops/release-workflows/release-preflight-v2.yaml)
   checks a reviewed v1 request against exact Git checkouts, deployment-lock
   bytes and the observed `kube-system` UID. Its output is a versioned Workflow

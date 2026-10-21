@@ -534,6 +534,17 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For trusted-main full preflight acceptance, inspect the separate
+`release-preflight-main.yml` artifact. `parent-request-ref.json` records the exact
+run-owned temporary ref and expected commit. `parent-request-ref-cleanup.json`
+with `status: absent` proves cleanup completed. Missing proof after runner loss
+requires an authenticated exact-ref read; remove only that run's ref after
+verifying its current SHA matches the recorded commit. A moved ref is an
+ownership conflict, not permission to force repair. Do not rerun publication
+blindly after an ambiguous API failure. Never upload the private Git Secret,
+raw Git/API errors or fixture token files. The workflow requires main and job
+contents write; PR validation intentionally cannot run this write boundary.
+
 The staged Argo Workflows preflight is described in the
 [release preflight guide](release-preflight-workflow.md). Inspect only the named
 Workflow and its failing node in the disposable cluster. A Git artifact failure
