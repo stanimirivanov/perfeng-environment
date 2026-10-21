@@ -345,6 +345,14 @@ must grant repository Actions Read access for private packages. This does not
 prove layer downloads, full manifest-byte hashing, parent release execution or
 retirement of the host verifier.
 
+Readiness-child runtime/HTTP parity uses the unchanged verifier with an actual
+pinned Git artifact and the mounted verifier package, synthetic workload and
+preflight observations, and an isolated HTTP peer on the internal Service.
+First/repeat/corrected results, policy refusal before probes, non-200/redirect/
+invalid-metrics refusal and restricted authority are checked in disposable kind.
+This does not establish native resource-observer or full readiness-parent
+execution, actual control-plane health, promotion or host-script retirement.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

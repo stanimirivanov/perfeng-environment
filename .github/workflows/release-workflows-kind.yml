@@ -14,14 +14,18 @@ on:
       - deployments/maintenance-checkpoint-v1.schema.json
       - deployments/release-adoption-v1.schema.json
       - deployments/release-request-v1.schema.json
+      - deployments/release-readiness-result-v1.schema.json
       - gitops/release-workflows/**
       - gitops/release-workflows-bootstrap/maintenance-application-access.yaml
       - gitops/release-workflows-bootstrap/ledger-namespace.yaml
       - gitops/release-workflows-bootstrap/ledger-access.yaml
       - gitops/release-workflows-bootstrap/adoption-application-access.yaml
       - tests/fixtures/release-request-v1.json
+      - tests/fixtures/release-readiness-observations.json
       - tests/integration/release-workflows/**
       - tests/test_release_workflows_integration.py
+      - tests/test_readiness_http_fixture.py
+      - tests/test_release_readiness.py
       - tests/test_release_adoption.py
       - tests/test_release_external_state.py
       - tests/release_verifier_support.py

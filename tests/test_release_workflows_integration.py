@@ -133,7 +133,14 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
                     self.assertEqual(required, supplied)
                     seen.add(ref["template"])
         self.assertEqual(seen, {"root", "receipt", "pointer", "create-receipt", "create-pointer"})
-        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh", "registry.sh"):
+        for script in (
+            "ledger.sh",
+            "recovery.sh",
+            "database.sh",
+            "bucket.sh",
+            "registry.sh",
+            "readiness.sh",
+        ):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
                 ast.parse(python, filename=f"{script} fixture Python {index}")
@@ -471,6 +478,35 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             source,
         )
 
+    def test_readiness_fixture_reuses_the_published_child_and_pinned_runtime(self):
+        workflow = yaml.safe_load((FIXTURE / "readiness-workflow.yaml").read_text())
+        child = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/verify-release-readiness-v2.yaml").read_text()
+        )
+        template = child["spec"]["templates"][0]
+        spec = workflow["spec"]
+        self.assertEqual(spec["serviceAccountName"], "release-readiness")
+        self.assertEqual(spec["activeDeadlineSeconds"], 300)
+        step = spec["templates"][0]["steps"][0][0]
+        self.assertEqual(
+            step["templateRef"], {"name": child["metadata"]["name"], "template": "run"}
+        )
+        required = {p["name"] for p in template["inputs"]["parameters"]}
+        self.assertEqual({p["name"] for p in step["arguments"]["parameters"]}, required)
+        self.assertEqual(
+            {p["name"] for p in spec["arguments"]["parameters"]}, required | {"selection-revision"}
+        )
+        pod = yaml.safe_load((FIXTURE / "readiness-pod.yaml").read_text())
+        self.assertEqual(pod["spec"]["containers"][0]["image"], template["container"]["image"])
+        self.assertFalse(pod["spec"]["automountServiceAccountToken"])
+        self.assertTrue(pod["spec"]["containers"][0]["securityContext"]["readOnlyRootFilesystem"])
+        service = yaml.safe_load((FIXTURE / "readiness-service.yaml").read_text())
+        self.assertEqual(service["metadata"]["name"], "control-plane")
+        self.assertEqual(service["metadata"]["namespace"], "perf-platform")
+        self.assertEqual(service["spec"]["selector"], pod["metadata"]["labels"])
+        self.assertEqual(service["spec"]["ports"][0]["port"], 8080)
+        self.assertIn('source "$source_dir/readiness.sh"', SCRIPT.read_text())
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
@@ -481,13 +517,21 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "database.sh",
             FIXTURE / "bucket.sh",
             FIXTURE / "registry.sh",
+            FIXTURE / "readiness.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
             )
             self.assertEqual(syntax.returncode, 0, syntax.stderr)
             self.assertNotIn(b"\r", script.read_bytes())
-        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh", "registry.sh"):
+        for script in (
+            "ledger.sh",
+            "recovery.sh",
+            "database.sh",
+            "bucket.sh",
+            "registry.sh",
+            "readiness.sh",
+        ):
             standalone = subprocess.run(
                 [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20
             )
