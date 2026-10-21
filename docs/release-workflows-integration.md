@@ -311,6 +311,52 @@ layer downloads or guaranteed full manifest-byte hashing. The host verifier's
 stronger byte check, full reviewed-request parent, deployment, migration,
 promotion and non-local acceptance remain separate. Original scripts are retained.
 
+## Readiness verifier runtime and HTTP parity
+
+The final sourced `readiness.sh` phase invokes the unchanged
+`perfeng-verify-release-readiness-v2` child through a step-only wrapper using
+`release-readiness`. Argo fetches the selected repository at the exact CI commit
+using the existing Git-read Secret. The non-root verifier mounts the published
+two-module package and checks the selected lock before making HTTP requests.
+
+Preflight and workload observations are explicitly synthetic policy fixtures.
+They are not collected from running PostgreSQL, SeaweedFS or control-plane
+workloads. A separate fixture Pod uses the same pinned Python image as the
+verifier and serves controlled responses through the real internal
+`control-plane.perf-platform.svc.cluster.local:8080` Service. Its selector is a
+fixture label. This proves the installed verifier, Git artifact and HTTP path;
+it does not prove the resource observer, reviewed-request parent, Argo CD
+reconciliation or actual application health.
+
+| Case | Required behavior |
+|:--|:--|
+| First/repeated healthy execution | All three probes succeed and schema-valid output binds the synthetic request, actual cluster UID and selected Git commit. Results are byte-identical. |
+| Wrong selected image | Exact policy refusal, verifier exit 2, no result and zero endpoint requests. |
+| HTTP 503 on readyz | Exact readyz refusal, no metrics request and no result. |
+| Redirected metrics | Exact metrics refusal; redirect destination is never requested. |
+| Commented readiness metric | HTTP 200 still refuses the invalid metrics body with no result. |
+| Explicit correction | Fixture administrator resets the same responder to healthy; a new Workflow emits the original result. |
+
+Only fixture administration can change responder mode through loopback HTTP
+inside its Pod. The release identity cannot exec into that Pod, modify workloads
+or Applications, create Jobs or Secrets, or list Secrets. The seven distinct
+Workflows and original responder Pod/Service UIDs remain. TCP readiness probes
+do not affect the per-case HTTP request counts.
+
+Artifacts include Workflow/result JSON, constant refusal lines and endpoint
+counts. Raw worker logs, Git credential context and HTTP response bodies are
+excluded. Negative cases require exit 2 from the verifier's main container and
+the exact owning refusal; Git checkout, image pull, controller and timeout
+failures cannot count as an expected rejection. Argo may retain the declared
+output's `valueFrom` path on failure; the absence check rejects a materialized
+`result.value` at any node, including empty/null, rather than the declaration.
+Correct prerequisites through
+their owner and submit a fresh Workflow; the verifier repairs nothing.
+
+The production package remains two files/708 lines. Full readiness-parent and
+native resource-observer acceptance, real service health, M04 recovery,
+promotion and script retirement remain open.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool
@@ -319,7 +365,7 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh` and `registry.sh` can only be sourced by the isolated
+The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh`, `registry.sh` and `readiness.sh` can only be sourced by the isolated
 harness with its ownership marker, private kubeconfig and command functions.
 They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are

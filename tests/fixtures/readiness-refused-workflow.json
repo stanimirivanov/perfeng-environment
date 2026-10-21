@@ -1,0 +1,27 @@
+{
+  "status": {
+    "phase": "Failed",
+    "nodes": {
+      "readiness-ci-refused": {
+        "type": "Steps",
+        "phase": "Failed"
+      },
+      "readiness-ci-refused-child": {
+        "type": "Pod",
+        "phase": "Failed",
+        "message": "main: Error (exit code 2)",
+        "outputs": {
+          "parameters": [
+            {
+              "name": "result",
+              "valueFrom": {
+                "path": "/tmp/readiness-result.json"
+              }
+            }
+          ],
+          "exitCode": "2"
+        }
+      }
+    }
+  }
+}

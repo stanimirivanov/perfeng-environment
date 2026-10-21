@@ -44,6 +44,19 @@ After failure, inspect the named failing step and existing owner diagnostics. Co
 
 Offline gates are `make workflow-lint` and `make validate`; the latter renders and checks both Workflow and Job ConfigMap references against the staged Project. Unit tests cover identity/freshness failures, endpoint bounds/redirect rejection and output publication after successful verification. These checks do not establish live parity or retire the host path.
 
+## Installed verifier and HTTP CI boundary
+
+The [disposable-kind CI fixture](release-workflows-integration.md#readiness-verifier-runtime-and-http-parity)
+invokes the unchanged verifier child with synthetic preflight/workload
+observations and a real selected Git artifact. A pinned HTTP peer on the internal
+Service exercises first/repeat success, image refusal before any HTTP request,
+503, redirect and invalid metrics refusal, then a fresh corrected execution.
+Exact verifier exit/refusal, absent failure output, request counts, retained
+Workflow identities and denied mutation/exec authority are required.
+This establishes installed verifier/HTTP parity only. Native resource
+observation, full reviewed-request parent execution and actual control-plane
+health still require separate acceptance before host-path retirement.
+
 ## Verifier package lifecycle
 
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).

@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: readiness-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: readiness
+spec:
+  serviceAccountName: release-readiness
+  entrypoint: verify
+  activeDeadlineSeconds: 300
+  arguments:
+    parameters:
+      - name: selection-revision
+      - name: preflight-result
+      - name: application
+      - name: postgres
+      - name: seaweedfs
+      - name: deployment
+      - name: service
+  templates:
+    - name: verify
+      steps:
+        - - name: readiness
+            templateRef:
+              name: perfeng-verify-release-readiness-v2
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: '{{workflow.parameters.preflight-result}}'
+                - name: application
+                  value: '{{workflow.parameters.application}}'
+                - name: postgres
+                  value: '{{workflow.parameters.postgres}}'
+                - name: seaweedfs
+                  value: '{{workflow.parameters.seaweedfs}}'
+                - name: deployment
+                  value: '{{workflow.parameters.deployment}}'
+                - name: service
+                  value: '{{workflow.parameters.service}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.readiness.outputs.parameters.result}}'

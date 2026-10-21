@@ -680,6 +680,21 @@ signal, not arbitrary image/controller/network failure. Only fixture admin
 corrects the deliberately invalid test Secret before a fresh Workflow. Digest
 access is not proof of layer downloads or complete manifest-byte validation.
 
+For readiness CI, inspect `readiness-*.workflow.json`, success result JSON,
+constant refusal lines and per-case endpoint counts. Wrong-image refusal must
+precede all HTTP requests. A 503 stops at readyz; redirects and invalid metrics
+stop at metrics, with zero redirect-target requests. The invalid cases require
+the verifier's exit 2 and its exact policy/endpoint refusal, so artifact checkout,
+image, executor and timeout failures must be diagnosed independently. Synthetic
+observations and the fixture HTTP peer do not establish actual workload health.
+Only fixture administration changes responder mode; correct the prerequisite
+and use a new Workflow. Do not upload raw worker logs or HTTP bodies or relax
+the absence-of-result checks to make a negative case pass. On failure Argo can
+retain an output parameter's `valueFrom` declaration without publishing a
+`value`. That declaration is not result evidence. The refusal gate rejects any
+materialized `result.value`, including empty/null values, while retaining the
+exit-code, exact-refusal and probe-count requirements.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files
