@@ -24,6 +24,13 @@ It is a schema fixture, **not** an approved command or a claim about the
 current cluster. Its `expectedCurrent: null` illustrates a create-only
 operation and must not be reused against a running environment.
 
+The separate [CI preflight request](../deployments/release-requests/ci-preflight-fixture-v1.json)
+uses an all-zero UID and a different historical reviewed selection. It exercises
+the Git/schema/identity children only; the complete production preflight must
+reject it against a real kind UID. It is not approved operational input and must
+not be changed to name a live cluster. See the
+[fixture boundary](release-workflows-integration.md#git-schema-and-preflight-identity).
+
 | Input | Required interpretation |
 |:--|:--|
 | `environment.name` | Logical environment; `perfeng-local` has additional v1 constraints. |

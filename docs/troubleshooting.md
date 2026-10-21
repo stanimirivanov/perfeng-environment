@@ -707,6 +707,18 @@ the assertions or scaling early. Preserve resource UIDs and use a fresh Workflow
 for refused cases. These synthetic workloads/status do not prove real services
 healthy, and raw executor logs/API snapshots must remain outside artifacts.
 
+For Git preflight CI, inspect `preflight-*.workflow.json`, success result JSON
+and constant refusal files. Positive child results deliberately bind the
+all-zero fixture UID, while `actual-cluster-uid` must match the native namespace
+read. The complete production parent must refuse this same request for target
+UID mismatch. Digest refusal belongs to `verify-identities`; unsafe-path refusal
+belongs to `validate-schema`. Each requires main exit 2, the exact diagnostic and
+no materialized result. Diagnose artifact authentication, schema image or
+executor failures independently; do not count them as expected refusal. Keep
+raw worker logs and Git Secret snapshots private. Restore the original parameter
+file and submit a fresh Workflow for correction; never change the fixture to a
+live UID or use child evidence as deployment approval.
+
 The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files

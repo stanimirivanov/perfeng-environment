@@ -362,6 +362,15 @@ scale-up. API snapshots and retained UIDs bound this installed-observer proof.
 Actual workload health, Argo CD reconciliation, full reviewed-request parent
 acceptance, promotion and host-script retirement remain open.
 
+Git/schema/preflight-identity parity uses an actual committed CI request with
+an all-zero fixture UID and a separately pinned reviewed Git selection. The
+unchanged child templates fetch both revisions, validate the schema and lock
+bytes, record repeat/corrected synthetic-UID evidence and reject bad digest/path
+parameters. A native namespace read is checked separately; the complete
+production preflight must reject the same request for wrong cluster UID.
+Successful full-parent admission for an actual reviewed cluster request, parent
+composition, promotion/recovery and host-script retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

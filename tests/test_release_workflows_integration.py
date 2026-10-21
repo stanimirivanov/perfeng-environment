@@ -3,6 +3,7 @@
 import ast
 import base64
 import configparser
+import hashlib
 import json
 import os
 import re
@@ -141,6 +142,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "registry.sh",
             "readiness.sh",
             "observer.sh",
+            "preflight.sh",
         ):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
@@ -609,6 +611,129 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
                     )
                     self.assertEqual(result.returncode, expected, result.stderr)
 
+    def test_preflight_wrapper_uses_unchanged_children_with_explicit_synthetic_uid(self):
+        workflow = yaml.safe_load((FIXTURE / "preflight-workflow.yaml").read_text())
+        production = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/release-preflight-v2.yaml").read_text()
+        )
+        self.assertEqual(
+            workflow["spec"]["serviceAccountName"], production["spec"]["serviceAccountName"]
+        )
+        self.assertEqual(workflow["spec"]["activeDeadlineSeconds"], 600)
+        self.assertEqual(
+            workflow["spec"]["arguments"],
+            {
+                "parameters": [
+                    {"name": p["name"]} for p in production["spec"]["arguments"]["parameters"]
+                ]
+            },
+        )
+        steps = workflow["spec"]["templates"][0]["steps"]
+        self.assertEqual(
+            [g[0]["name"] for g in steps], ["validate-schema", "cluster-uid", "verify-identities"]
+        )
+        for group in steps:
+            step = group[0]
+            self.assertEqual(
+                step["templateRef"],
+                {"name": production["metadata"]["name"], "template": step["name"]},
+            )
+        self.assertEqual(
+            steps[2][0]["arguments"]["parameters"],
+            [{"name": "observed-cluster-uid", "value": "00000000-0000-0000-0000-000000000000"}],
+        )
+        # The production parent must continue binding the verifier to the native UID.
+        self.assertEqual(
+            production["spec"]["templates"][0]["steps"][2][0]["arguments"]["parameters"][0][
+                "value"
+            ],
+            "{{steps.cluster-uid.outputs.parameters.uid}}",
+        )
+        self.assertIn('source "$source_dir/preflight.sh"', SCRIPT.read_text())
+
+    def test_preflight_ci_request_and_parameter_variants_preserve_exact_bytes(self):
+        from jsonschema import Draft202012Validator
+
+        path = ROOT / "deployments/release-requests/ci-preflight-fixture-v1.json"
+        raw = path.read_bytes()
+        self.assertNotIn(b"\r", raw)
+        request = json.loads(raw)
+        Draft202012Validator(
+            json.loads((ROOT / "deployments/release-request-v1.schema.json").read_text())
+        ).validate(request)
+        self.assertEqual(
+            request["environment"]["clusterUID"], "00000000-0000-0000-0000-000000000000"
+        )
+        self.assertEqual(
+            request["selection"]["revision"], "4133113e481de32eae314c904778c6148790b80c"
+        )
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", (FIXTURE / "preflight.sh").read_text(), re.S)[0]
+        with tempfile.TemporaryDirectory() as temporary:
+            result = subprocess.run(
+                [sys.executable, "-", temporary, "f" * 40, "actual-fixture-cluster"],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+                cwd=ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout + result.stderr, "")
+            directory = Path(temporary)
+            original = json.loads((directory / "preflight-parameters.json").read_text())
+            self.assertEqual(
+                original["request-sha256"], "sha256:" + hashlib.sha256(raw).hexdigest()
+            )
+            self.assertEqual(original["selection-revision"], request["selection"]["revision"])
+            self.assertNotEqual(original["request-revision"], original["selection-revision"])
+            self.assertEqual(
+                json.loads((directory / "preflight-wrong-digest.json").read_text()),
+                {**original, "request-sha256": "sha256:" + "0" * 64},
+            )
+            self.assertEqual(
+                json.loads((directory / "preflight-unsafe-path.json").read_text()),
+                {
+                    **original,
+                    "request-path": "deployments/release-requests/../local-control-plane.json",
+                },
+            )
+            refused = subprocess.run(
+                [sys.executable, "-", temporary, "f" * 40, request["environment"]["clusterUID"]],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+                cwd=ROOT,
+            )
+            self.assertNotEqual(refused.returncode, 0)
+
+    @unittest.skipUnless(BASH, "Bash unavailable; Linux CI executes the schema path guard")
+    def test_preflight_schema_guard_refuses_unsafe_names_before_file_access(self):
+        production = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/release-preflight-v2.yaml").read_text()
+        )
+        script = next(t for t in production["spec"]["templates"] if t["name"] == "validate-schema")[
+            "container"
+        ]["args"][0]
+        assert BASH is not None
+        for path, message in (
+            ("/tmp/request.json", "Invalid request path"),
+            ("deployments/release-requests/../local-control-plane.json", "Invalid request name"),
+        ):
+            with tempfile.TemporaryDirectory() as temporary:
+                result = subprocess.run(
+                    [BASH, "-ec", script],
+                    env={**os.environ, "REQUEST_PATH": path},
+                    cwd=temporary,
+                    text=True,
+                    capture_output=True,
+                    timeout=20,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(result.stderr, message + "\n")
+                self.assertEqual(list(Path(temporary).iterdir()), [])
+
     @unittest.skipIf(
         os.name == "nt" and shutil.which("jq") is None,
         "jq unavailable on Windows; Linux CI checks the native predicate",
@@ -655,6 +780,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "registry.sh",
             FIXTURE / "readiness.sh",
             FIXTURE / "observer.sh",
+            FIXTURE / "preflight.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
@@ -669,6 +795,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             "registry.sh",
             "readiness.sh",
             "observer.sh",
+            "preflight.sh",
         ):
             standalone = subprocess.run(
                 [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20

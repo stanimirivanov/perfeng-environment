@@ -15,6 +15,7 @@ on:
       - deployments/release-adoption-v1.schema.json
       - deployments/release-request-v1.schema.json
       - deployments/release-readiness-result-v1.schema.json
+      - deployments/release-requests/**
       - gitops/release-workflows/**
       - gitops/release-workflows-bootstrap/maintenance-application-access.yaml
       - gitops/release-workflows-bootstrap/ledger-namespace.yaml
