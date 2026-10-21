@@ -43,6 +43,23 @@ registry_jobs() {
   k -n perf-generators get jobs -l perfeng.io/purpose=release-external-state -o json \
     | jq -r '.items[].metadata.name | select(startswith("perfeng-prepare-registry-v1-"))' | sort
 }
+registry_signals() {
+  # Emit constants only; registry errors can contain URLs, identities and credentials.
+  uv run --locked --offline python - "$1" <<'PY'
+import re, sys
+from pathlib import Path
+message = Path(sys.argv[1]).read_text(errors="replace").lower()
+patterns = {
+    "authorization": r"unauthorized|denied|forbidden|authentication required|status code (401|403)",
+    "manifest-missing": r"manifest_unknown|name_unknown|manifest unknown|status code 404|404 not found",
+    "tls": r"x509|tls handshake|certificate signed by unknown authority",
+    "network": r"no such host|connection refused|i/o timeout|context deadline exceeded|network is unreachable",
+    "command": r"unknown command|unknown flag|exec format error|executable file not found",
+}
+signals = [name for name, pattern in patterns.items() if re.search(pattern, message)]
+print("\n".join(signals or ["unclassified"]))
+PY
+}
 registry_case() {
   registry_label=$1 registry_expected=$2
   echo "Registry case: $registry_label ($registry_expected)"
@@ -59,15 +76,21 @@ registry_case() {
   k -n perf-generators wait "--for=condition=$registry_condition" "job/$registry_job" --timeout=30s
   k -n perf-generators get job "$registry_job" -o json > "$results/registry-$registry_label.job.json"
   k -n perf-generators get pods -l "batch.kubernetes.io/job-name=$registry_job" -o json > "$fixture/registry-pods.json"
+  jq '[.items[].status.containerStatuses[]? | {name, exitCode: .state.terminated.exitCode}]' \
+    "$fixture/registry-pods.json" > "$results/registry-$registry_label.exit-codes.json"
   for worker in k6 kube-burner analysis; do
     k -n perf-generators logs "job/$registry_job" -c "$worker" --tail=20 --limit-bytes=8192 > "$fixture/registry-$worker.log"
     # Raw registry URLs/errors may include credential context: never upload them.
-    grep -Eo 'UNAUTHORIZED|DENIED|401 Unauthorized|403 Forbidden' "$fixture/registry-$worker.log" \
-      | sort -u > "$results/registry-$registry_label-$worker.signals.txt" || :
+    registry_signals "$fixture/registry-$worker.log" > "$results/registry-$registry_label-$worker.signals.txt"
   done
   if [[ $registry_expected == success ]]; then
     if [[ $registry_rc != 0 ]]; then
-      echo 'Registry access failed: check pinned references, network and package Manage Actions access -> repository Read grant.' >&2
+      for worker in k6 kube-burner analysis; do
+        printf 'Registry %s: ' "$worker" >&2
+        tr '\n' ' ' < "$results/registry-$registry_label-$worker.signals.txt" >&2
+        printf '\n' >&2
+      done
+      echo 'Registry access failed: inspect registry exit-codes and signal artifacts; authorization requires package Manage Actions access -> repository Read grant.' >&2
       return 1
     fi
     jq -e '.status.phase == "Succeeded"' "$results/registry-$registry_label.workflow.json" > /dev/null
@@ -87,7 +110,7 @@ registry_case() {
     jq -e '.status.phase == "Failed" or .status.phase == "Error"' "$results/registry-$registry_label.workflow.json" > /dev/null
     jq -e '.status.failed == 1 and any(.status.conditions[]?; .type == "Failed" and .status == "True")' "$results/registry-$registry_label.job.json" > /dev/null
     jq -e 'any(.items[].status.containerStatuses[]?; .name == "kube-burner" and .state.terminated.exitCode == 1)' "$fixture/registry-pods.json" > /dev/null
-    [[ -s $results/registry-$registry_label-kube-burner.signals.txt ]]
+    grep -qx authorization "$results/registry-$registry_label-kube-burner.signals.txt"
   fi
   registry_secret_snapshot "$fixture/registry-secret-after.json"
   cmp "$fixture/registry-secret-before.json" "$fixture/registry-secret-after.json"

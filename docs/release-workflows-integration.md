@@ -273,7 +273,12 @@ owner-selected identity. Only this isolated job adds `packages: read` beside
 `contents: read`. A package owner must grant the environment repository **Read**
 under each private package's **Manage Actions access**. Follow
 [GitHub's access guidance](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#ensuring-workflow-access-to-your-package).
-Workflow YAML does not establish this grant. No PAT, host login or package
+Workflow YAML does not establish this grant. Failed workers publish exit codes
+and constant error categories (authorization, manifest-missing, TLS, network,
+command or unclassified), with case-insensitive matching and no raw log lines.
+An unclassified error requires further investigation; it is not an auth denial
+and cannot satisfy the deliberately invalid credential case.
+No PAT, host login or package
 settings mutation is performed. Missing access fails with actionable guidance.
 
 Before the original token file is removed and `GITHUB_TOKEN` unset, the sourced
@@ -295,8 +300,8 @@ three pinned `crane` workers.
 | Retained evidence | All four Job UIDs remain. The release identity cannot delete Jobs, mutate/enumerate Secrets, patch workloads or exec into Pods. |
 
 Raw worker logs remain private. Upload only Workflow/Job JSON with Secret
-references, validated digest lines, retained Job names and fixed authorization
-signals such as `UNAUTHORIZED`/`DENIED`. Check package grants, immutable selection
+references, validated digest lines, retained Job names, worker exit codes and
+constant error categories. Check package grants, immutable selection
 and registry connectivity on failure; never substitute credentials or broaden
 permissions automatically. Existing operation bounds and owned-cluster cleanup
 remain in force.

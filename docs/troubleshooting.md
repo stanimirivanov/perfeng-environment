@@ -664,7 +664,12 @@ other S3 failures still require investigation. Do not upload raw server logs or
 relax the sentinel write/retention assertions.
 
 For registry CI, inspect `registry-*.workflow.json`, Job JSON, digest evidence
-and allowlisted authorization signals. A first-access denial requires checking
+and `registry-*.exit-codes.json` plus per-worker signal categories. Categories
+cover authorization (including lowercase denials), missing manifests, TLS,
+network and command errors. `unclassified` means the bounded private log did
+not match a known category; it does not establish a package-access problem.
+Only constant category names are published, never raw error context.
+A first-access authorization signal requires checking
 the package's **Manage Actions access** repository **Read** grant as well as the
 job's `packages: read`; a successful Git checkout does not establish package
 authorization. Confirm exact selected references and connectivity too. The

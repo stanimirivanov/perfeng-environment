@@ -436,6 +436,41 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             self.assertNotEqual(refused.returncode, 0)
             self.assertNotIn("private-token-with-newline", refused.stdout + refused.stderr)
 
+    def test_registry_diagnostics_classify_errors_without_publishing_context(self):
+        source = (FIXTURE / "registry.sh").read_text()
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[1]
+        cases = {
+            "DENIED: installation not allowed to Read organization package": "authorization",
+            "denied: permission_denied: read_package": "authorization",
+            "unexpected status code 403": "authorization",
+            "MANIFEST_UNKNOWN: missing": "manifest-missing",
+            "x509: certificate signed by unknown authority": "tls",
+            "dial tcp: lookup ghcr.io: no such host": "network",
+            'unknown command "digest"': "command",
+            "unexpected registry failure": "unclassified",
+            "sha256:" + "a" * 64: "unclassified",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "worker.log"
+            for message, expected in cases.items():
+                with self.subTest(message=message):
+                    path.write_text("https://private-token@example.test/private-path " + message)
+                    result = subprocess.run(
+                        [sys.executable, "-", str(path)],
+                        input=code,
+                        text=True,
+                        capture_output=True,
+                        timeout=20,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, expected + "\n")
+                    self.assertEqual(result.stderr, "")
+        # Unknown or infrastructure errors must never satisfy the negative auth case.
+        self.assertIn(
+            'grep -qx authorization "$results/registry-$registry_label-kube-burner.signals.txt"',
+            source,
+        )
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
