@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: preflight-identity-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: preflight
+spec:
+  serviceAccountName: release-preflight
+  entrypoint: identity-fixture
+  activeDeadlineSeconds: 600
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: identity-fixture
+      steps:
+        - - name: validate-schema
+            templateRef:
+              name: perfeng-release-preflight-v2
+              template: validate-schema
+        - - name: cluster-uid
+            templateRef:
+              name: perfeng-release-preflight-v2
+              template: cluster-uid
+        - - name: verify-identities
+            templateRef:
+              name: perfeng-release-preflight-v2
+              template: verify-identities
+            arguments:
+              parameters:
+                # Synthetic child input only. The unchanged parent uses the real UID.
+                - name: observed-cluster-uid
+                  value: '00000000-0000-0000-0000-000000000000'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.verify-identities.outputs.parameters.result}}'
+          - name: actual-cluster-uid
+            valueFrom:
+              parameter: '{{steps.cluster-uid.outputs.parameters.uid}}'

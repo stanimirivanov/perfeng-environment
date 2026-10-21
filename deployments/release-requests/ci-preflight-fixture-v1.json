@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "PerfengReleaseRequest",
+  "environment": {
+    "name": "perfeng-local",
+    "clusterUID": "00000000-0000-0000-0000-000000000000"
+  },
+  "selection": {
+    "repository": "https://github.com/stanimirivanov/perfeng-environment.git",
+    "revision": "4133113e481de32eae314c904778c6148790b80c",
+    "gitopsPath": "gitops/environments/local",
+    "lockDigests": {
+      "deployments/local-control-plane.json": "sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f",
+      "deployments/local-infrastructure.json": "sha256:859ab59f41c2a26ce7ff7989dc801bd499f9216c6704c8ef7bf4581f0fc710dd",
+      "deployments/local-native-target.json": "sha256:67710e2e9366cd8080437487741eeee667f044440bcf44aecf1a1ab5ce705573"
+    }
+  },
+  "promotion": {
+    "expectedCurrent": null,
+    "activation": "manual",
+    "migration": {
+      "mode": "forward-only",
+      "id": "0018"
+    }
+  }
+}

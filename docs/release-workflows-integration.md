@@ -398,6 +398,49 @@ Full reviewed-request/preflight and readiness-parent execution, actual workload
 health, Argo CD reconciliation, promotion and host-script retirement remain
 separate. Production verifier code remains two files/708 physical lines.
 
+## Git, schema and preflight identity
+
+The final `preflight.sh` phase installs the unchanged
+`perfeng-release-preflight-v2` and existing narrow `release-preflight` grants.
+Argo's Git artifact driver fetches the actual committed CI request and a
+separately pinned reviewed selection from the original private repository,
+using the existing Git-read Secret. The pinned schema CLI and mounted identity
+verifier process those files; no request ConfigMap, rewritten checkout, alternate
+Git server or dynamic publication is used.
+
+The committed [CI request](../deployments/release-requests/ci-preflight-fixture-v1.json)
+has an all-zero fixture UID, a historical reviewed selection and the hashes of
+that selection's committed lock bytes. It is not an operational request. The
+step-only wrapper invokes the unchanged schema, native namespace-read and
+identity children. **Only this child fixture supplies the all-zero observed UID
+to the identity child.** It separately checks the native namespace output
+against the real cluster UID. Successful child output therefore proves Git,
+schema and identity runtime parity using synthetic cluster input, not successful
+production-parent admission or permission to deploy.
+
+| Case | Required behavior |
+|:--|:--|
+| First/repeat child fixture | Schema CLI and identity child succeed; schema-valid evidence matches exact request bytes, both Git revisions, selected lock hashes and synthetic UID. Results are identical. |
+| Wrong byte digest | Identity child exits 2 with the exact request-byte mismatch diagnostic and no materialized result. |
+| Unsafe request path | Schema child exits 2 at the request-name guard before identity verification; exact owning diagnostic is required. |
+| Wrong-cluster production parent | Submit the same request to the complete, unchanged production preflight. Its native UID input must cause identity refusal, not successful admission. |
+| Fresh correction | Submit the original parameters again to the child fixture; evidence matches the first result. |
+
+Expected failures require the named owning Pod step, main exit 2 and exact
+constant refusal, with no `result.value` at any node. Unresolved Argo output
+declarations are allowed. Git/artifact, image, controller and timeout failures
+cannot count as expected refusal. All six Workflow UIDs, the real namespace UID
+and the complete Git Secret object remain unchanged/retained. The identity cannot
+patch namespaces, workloads or Applications, create Jobs/Secrets, list Secrets
+or exec into Pods. Raw logs and Secret snapshots remain private; artifacts
+contain Workflow/result JSON and constant refusal lines only.
+
+The real cluster UID must differ from the fixture's all-zero UID. Do not replace
+the fixture UID with a live value or reuse its initial-promotion intent against
+an existing environment. A successful complete parent with an actual reviewed
+cluster request, parent composition, promotion/recovery and script retirement
+remain open. Production verifier code remains two files/708 physical lines.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool
@@ -406,7 +449,7 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh`, `registry.sh`, `readiness.sh` and `observer.sh` can only be sourced by the isolated
+The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh`, `registry.sh`, `readiness.sh`, `observer.sh` and `preflight.sh` can only be sourced by the isolated
 harness with its ownership marker, private kubeconfig and command functions.
 They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are

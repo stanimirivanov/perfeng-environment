@@ -91,6 +91,23 @@ retained cluster to satisfy this pilot gate.
 requires Docker and a disposable kind cluster. No live acceptance is implied
 by an offline pass.
 
+## Git/schema/identity CI boundary
+
+The [disposable-kind Git preflight fixture](release-workflows-integration.md#git-schema-and-preflight-identity)
+uses a committed CI-only request with the all-zero cluster UID and a separately
+pinned reviewed selection. The test wrapper calls the unchanged children,
+supplies that synthetic UID only to the identity child, and independently checks
+the native namespace-read output against the actual cluster UID. First/repeat
+and fresh corrected child results must match exact Git request/lock bytes.
+Wrong digest and unsafe path must fail at their owning steps.
+
+The same CI phase submits the request to the complete production preflight,
+which must reject it because its native UID differs. This adds real Git/schema
+and child-runtime evidence plus full-parent wrong-cluster refusal. It does not
+satisfy the successful complete-parent two-run gate for a reviewed actual
+cluster request. No operational request, promotion receipt, credential change
+or host-script retirement follows from these child results.
+
 ## Result, recovery and limits
 
 Workflow status and logs are operational evidence in the cluster. The separately

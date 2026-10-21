@@ -57,7 +57,7 @@ for tool in kind kubectl argo; do
   fi
   chmod 700 "$fixture/bin/$tool"
 done
-argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml" "$source_dir/bucket-workflow.yaml" "$source_dir/registry-workflow.yaml" "$source_dir/readiness-workflow.yaml" "$source_dir/observer-workflow.yaml"
+argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml" "$source_dir/bucket-workflow.yaml" "$source_dir/registry-workflow.yaml" "$source_dir/readiness-workflow.yaml" "$source_dir/observer-workflow.yaml" "$source_dir/preflight-workflow.yaml"
 # Refuse any pre-existing kind cluster; cleanup is armed only after this check.
 clusters=$(kind get clusters)
 [[ -z $clusters ]] || refuse 'pre-existing kind clusters are not owned by this test.'
@@ -76,7 +76,7 @@ k wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 # Select the actual rendered package and child; do not maintain fixture copies.
 k kustomize gitops/release-workflows | uv run --locked --offline python -c '
 import json, sys, yaml
-names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1"), ("WorkflowTemplate", "perfeng-prepare-execution-registry-v1"), ("WorkflowTemplate", "perfeng-verify-release-readiness-v2"), ("WorkflowTemplate", "perfeng-observe-release-readiness-v1")}
+names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1"), ("WorkflowTemplate", "perfeng-prepare-execution-registry-v1"), ("WorkflowTemplate", "perfeng-verify-release-readiness-v2"), ("WorkflowTemplate", "perfeng-observe-release-readiness-v1"), ("WorkflowTemplate", "perfeng-release-preflight-v2")}
 items = [o for o in yaml.safe_load_all(sys.stdin) if (o["kind"], o["metadata"]["name"]) in names]
 assert len(items) == len(names)
 print(json.dumps({"apiVersion": "v1", "kind": "List", "items": items}))
@@ -182,3 +182,4 @@ source "$source_dir/bucket.sh"
 registry_cases
 source "$source_dir/readiness.sh"
 source "$source_dir/observer.sh"
+source "$source_dir/preflight.sh"
