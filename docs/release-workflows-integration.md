@@ -3,7 +3,7 @@
 ## TL;DR
 
 - The `release-workflows-kind.yml` CI job exercises unchanged maintenance,
-  adoption persistence, database-role and bucket preparation templates on an isolated
+  adoption persistence, database-role, bucket and registry templates on an isolated
   GitHub-hosted Linux runner.
 - It installs checksum-pinned kind, kubectl, Argo CLI and the official
   namespace-scoped Argo v4.1.5 asset; production selections are unchanged.
@@ -266,6 +266,46 @@ from a bounded server-log tail, never raw lines or identifiers. The original
 PUT exit status still fails the fixture. The existing teardown removes the
 job-owned cluster; private files disappear with the ephemeral host.
 
+## Execution-registry manifest access
+
+[ADR 0019](decisions/0019-use-ci-identity-for-registry-parity.md) records the
+owner-selected identity. Only this isolated job adds `packages: read` beside
+`contents: read`. A package owner must grant the environment repository **Read**
+under each private package's **Manage Actions access**. Follow
+[GitHub's access guidance](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#ensuring-workflow-access-to-your-package).
+Workflow YAML does not establish this grant. No PAT, host login or package
+settings mutation is performed. Missing access fails with actionable guidance.
+
+Before the original token file is removed and `GITHUB_TOKEN` unset, the sourced
+`registry.sh` converts it and `GITHUB_ACTOR` into private encoded Secret documents.
+It also creates an invalid credential and derives expected digests from the
+published child. Both encoded files are removed by the exit handler and excluded
+from artifacts. The CI actor is not retained-environment operator admission.
+
+The final phase creates the disposable `perf-generators` namespace and installs
+the unchanged generator Job grant and `perfeng-prepare-execution-registry-v1`
+child. A step-only wrapper exposes its single `job-name`; the native Job retains
+three pinned `crane` workers.
+
+| Case | Required behavior |
+|:--|:--|
+| First/repeated authenticated execution | All three workers exit 0 and emit the selected digest; distinct Jobs remain and complete Secret objects are unchanged. |
+| Invalid credential | Owning Job fails, kube-burner exits 1 and emits an authorization signal. Unrelated transport/controller/image errors cannot count. |
+| Explicit fixture-admin correction | Administrator replaces only the test Secret and submits a fresh Workflow; all digests match the first observation. |
+| Retained evidence | All four Job UIDs remain. The release identity cannot delete Jobs, mutate/enumerate Secrets, patch workloads or exec into Pods. |
+
+Raw worker logs remain private. Upload only Workflow/Job JSON with Secret
+references, validated digest lines, retained Job names and fixed authorization
+signals such as `UNAUTHORIZED`/`DENIED`. Check package grants, immutable selection
+and registry connectivity on failure; never substitute credentials or broaden
+permissions automatically. Existing operation bounds and owned-cluster cleanup
+remain in force.
+
+This proves manifest/digest access at that moment. `crane digest` does not prove
+layer downloads or guaranteed full manifest-byte hashing. The host verifier's
+stronger byte check, full reviewed-request parent, deployment, migration,
+promotion and non-local acceptance remain separate. Original scripts are retained.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool
@@ -274,7 +314,7 @@ Run `make validate` and `make workflow-lint` for complete non-live checks.
 The latter covers production WorkflowTemplates; this fixture additionally runs
 through the real controller in its separate CI tier.
 
-The helpers `ledger.sh`, `recovery.sh`, `database.sh` and `bucket.sh` can only be sourced by the isolated
+The helpers `ledger.sh`, `recovery.sh`, `database.sh`, `bucket.sh` and `registry.sh` can only be sourced by the isolated
 harness with its ownership marker, private kubeconfig and command functions.
 They have no separate bootstrap or operator entrypoint. All shell files receive offline syntax checks;
 the fixture's embedded Python is syntax checked, and generated/stored data are

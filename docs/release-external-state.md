@@ -15,7 +15,7 @@ The parent keeps the mutex, deadline, sequential steps and v1 outputs (`prefligh
 
 Argo Workflows owns these finite Jobs. Argo CD owns the WorkflowTemplate and RBAC through the staged Application, and continues to own the persistent PostgreSQL and SeaweedFS workloads. The workflow does not apply those workloads, sync Argo CD, publish policies, migrate schema or activate the M04 release. A local Argo mutex serializes submissions of this template. It does not serialize against the still-supported host commands, so operators must not run both preparation paths concurrently.
 
-The AWS CLI Job in `perf-platform` uses `perfeng-s3-auth` to check or create only `perfeng-artifacts`. A lookup failure other than a reported 404 stops before creation. The PostgreSQL client Job in `perf-platform` uses the existing admin and control-plane database Secrets, creates only missing `perfeng_migration` and `perfeng_runtime` roles, rejects unsafe existing attributes, applies fixed database privileges and verifies both logins. The registry Job in `perf-generators` mounts `perfeng-execution-registry` as a Docker config and uses the pinned `crane` image to request the three reviewed digest images. Its success proves pull access at that moment, not future availability.
+The AWS CLI Job in `perf-platform` uses `perfeng-s3-auth` to check or create only `perfeng-artifacts`. A lookup failure other than a reported 404 stops before creation. The PostgreSQL client Job in `perf-platform` uses the existing admin and control-plane database Secrets, creates only missing `perfeng_migration` and `perfeng_runtime` roles, rejects unsafe existing attributes, applies fixed database privileges and verifies both logins. The registry Job in `perf-generators` mounts `perfeng-execution-registry` as a Docker config and uses the pinned `crane` image to request the three reviewed digest images. Its success proves manifest/digest access at that moment; image-layer downloads and complete manifest-byte verification remain separate checks.
 
 Job Pods do not mount Kubernetes API tokens. The workflow ServiceAccount has Git-read and `kube-system` read rights for preflight plus create/get/watch on Jobs in the two named namespaces. It cannot create Secrets or manage Deployments/PVCs. Only trusted operators may submit Workflows in this namespace during the local pilot. M06 still needs submission admission, per-operator identity, external Secret delivery, backup/restore and durable workflow evidence for a shared environment.
 
@@ -47,3 +47,13 @@ deliberately incorrect fixture credential, fresh first/repeat Jobs preserve
 the bucket, a sentinel object and the good Secrets. This uses a direct internal
 S3 listener and emptyDir, not the production proxy/PVC topology. It does not
 establish full-parent execution, registry parity, backup or operational cutover.
+
+The [registry CI slice](release-workflows-integration.md#execution-registry-manifest-access)
+uses the owner-selected ephemeral `GITHUB_TOKEN` with package-read permission
+and a package-side repository Read grant. First/repeat/corrected native Jobs
+must return all three pinned digests; an invalid credential must produce an
+owning-Job authorization refusal. Only fixture administration replaces its
+test Secret, and all four Job identities remain. Here registry access means
+manifest/digest access: `crane digest` does not download layers or guarantee a
+full manifest-byte hash check like the retained host verifier. No operational
+cutover or script retirement follows from this child-level gate.

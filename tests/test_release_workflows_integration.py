@@ -42,6 +42,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         self.assertEqual(set(events), {"pull_request", "workflow_dispatch"})
         self.assertEqual(workflow["permissions"], {"contents": "read"})
         job = workflow["jobs"]["maintenance-verifier"]
+        self.assertEqual(job["permissions"], {"contents": "read", "packages": "read"})
         self.assertEqual(job["runs-on"], "ubuntu-latest")
         self.assertLessEqual(job["timeout-minutes"], 30)
         self.assertIn("head.repo.full_name == github.repository", job["if"])
@@ -132,7 +133,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
                     self.assertEqual(required, supplied)
                     seen.add(ref["template"])
         self.assertEqual(seen, {"root", "receipt", "pointer", "create-receipt", "create-pointer"})
-        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh"):
+        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh", "registry.sh"):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
                 ast.parse(python, filename=f"{script} fixture Python {index}")
@@ -351,6 +352,90 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             self.assertEqual(identities[0]["actions"], ["Admin", "Read", "Write", "List"])
             self.assertNotEqual(credentials[0], credentials[1])
 
+    def test_registry_fixture_reuses_the_child_with_private_credential_lifecycle(self):
+        workflow = yaml.safe_load((FIXTURE / "registry-workflow.yaml").read_text())
+        production = yaml.safe_load(
+            (ROOT / "gitops/release-workflows/prepare-execution-registry.yaml").read_text()
+        )
+        spec = workflow["spec"]
+        self.assertEqual(spec["serviceAccountName"], "release-external-state")
+        self.assertLessEqual(spec["activeDeadlineSeconds"], 300)
+        self.assertEqual(
+            spec["templates"][0]["steps"][0][0]["templateRef"],
+            {"name": production["metadata"]["name"], "template": "run"},
+        )
+        self.assertEqual(set(spec["templates"][0]), {"name", "steps", "outputs"})
+        source = SCRIPT.read_text()
+        self.assertLess(source.index("registry_credentials\n"), source.index("unset GITHUB_TOKEN"))
+        self.assertLess(
+            source.index('source "$source_dir/bucket.sh"'), source.index("registry_cases\n")
+        )
+        self.assertIn(
+            '"$fixture/registry-approved.secret.json"',
+            source[source.index("finish()") : source.index("trap finish EXIT")],
+        )
+
+    def test_registry_credentials_use_only_the_private_token_and_actions_actor(self):
+        source = (FIXTURE / "registry.sh").read_text()
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]
+        token, actor = "fixture-ephemeral-token-no-real-authority", "fixture-ci-actor"
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "token").write_text(token)
+            result = subprocess.run(
+                [sys.executable, "-", temporary],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+                cwd=ROOT,
+                env={**os.environ, "GITHUB_ACTOR": actor},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout + result.stderr, "")
+            passwords = []
+            for label in ("approved", "denied"):
+                value = json.loads((directory / f"registry-{label}.secret.json").read_text())
+                self.assertTrue(value["immutable"])
+                self.assertEqual(value["type"], "kubernetes.io/dockerconfigjson")
+                self.assertEqual(
+                    value["metadata"],
+                    {
+                        "name": "perfeng-execution-registry",
+                        "namespace": "perf-generators",
+                        "labels": {
+                            "app.kubernetes.io/managed-by": "perfeng-environment",
+                            "perfeng.io/purpose": "execution-image-pull",
+                        },
+                    },
+                )
+                config = json.loads(base64.b64decode(value["data"][".dockerconfigjson"]))
+                self.assertEqual(set(config["auths"]), {"ghcr.io"})
+                credential = config["auths"]["ghcr.io"]
+                self.assertEqual(credential["username"], actor)
+                self.assertEqual(
+                    base64.b64decode(credential["auth"]).decode(),
+                    actor + ":" + credential["password"],
+                )
+                passwords.append(credential["password"])
+            self.assertEqual(passwords[0], token)
+            self.assertNotEqual(passwords[1], token)
+            expected = json.loads((directory / "registry-expected.json").read_text())
+            self.assertEqual(set(expected), {"k6", "kube-burner", "analysis"})
+            self.assertTrue(all(re.fullmatch(r"sha256:[0-9a-f]{64}", d) for d in expected.values()))
+            (directory / "token").write_text("private-token-with-newline\n")
+            refused = subprocess.run(
+                [sys.executable, "-", temporary],
+                input=code,
+                text=True,
+                capture_output=True,
+                timeout=20,
+                cwd=ROOT,
+                env={**os.environ, "GITHUB_ACTOR": actor},
+            )
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertNotIn("private-token-with-newline", refused.stdout + refused.stderr)
+
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_shell_syntax_and_unsupported_runners_refuse_before_side_effects(self):
         assert BASH is not None
@@ -360,13 +445,14 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "recovery.sh",
             FIXTURE / "database.sh",
             FIXTURE / "bucket.sh",
+            FIXTURE / "registry.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
             )
             self.assertEqual(syntax.returncode, 0, syntax.stderr)
             self.assertNotIn(b"\r", script.read_bytes())
-        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh"):
+        for script in ("ledger.sh", "recovery.sh", "database.sh", "bucket.sh", "registry.sh"):
             standalone = subprocess.run(
                 [BASH, (FIXTURE / script).as_posix()], capture_output=True, timeout=20
             )

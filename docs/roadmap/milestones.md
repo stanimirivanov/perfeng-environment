@@ -337,6 +337,14 @@ its deliberately wrong initial credential. Direct internal S3/emptyDir does not
 prove production proxy/storage behavior. Registry and full-parent release
 acceptance, migration and operational cutover remain separate gates.
 
+The registry CI slice uses the owner-approved ephemeral repository identity
+and package-read permission ([ADR 0019](../decisions/0019-use-ci-identity-for-registry-parity.md)).
+It checks all three manifest digests on first/repeat/corrected native Jobs and
+an invalid-credential refusal, retaining Job and Secret evidence. Package owners
+must grant repository Actions Read access for private packages. This does not
+prove layer downloads, full manifest-byte hashing, parent release execution or
+retirement of the host verifier.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
