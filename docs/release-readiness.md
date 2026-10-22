@@ -67,6 +67,22 @@ UIDs remain stable/retained. This adds installed observer parity; real workload
 health, Argo CD reconciliation and full reviewed-request parent acceptance
 remain open.
 
+## Complete-parent CI acceptance
+
+The final [trusted-main acceptance phase](release-workflows-integration.md#complete-release-readiness-parent)
+submits this unchanged parent against the actual selected server, foundation
+charts and real Argo CD after their individual prerequisites. The same pinned
+Git request binds the real disposable cluster UID. First/repeat/corrected results
+must match the schema, nested preflight and API resource identities/generations.
+Wrong-digest preflight and revoked named Application-read failures must stop at
+their owning nodes without readiness evidence or downstream execution; the
+fixture explicitly restores the existing grant before a fresh correction.
+
+Existing credentials and permissions remain unchanged. This acceptance runs
+only after merge in the isolated trusted-main job; offline tests are not live
+parent evidence. Product acceptance, dependency recovery, adoption/promotion,
+root/foundation Application activation and measured host retirement remain open.
+
 ## Verifier package lifecycle
 
 The next prerequisite is [selected migration-image CI parity](release-workflows-integration.md#selected-migration-image-parity):

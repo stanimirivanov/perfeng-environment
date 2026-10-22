@@ -458,6 +458,16 @@ acceptance awaits the post-merge main run. Complete readiness/adoption, foundati
 Application adoption, production security/recovery and script retirement remain
 open; no production verifier/template or host entrypoint changes.
 
+Complete readiness-parent acceptance now composes the unchanged production parent
+after real Argo CD, actual foundation charts and selected-server prerequisites.
+The same pinned Git request must produce schema-valid first/repeat/corrected
+results bound to nested preflight and API identities/generations. Wrong-digest
+and revoked Application-read cases must stop at their owning nodes, with no
+readiness result or downstream verification. Existing grants/credentials remain
+unchanged; live acceptance awaits the post-merge trusted-main run. Adoption,
+promotion/recovery, root/foundation activation, product qualification and measured
+script retirement remain separate; production templates/verifiers are unchanged.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

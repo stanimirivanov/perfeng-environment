@@ -31,6 +31,16 @@
 
 ## Disposable Argo CD acceptance
 
+For complete readiness-parent CI, inspect `readiness-parent-*.workflow.json`,
+worker projections and constant outcomes. The wrong digest must fail only at
+`verify-identities`; a deliberately revoked Application-read grant must fail
+only at `application`, after successful preflight/foundation observations.
+Artifact/image/network/timeout errors are unexpected failures, not evidence of
+these refusals. Restore only the checked-in readiness Application-read bootstrap
+grant before a fresh submission; never broaden RBAC, substitute observations,
+retry successful nodes or change a published verifier to obtain a result.
+See [complete parent acceptance](release-workflows-integration.md#complete-release-readiness-parent).
+
 For disposable trusted-main Argo CD acceptance, inspect `argocd-*.failure.json`
 for safe sync/health/operation phases and condition types. Verify the selected
 bootstrap and private repository access before changing manifests. Installation,

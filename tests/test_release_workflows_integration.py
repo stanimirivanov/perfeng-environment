@@ -150,6 +150,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "runtime-grants.sh",
             "server.sh",
             "argocd.sh",
+            "readiness-parent.sh",
         ):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
@@ -801,6 +802,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "runtime-grants.sh",
             FIXTURE / "server.sh",
             FIXTURE / "argocd.sh",
+            FIXTURE / "readiness-parent.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
