@@ -782,6 +782,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "observer.sh",
             FIXTURE / "preflight.sh",
             FIXTURE / "preflight-parent.sh",
+            FIXTURE / "maintenance-parent.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
