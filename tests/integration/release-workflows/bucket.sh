@@ -4,60 +4,9 @@ set -euo pipefail
 [[ ${GITHUB_ACTIONS:-} == true && ${RUNNER_ENVIRONMENT:-} == github-hosted && ${RUNNER_OS:-} == Linux ]] || exit 2
 [[ -n ${fixture:-} && -f $fixture/owned && ${KUBECONFIG:-} == "$fixture/kubeconfig" ]] || exit 2
 declare -F k a > /dev/null || exit 2
-for grant in serviceaccount workflow-access platform-jobs; do
-  k apply -f "gitops/release-workflows/rbac/external-state/$grant.yaml"
-done
-uv run --locked --offline python - "$fixture" <<'PY'
-import base64, json, secrets, sys
-from pathlib import Path
-directory = Path(sys.argv[1])
-access, secret, denied_access, denied_secret = secrets.token_hex(16), secrets.token_hex(32), secrets.token_hex(16), secrets.token_hex(32)
-def config(access, secret):
-    return {"identities": [{"name": "local-bootstrap", "credentials": [{"accessKey": access, "secretKey": secret}],
-        "actions": ["Admin", "Read", "Write", "List"]}]}
-def document(name, values):
-    return dict(apiVersion="v1", kind="Secret", type="Opaque", immutable=True,
-        metadata=dict(name=name, namespace="perf-platform", labels={"app.kubernetes.io/managed-by": "perfeng-environment"}),
-        data={k: base64.b64encode(v.encode()).decode() for k, v in values.items()})
-profiles = f"[default]\naws_access_key_id={access}\naws_secret_access_key={secret}\n[denied]\naws_access_key_id={denied_access}\naws_secret_access_key={denied_secret}\n"
-server = document("bucket-ci-auth", {"s3.json": json.dumps(config(access, secret)), "credentials": profiles})
-(directory / "bucket-server-auth.json").write_text(json.dumps(server))
-for label, key, password in (("approved", access, secret), ("denied", denied_access, denied_secret)):
-    value = document("perfeng-s3-auth", {"access-key": key, "secret-key": password, "s3.json": json.dumps(config(key, password))})
-    (directory / f"bucket-client-{label}.json").write_text(json.dumps(value))
-PY
-k create -f "$fixture/bucket-server-auth.json"
-k create -f "$fixture/bucket-client-denied.json"
-for manifest in seaweedfs-pod seaweedfs-service bucket-observer; do k create -f "$source_dir/$manifest.yaml"; done
-k -n perf-platform wait --for=condition=Ready pod/bucket-ci-seaweedfs pod/bucket-ci-observer --timeout=180s
-observer() {
-  timeout 90s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --request-timeout=20s \
-    -n perf-platform exec -i bucket-ci-observer -- "$@"
-}
-s3() {
-  observer env "AWS_PROFILE=$1" aws --endpoint-url http://seaweedfs.perf-platform.svc.cluster.local:8333 \
-    --cli-connect-timeout 10 --cli-read-timeout 30 s3api "${@:2}"
-}
-bucket_secrets() {
-  k -n perf-platform get secrets perfeng-s3-auth bucket-ci-auth -o json \
-    | jq -S '.items | sort_by(.metadata.name)' > "$1"
-}
-bucket_jobs() {
-  k -n perf-platform get jobs -l perfeng.io/purpose=release-external-state -o json \
-    | jq -r '.items[].metadata.name | select(startswith("perfeng-prepare-bucket-v1-"))' | sort
-}
-bucket_absence() {
-  if s3 default head-bucket --bucket perfeng-artifacts > "$fixture/bucket-head.out" 2> "$fixture/bucket-head.error"; then
-    echo 'Expected an absent fixture bucket' >&2; exit 1
-  fi
-  grep -Eq '\(404\)|Not Found' "$fixture/bucket-head.error"
-}
-bucket_allocation_diagnostics() {
-  # Emit only known allocation signals/counts, never raw server logs or keys.
-  k -n perf-platform logs bucket-ci-seaweedfs -c seaweedfs --tail=120 --limit-bytes=32768 2>/dev/null \
-    | grep -Eo 'No writable volumes|no free volumes|No matching data node found|Not enough data nodes found|create [0-9]+ volume, created [0-9]+' \
-    | sort -u > "$results/bucket-allocation.txt" || :
-}
+source "$source_dir/external-state-fixtures.sh"
+bucket_setup
+
 bucket_case() {
   bucket_label=$1 bucket_expected=$2
   echo "Bucket case: $bucket_label ($bucket_expected)"

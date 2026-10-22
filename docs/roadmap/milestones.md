@@ -387,6 +387,16 @@ main acceptance. Applications remain fixtures; actual maintenance writes,
 full readiness/external-state/adoption composition, recovery/export, promotion
 and measured host-script retirement remain open.
 
+Complete external-state composition is the next trusted-main slice: the same
+real-UID request must pass preflight/selection and bucket/database/registry Jobs.
+First/repeat, zero-Job bad-digest refusal, denied-bucket and unsafe-role stopping
+boundaries, fresh correction and retained provider/credential identities are
+required. The owner approved package-read access in the existing write-capable
+main job ([ADR 0021](../decisions/0021-authorize-trusted-main-external-state-parity.md)).
+Live acceptance is pending its post-merge run. Providers remain transient;
+real readiness/adoption, migrations, promotion/recovery/export, full registry
+byte verification and the original 13-entrypoint retirement gate remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

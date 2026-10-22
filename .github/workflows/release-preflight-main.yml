@@ -1,4 +1,4 @@
-name: Release preflight and maintenance composition on trusted main
+name: Release parent composition on trusted main
 
 on:
   push:
@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      packages: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,7 +36,7 @@ jobs:
         with:
           version: "0.12.5"
       - run: uv sync --locked
-      - name: Accept production preflight and maintenance parents on an owned cluster
+      - name: Accept production release parents on an owned cluster
         run: make release-workflows-integration
         env:
           RELEASE_KIND_MODE: preflight-parent
