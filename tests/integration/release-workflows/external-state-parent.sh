@@ -20,7 +20,7 @@ external_inventory() {
       .metadata.namespace + "/" + .metadata.name' | sort
 }
 external_secrets() {
-  k -n perf-platform get secrets perfeng-postgres-auth perfeng-control-plane-database perfeng-s3-auth bucket-ci-auth -o json \
+  k -n perf-platform get secrets perfeng-postgres-auth perfeng-control-plane-database perfeng-s3-auth bucket-ci-auth perfeng-s3-server-auth-v3 -o json \
     | jq -S '.items | sort_by(.metadata.name)' > "$fixture/external-platform-secrets.json"
   k -n perf-generators get secret perfeng-execution-registry -o json | jq -S . > "$fixture/external-registry-secret.json"
   k -n argo-workflows get secret release-git-read -o json | jq -S . > "$fixture/external-git-secret.json"
@@ -177,3 +177,5 @@ done
 [[ $(k auth can-i create pods --subresource=exec -n perf-platform --as "$identity" || :) == no ]]
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 echo 'Complete external-state parent passed; deployment, migration, recovery and retirement remain separate.'
+
+seaweedfs_chart_retention

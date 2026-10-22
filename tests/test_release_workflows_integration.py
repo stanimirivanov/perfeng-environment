@@ -140,6 +140,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "database.sh",
             "external-state-fixtures.sh",
             "postgres-chart.sh",
+            "seaweedfs-chart.sh",
             "bucket.sh",
             "registry.sh",
             "readiness.sh",
@@ -549,6 +550,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
                 ("service", "service"),
                 ("deployment", "deployment"),
                 ("postgres", "statefulset"),
+                ("seaweedfs", "statefulset"),
             ],
         )
         source = SCRIPT.read_text()
@@ -784,6 +786,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "database.sh",
             FIXTURE / "external-state-fixtures.sh",
             FIXTURE / "postgres-chart.sh",
+            FIXTURE / "seaweedfs-chart.sh",
             FIXTURE / "bucket.sh",
             FIXTURE / "registry.sh",
             FIXTURE / "readiness.sh",
@@ -807,6 +810,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             "database.sh",
             "external-state-fixtures.sh",
             "postgres-chart.sh",
+            "seaweedfs-chart.sh",
             "bucket.sh",
             "registry.sh",
             "readiness.sh",

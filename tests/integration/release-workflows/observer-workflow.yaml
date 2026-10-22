@@ -83,3 +83,18 @@ spec:
           - name: postgres
             valueFrom:
               parameter: '{{steps.postgres.outputs.parameters.observation}}'
+    - name: seaweedfs
+      steps:
+        - - name: seaweedfs
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: seaweedfs
+      outputs:
+        parameters:
+          - name: seaweedfs
+            valueFrom:
+              parameter: '{{steps.seaweedfs.outputs.parameters.observation}}'
