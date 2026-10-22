@@ -4,6 +4,10 @@
 - Date: 2026-10-22
 - Milestone: M06 — Production Readiness
 
+The later owner-approved [ADR 0023](0023-authorize-disposable-argocd-source-access.md)
+extends the credential boundary for disposable Argo CD acceptance only. The
+checkout-only restrictions below describe this original server-parity slice.
+
 ## TL;DR
 
 - The owner approved the existing contents-read token for one additional trusted-main checkout of the selected private `perfeng-k8s` commit.

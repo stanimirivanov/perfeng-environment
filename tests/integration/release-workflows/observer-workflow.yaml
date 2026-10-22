@@ -57,6 +57,17 @@ spec:
           - name: service
             valueFrom:
               parameter: '{{steps.service.outputs.parameters.observation}}'
+    - name: application
+      steps:
+        - - name: application
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: application
+      outputs:
+        parameters:
+          - name: application
+            valueFrom:
+              parameter: '{{steps.application.outputs.parameters.observation}}'
     - name: deployment
       steps:
         - - name: deployment

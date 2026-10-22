@@ -47,6 +47,9 @@ finish() {
     if [[ $rc == 0 && $cleanup_rc != 0 ]]; then rc=$cleanup_rc; fi
   fi
   rm -f "$fixture/token" "$fixture/username" "$fixture/registry-approved.secret.json" "$fixture/registry-denied.secret.json"
+  if [[ $mode == preflight-parent ]]; then
+    rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json"
+  fi
   exit "$rc"
 }
 trap finish EXIT

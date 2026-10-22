@@ -149,6 +149,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "migration-image.sh",
             "runtime-grants.sh",
             "server.sh",
+            "argocd.sh",
         ):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
@@ -548,6 +549,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
                 ("application", "application"),
                 ("deployment", "deployment"),
                 ("service", "service"),
+                ("application", "application"),
                 ("deployment", "deployment"),
                 ("postgres", "statefulset"),
                 ("seaweedfs", "statefulset"),
@@ -798,6 +800,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "migration-image.sh",
             FIXTURE / "runtime-grants.sh",
             FIXTURE / "server.sh",
+            FIXTURE / "argocd.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20

@@ -17,8 +17,9 @@
 - Database/bucket parity uses transient PostgreSQL/SeaweedFS and generated
   credentials; it does not deploy production charts, test retained storage,
   prove the production S3 proxy boundary or execute migrations.
-- The test refuses local/self-hosted execution. No retained cluster or
-  environment credential is used; only non-secret results are uploaded.
+- The test refuses local/self-hosted execution. No retained cluster is used;
+  only non-secret results are uploaded. Trusted-main private source access has
+  the explicit credential exception described below.
 - A separate [trusted-main workflow](../.github/workflows/release-preflight-main.yml)
   accepts the complete production preflight using a generated Git request for
   its real disposable cluster UID; see [ADR 0020](decisions/0020-publish-disposable-ci-release-requests.md).
@@ -31,6 +32,10 @@
 - A later CI-only phase runs the selected image's embedded migrator on the
   initially empty disposable schema, with fresh maintenance evidence before
   each attempt. It does not introduce a production migration entrypoint.
+- The final trusted-main phase installs actual Argo CD from the selected
+  infrastructure bootstrap and manually syncs private control-plane sources,
+  including real Service drift/correction. This separately approved phase uses
+  an ephemeral exact-URL source-token Secret; see [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md).
 
 ## Invocation and isolation
 
@@ -830,6 +835,42 @@ the fixture UID with a live value or reuse its initial-promotion intent against
 an existing environment. A successful complete parent with an actual reviewed
 cluster request, parent composition, promotion/recovery and script retirement
 remain open. Production verifier code remains two files/708 physical lines.
+
+## Actual Argo CD convergence
+
+After foundation chart and selected-server acceptance, trusted-main installs the
+infrastructure lock's Argo CD bootstrap from its validated clean pinned checkout.
+Earlier phases retain the minimal CRD; this final phase installs the actual
+controller and never writes Application status.
+
+The owner-approved [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md)
+extends the existing contents-read credential to that checkout and one immutable
+repository Secret for the exact private `perfeng-k8s` URL. Its underlying rights
+are not attenuated. An exclusive private runner file transfers the token from a
+dedicated staging step; it is absent from the acceptance step environment, Git,
+Helm values and artifacts. Remove it after Secret creation and on failure;
+owned cluster teardown removes the Secret. PR CI receives no source token.
+
+Mark the root `skip-reconcile` before installing the controller. The selected
+Application keeps its exact committed sources/values/destination and disabled
+automatic sync. Manual operations do not prune, force or replace. Each fresh
+operation must complete with its case marker, exact compared sources/revisions,
+`Synced`/`Healthy` and no conditions. The unchanged production Application observer
+then succeeds first/repeat. Compare stable observation fields; generation can
+change across controller status and operation updates.
+
+Change the live Service target port to 8081. Require the controller to report
+that Service `OutOfSync`, with no pending operation, while the wrong port remains.
+A fresh manual sync restores the selected `http` target and observer success.
+Compare resource UIDs, PVC bindings, ConfigMap/Secret data, schema/roles and
+sentinel bytes across adoption/correction. Secret snapshots and raw diagnostics
+remain private; results contain selected Application status, observer Workflows
+and constant drift evidence.
+
+Live evidence comes only from post-merge trusted-main CI. This does not establish
+root/foundation Application adoption or complete release readiness. Production
+templates/verifier budget and original host entrypoints remain unchanged; there
+is no script-retirement credit.
 
 ## Verification and remaining gates
 
