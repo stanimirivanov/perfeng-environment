@@ -416,6 +416,17 @@ is pending. No production grant owner, template or CI permission changes; actual
 server/chart/runtime-package wiring and complete readiness/adoption remain open,
 alongside populated upgrades/recovery, promotion and measured script retirement.
 
+Selected server parity follows runtime grants in trusted-main CI. Render the
+actual pinned Helm chart and immutable Kustomize package using the owner-approved
+private checkout ([ADR 0022](../decisions/0022-use-pinned-source-for-server-parity.md)).
+Require original native Deployment/Service observations and production HTTP
+probes on the actual image, first/repeat success, stopped-server refusal and
+fresh correction with retained Deployment/Service/credential identities. Live
+acceptance is pending its post-merge main run. Static operational endpoints do
+not establish dependency recovery. Complete readiness/adoption, real Argo CD
+reconciliation, foundation storage proof, populated upgrades/recovery, promotion
+and measured retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
