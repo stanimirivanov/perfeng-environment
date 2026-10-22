@@ -26,6 +26,75 @@ JQ = shutil.which("jq")
 
 
 class ArgoCDIntegrationTests(unittest.TestCase):
+    def test_seaweedfs_uses_only_reviewed_pin_and_automation_overrides(self):
+        path = ROOT / MODULE.FOUNDATION_APPLICATIONS["seaweedfs"]
+        raw = path.read_bytes()
+        expected = yaml.safe_load(raw)
+        expected["spec"]["source"]["targetRevision"] = "a" * 40
+        expected["spec"]["syncPolicy"]["automated"] = {
+            "enabled": False,
+            "prune": False,
+            "selfHeal": False,
+        }
+        self.assertEqual(MODULE.foundation_application("a" * 40, "seaweedfs"), expected)
+        self.assertEqual(path.read_bytes(), raw)
+        for workload in ("../seaweedfs", "root", "control-plane", ""):
+            with self.subTest(workload=workload), self.assertRaises(ValueError):
+                MODULE.foundation_application("a" * 40, workload)
+        for revision in ("main", "a" * 39, "A" * 40, "a" * 40 + "\n"):
+            with self.subTest(revision=revision), self.assertRaises(ValueError):
+                MODULE.foundation_application(revision, "seaweedfs")
+
+    def test_seaweedfs_convergence_requires_its_own_source_uid_and_fresh_operation(self):
+        revision = "a" * 40
+        spec = MODULE.foundation_application(revision, "seaweedfs")["spec"]
+        original: dict[str, Any] = {
+            "metadata": {"uid": "owned-seaweedfs"},
+            "spec": spec,
+            "status": {
+                "sync": {
+                    "status": "Synced",
+                    "revision": revision,
+                    "comparedTo": {"source": spec["source"], "destination": spec["destination"]},
+                },
+                "health": {"status": "Healthy"},
+                "operationState": {
+                    "phase": "Succeeded",
+                    "syncResult": {"revision": revision, "source": spec["source"]},
+                    "operation": {
+                        "info": [{"name": "ci-case", "value": "repeat"}],
+                        "sync": {"revision": revision, "syncStrategy": {"apply": {}}},
+                    },
+                },
+            },
+        }
+        MODULE.foundation_converged(original, "owned-seaweedfs", "repeat", revision, "seaweedfs")
+        for field, replacement in (
+            ("metadata.uid", "foreign"),
+            ("spec.source.path", "charts/postgres"),
+            ("spec.syncPolicy.automated.enabled", True),
+            ("status.sync.status", "OutOfSync"),
+            ("status.sync.revision", "b" * 40),
+            ("status.health.status", "Progressing"),
+            ("status.conditions", [{"type": "ComparisonError"}]),
+            ("status.sync.comparedTo.source", {}),
+            ("status.operationState.phase", "Failed"),
+            ("status.operationState.syncResult.source", {}),
+            ("status.operationState.operation.info", []),
+            ("status.operationState.operation.sync.manifests", ["local-override"]),
+        ):
+            with self.subTest(field=field):
+                value = copy.deepcopy(original)
+                target = value
+                *parents, key = field.split(".")
+                for parent in parents:
+                    target = target[parent]
+                target[key] = replacement
+                with self.assertRaises(AssertionError):
+                    MODULE.foundation_converged(
+                        value, "owned-seaweedfs", "repeat", revision, "seaweedfs"
+                    )
+
     def test_environment_secret_is_exact_url_and_other_sources_are_refused(self):
         secret = MODULE.repository_secret("private-test-value", MODULE.ENVIRONMENT_REPOSITORY)
         self.assertEqual(secret["metadata"]["name"], "ci-perfeng-environment-repository")
@@ -123,6 +192,7 @@ class ArgoCDIntegrationTests(unittest.TestCase):
         for application in (
             yaml.safe_load((ROOT / MODULE.APPLICATION).read_text()),
             MODULE.postgres_application("a" * 40),
+            MODULE.foundation_application("a" * 40, "seaweedfs"),
         ):
             with self.subTest(application=application["metadata"]["name"]):
                 application["metadata"]["resourceVersion"] = "23"

@@ -31,6 +31,15 @@
 
 ## Disposable Argo CD acceptance
 
+For SeaweedFS Application adoption, inspect `seaweedfs-application-*.json` and
+`seaweedfs-chart-adopt-*` native/peer evidence. A timeout, comparison failure or
+unexpectedly reachable private port is a failure, not the deliberate Service
+name drift. Confirm exact chart revision, real proxy access and the existing
+repository authorization before changing configuration. Preserve credentials,
+proxy data, PVC/PV and sentinel evidence; do not force/replace a StatefulSet,
+recreate storage, enable root/automatic sync or upload raw logs/Secret snapshots.
+See [SeaweedFS Application acceptance](release-workflows-integration.md#seaweedfs-application-adoption).
+
 For PostgreSQL Application adoption, inspect `postgres-application-*.json` and
 `postgres-chart-adopt-*.workflow.json`/`*.client.json`. Check the selected source
 commit and exact environment repository access before changing manifests. A

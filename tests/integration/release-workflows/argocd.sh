@@ -67,7 +67,10 @@ external_secrets "$fixture/argocd-external-before.json"
 
 argocd_sync() {
   local application=$1 label=$2
-  [[ $application == perfeng-local-control-plane || $application == perfeng-local-postgres ]] || return 2
+  case "$application" in
+    perfeng-local-control-plane|perfeng-local-postgres|perfeng-local-seaweedfs) ;;
+    *) return 2 ;;
+  esac
   echo "Argo CD convergence case: $application $label"
   k -n argocd get application "$application" -o json \
     | jq --arg label "$label" '{metadata:{resourceVersion:.metadata.resourceVersion},operation:{

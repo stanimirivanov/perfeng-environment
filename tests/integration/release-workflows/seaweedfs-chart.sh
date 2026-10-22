@@ -112,3 +112,94 @@ seaweedfs_chart_retention() {
   done
   echo 'SeaweedFS proxy/PVC retention passed; production IAM and recovery remain separate.'
 }
+
+seaweedfs_application_state() {
+  local prefix=$1 pv
+  seaweedfs_chart_storage "$prefix.storage.json"
+  pv=$(jq -er .volume "$prefix.storage.json")
+  k get pv "$pv" -o json | jq -S '{uid:.metadata.uid,name:.metadata.name,claim:.spec.claimRef.uid}' > "$prefix.pv.json"
+  k -n perf-platform get service seaweedfs -o json | jq -S '{uid:.metadata.uid,spec}' > "$prefix.service.json"
+  k -n perf-platform get configmap seaweedfs-proxy -o json \
+    | jq -S '{uid:.metadata.uid,data,binaryData,immutable}' > "$prefix.proxy.json"
+  k -n perf-platform get statefulset seaweedfs -o json \
+    | jq -S '{uid:.metadata.uid,selector:.spec.selector,service:.spec.serviceName,claims:.spec.volumeClaimTemplates,
+      labels:.spec.template.metadata.labels,podSpec:.spec.template.spec}' > "$prefix.statefulset.json"
+  external_secrets "$prefix.credentials.json"
+  s3 default head-object --bucket perfeng-artifacts --key ci/parent-sentinel.bin > "$prefix.object.json"
+  s3 default get-object --bucket perfeng-artifacts --key ci/parent-sentinel.bin /tmp/seaweedfs-application-retained.bin > "$prefix.download.json"
+  observer cat /tmp/seaweedfs-application-retained.bin > "$prefix.bytes"
+  k -n argocd get applications perfeng-local-root perfeng-local-control-plane perfeng-local-postgres -o json \
+    | jq -S '[.items[] | {uid:.metadata.uid,spec,skip:.metadata.annotations["argocd.argoproj.io/skip-reconcile"]}] | sort_by(.uid)' > "$prefix.other-applications.json"
+}
+
+seaweedfs_application_acceptance() {
+  local revision application_uid label field first_pod before_pod name uid
+  declare -F argocd_sync external_secrets postgres_application_state > /dev/null || return 2
+  echo 'SeaweedFS Application: adopt the prepared proxy and retained object store'
+  revision=$(jq -er '."selection-revision"' "$fixture/parent-parameters.json")
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" seaweedfs "$revision" "$fixture/seaweedfs-application.json"
+  postgres_application_state "$fixture/seaweedfs-application-postgres-before"
+  [[ $(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}') == "$(jq -er .after "$results/postgres-application-pod-uids.json")" ]]
+  seaweedfs_application_state "$fixture/seaweedfs-application-before"
+  cmp "$fixture/external-sentinel.bin" "$fixture/seaweedfs-application-before.bytes"
+  before_pod=$(k -n perf-platform get pod "$bucket_server_pod" -o jsonpath='{.metadata.uid}')
+  k create -f "$fixture/seaweedfs-application.json"
+  application_uid=$(k -n argocd get application perfeng-local-seaweedfs -o jsonpath='{.metadata.uid}')
+  k -n argocd wait application/perfeng-local-seaweedfs --for="jsonpath={.status.sync.revision}=$revision" --timeout=240s
+  k -n argocd get application perfeng-local-seaweedfs -o json \
+    | jq -e '(.status.conditions // [] | length)==0 and (.status.sync.status=="Synced" or .status.sync.status=="OutOfSync")' > /dev/null
+  for label in first repeat corrected; do
+    if [[ $label == corrected ]]; then
+      k -n perf-platform patch service seaweedfs --type=json \
+        -p '[{"op":"test","path":"/spec/ports/0/name","value":"s3"},{"op":"replace","path":"/spec/ports/0/name","value":"s3-ci-drift"}]'
+      k -n argocd annotate application perfeng-local-seaweedfs argocd.argoproj.io/refresh=hard --overwrite
+      k -n argocd wait application/perfeng-local-seaweedfs --for=jsonpath='{.status.sync.status}'=OutOfSync --timeout=180s
+      k -n argocd get application perfeng-local-seaweedfs -o json \
+        | jq -e '.spec.syncPolicy.automated=={enabled:false,prune:false,selfHeal:false} and .operation==null and
+          ([.status.resources[] | select(.kind=="Service" and .name=="seaweedfs" and .status=="OutOfSync")]|length)==1' > /dev/null
+      [[ $(k -n perf-platform get service seaweedfs -o jsonpath='{.spec.ports[0].name}') == s3-ci-drift ]]
+      printf '%s\n' 'SeaweedFS Service drift observed without automatic repair' > "$results/seaweedfs-application-drift.outcome.txt"
+    fi
+    argocd_sync perfeng-local-seaweedfs "$label"
+    k -n argocd get application perfeng-local-seaweedfs -o json > "$fixture/seaweedfs-application-current.json"
+    PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" seaweedfs-converged \
+      "$fixture/seaweedfs-application-current.json" "$application_uid" "$label" "$revision"
+    jq '{uid:.metadata.uid,spec,sync:.status.sync,health:.status.health,phase:.status.operationState.phase,case:.status.operationState.operation.info}' \
+      "$fixture/seaweedfs-application-current.json" > "$results/seaweedfs-application-$label.json"
+    k -n perf-platform rollout status statefulset/seaweedfs --timeout=360s
+    k -n perf-platform wait --for=condition=Ready "pod/$bucket_server_pod" --timeout=120s
+    seaweedfs_chart_observe "adopt-$label"
+    seaweedfs_chart_peer "adopt-$label"
+    seaweedfs_application_state "$fixture/seaweedfs-application-$label"
+    for field in storage pv service proxy statefulset credentials object other-applications; do
+      cmp "$fixture/seaweedfs-application-before.$field.json" "$fixture/seaweedfs-application-$label.$field.json"
+    done
+    cmp "$fixture/seaweedfs-application-before.bytes" "$fixture/seaweedfs-application-$label.bytes"
+    if [[ $label == first ]]; then
+      first_pod=$(k -n perf-platform get pod "$bucket_server_pod" -o jsonpath='{.metadata.uid}')
+    else
+      [[ $(k -n perf-platform get pod "$bucket_server_pod" -o jsonpath='{.metadata.uid}') == "$first_pod" ]]
+    fi
+  done
+  postgres_application_state "$fixture/seaweedfs-application-postgres-after"
+  for field in storage pv service statefulset external server repository roles acl schema other-applications; do
+    cmp "$fixture/seaweedfs-application-postgres-before.$field.json" "$fixture/seaweedfs-application-postgres-after.$field.json"
+  done
+  for field in canary sentinel; do
+    cmp "$fixture/seaweedfs-application-postgres-before.$field.txt" "$fixture/seaweedfs-application-postgres-after.$field.txt"
+  done
+  [[ $(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}') == "$(jq -er .after "$results/postgres-application-pod-uids.json")" ]]
+  jq -n --arg before "$before_pod" --arg after "$first_pod" '{before:$before,after:$after}' > "$results/seaweedfs-application-pod-uids.json"
+  for label in first repeat corrected; do
+    name=$(jq -er .metadata.name "$results/seaweedfs-chart-adopt-$label.workflow.json")
+    uid=$(jq -er .metadata.uid "$results/seaweedfs-chart-adopt-$label.workflow.json")
+    [[ $(k -n argo-workflows get workflow "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
+    name=$(jq -er .metadata.name "$results/seaweedfs-chart-adopt-$label.peer.json")
+    uid=$(jq -er .metadata.uid "$results/seaweedfs-chart-adopt-$label.peer.json")
+    [[ $(k -n perf-platform get job "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
+  done
+  k -n argocd get application perfeng-local-root -o json \
+    | jq -e '.metadata.annotations["argocd.argoproj.io/skip-reconcile"]=="true" and .spec.syncPolicy.automated.enabled==false and .operation==null' > /dev/null
+  [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
+  echo 'SeaweedFS Application adoption, proxy/private peers and storage/object retention passed; root remains skipped.'
+}

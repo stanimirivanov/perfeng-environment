@@ -478,6 +478,18 @@ Root and SeaweedFS Application adoption, complete release adoption/promotion,
 recovery/security and measured script retirement remain separate. Production
 Application/chart/template/verifier and operator paths remain unchanged.
 
+SeaweedFS Application acceptance follows PostgreSQL using the already approved
+environment repository. The shared foundation validator pins the CI-only manual
+Application; first/repeat/corrected controller and native observations must
+preserve proxy/configuration/credential/storage identities and S3 sentinel
+metadata/bytes. Credential-free peers must still reach 8333 and refuse private
+listeners, and deliberate Service-name drift requires explicit correction.
+PostgreSQL adoption/data and other Application specs remain unchanged; root stays
+skipped. Live acceptance awaits the post-merge trusted-main run. Root activation,
+complete release adoption/promotion, production IAM/recovery/security and
+measured script retirement remain separate; production manifests/verifiers and
+operator paths are unchanged.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
