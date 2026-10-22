@@ -2,7 +2,10 @@
 
 import copy
 import importlib.util
+import json
 import os
+import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -19,9 +22,133 @@ SPEC = importlib.util.spec_from_file_location("argocd_inputs", FIXTURE / "argocd
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+JQ = shutil.which("jq")
 
 
 class ArgoCDIntegrationTests(unittest.TestCase):
+    def test_environment_secret_is_exact_url_and_other_sources_are_refused(self):
+        secret = MODULE.repository_secret("private-test-value", MODULE.ENVIRONMENT_REPOSITORY)
+        self.assertEqual(secret["metadata"]["name"], "ci-perfeng-environment-repository")
+        self.assertEqual(secret["stringData"]["url"], MODULE.ENVIRONMENT_REPOSITORY)
+        self.assertEqual(
+            secret["metadata"]["labels"], {"argocd.argoproj.io/secret-type": "repository"}
+        )
+        self.assertTrue(secret["immutable"])
+        for source in (
+            "https://github.com/stanimirivanov/",
+            MODULE.ENVIRONMENT_REPOSITORY + "/",
+            "https://github.com/stanimirivanov/other.git",
+            "ssh://git@github.com/stanimirivanov/perfeng-environment.git",
+        ):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                MODULE.repository_secret("private-test-value", source)
+
+    def test_postgres_ci_overrides_are_only_pin_and_disabled_automation(self):
+        path = ROOT / MODULE.POSTGRES_APPLICATION
+        original = path.read_bytes()
+        expected = yaml.safe_load(original)
+        expected["spec"]["source"]["targetRevision"] = "a" * 40
+        expected["spec"]["syncPolicy"]["automated"] = {
+            "enabled": False,
+            "prune": False,
+            "selfHeal": False,
+        }
+        self.assertEqual(MODULE.postgres_application("a" * 40), expected)
+        self.assertEqual(path.read_bytes(), original)
+        for revision in ("main", "a" * 39, "A" * 40, "a" * 40 + "\n"):
+            with self.subTest(revision=revision), self.assertRaises(ValueError):
+                MODULE.postgres_application(revision)
+
+    def test_postgres_convergence_refuses_wrong_source_stale_operation_and_partial_sync(self):
+        revision = "a" * 40
+        spec = MODULE.postgres_application(revision)["spec"]
+        original: dict[str, Any] = {
+            "metadata": {"uid": "owned-postgres"},
+            "spec": spec,
+            "status": {
+                "sync": {
+                    "status": "Synced",
+                    "revision": revision,
+                    "comparedTo": {"source": spec["source"], "destination": spec["destination"]},
+                },
+                "health": {"status": "Healthy"},
+                "operationState": {
+                    "phase": "Succeeded",
+                    "syncResult": {"revision": revision, "source": spec["source"]},
+                    "operation": {
+                        "info": [{"name": "ci-case", "value": "repeat"}],
+                        "sync": {"revision": revision, "syncStrategy": {"apply": {}}},
+                    },
+                },
+            },
+        }
+        MODULE.postgres_converged(original, "owned-postgres", "repeat", revision)
+        for field, replacement in (
+            ("metadata.uid", "foreign"),
+            ("spec.source.targetRevision", "main"),
+            ("spec.syncPolicy.automated.enabled", True),
+            ("status.sync.status", "OutOfSync"),
+            ("status.sync.revision", "b" * 40),
+            ("status.health.status", "Progressing"),
+            ("status.conditions", [{"type": "ComparisonError"}]),
+            ("status.sync.comparedTo.source", {}),
+            ("status.sync.comparedTo.destination", {}),
+            ("status.operationState.phase", "Failed"),
+            ("status.operationState.syncResult.revision", "b" * 40),
+            ("status.operationState.syncResult.source", {}),
+            ("status.operationState.operation.info", []),
+            ("status.operationState.operation.sync.manifests", ["local-override"]),
+            ("status.operationState.operation.sync.prune", True),
+            ("operation", {"sync": {}}),
+        ):
+            with self.subTest(field=field):
+                value = copy.deepcopy(original)
+                target = value
+                *parents, key = field.split(".")
+                for parent in parents:
+                    target = target[parent]
+                target[key] = replacement
+                with self.assertRaises(AssertionError):
+                    MODULE.postgres_converged(value, "owned-postgres", "repeat", revision)
+
+    @unittest.skipUnless(JQ, "jq required")
+    def test_shared_sync_request_preserves_single_and_multi_source_revision_contracts(self):
+        assert JQ is not None
+        expression = re.search(
+            r"jq --arg label \"\$label\" '(.+?)' > \"\$fixture/argocd-sync.json\"",
+            (FIXTURE / "argocd.sh").read_text(),
+            re.S,
+        )
+        assert expression
+        for application in (
+            yaml.safe_load((ROOT / MODULE.APPLICATION).read_text()),
+            MODULE.postgres_application("a" * 40),
+        ):
+            with self.subTest(application=application["metadata"]["name"]):
+                application["metadata"]["resourceVersion"] = "23"
+                completed = subprocess.run(
+                    [JQ, "--arg", "label", "repeat", expression[1]],
+                    input=json.dumps(application),
+                    text=True,
+                    capture_output=True,
+                    timeout=20,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                request = json.loads(completed.stdout)
+                self.assertEqual(request["metadata"], {"resourceVersion": "23"})
+                self.assertEqual(
+                    request["operation"]["info"], [{"name": "ci-case", "value": "repeat"}]
+                )
+                spec = application["spec"]
+                selected = (
+                    {"revisions": [s["targetRevision"] for s in spec["sources"]]}
+                    if "sources" in spec
+                    else {"revision": spec["source"]["targetRevision"]}
+                )
+                self.assertEqual(
+                    request["operation"]["sync"], {**selected, "syncStrategy": {"apply": {}}}
+                )
+
     def test_bootstrap_reuses_validation_and_refuses_wrong_head_or_dirty_source(self):
         lock = MODULE.infrastructure.load_lock()
         for head, dirty in ((lock.revision, b""), ("0" * 40, b""), (lock.revision, b" M file")):

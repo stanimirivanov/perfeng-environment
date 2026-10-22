@@ -468,6 +468,16 @@ unchanged; live acceptance awaits the post-merge trusted-main run. Adoption,
 promotion/recovery, root/foundation activation, product qualification and measured
 script retirement remain separate; production templates/verifiers are unchanged.
 
+PostgreSQL Application acceptance follows complete readiness, with ADR 0024's
+owner-approved exact environment repository configuration using the existing
+read token. A CI-only pinned/manual Application must converge first/repeat,
+observe real Service-name drift and explicitly correct it while preserving
+database, credential and storage identities/data. Native StatefulSet and TCP
+checks remain required; live acceptance awaits the post-merge trusted-main run.
+Root and SeaweedFS Application adoption, complete release adoption/promotion,
+recovery/security and measured script retirement remain separate. Production
+Application/chart/template/verifier and operator paths remain unchanged.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

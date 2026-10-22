@@ -29,7 +29,11 @@ k -n argocd patch application perfeng-local-control-plane --type=json --patch-fi
 PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" secret \
   "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json"
 k create -f "$fixture/argocd-repository-secret.json"
-rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json"
+PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" secret \
+  "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-environment-repository-secret.json" \
+  https://github.com/stanimirivanov/perfeng-environment.git
+k create -f "$fixture/argocd-environment-repository-secret.json"
+rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json" "$fixture/argocd-environment-repository-secret.json"
 k -n argocd get secret ci-perfeng-k8s-repository -o json | jq -S . > "$fixture/argocd-repository-before.json"
 k apply --server-side -k "$bootstrap"
 k wait --for=condition=Established crd/applications.argoproj.io crd/appprojects.argoproj.io --timeout=90s
@@ -61,27 +65,33 @@ migration_snapshot "$results/argocd-schema-before.json"
 role_snapshot "$fixture/argocd-roles-before.json"
 external_secrets "$fixture/argocd-external-before.json"
 
-argocd_case() {
-  local label=$1 workflow rc
-  echo "Argo CD convergence case: $label"
-  k -n argocd get application perfeng-local-control-plane -o json \
+argocd_sync() {
+  local application=$1 label=$2
+  [[ $application == perfeng-local-control-plane || $application == perfeng-local-postgres ]] || return 2
+  echo "Argo CD convergence case: $application $label"
+  k -n argocd get application "$application" -o json \
     | jq --arg label "$label" '{metadata:{resourceVersion:.metadata.resourceVersion},operation:{
       initiatedBy:{username:"disposable-ci"},info:[{name:"ci-case",value:$label}],
-      sync:{revisions:[.spec.sources[].targetRevision],syncStrategy:{apply:{}}}}}' > "$fixture/argocd-sync.json"
-  k -n argocd patch application perfeng-local-control-plane --type=merge --patch-file "$fixture/argocd-sync.json"
+      sync:((if .spec.sources then {revisions:[.spec.sources[].targetRevision]} else {revision:.spec.source.targetRevision} end)
+        + {syncStrategy:{apply:{}}})}}' > "$fixture/argocd-sync.json"
+  k -n argocd patch application "$application" --type=merge --patch-file "$fixture/argocd-sync.json"
   # Wait for this operation, not a previous Succeeded status with the same revision.
-  if ! k -n argocd wait application/perfeng-local-control-plane \
+  if ! k -n argocd wait "application/$application" \
     --for="jsonpath={.status.operationState.operation.info[0].value}=$label" --timeout=240s \
-    || ! k -n argocd wait application/perfeng-local-control-plane \
+    || ! k -n argocd wait "application/$application" \
       --for=jsonpath='{.status.operationState.phase}'=Succeeded --timeout=240s \
-    || ! k -n argocd wait application/perfeng-local-control-plane \
+    || ! k -n argocd wait "application/$application" \
       --for=jsonpath='{.status.sync.status}'=Synced --timeout=120s \
-    || ! k -n argocd wait application/perfeng-local-control-plane \
+    || ! k -n argocd wait "application/$application" \
       --for=jsonpath='{.status.health.status}'=Healthy --timeout=180s; then
-    k -n argocd get application perfeng-local-control-plane -o json \
-      | jq '{sync:.status.sync.status,health:.status.health.status,operation:.status.operationState.phase,conditions:[.status.conditions[]?.type]}' > "$results/argocd-$label.failure.json"
+    k -n argocd get application "$application" -o json \
+      | jq '{sync:.status.sync.status,health:.status.health.status,operation:.status.operationState.phase,conditions:[.status.conditions[]?.type]}' > "$results/argocd-$application-$label.failure.json"
     return 1
   fi
+}
+argocd_case() {
+  local label=$1 workflow rc
+  argocd_sync perfeng-local-control-plane "$label"
   k -n argocd get application perfeng-local-control-plane -o json > "$fixture/argocd-current.json"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" converged \
     "$fixture/argocd-current.json" "$application_uid" "$label"

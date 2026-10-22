@@ -917,6 +917,43 @@ qualification, adoption, promotion, root/foundation Application activation or
 script retirement. Production templates, verifier budget and operator commands
 remain unchanged.
 
+## PostgreSQL Application adoption
+
+After complete readiness-parent acceptance, trusted-main CI adopts the prepared
+PostgreSQL chart through its real Application. The owner-approved
+[ADR 0024](decisions/0024-authorize-environment-source-for-foundation-parity.md)
+adds a second immutable repository Secret for the exact private environment Git
+URL using the existing read token. The same private staging file creates both
+approved repository Secrets before removal. Underlying token rights are not
+narrowed by URL configuration; PR exposure, job permissions and stored tokens
+remain unchanged. Raw Secret documents/snapshots stay private and cleanup covers
+both temporary documents plus the token file.
+
+The existing PostgreSQL Application is copied only into the private fixture,
+with its source pinned to the selected commit and automatic sync/self-healing/
+pruning disabled. Production manifests and chart defaults remain unchanged.
+Reuse the native Argo CD sync adapter for single-source revision requests;
+control-plane multi-source sync still uses its original revision array. Require
+fresh first/repeat/corrected operations, exact compared source and sync-result
+revision, `Synced`/`Healthy` and no conditions. Each success must also pass the
+unchanged StatefulSet observer and authenticated TCP client Job.
+
+Change the Service port name from `postgres` to `pg-ci-drift`, leaving its numeric
+port/target routing intact. Require controller-produced Service `OutOfSync`, no
+automatic repair and the actual drifted name before explicit manual correction.
+All state comparisons after correction must match the initial prepared baseline:
+StatefulSet/Service/PVC/PV UIDs/binding, claim/image/Secret references, credentials,
+schema/migration ledger, roles/ACLs and canary/sentinel OIDs/bytes. A legitimate
+initial adoption rollout may replace the Pod; repeat and Service-only correction
+must retain the adopted Pod. `postgres-application-pod-uids.json` records the
+before/after identity for later phases. Native Workflows and client Jobs remain
+retained. Other Application specs/UIDs are compared and the root stays skipped.
+
+Live acceptance runs only after merge in trusted-main CI. This is PostgreSQL
+Application ownership parity, not root/SeaweedFS Application activation,
+complete release adoption/promotion, backup/restore, operational cutover or
+script retirement. Existing production templates/verifiers and host paths remain.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool

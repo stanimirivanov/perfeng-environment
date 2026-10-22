@@ -31,6 +31,15 @@
 
 ## Disposable Argo CD acceptance
 
+For PostgreSQL Application adoption, inspect `postgres-application-*.json` and
+`postgres-chart-adopt-*.workflow.json`/`*.client.json`. Check the selected source
+commit and exact environment repository access before changing manifests. A
+comparison, installation or timeout error is not the deliberate Service-name
+drift. Do not enable automatic/root sync, force/replace a StatefulSet, rotate
+credentials or recreate a PVC to pass adoption. Preserve private snapshots and
+inspect any state mismatch; never upload them or repository-server logs. See
+[PostgreSQL Application acceptance](release-workflows-integration.md#postgresql-application-adoption).
+
 For complete readiness-parent CI, inspect `readiness-parent-*.workflow.json`,
 worker projections and constant outcomes. The wrong digest must fail only at
 `verify-identities`; a deliberately revoked Application-read grant must fail

@@ -4,6 +4,10 @@
 - Date: 2026-10-22
 - Milestone: M06 — Production Readiness
 
+The later owner-approved [ADR 0024](0024-authorize-environment-source-for-foundation-parity.md)
+extends the configured repository URLs for foundation Application parity. The
+single-URL restriction below describes this original control-plane slice.
+
 ## TL;DR
 
 - The owner approved the existing contents-read token for the pinned infrastructure checkout and an ephemeral exact-URL `perfeng-k8s` Argo CD repository Secret.
