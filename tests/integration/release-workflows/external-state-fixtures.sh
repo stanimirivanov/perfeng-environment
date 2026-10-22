@@ -32,13 +32,20 @@ for name, values in (
 (directory / "database-restore-password.sql").write_text("ALTER ROLE perfeng_runtime PASSWORD '" + runtime + "';\n")
 PY
   k create -f "$fixture/database-secrets.json"
-  k create -f "$source_dir/postgres-pod.yaml"
-  k create -f "$source_dir/postgres-service.yaml"
-  k -n perf-platform wait --for=condition=Ready pod/database-ci-postgres --timeout=180s
+  if [[ ${mode:-} == preflight-parent ]]; then
+    database_pod=postgres-0
+    source "$source_dir/postgres-chart.sh"
+    postgres_chart_setup
+  else
+    database_pod=database-ci-postgres
+    k create -f "$source_dir/postgres-pod.yaml"
+    k create -f "$source_dir/postgres-service.yaml"
+    k -n perf-platform wait --for=condition=Ready "pod/$database_pod" --timeout=180s
+  fi
 }
 sql() {
   timeout 30s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --request-timeout=20s \
-    -n perf-platform exec -i database-ci-postgres -- psql -X -w -qAt -U postgres -d perfeng -v ON_ERROR_STOP=1 "$@"
+    -n perf-platform exec -i "$database_pod" -- psql -X -w -qAt -U postgres -d perfeng -v ON_ERROR_STOP=1 "$@"
 }
 role_snapshot() {
   sql > "$1" <<'SQL'

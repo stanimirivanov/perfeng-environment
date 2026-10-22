@@ -534,6 +534,18 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For PostgreSQL chart CI, inspect `postgres-chart-<case>` observation/storage/PV/
+client artifacts and old/new Pod UIDs. A missing or incompatible `standard`
+StorageClass is a fixture prerequisite failure, not permission to install a new
+provisioner. Native rollout/socket readiness alone is insufficient: the bounded
+client Job must authenticate through TCP before acceptance. A restart must retain
+the bound claim and canary OID/bytes while replacing the Pod and converging a new
+StatefulSet revision. Do not recreate a PVC or rotate credentials after failure.
+Main diagnostics now target `postgres-0`; PR child parity still uses
+`database-ci-postgres`. Logs and password/Secret snapshots remain private. See
+[PostgreSQL chart retention](release-workflows-integration.md#postgresql-chart-and-pvc-retention);
+this is not a backup/restore or retained-environment recovery procedure.
+
 For selected server CI, inspect `server-<case>` native projections, worker exit
 and Pod image/UID artifacts. A source-checkout failure requires the already
 approved repository-read Secret and exact selected commit; do not forward that

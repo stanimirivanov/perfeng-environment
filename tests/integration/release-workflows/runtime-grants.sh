@@ -93,7 +93,7 @@ cmp "$fixture/runtime-grants-roles-before.json" "$fixture/runtime-grants-roles-a
 sql -c "SELECT oid::text FROM pg_class WHERE oid='public.migration_ci_sentinel'::regclass;" > "$results/runtime-grants-sentinel-after.txt"
 cmp "$results/runtime-grants-sentinel-before.txt" "$results/runtime-grants-sentinel-after.txt"
 [[ $(sql -c 'SELECT value FROM public.migration_ci_sentinel WHERE id=1;') == migration-image-parity-v1 ]]
-[[ $(k -n perf-platform get pod database-ci-postgres -o jsonpath='{.metadata.uid}') == "$postgres_uid" ]]
+[[ $(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}') == "$postgres_uid" ]]
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 [[ $(k -n perf-platform get deployment control-plane -o jsonpath='{.spec.replicas}') == 0 ]]
 for suffix in workflow job; do

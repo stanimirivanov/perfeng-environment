@@ -25,7 +25,8 @@ image=$(jq -er .image "$source_dir/migration-image.json")
 external_secrets "$fixture/migration-secrets-before.json"
 k -n perf-platform get secret migration-ci-registry -o json | jq -S . > "$fixture/migration-pull-before.json"
 role_snapshot "$fixture/migration-roles-before.json"
-postgres_uid=$(k -n perf-platform get pod database-ci-postgres -o jsonpath='{.metadata.uid}')
+postgres_uid=$(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}')
+[[ $postgres_uid == "$(jq -er .after "$results/postgres-chart-pod-uids.json")" ]]
 sql > "$results/migration-image-initial.json" <<'SQL'
 SELECT json_build_object('schemaAbsent',to_regnamespace('perfeng_control') IS NULL,
  'applicationRelations',(SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -91,7 +92,7 @@ PY
     jq -e '.status.failed == 1' "$results/migration-image-$migration_label.job.json" > /dev/null
     jq -e 'length == 1 and .[0].containers == [{name:"migrate",exitCode:1,waitingReason:null}]' "$results/migration-image-$migration_label.worker.json" > /dev/null
     since=$(jq -er .metadata.creationTimestamp "$results/migration-image-$migration_label.workflow.json")
-    k -n perf-platform logs database-ci-postgres -c postgres --since-time="$since" --tail=120 --limit-bytes=32768 > "$fixture/migration-postgres.log"
+    k -n perf-platform logs "$database_pod" -c postgres --since-time="$since" --tail=120 --limit-bytes=32768 > "$fixture/migration-postgres.log"
     migration_permission_denied "$fixture/migration-postgres.log"
     printf '%s\n' 'runtime role: PostgreSQL denied CREATE on the disposable database' > "$results/migration-image-runtime-role.refusal.txt"
     [[ $(sql -c "SELECT to_regnamespace('perfeng_control') IS NULL;") == t ]]
@@ -124,7 +125,7 @@ k -n perf-platform get secret migration-ci-registry -o json | jq -S . > "$fixtur
 cmp "$fixture/migration-pull-before.json" "$fixture/migration-pull-after.json"
 role_snapshot "$fixture/migration-roles-after.json"
 cmp "$fixture/migration-roles-before.json" "$fixture/migration-roles-after.json"
-[[ $(k -n perf-platform get pod database-ci-postgres -o jsonpath='{.metadata.uid}') == "$postgres_uid" ]]
+[[ $(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}') == "$postgres_uid" ]]
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 for label in runtime-role first repeat; do
   for suffix in workflow.json checkpoint.workflow.json; do
