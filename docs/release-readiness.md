@@ -69,6 +69,13 @@ remain open.
 
 ## Verifier package lifecycle
 
+The next prerequisite is [selected migration-image CI parity](release-workflows-integration.md#selected-migration-image-parity):
+the actual released migrator prepares only the disposable schema, checks all
+eighteen source checksums and preserves repeated execution state. This does not
+start the selected server or make synthetic sleeper observations real readiness.
+Runtime configuration/grants, actual control-plane endpoints and full readiness
+parent acceptance remain separate work.
+
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
 Request and result data schemas remain v1. Published v1 source is recoverable
 from the retirement index; installed v1 objects are retained with pruning off.

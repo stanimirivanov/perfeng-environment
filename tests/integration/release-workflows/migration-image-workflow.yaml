@@ -1,0 +1,68 @@
+# CI only: an explicit administrative binary from the selected released image.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: migration-image-ci-
+  namespace: argo-workflows
+spec:
+  serviceAccountName: release-external-state
+  entrypoint: migrate
+  activeDeadlineSeconds: 240
+  arguments:
+    parameters:
+      - name: image
+      - name: credential-key
+      - name: application-name
+  templates:
+    - name: migrate
+      resource:
+        action: create
+        successCondition: status.succeeded > 0
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            generateName: migration-image-ci-
+            namespace: perf-platform
+            labels:
+              perfeng.io/purpose: ci-migration-image
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 180
+            template:
+              spec:
+                restartPolicy: Never
+                automountServiceAccountToken: false
+                imagePullSecrets:
+                  - name: migration-ci-registry
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 65532
+                  seccompProfile:
+                    type: RuntimeDefault
+                containers:
+                  - name: migrate
+                    image: '{{workflow.parameters.image}}'
+                    command: [/usr/local/bin/migrate]
+                    env:
+                      - name: PERFENG_DATABASE_URL
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-control-plane-database
+                            key: '{{workflow.parameters.credential-key}}'
+                      - name: PGAPPNAME
+                        value: '{{workflow.parameters.application-name}}'
+                    resources:
+                      requests: {cpu: 50m, memory: 64Mi}
+                      limits: {cpu: 250m, memory: 256Mi}
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                        drop: [ALL]
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              jsonPath: '{.metadata.name}'

@@ -144,6 +144,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "readiness.sh",
             "observer.sh",
             "preflight.sh",
+            "migration-image.sh",
         ):
             source = (FIXTURE / script).read_text()
             for index, python in enumerate(re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)):
@@ -786,6 +787,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "preflight-parent.sh",
             FIXTURE / "maintenance-parent.sh",
             FIXTURE / "external-state-parent.sh",
+            FIXTURE / "migration-image.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
