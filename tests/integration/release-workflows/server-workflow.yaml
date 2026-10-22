@@ -1,0 +1,78 @@
+# CI only: real native server observations and the installed HTTP adapter.
+# Deliberately omits Application/foundation observations and full readiness result.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: server-ci-
+  namespace: argo-workflows
+spec:
+  serviceAccountName: release-readiness
+  entrypoint: observe
+  activeDeadlineSeconds: 420
+  templates:
+    - name: observe
+      steps:
+        - - name: deployment
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: deployment
+        - - name: service
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: service
+        - - name: http
+            template: http
+      outputs:
+        parameters:
+          - name: deployment
+            valueFrom:
+              parameter: '{{steps.deployment.outputs.parameters.observation}}'
+          - name: service
+            valueFrom:
+              parameter: '{{steps.service.outputs.parameters.observation}}'
+    - name: http
+      activeDeadlineSeconds: 90
+      volumes:
+        - name: verifier
+          configMap:
+            name: perfeng-release-verifiers-v2
+        # The executor needs its ordinary task-result identity. Mask its default
+        # API credential path in main only; Kubernetes skips automatic mounting
+        # into a container that already mounts this path.
+        - name: no-api-token
+          emptyDir: {}
+      container:
+        image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+        command: [python, -c]
+        args:
+          - |
+            import sys
+            from pathlib import Path
+            assert not Path('/var/run/secrets/kubernetes.io/serviceaccount/token').exists()
+            sys.path.insert(0, '/opt/release')
+            import release_runtime_v2 as runtime
+            try:
+                runtime.probe_endpoints()
+            except runtime.policy.ReadinessRefused as error:
+                print('Server HTTP refused: ' + str(error), flush=True)
+                sys.exit(2)
+            print('Selected server operational endpoints verified', flush=True)
+        volumeMounts:
+          - name: verifier
+            mountPath: /opt/release
+            readOnly: true
+          - name: no-api-token
+            mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+            readOnly: true
+        resources:
+          requests: {cpu: 25m, memory: 64Mi}
+          limits: {cpu: 200m, memory: 256Mi}
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+          seccompProfile:
+            type: RuntimeDefault

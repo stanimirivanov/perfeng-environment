@@ -117,3 +117,4 @@ How will the assumptions and consequences be verified?
 | [0019](0019-use-ci-identity-for-registry-parity.md) | Proposed | Use the ephemeral repository CI identity with package-read permission for disposable registry manifest-access parity. |
 | [0020](0020-publish-disposable-ci-release-requests.md) | Proposed | Publish a run-owned temporary Git request in trusted main CI to accept the unchanged complete preflight against an actual disposable cluster UID. |
 | [0021](0021-authorize-trusted-main-external-state-parity.md) | Proposed | Combine existing trusted-main Git publication with owner-approved package-read authority for complete external-state parent parity. |
+| [0022](0022-use-pinned-source-for-server-parity.md) | Proposed | Use the existing contents-read credential only for a pinned private chart/package checkout in trusted-main server parity, keeping it out of the cluster. |

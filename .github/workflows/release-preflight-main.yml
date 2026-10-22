@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/release-preflight-main.yml
       - .argo-linux-amd64.sha256
+      - .helm-linux-amd64.sha256
       - pyproject.toml
       - uv.lock
       - deployments/**
@@ -29,6 +30,16 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+      - name: Check out selected server chart and runtime package
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/perfeng-k8s
+          ref: b4499997cc4653f7a28bac7b242f8db421877f9a
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+          path: .ci/perfeng-k8s
+          persist-credentials: false
+          submodules: false
+          lfs: false
       - uses: actions/setup-python@v7
         with:
           python-version-file: .python-version

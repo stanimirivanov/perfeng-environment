@@ -534,6 +534,18 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For selected server CI, inspect `server-<case>` native projections, worker exit
+and Pod image/UID artifacts. A source-checkout failure requires the already
+approved repository-read Secret and exact selected commit; do not forward that
+token into kind or fall back to a copied manifest. A rollout failure can indicate
+package access, missing runtime inputs or the selected server failing startup.
+Do not replace the image or override its command. Stopped-server refusal requires
+one HTTP main exit 2 and the exact `livez` diagnostic after the serving Pod is
+absent; image/executor failures do not qualify. Correction must preserve the
+Deployment/Service and create a fresh server Pod. Keep raw logs and credential
+snapshots private. Operational health does not prove dependency recovery or full
+release readiness. See the [server parity boundary](release-workflows-integration.md#selected-server-rollout-and-http-parity).
+
 For runtime-grant CI, inspect `runtime-grants-<case>` Workflow, Job and worker
 artifacts. Missing/excess grants require psql exit 3 and the exact privilege-matrix
 error; a generic failed Job, image pull, connection or authentication error is

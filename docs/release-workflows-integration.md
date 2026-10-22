@@ -258,6 +258,57 @@ runtime package, prove full readiness/adoption, authorize retained-environment
 grants/migrations, implement recovery or retire host entrypoints. Real server
 wiring and complete readiness remain the next integration gate.
 
+### Selected server rollout and HTTP parity
+
+After runtime grants, the trusted-main job runs the actual selected server from
+its pinned Helm chart and immutable Kustomize runtime package. The owner approved
+the existing private-source token only for the pinned `perfeng-k8s` checkout,
+with unpersisted credentials and no token passed into the cluster
+([ADR 0022](decisions/0022-use-pinned-source-for-server-parity.md)). The job's
+existing `GITHUB_TOKEN` authority remains unchanged. This source credential is
+not the Git/registry token already used inside the disposable fixture.
+
+Verify checkout origin, exact HEAD and clean content, then validate the selected
+chart/bundle/package. Render with the reviewed Application values and existing
+checksum-verified Helm pin. Check seven expected resources and exact immutable
+ConfigMap bytes before applying. Fixture-only runtime/authentication/pull Secrets
+reuse existing transient database/storage/package identities. The Deployment
+keeps its original UID, starts the selected image without command overrides and
+uses the chart's actual runtime mounts, probes, resources and Job-controller RBAC.
+The one owned kind node receives the chart's required placement label. The
+placeholder Deployment transitions via a complete API replacement guarded by
+its observed UID/resourceVersion. A first strategic apply could retain its
+old, differently named container; the guarded replacement avoids that merge
+and refuses races without deleting or recreating the Deployment.
+
+| Case | Required evidence |
+|:--|:--|
+| First | Original native Deployment/Service observer children succeed; selected image and runtime references match; installed production HTTP adapter validates real `/livez`, `/readyz` and `/metrics`. |
+| Repeat | A fresh Workflow succeeds using the same server Pod and unchanged Service projection. |
+| Stopped | Administrator scales to zero and waits for the server Pod to disappear. Fresh HTTP-only worker exits 2 with the exact `operational endpoint failed: livez` refusal. Generic image/executor failure is insufficient. |
+| Corrected | Explicit scale-up; fresh native/HTTP Workflow succeeds with the original Deployment/Service and a new server Pod. |
+
+No Application or foundation status is fabricated for this phase. The unchanged
+HTTP adapter is imported from the installed verifier ConfigMap; production code
+and its two-module/708-line budget remain intact. The HTTP main container masks
+the default API token path and checks absence at runtime, while Argo's executor
+retains its existing task-result identity. It receives no Git or runtime Secrets.
+
+Artifacts use `server-<case>.{workflow,worker,pods,service}.json` as applicable,
+constant HTTP outcomes and safe schema/ConfigMap observations. Raw HTTP logs,
+render inputs with Secrets and credential/password snapshots remain private.
+Compare schema/ledger/OIDs, sentinel bytes, role/password identities, runtime
+Secrets/ConfigMaps and provider/cluster UIDs. Retain all four Workflow UIDs until
+normal owned cleanup. Failed Workflows are never replaced or blindly retried.
+
+The stopped case proves the adapter refuses while the real server is absent;
+it does not distinguish all possible transport failures. The selected server's
+`/readyz` is a static service signal, not a database/storage dependency check.
+Full readiness-parent composition, real Argo CD reconciliation, foundation
+chart/storage acceptance, workload/API behavior, recovery, promotion and script
+retirement remain separate. Live server acceptance is pending trusted-main CI
+after merge; no local cluster execution is permitted by this fixture.
+
 ### Read-only PR boundary integration
 
 The separate `make release-workflows-integration` target is invoked by the
