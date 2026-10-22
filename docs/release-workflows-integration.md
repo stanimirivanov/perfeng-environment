@@ -872,6 +872,51 @@ root/foundation Application adoption or complete release readiness. Production
 templates/verifier budget and original host entrypoints remain unchanged; there
 is no script-retirement credit.
 
+## Complete release-readiness parent
+
+After actual Argo CD convergence, the same trusted-main job submits the unchanged
+`perfeng-release-readiness-v2` with only the existing four request parameters.
+It consumes the same pinned Git request, selected commit and actual cluster UID.
+No synthetic preflight/resource arguments, alternate HTTP peer or copied parent
+are supplied. Existing credentials, token exposure and job permissions remain
+unchanged.
+
+The full parent fetches/validates Git inputs, observes both actual foundation
+StatefulSets, the real Application, selected Deployment and Service, then runs
+the installed verifier and operational endpoint probes. First/repeat results
+must validate against the readiness schema and bind the exact nested preflight,
+lock bytes/revision/image, cluster UID and API-observed resource UIDs/generations.
+Worker evidence must identify the dedicated readiness ServiceAccount and the
+successful production verifier's constant outcome. Results are compared exactly;
+this fixture performs no rollout during these attempts.
+
+| Case | Required owning boundary |
+|:--|:--|
+| Wrong request digest | Preflight identity Pod exits 2 with the exact byte-digest refusal; no foundation/Application/Deployment/Service/verification step runs. |
+| Revoked Application-read grant | Nested preflight and both foundation observers succeed; the named Application observer exits 1 with its own forbidden diagnostic, before Deployment/Service/HTTP verification. |
+| Explicit grant restoration | Reapply only the existing bootstrap Role/Binding, prove named read access, then submit a fresh parent whose full result matches the first. |
+
+Both failures must leave the parent result unresolved and publish no
+`PerfengReleaseReadiness` result at any node. A successful nested preflight result
+is permitted for the access refusal. Worker/node identity, exit code and exact
+owning diagnostics distinguish intended refusals from image, artifact, network
+or timeout failures. Keep raw worker logs private and upload constant outcomes,
+Workflow/worker projections and validated results only.
+
+Compare existing workload/Pod/RBAC/PV/PVC identities, ConfigMap/Secret data,
+schema/roles, Git/repository credentials and database/object-store sentinels
+across all five attempts. Retain every Workflow UID. Check that the readiness
+identity cannot patch Applications/workloads, create Jobs/Secrets, list Secrets
+or exec into Pods. Fixture administration temporarily removes and explicitly
+restores its existing Application-read RoleBinding; this does not add authority.
+
+Live acceptance runs only after merge in trusted-main CI. Complete readiness
+evidence covers the selected control-plane/foundation gate, not dependency
+recovery (`/readyz` is static service availability), product smoke/benchmark
+qualification, adoption, promotion, root/foundation Application activation or
+script retirement. Production templates, verifier budget and operator commands
+remain unchanged.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool
