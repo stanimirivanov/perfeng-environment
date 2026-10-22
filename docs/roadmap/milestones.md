@@ -397,6 +397,15 @@ Live acceptance is pending its post-merge run. Providers remain transient;
 real readiness/adoption, migrations, promotion/recovery/export, full registry
 byte verification and the original 13-entrypoint retirement gate remain open.
 
+Selected migration-image parity is the next prerequisite for real readiness:
+the trusted-main fixture runs the actual pinned `/usr/local/bin/migrate` after
+fresh complete maintenance checkpoints. Runtime-role CREATE denial, the first
+eighteen exact source hashes and repeat ledger/OID/sentinel preservation are
+required on the initially empty disposable database. Post-merge live acceptance
+is pending. This introduces no production migration template and changes no
+supported host path. Populated upgrade/backup/recovery, runtime grants/server
+wiring, full readiness/adoption, promotion and measured retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

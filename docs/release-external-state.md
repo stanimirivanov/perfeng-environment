@@ -26,6 +26,12 @@ Job Pods do not mount Kubernetes API tokens. The workflow ServiceAccount has Git
 
 ## Disposable-kind acceptance and recovery
 
+The later [migration-image CI phase](release-workflows-integration.md#selected-migration-image-parity)
+consumes this parent's disposable role credentials and runs the selected image's
+administrative binary only after a fresh maintenance checkpoint. External-state
+preparation itself still performs no schema migration; no production migration
+entrypoint or retained-environment permission is added by that CI proof.
+
 Use an isolated disposable `perfeng-local` cluster with the pinned Workflows substrate, the staged Application and a reviewed release request for that cluster UID. Provision the three existing credential identities through the approved bootstrap channel before submission. In particular, the database credential Secret must exist before the role Job; the supported `control_plane_database.py deploy` command currently creates both and is not yet retired. For an independent first-run proof, provision the Secret without pre-creating roles in the disposable cluster. Never copy credential bytes into Git or a Workflow argument.
 
 Submit `perfeng-release-external-state-v1` with the four parameters shown in the [preflight guide](release-preflight-workflow.md#disposable-kind-verification), replacing the `--from` template name. Record the Workflow UID, preflight result and three output Job names. Inspect only bounded, non-secret logs. Run the exact request twice and compare the bucket, role and Secret identities; Job names should differ and the earlier Jobs should remain for diagnosis. Inject a missing Secret, an unsafe existing role or denied registry pull on a separate disposable fixture. Each case must stop at its owning Job and leave the failure visible without a credential rotation, state deletion or automatic Job replacement.

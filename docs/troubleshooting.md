@@ -534,6 +534,16 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For selected migrator CI, inspect `migration-image-<case>` artifacts. A failed
+runtime-role case requires exit 1 **and** the matching PostgreSQL CREATE-denial
+signal after a successful connection phase; generic failure is insufficient.
+Worker waiting reasons identify image-pull failures, which may require existing
+package-side repository Read access, never an anonymous fallback or credential
+repair. Keep raw logs and Secret/hash snapshots private. Missing/gapped/checksum
+mismatched ledger rows or changed OIDs/timestamps fail the fixture without repair.
+Keep failed Jobs and inspect before submitting fresh evidence. Do not run this
+test against retained data or interpret its success as backup/upgrade recovery.
+
 For complete external-state CI, inspect `external-parent-<case>.workflow.json`,
 the new-Job inventory and owning Job/worker exit artifacts. A bad request digest
 must create no Jobs. Bucket refusal must leave database/registry unexecuted;

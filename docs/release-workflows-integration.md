@@ -28,6 +28,9 @@
 - It also composes the complete external-state parent against the shared
   transient database/bucket fixtures and private registry with owner-approved
   package-read authority ([ADR 0021](decisions/0021-authorize-trusted-main-external-state-parity.md)).
+- A later CI-only phase runs the selected image's embedded migrator on the
+  initially empty disposable schema, with fresh maintenance evidence before
+  each attempt. It does not introduce a production migration entrypoint.
 
 ## Invocation and isolation
 
@@ -156,6 +159,59 @@ This is complete finite preparation on transient PostgreSQL and direct internal
 S3/emptyDir, pending a successful post-merge main run. It does not establish
 production storage/proxy health, real readiness or adoption, schema migration,
 manifest-byte/layer verification, recovery/export, promotion or host retirement.
+
+### Selected migration-image parity
+
+After external-state preparation, the main-only job runs the exact control-plane
+image selected by `deployments/local-control-plane.json`. Its CI resource wrapper
+executes `/usr/local/bin/migrate` directly; no rebuilt binary, mutable image tag
+or shell substitute is used. `migration-image.json` records the selected image,
+source commit and raw SHA-256 of the eighteen SQL files embedded by that source.
+These are test expectations, not copied SQL or a new shared release contract.
+A new image/source selection requires reviewing this fixture too. No extra Git
+read credential or CI permission is introduced. The selected control-plane
+package rejects anonymous pulls; it must separately grant this repository
+Actions Read access, just as the execution packages do. Success against those
+other packages does not prove access to this one. No package setting is changed
+by this PR.
+
+Before any attempt, require the owned disposable PostgreSQL Pod, no application
+relations in `public`, absent `perfeng_control`, migration CREATE permission and
+no runtime CREATE permission. Each attempt then submits a **fresh complete**
+maintenance parent against the original Git request. Its successful checkpoint
+must bind that request/selection/cluster and finish before migration Workflow
+and Job creation. This sequential CI proof is not an atomic production admission
+or a backup/recovery attestation.
+
+| Case | Required evidence |
+|:--|:--|
+| Runtime role | Migrator connects, reaches migration processing, exits 1 and leaves the schema absent. PostgreSQL itself must report database CREATE denial for `perfeng_runtime`, database `perfeng` and this attempt's application name. |
+| First migration role | Exact selected image exits 0; the schema belongs to `perfeng_migration`, with all eighteen expected filename/checksum rows through `0018_benchmark_cleanup.sql`. |
+| Repeat | Fresh checkpoint and Job; preserve schema/relation OIDs, ledger hashes/timestamps and a separately seeded non-secret sentinel's OID/bytes. |
+
+The fixture-only PostgreSQL log prefix includes user, database and application.
+The pinned driver's [standard `PGAPPNAME` support](https://github.com/jackc/pgx/blob/v5.11.0/pgconn/config.go)
+binds the expected denial to the runtime-role attempt. A generic migrator failure,
+connection failure, wrong role/application or image-pull error cannot count.
+Raw PostgreSQL/migrator logs stay private; upload only the constant denial,
+worker exit/waiting reasons, safe image/Job metadata, checkpoints and schema
+observations. The separate disposable Docker-config Secret reuses the approved
+CI token; its full data and the database credential/password snapshots are never
+uploaded. Job Pods have no Kubernetes API token, run non-root and use a read-only
+root filesystem.
+
+Artifacts use `migration-image-<case>.{workflow,job,worker,checkpoint,schema}.json`
+as applicable, including checkpoint Workflow JSON. Three distinct migration Jobs
+and Workflows plus three fresh checkpoint Workflows remain queryable before
+normal owned-cluster cleanup. Database Pod, role/password and Secret identities
+remain unchanged. No failed Job is replaced or retried.
+
+Live OCI/schema acceptance first runs after merge. This phase establishes
+selected migrator/schema parity only: it does not upgrade a retained database,
+test a populated upgrade or restore, grant runtime table privileges, run the
+control-plane server, establish readiness/adoption, authorize production
+migration/promotion, or retire the supported host commands. The existing M04
+manual pause/backup/migration/recovery process remains authoritative.
 
 ### Read-only PR boundary integration
 
