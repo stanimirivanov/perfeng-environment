@@ -8,6 +8,12 @@ if [[ ${GITHUB_ACTIONS:-} != true || ${RUNNER_ENVIRONMENT:-} != github-hosted ||
   refuse 'requires an isolated GitHub-hosted Linux runner.'
 fi
 [[ -n ${RUNNER_TEMP:-} && -d $RUNNER_TEMP && -n ${GITHUB_TOKEN:-} ]] || refuse 'runner temporary directory/read token unavailable.'
+mode=${RELEASE_KIND_MODE:-boundaries}
+[[ $mode == boundaries || $mode == preflight-parent ]] || refuse 'unknown CI mode.'
+if [[ $mode == preflight-parent ]]; then
+  [[ ${GITHUB_REF:-} == refs/heads/main && ${GITHUB_REPOSITORY:-} == stanimirivanov/perfeng-environment ]] || refuse 'parent acceptance requires trusted main.'
+  [[ ${GITHUB_EVENT_NAME:-} == push || ${GITHUB_EVENT_NAME:-} == workflow_dispatch ]] || refuse 'parent acceptance event is not trusted.'
+fi
 [[ -z ${DOCKER_HOST:-}${DOCKER_CONTEXT:-} ]] || refuse 'Docker endpoint/context override is not allowed.'
 [[ $(docker context show) == default ]] || refuse 'requires the default local Docker context.'
 [[ $(docker context inspect default --format '{{.Endpoints.docker.Host}}') == unix:///var/run/docker.sock ]] || refuse 'requires the local Unix Docker socket.'
@@ -24,6 +30,15 @@ finish() {
   rc=$?
   trap - EXIT
   set +e
+  if [[ $mode == preflight-parent && -f $fixture/request-ref.json ]]; then
+    uv run --locked --offline python "$source_dir/request_ref.py" cleanup "$fixture"
+    ref_rc=$?
+    cp "$fixture/request-ref.json" "$results/parent-request-ref.json"
+    if [[ -f $fixture/request-ref-cleanup.json ]]; then
+      cp "$fixture/request-ref-cleanup.json" "$results/parent-request-ref-cleanup.json"
+    fi
+    if [[ $ref_rc != 0 ]]; then rc=$ref_rc; fi
+  fi
   if [[ -f $fixture/owned ]]; then
     k -n argo-workflows get workflows -o json > "$results/workflows.json"
     k -n argo-workflows get pods -o wide > "$results/pods.txt"
@@ -87,6 +102,11 @@ printf '%s' x-access-token > "$fixture/username"
 printf '%s' "$GITHUB_TOKEN" > "$fixture/token"
 k -n argo-workflows create secret generic release-git-read \
   --from-file="username=$fixture/username" --from-file="password=$fixture/token"
+if [[ $mode == preflight-parent ]]; then
+  rm -f "$fixture/token" "$fixture/username"
+  source "$source_dir/preflight-parent.sh"
+  exit 0
+fi
 source "$source_dir/registry.sh"
 registry_credentials
 rm -f "$fixture/token" "$fixture/username"

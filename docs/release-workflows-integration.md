@@ -19,8 +19,46 @@
   prove the production S3 proxy boundary or execute migrations.
 - The test refuses local/self-hosted execution. No retained cluster or
   environment credential is used; only non-secret results are uploaded.
+- A separate [trusted-main workflow](../.github/workflows/release-preflight-main.yml)
+  accepts the complete production preflight using a generated Git request for
+  its real disposable cluster UID; see [ADR 0020](decisions/0020-publish-disposable-ci-release-requests.md).
 
 ## Invocation and isolation
+
+### Complete preflight on trusted main
+
+The separate main-only workflow selects `RELEASE_KIND_MODE=preflight-parent` in
+the same harness. It reuses tool pins, private kubeconfig and cluster ownership
+guards, then skips maintenance/database/bucket/registry/readiness cases. Only
+this job has `contents: write`; the existing PR job keeps read permissions.
+No additional operator command or production wrapper is introduced.
+
+After startup, a CI-only helper creates a schema-valid request with the actual
+`kube-system` UID and the checked-out main commit's raw lock digests. The request
+is a child Git commit published through a create-only unique ref. The unchanged
+`perfeng-release-preflight-v2` parent runs twice with that exact request SHA and
+the distinct selection SHA. Both results must match, validate against the result
+schema and bind the actual UID. Workflow UIDs and the private Git Secret must
+remain unchanged, with Kubernetes writes and Pod exec denied.
+
+Unlike the read-only PR job described below, this job's ephemeral Git artifact
+credential has repository write authority. The Secret name does not reduce it.
+Only reviewed main code can execute this trusted boundary. Generated requests
+are disposable test inputs, not human-reviewed deployment approval.
+
+The exit handler conditionally deletes only the exact run-owned ref at its
+expected SHA, including after ambiguous publication failure, before cluster
+cleanup. A moved ref fails cleanup; no forced branch update is permitted.
+Results include `parent-request-ref.json`, `parent-request-ref-cleanup.json`,
+request bytes/parameters and `parent-{first,repeat}.{workflow,result}.json`.
+Secret snapshots and raw Git diagnostics remain private. Abrupt runner loss can
+leave a temporary ref requiring identity-checked manual cleanup.
+
+This gate first runs after merge; offline/PR success does not claim live parent
+acceptance. Successful preflight alone does not prove full release composition,
+application delivery, promotion, recovery or script retirement.
+
+### Read-only PR boundary integration
 
 The separate `make release-workflows-integration` target is invoked by the
 path-filtered PR job or an explicitly selected `workflow_dispatch` run. It is

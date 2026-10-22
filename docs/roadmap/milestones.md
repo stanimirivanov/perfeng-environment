@@ -368,8 +368,15 @@ unchanged child templates fetch both revisions, validate the schema and lock
 bytes, record repeat/corrected synthetic-UID evidence and reject bad digest/path
 parameters. A native namespace read is checked separately; the complete
 production preflight must reject the same request for wrong cluster UID.
-Successful full-parent admission for an actual reviewed cluster request, parent
-composition, promotion/recovery and host-script retirement remain open.
+
+The next full-preflight gate is implemented by a separate trusted-main CI
+workflow ([ADR 0020](../decisions/0020-publish-disposable-ci-release-requests.md)).
+It publishes a run-owned request after kind assigns the actual UID, executes
+the unchanged parent twice and conditionally deletes its exact temporary ref.
+PR checks stay read-only. Live acceptance is pending the post-merge main run;
+full release composition, promotion/recovery and script retirement remain open.
+Admission of an operator-reviewed request for a retained environment, full parent
+composition, promotion/recovery and host-script retirement remain separate gates.
 
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the

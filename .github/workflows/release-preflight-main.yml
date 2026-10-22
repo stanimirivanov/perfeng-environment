@@ -1,0 +1,50 @@
+name: Full release preflight on trusted main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-preflight-main.yml
+      - .argo-linux-amd64.sha256
+      - pyproject.toml
+      - uv.lock
+      - deployments/**
+      - gitops/release-workflows/**
+      - tests/integration/release-workflows/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-parent:
+    if: github.ref == 'refs/heads/main' && github.repository == 'stanimirivanov/perfeng-environment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.5"
+      - run: uv sync --locked
+      - name: Accept complete production preflight on an owned cluster
+        run: make release-workflows-integration
+        env:
+          RELEASE_KIND_MODE: preflight-parent
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Retain only non-secret fixture evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-preflight-main-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-workflows-results/
+          if-no-files-found: ignore
+          retention-days: 3
