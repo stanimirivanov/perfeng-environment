@@ -118,3 +118,4 @@ How will the assumptions and consequences be verified?
 | [0020](0020-publish-disposable-ci-release-requests.md) | Proposed | Publish a run-owned temporary Git request in trusted main CI to accept the unchanged complete preflight against an actual disposable cluster UID. |
 | [0021](0021-authorize-trusted-main-external-state-parity.md) | Proposed | Combine existing trusted-main Git publication with owner-approved package-read authority for complete external-state parent parity. |
 | [0022](0022-use-pinned-source-for-server-parity.md) | Proposed | Use the existing contents-read credential only for a pinned private chart/package checkout in trusted-main server parity, keeping it out of the cluster. |
+| [0023](0023-authorize-disposable-argocd-source-access.md) | Proposed | Extend source-token use to a pinned infrastructure checkout and an exact-URL repository Secret for actual Argo CD reconciliation in disposable trusted-main CI. |

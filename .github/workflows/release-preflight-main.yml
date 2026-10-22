@@ -40,6 +40,16 @@ jobs:
           persist-credentials: false
           submodules: false
           lfs: false
+      - name: Check out selected Argo CD bootstrap
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/k8s-infrastructure
+          ref: 5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+          path: .ci/k8s-infrastructure
+          persist-credentials: false
+          submodules: false
+          lfs: false
       - uses: actions/setup-python@v7
         with:
           python-version-file: .python-version
@@ -47,11 +57,29 @@ jobs:
         with:
           version: "0.12.5"
       - run: uv sync --locked
+      - name: Stage private Argo CD repository credential
+        shell: bash
+        env:
+          ARGOCD_SOURCE_TOKEN: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+        run: |
+          set +x
+          umask 077
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'perfeng-argocd-token'
+          with path.open('x', encoding='utf-8') as stream:
+              stream.write(os.environ['ARGOCD_SOURCE_TOKEN'])
+          PY
       - name: Accept production release parents on an owned cluster
         run: make release-workflows-integration
         env:
           RELEASE_KIND_MODE: preflight-parent
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Remove private Argo CD repository credential
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/perfeng-argocd-token"
       - name: Retain only non-secret fixture evidence
         if: always()
         uses: actions/upload-artifact@v6

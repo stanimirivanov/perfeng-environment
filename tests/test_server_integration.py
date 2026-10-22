@@ -19,7 +19,7 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ServerIntegrationTests(unittest.TestCase):
-    def test_source_token_stays_in_pinned_checkout_with_unchanged_job_authority(self):
+    def test_server_checkout_remains_pinned_with_unchanged_job_authority(self):
         workflow = yaml.safe_load(
             (ROOT / ".github/workflows/release-preflight-main.yml").read_text()
         )
@@ -41,7 +41,7 @@ class ServerIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             sum("PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN" in json.dumps(s) for s in job["steps"]),
-            1,
+            3,
         )
 
     def test_checkout_refuses_wrong_head_and_modified_content_before_render(self):

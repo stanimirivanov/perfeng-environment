@@ -448,6 +448,16 @@ PR child fixtures and production charts/templates remain unchanged. Production
 S3 IAM policy, real Argo CD convergence, complete readiness/adoption, backup/
 restore and host-loss recovery, promotion and measured retirement remain open.
 
+Actual Argo CD acceptance adds the pinned infrastructure bootstrap after chart/
+server parity. ADR 0023 records owner-approved source-token exposure to its pinned
+checkout and an exact-URL repository Secret in disposable trusted-main CI. The
+root is skipped; unchanged selected control-plane sources are manually synced.
+Fresh operations and native observers must prove first/repeat convergence, real
+Service drift and explicit correction while preserving identities/data. Live
+acceptance awaits the post-merge main run. Complete readiness/adoption, foundation
+Application adoption, production security/recovery and script retirement remain
+open; no production verifier/template or host entrypoint changes.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

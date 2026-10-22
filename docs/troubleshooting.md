@@ -29,6 +29,16 @@
 - Never paste Secret YAML, credential environment variables, decoded tokens or
   unreviewed logs into an issue.
 
+## Disposable Argo CD acceptance
+
+For disposable trusted-main Argo CD acceptance, inspect `argocd-*.failure.json`
+for safe sync/health/operation phases and condition types. Verify the selected
+bootstrap and private repository access before changing manifests. Installation,
+source and timeout failures do not count as expected drift. Deliberate Service
+drift must remain `OutOfSync` until explicit manual correction. Never enable root
+or automatic sync, or upload repository-server logs, Secret snapshots or token
+files as a repair. See [actual Argo CD convergence](release-workflows-integration.md#actual-argo-cd-convergence).
+
 ## Scope and command safety
 
 For the staged release-readiness Workflow, inspect the failing observation or
