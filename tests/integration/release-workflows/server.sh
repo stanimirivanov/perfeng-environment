@@ -106,7 +106,7 @@ cmp "$fixture/server-roles-before.json" "$fixture/server-roles-after.json"
 [[ $(sql -c 'SELECT value FROM public.migration_ci_sentinel WHERE id=1;') == migration-image-parity-v1 ]]
 sql -c "SELECT oid::text FROM pg_class WHERE oid='public.migration_ci_sentinel'::regclass;" > "$results/server-sentinel-oid.txt"
 cmp "$results/migration-image-sentinel-oid-after.txt" "$results/server-sentinel-oid.txt"
-[[ $(k -n perf-platform get pod database-ci-postgres -o jsonpath='{.metadata.uid}') == "$postgres_uid" ]]
+[[ $(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}') == "$postgres_uid" ]]
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 jq -s -e 'length==4 and ([.[].metadata.uid]|unique|length)==4' "$results"/server-*.workflow.json > /dev/null
 for label in first repeat stopped corrected; do

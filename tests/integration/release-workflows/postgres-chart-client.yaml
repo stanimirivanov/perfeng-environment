@@ -1,0 +1,41 @@
+# CI admission check: authenticate through the real chart Service, not initdb's socket.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: postgres-chart-client-
+  namespace: perf-platform
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: client
+          image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+          command: [psql]
+          args: [-X, -w, -qAt, -v, ON_ERROR_STOP=1, -c, 'SELECT 1;']
+          env:
+            - {name: PGHOST, value: postgres.perf-platform.svc.cluster.local}
+            - {name: PGDATABASE, value: perfeng}
+            - {name: PGUSER, value: postgres}
+            - {name: PGCONNECT_TIMEOUT, value: '5'}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: perfeng-postgres-auth
+                  key: password
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

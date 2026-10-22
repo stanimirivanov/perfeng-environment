@@ -427,6 +427,16 @@ not establish dependency recovery. Complete readiness/adoption, real Argo CD
 reconciliation, foundation storage proof, populated upgrades/recovery, promotion
 and measured retirement remain open.
 
+PostgreSQL chart/PVC parity replaces the main fixture's standalone database
+provider with the actual repository chart, before migration and server phases.
+Native observation, authenticated TCP client checks and a controller-driven Pod
+restart must preserve PVC/PV, canary, Service and Secret identities while advancing
+the StatefulSet generation/revision. The canary is outside the application DB.
+Post-merge live acceptance remains pending; this proves local Pod-replacement
+retention only. SeaweedFS chart/storage, real Argo CD convergence, full readiness/
+adoption, retained-environment recovery, promotion and measured retirement remain
+open. PR child parity and production manifests/permissions remain unchanged.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

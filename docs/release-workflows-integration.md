@@ -309,6 +309,51 @@ chart/storage acceptance, workload/API behavior, recovery, promotion and script
 retirement remain separate. Live server acceptance is pending trusted-main CI
 after merge; no local cluster execution is permitted by this fixture.
 
+### PostgreSQL chart and PVC retention
+
+Trusted-main database setup now renders the repository's actual `charts/postgres`
+from the event checkout, with reviewed defaults and the existing immutable
+`perfeng-postgres-auth` Secret. This replaces only the main fixture's standalone
+Pod/Service; read-only PR child parity keeps that original transient provider.
+The shared SQL/log helpers select the corresponding Pod explicitly. Existing
+external-state, selected migrator, runtime-grant and real-server checks all run
+against `postgres-0` after the restart below.
+
+Require kind's existing `standard` local-path provisioner with
+`WaitForFirstConsumer`; no provisioner is installed or repaired. Label only the
+owned node for chart placement and create the unmodified StatefulSet/Service.
+The chart's retained claim policy, non-root/no-token Pod, image, resources and
+claim templates are used as published. No Helm install or second reconciler is
+introduced. These PVCs remain disposable with the owned kind node.
+
+| Case | Required evidence |
+|:--|:--|
+| First | Native chart rollout; a bounded client Job authenticates over the actual TCP Service; unchanged production StatefulSet observer reports current generation/revision and one ready/updated replica. |
+| Restart | Native `kubectl rollout restart` and bounded rollout wait replace the Pod. Require a new Pod UID, original StatefulSet UID, advanced generation and converged new revision. |
+| Retention | Original bound PVC UID/PV binding, PV UID/claim reference, Service and immutable auth Secret remain unchanged; canary OID/bytes survive in the separate `postgres` database. |
+| Downstream | Existing first-migration test still sees an empty `perfeng` application database; all subsequent database/grant/server gates use the restarted chart Pod. |
+
+The chart's Unix-socket readiness can briefly observe initdb's temporary server.
+The CI-only PostgreSQL client Job therefore independently authenticates over TCP,
+before and after restart, with native bounded startup retries (three retries,
+120-second deadline). It uses the same pinned client image, existing admin Secret
+and no API token. A failed connection/SQL command cannot establish readiness.
+This adds no probe override to the chart.
+
+Fixture administration sets `log_line_prefix` through `ALTER SYSTEM` and reload,
+then verifies it survives restart. This preserves the migrator's user/database/
+attempt diagnostic without changing the chart's Pod template or weakening that
+existing refusal criterion. Raw credentials and logs stay private. Artifacts use
+`postgres-chart-<case>.{workflow,observation,storage,pv,service,client}.json`,
+non-secret canary observations and old/new Pod UIDs. Native Workflows and client
+Jobs remain until normal owned teardown.
+
+This is Pod-replacement retention on kind local-path storage, not a backup,
+restore, disaster recovery or retained-environment migration test. Local execution
+remains prohibited. Live acceptance first runs after merge on trusted main.
+SeaweedFS still uses its transient direct-S3 fixture; Argo CD convergence and
+complete readiness/adoption, promotion and measured retirement remain open.
+
 ### Read-only PR boundary integration
 
 The separate `make release-workflows-integration` target is invoked by the

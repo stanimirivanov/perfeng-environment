@@ -139,6 +139,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "recovery.sh",
             "database.sh",
             "external-state-fixtures.sh",
+            "postgres-chart.sh",
             "bucket.sh",
             "registry.sh",
             "readiness.sh",
@@ -547,6 +548,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
                 ("deployment", "deployment"),
                 ("service", "service"),
                 ("deployment", "deployment"),
+                ("postgres", "statefulset"),
             ],
         )
         source = SCRIPT.read_text()
@@ -781,6 +783,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "recovery.sh",
             FIXTURE / "database.sh",
             FIXTURE / "external-state-fixtures.sh",
+            FIXTURE / "postgres-chart.sh",
             FIXTURE / "bucket.sh",
             FIXTURE / "registry.sh",
             FIXTURE / "readiness.sh",
@@ -803,6 +806,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             "recovery.sh",
             "database.sh",
             "external-state-fixtures.sh",
+            "postgres-chart.sh",
             "bucket.sh",
             "registry.sh",
             "readiness.sh",
