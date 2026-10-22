@@ -213,6 +213,51 @@ control-plane server, establish readiness/adoption, authorize production
 migration/promotion, or retire the supported host commands. The existing M04
 manual pause/backup/migration/recovery process remains authoritative.
 
+### Runtime database grant parity
+
+After selected-image migration, the same trusted-main fixture applies the exact
+reviewed grant transaction from `scripts/control_plane_migration.py`. The CI SQL
+copy is byte-checked offline against that function. Fixture administration alone
+applies grants; this is not a new production migration/grant WorkflowTemplate.
+
+A CI-only Argo resource wrapper creates PostgreSQL client Jobs pinned to the
+fixture server digest. Workers receive only the existing `runtime-url` Secret
+key, authenticate over TCP, have no Kubernetes API token and run non-root with a
+read-only root filesystem. No CI token scope or stored credential is added.
+
+| Case | Required evidence |
+|:--|:--|
+| Ungranted | Worker exits 3 at the exact SQL privilege-matrix refusal. |
+| First | Administrator applies reviewed grants; worker verifies the effective table privilege matrix, schema USAGE and no schema/database CREATE. |
+| Repeat | Reapply the transaction; a fresh worker succeeds and table/schema ACLs match the first application. |
+| Excess DELETE | Administrator deliberately grants DELETE on `runs`; a fresh worker refuses at the same exact policy boundary. No rows are deleted. |
+| Corrected | Administrator reapplies the reviewed transaction; a fresh worker succeeds and ACLs match the first application. |
+
+Successful workers execute real reads and zero-row INSERT/UPDATE statements on
+permitted tables inside a rolled-back transaction. They also require actual
+permission denials for schema DDL, DELETE and migration-ledger reads. All seven
+application tables have precisely the reviewed table privileges; the ledger and
+six retained native-worker tables have none of those runtime table privileges.
+This checks the selected schema, not arbitrary future schemas or column grants.
+A missing or unexpected table fails rather than silently expanding the policy.
+
+Artifacts use `runtime-grants-<case>.{workflow,job,worker}.json`, constant outcome
+markers, safe ACL/schema observations and sentinel OIDs. Expected refusal requires
+failed Workflow/Job state, one worker exit 3 and the exact SQL policy error;
+image pulls, connection errors and authentication errors cannot substitute.
+Raw client logs, role/password snapshots, Secret snapshots and table data digests
+stay private. Before/after checks preserve all table data, schema/relation OIDs,
+ledger hashes/timestamps, sentinel bytes, role/password and Secret identities,
+PostgreSQL Pod and cluster UID. Five distinct Workflows/Jobs remain queryable
+until normal owned-cluster cleanup; failed attempts are never replaced.
+
+Run offline checks with `make validate` and lint the CI wrapper alongside the
+staged production templates with Argo. Live acceptance first runs on trusted main
+after merge. This phase does not run the control-plane server, load its chart or
+runtime package, prove full readiness/adoption, authorize retained-environment
+grants/migrations, implement recovery or retire host entrypoints. Real server
+wiring and complete readiness remain the next integration gate.
+
 ### Read-only PR boundary integration
 
 The separate `make release-workflows-integration` target is invoked by the

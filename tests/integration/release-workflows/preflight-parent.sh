@@ -62,3 +62,4 @@ echo 'Complete preflight passed twice against the actual disposable cluster UID;
 source "$source_dir/maintenance-parent.sh"
 source "$source_dir/external-state-parent.sh"
 source "$source_dir/migration-image.sh"
+source "$source_dir/runtime-grants.sh"

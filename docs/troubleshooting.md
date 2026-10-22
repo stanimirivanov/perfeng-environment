@@ -534,6 +534,16 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For runtime-grant CI, inspect `runtime-grants-<case>` Workflow, Job and worker
+artifacts. Missing/excess grants require psql exit 3 and the exact privilege-matrix
+error; a generic failed Job, image pull, connection or authentication error is
+insufficient. Successful first/repeat/corrected attempts must preserve all table
+data, ledger/OIDs, sentinel, credentials and role identities. Only fixture
+administration reapplies the reviewed transaction after deliberate DELETE drift;
+workers cannot repair grants. Keep raw logs, data digests and password/Secret
+snapshots private. Do not run this fixture against a retained database. See the
+[runtime grant matrix](release-workflows-integration.md#runtime-database-grant-parity).
+
 For selected migrator CI, inspect `migration-image-<case>` artifacts. A failed
 runtime-role case requires exit 1 **and** the matching PostgreSQL CREATE-denial
 signal after a successful connection phase; generic failure is insufficient.
