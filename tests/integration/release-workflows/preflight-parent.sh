@@ -59,3 +59,4 @@ for permission in 'patch namespaces kube-system' 'create secrets argo-workflows'
 done
 [[ $(k auth can-i create pods --subresource=exec -n perf-platform --as "$identity" || :) == no ]]
 echo 'Complete preflight passed twice against the actual disposable cluster UID; release composition remains unproven.'
+source "$source_dir/maintenance-parent.sh"

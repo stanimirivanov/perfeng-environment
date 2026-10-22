@@ -534,6 +534,18 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For trusted-main maintenance composition, inspect
+`maintenance-parent-<case>.workflow.json` and its safe refusal/result/projection
+files. An observation refusal legitimately retains a successful nested
+preflight result; only the final checkpoint must be absent. A bad request digest
+must fail at `verify-identities` before `observe` runs. Expected observation
+failures require main exit 2 and the exact policy/operational-response diagnostic;
+Git, image, controller and timeout errors do not satisfy the case. The revoked
+grant belongs only to the disposable fixture. Restore it through fixture
+administration and submit a fresh Workflow; never retry successful nodes or
+change retained-environment permissions to repair CI. See the
+[composition matrix](release-workflows-integration.md#complete-maintenance-parent-composition).
+
 For trusted-main full preflight acceptance, inspect the separate
 `release-preflight-main.yml` artifact. `parent-request-ref.json` records the exact
 run-owned temporary ref and expected commit. `parent-request-ref-cleanup.json`

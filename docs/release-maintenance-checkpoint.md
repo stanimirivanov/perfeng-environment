@@ -6,6 +6,10 @@
 - It requires owned, paused root/child Applications, no active sync, a current zero-replica Deployment and no matching Pods, including terminating Pods.
 - Its versioned result is observation evidence, not a promotion receipt, backup proof, migration authorization or an ongoing lock.
 - Keep the [manual M04 maintenance and recovery path](kubernetes-runtime-deployment.md). This staged checkpoint does not pause, migrate, resume, sync or repair anything.
+- A [trusted-main CI phase](release-workflows-integration.md#complete-maintenance-parent-composition)
+  exercises this unchanged complete parent using the real disposable UID and
+  exact Git request after full preflight. Fixture Applications remain synthetic;
+  live composition acceptance is pending its post-merge main run.
 
 ## Inputs and execution
 
@@ -50,7 +54,12 @@ The separate [kind integration gate](release-workflows-integration.md) exercises
 this unchanged verifier child under the real Argo controller and Kubernetes
 RBAC, including refusal and fresh-attempt recovery. Its synthetic preflight
 and Application fixtures do not satisfy full maintenance-parent, release
-admission or operational-cutover acceptance.
+admission or operational-cutover acceptance. The separate trusted-main extension
+uses actual complete preflight followed by this parent: it checks first/repeat,
+preflight refusal before observation, unpaused/revoked-read refusal and fresh
+correction. It retains nested preflight evidence without confusing that output
+with a failed parent's checkpoint. No operational cutover follows from fixture
+composition alone.
 
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
 Request and result data schemas remain v1. Published v1 source is recoverable

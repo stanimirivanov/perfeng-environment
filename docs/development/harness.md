@@ -21,7 +21,7 @@
 | Pinned integration | `make release-selection-check` | Validate exact sibling revisions selected by deployment locks; requires the adjacent repositories and their selected commits. |
 | Disposable-kind release integration | `make release-workflows-integration` | Separate GitHub-hosted Linux CI tier; maintenance, ledger recovery, external-state Jobs, readiness HTTP/native observation and Git/schema/preflight-child parity with synthetic inputs/workloads. Uses job-scoped package-read permission and package-side access grants. Refuses local/self-hosted runners and is absent from offline aggregates. See the [fixture guide](../release-workflows-integration.md). |
 | Live operation | `task bootstrap`, `task status`, `task smoke`, `task destroy` | Access or mutate the dedicated local environment; follow the operating guides and obtain required authority. |
-| Trusted-main full preflight | `release-preflight-main.yml` | Main-only GitHub-hosted CI, job contents write, generated run-owned Git request and actual kind UID; unchanged complete parent twice and guarded ref cleanup. Never run locally or on PR code. See [ADR 0020](../decisions/0020-publish-disposable-ci-release-requests.md). |
+| Trusted-main parent composition | `release-preflight-main.yml` | Main-only GitHub-hosted CI, existing job contents write and one run-owned Git request for the actual kind UID; complete preflight twice followed by maintenance-checkpoint first/repeat/refusal/correction and guarded ref cleanup. Never run locally or on PR code. See [ADR 0020](../decisions/0020-publish-disposable-ci-release-requests.md). |
 
 The metadata-only `pull_request_target` workflow checks a PR's title, leading
 closing reference, and issue branch against one issue number. It checks out the

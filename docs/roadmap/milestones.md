@@ -378,6 +378,15 @@ full release composition, promotion/recovery and script retirement remain open.
 Admission of an operator-reviewed request for a retained environment, full parent
 composition, promotion/recovery and host-script retirement remain separate gates.
 
+The next composition slice extends the same trusted-main job with the unchanged
+complete maintenance-checkpoint parent and its real-UID Git request. First/repeat
+checkpoint identity/version checks, preflight refusal before observation,
+unpaused/revoked-read refusals and fresh correction are required. This phase
+adds no production template or authorization changes and is pending post-merge
+main acceptance. Applications remain fixtures; actual maintenance writes,
+full readiness/external-state/adoption composition, recovery/export, promotion
+and measured host-script retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

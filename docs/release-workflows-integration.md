@@ -22,6 +22,9 @@
 - A separate [trusted-main workflow](../.github/workflows/release-preflight-main.yml)
   accepts the complete production preflight using a generated Git request for
   its real disposable cluster UID; see [ADR 0020](decisions/0020-publish-disposable-ci-release-requests.md).
+- The same trusted-main run then exercises complete maintenance-checkpoint
+  composition with that exact request, manually paused fixture Applications
+  and a zero-replica Deployment. No synthetic preflight result is substituted.
 
 ## Invocation and isolation
 
@@ -57,6 +60,48 @@ leave a temporary ref requiring identity-checked manual cleanup.
 This gate first runs after merge; offline/PR success does not claim live parent
 acceptance. Successful preflight alone does not prove full release composition,
 application delivery, promotion, recovery or script retirement.
+
+### Complete maintenance-parent composition
+
+After both complete preflights pass, the same trusted-main job submits the
+unchanged `perfeng-release-maintenance-checkpoint-v2` parent. It reuses the
+existing request parameters, Git ref, token and granted ServiceAccount; no new
+CI authorization or production permission is added. Fixture administration
+creates the two reviewed Application specs with automatic sync disabled and
+the existing zero-replica Deployment. There is no Argo CD controller or actual
+control-plane deployment in this test.
+
+| Case | Required evidence |
+|:--|:--|
+| First/repeat | Complete parent succeeds; checkpoint schema, actual cluster UID, request/selection identities and each current resource UID/version match. |
+| Wrong request digest | Identity Pod exits 2 at preflight with the exact byte-mismatch diagnostic; downstream observation does not execute. |
+| Unpaused root | Preflight succeeds, observation exits 2 with its controlled policy refusal and no checkpoint is published. |
+| Revoked Application read | Fixture administration removes only its disposable named read binding and confirms denial. Preflight still succeeds; observation exits 2 with its operational-response refusal. |
+| Fresh correction | Administration restores the reviewed pause/read grant and confirms access. A new complete parent succeeds against the original request. |
+
+Observation failures may retain a successful nested preflight `result.value`.
+They must not publish a parent or observer result, including an empty/null
+materialized value. Unresolved Argo output declarations are allowed. The
+checked-in refusal predicate, owning Pod phase, main exit 2 and exact constant
+diagnostic distinguish controlled refusal from image, Git, controller or timeout
+failures. Successful nested preflight evidence must equal the original complete
+preflight result from this run.
+
+Each case records only projected Application/Deployment identities and versions
+before/after execution; they must remain unchanged within the case. UID identity
+persists across explicit fixture-admin corrections. All six Workflow identities
+and the complete private Git Secret object are retained and unchanged, and
+workload/Application writes, Pod deletion/exec, Job creation, Secret enumeration
+and ledger patch are denied to the workflow identity. Results are named
+`maintenance-parent-<case>.{workflow,result,preflight,before,after}.json` as
+applicable, plus constant refusal lines. Raw Pod logs and Secret snapshots stay
+private. Existing exit handling cleans the one owned ref and disposable cluster.
+
+This is complete **maintenance-checkpoint composition** evidence after the main
+job passes. It does not prove Argo CD reconciliation, real workload health,
+automatic pause/resume, Run draining, backups, migration/recovery, promotion or
+retirement of any supported host entrypoint. Local/PR checks cannot claim live
+acceptance of this trusted-main phase.
 
 ### Read-only PR boundary integration
 
