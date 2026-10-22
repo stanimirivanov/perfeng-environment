@@ -113,4 +113,5 @@ for label in first repeat stopped corrected; do
   name=$(jq -er .metadata.name "$results/server-$label.workflow.json") uid=$(jq -er .metadata.uid "$results/server-$label.workflow.json")
   [[ $(k -n argo-workflows get workflow "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
 done
+[[ $(k -n perf-platform get pod "$bucket_server_pod" -o jsonpath='{.metadata.uid}') == "$(jq -er .after "$results/seaweedfs-chart-pod-uids.json")" ]]
 echo 'Selected server/native/HTTP parity passed; full readiness and Argo CD remain separate.'

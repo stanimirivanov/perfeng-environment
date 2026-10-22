@@ -437,6 +437,17 @@ retention only. SeaweedFS chart/storage, real Argo CD convergence, full readines
 adoption, retained-environment recovery, promotion and measured retirement remain
 open. PR child parity and production manifests/permissions remain unchanged.
 
+SeaweedFS chart/proxy/PVC parity replaces the main direct-S3 provider with the
+actual repository chart and independent immutable server-auth Secret. The
+unchanged external-state parent uses the real proxy, while credential-free peer
+Jobs require reachable 8333 and exact refusal on private HTTP/gRPC listeners.
+A native restart must retain sentinel metadata/bytes, PVC/PV, Service, proxy
+configuration and credentials, with the restarted provider UID retained through
+selected-server acceptance. Live acceptance is pending the post-merge main run.
+PR child fixtures and production charts/templates remain unchanged. Production
+S3 IAM policy, real Argo CD convergence, complete readiness/adoption, backup/
+restore and host-loss recovery, promotion and measured retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

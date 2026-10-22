@@ -87,8 +87,16 @@ for label, key, password in (("approved", access, secret), ("denied", denied_acc
 PY
   k create -f "$fixture/bucket-server-auth.json"
   k create -f "$fixture/bucket-client-denied.json"
-  for manifest in seaweedfs-pod seaweedfs-service bucket-observer; do k create -f "$source_dir/$manifest.yaml"; done
-  k -n perf-platform wait --for=condition=Ready pod/bucket-ci-seaweedfs pod/bucket-ci-observer --timeout=180s
+  if [[ ${mode:-} == preflight-parent ]]; then
+    bucket_server_pod=seaweedfs-0
+    source "$source_dir/seaweedfs-chart.sh"
+    seaweedfs_chart_setup
+  else
+    bucket_server_pod=bucket-ci-seaweedfs
+    for manifest in seaweedfs-pod seaweedfs-service; do k create -f "$source_dir/$manifest.yaml"; done
+  fi
+  k create -f "$source_dir/bucket-observer.yaml"
+  k -n perf-platform wait --for=condition=Ready "pod/$bucket_server_pod" pod/bucket-ci-observer --timeout=180s
 }
 observer() {
   timeout 90s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --request-timeout=20s \
@@ -114,7 +122,7 @@ bucket_absence() {
 }
 bucket_allocation_diagnostics() {
   # Emit only known allocation signals/counts, never raw server logs or keys.
-  k -n perf-platform logs bucket-ci-seaweedfs -c seaweedfs --tail=120 --limit-bytes=32768 2>/dev/null \
+  k -n perf-platform logs "${bucket_server_pod:-bucket-ci-seaweedfs}" -c seaweedfs --tail=120 --limit-bytes=32768 2>/dev/null \
     | grep -Eo 'No writable volumes|no free volumes|No matching data node found|Not enough data nodes found|create [0-9]+ volume, created [0-9]+' \
     | sort -u > "$results/bucket-allocation.txt" || :
 }

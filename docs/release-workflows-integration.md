@@ -354,6 +354,62 @@ remains prohibited. Live acceptance first runs after merge on trusted main.
 SeaweedFS still uses its transient direct-S3 fixture; Argo CD convergence and
 complete readiness/adoption, promotion and measured retirement remain open.
 
+### SeaweedFS chart, proxy and PVC retention
+
+Trusted-main bucket setup now uses the repository's actual `charts/seaweedfs`
+with reviewed defaults: the real SeaweedFS server, HAProxy sidecar, Service,
+proxy ConfigMap and retained claim. Read-only PR child parity keeps its original
+direct-S3 transient provider. This changes only fixture composition, without
+modifying a production chart, template, image pin or CI credential permission.
+
+The chart's immutable `perfeng-s3-server-auth-v3` Secret receives only the existing
+fixture server's approved `s3.json`. It is independent of the deliberately denied
+`perfeng-s3-auth` client; fixture administration corrects only that client as
+before. Secret snapshots cover the server identity throughout main acceptance.
+These bootstrap credentials test storage/proxy behavior; they do not reproduce
+or establish production least-privilege S3 IAM policy.
+
+Render three expected chart resources without Pod-template overrides. Require
+kind's existing standard local-path provisioner; reuse the owned node placement
+established by PostgreSQL setup. The unchanged production StatefulSet observer
+must report current generation/revision and one ready/updated replica. Actual
+external-state preparation then exercises its unchanged first/repeat/refusal/
+correction sequence through the chart Service on port 8333, which reaches the
+private backend through HAProxy.
+
+A separate credential-free/API-token-free native peer Job first connects to the
+actual Pod's proxy port 8333. It then requires exact connection refusal for S3
+backend HTTP/gRPC (9000/19000), master (9333/19333), filer (8888/18888) and volume
+(8080/18080) listeners. An open private port, proxy refusal, timeout or generic
+network error fails the Job; it cannot count as isolation. The image is the
+existing pinned Python runtime and the Job has no retries and a 60-second bound.
+This peer runs before and after restart; it is not a full network-security audit.
+
+After complete external-state acceptance creates its existing sentinel, native
+`kubectl rollout restart` must replace the SeaweedFS Pod and converge an advanced
+StatefulSet generation/new revision. Preserve the original StatefulSet, bound
+PVC/PV/claim identity, Service, proxy ConfigMap and immutable server/client
+credentials. Compare sentinel object metadata and downloaded bytes across the
+restart. The later selected server gate requires the same post-restart provider
+Pod UID. No object overwrite, bucket deletion, Secret rotation or PVC recreation
+is used as recovery.
+
+Artifacts use `seaweedfs-chart-<case>.{workflow,observation,peer,storage,pv,service,proxy,object}.json`,
+old/new Pod UIDs and non-secret sentinel bytes. Peer Job/worker state is captured
+even on failure; upload only constant outcomes and allowlisted exception/open-port
+signals, with raw peer logs private. Keep raw credentials and Secret
+snapshots private. Workflows/peer Jobs remain until normal owned-cluster teardown.
+Missing storage, failed native rollout, exposure or changed object/identity fails
+without repair. The v1 bucket worker's hidden lookup stderr limitation remains:
+this does not newly prove per-Job authorization-versus-provider-error causality.
+
+Live chart/proxy/PVC acceptance is pending trusted-main execution after merge;
+no local live run is authorized. Pod-replacement retention on kind is not backup,
+restore or host/node-loss recovery. Production IAM-policy acceptance, real Argo CD
+convergence, complete readiness/adoption, promotion and measured retirement remain
+open. Both foundation charts and the selected server now have CI acceptance
+paths; that is not a completed deployment migration or production-readiness claim.
+
 ### Read-only PR boundary integration
 
 The separate `make release-workflows-integration` target is invoked by the

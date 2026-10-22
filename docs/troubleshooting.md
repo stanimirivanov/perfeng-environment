@@ -534,6 +534,18 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For SeaweedFS chart CI, inspect `seaweedfs-chart-<case>` native/peer/storage and
+object observations. Main diagnostics target `seaweedfs-0`; PR child parity still
+uses `bucket-ci-seaweedfs`. The peer must reach 8333 before private-port refusals
+can count; a timeout, unreachable proxy or open backend fails acceptance. Do not
+expose the backend or bypass HAProxy as a repair. The server-auth Secret is
+independent of the deliberately denied client. Preserve both identities across
+the retention restart and compare sentinel metadata/bytes and original PVC/PV.
+Changed data or credentials must fail without bucket/PVC deletion or rotation.
+Raw logs and Secret snapshots stay private. See the
+[SeaweedFS chart boundary](release-workflows-integration.md#seaweedfs-chart-proxy-and-pvc-retention);
+this does not prove production IAM policy, backup/restore or full readiness.
+
 For PostgreSQL chart CI, inspect `postgres-chart-<case>` observation/storage/PV/
 client artifacts and old/new Pod UIDs. A missing or incompatible `standard`
 StorageClass is a fixture prerequisite failure, not permission to install a new
