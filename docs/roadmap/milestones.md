@@ -406,6 +406,16 @@ is pending. This introduces no production migration template and changes no
 supported host path. Populated upgrade/backup/recovery, runtime grants/server
 wiring, full readiness/adoption, promotion and measured retirement remain open.
 
+Runtime database grant parity follows the selected-image migration in the same
+trusted-main fixture. It applies the exact existing grant transaction and runs
+runtime-only PostgreSQL client Jobs for missing grants, first/repeat application,
+excess DELETE refusal and correction. Exact table privileges, actual allowed
+reads/zero-row writes and denied DDL/DELETE/ledger access are checked while
+preserving data, schema/ledger/OIDs and credentials. Post-merge live acceptance
+is pending. No production grant owner, template or CI permission changes; actual
+server/chart/runtime-package wiring and complete readiness/adoption remain open,
+alongside populated upgrades/recovery, promotion and measured script retirement.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

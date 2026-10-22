@@ -72,7 +72,7 @@ for tool in kind kubectl argo; do
   fi
   chmod 700 "$fixture/bin/$tool"
 done
-argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml" "$source_dir/bucket-workflow.yaml" "$source_dir/registry-workflow.yaml" "$source_dir/readiness-workflow.yaml" "$source_dir/observer-workflow.yaml" "$source_dir/preflight-workflow.yaml" "$source_dir/migration-image-workflow.yaml"
+argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows "$source_dir/workflow.yaml" "$source_dir/ledger-workflow.yaml" "$source_dir/database-workflow.yaml" "$source_dir/bucket-workflow.yaml" "$source_dir/registry-workflow.yaml" "$source_dir/readiness-workflow.yaml" "$source_dir/observer-workflow.yaml" "$source_dir/preflight-workflow.yaml" "$source_dir/migration-image-workflow.yaml" "$source_dir/runtime-grants-workflow.yaml"
 # Refuse any pre-existing kind cluster; cleanup is armed only after this check.
 clusters=$(kind get clusters)
 [[ -z $clusters ]] || refuse 'pre-existing kind clusters are not owned by this test.'

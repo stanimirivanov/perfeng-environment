@@ -1,0 +1,75 @@
+# CI only: the fixture administrator applies grants separately. This worker has
+# only the runtime URL and proves effective database authority over real TCP.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: runtime-grants-ci-
+  namespace: argo-workflows
+spec:
+  serviceAccountName: release-external-state
+  entrypoint: probe
+  activeDeadlineSeconds: 150
+  templates:
+    - name: probe
+      resource:
+        action: create
+        successCondition: status.succeeded > 0
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            generateName: runtime-grants-ci-
+            namespace: perf-platform
+            labels:
+              perfeng.io/purpose: ci-runtime-grants
+              perfeng.io/workflow: '{{workflow.name}}'
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 90
+            template:
+              spec:
+                restartPolicy: Never
+                automountServiceAccountToken: false
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 999
+                  runAsGroup: 999
+                  seccompProfile:
+                    type: RuntimeDefault
+                containers:
+                  - name: probe
+                    image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+                    command: [psql]
+                    args: [-X, -w, -qAt, -v, ON_ERROR_STOP=1, -f, /sql/probe.sql]
+                    env:
+                      - name: PGDATABASE
+                        valueFrom:
+                          secretKeyRef:
+                            name: perfeng-control-plane-database
+                            key: runtime-url
+                      - name: PGCONNECT_TIMEOUT
+                        value: '10'
+                      - name: PGAPPNAME
+                        value: runtime-grants-ci
+                    resources:
+                      requests: {cpu: 25m, memory: 32Mi}
+                      limits: {cpu: 250m, memory: 128Mi}
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                        drop: [ALL]
+                    volumeMounts:
+                      - name: sql
+                        mountPath: /sql
+                        readOnly: true
+                volumes:
+                  - name: sql
+                    configMap:
+                      name: runtime-grants-ci
+      outputs:
+        parameters:
+          - name: job-name
+            valueFrom:
+              jsonPath: '{.metadata.name}'
