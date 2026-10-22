@@ -25,6 +25,9 @@
 - The same trusted-main run then exercises complete maintenance-checkpoint
   composition with that exact request, manually paused fixture Applications
   and a zero-replica Deployment. No synthetic preflight result is substituted.
+- It also composes the complete external-state parent against the shared
+  transient database/bucket fixtures and private registry with owner-approved
+  package-read authority ([ADR 0021](decisions/0021-authorize-trusted-main-external-state-parity.md)).
 
 ## Invocation and isolation
 
@@ -102,6 +105,57 @@ job passes. It does not prove Argo CD reconciliation, real workload health,
 automatic pause/resume, Run draining, backups, migration/recovery, promotion or
 retirement of any supported host entrypoint. Local/PR checks cannot claim live
 acceptance of this trusted-main phase.
+
+### Complete external-state parent composition
+
+After maintenance composition, the same main-only job reuses the one exact
+request/ref for `perfeng-release-external-state-v1`. The owner approved adding
+`packages: read` alongside its existing contents write. The unchanged parent
+performs real Git preflight and the v2 lock-selection guard before native bucket,
+database-role and registry Jobs. Shared setup functions preserve existing child
+fixtures and generate only disposable credentials; no second production
+bootstrap path or runtime Python module is introduced.
+
+| Case | Required outcome |
+|:--|:--|
+| Wrong byte digest | Exact identity refusal, no selection/preparation execution and zero Jobs. |
+| Denied bucket | Confirmed absent bucket (404) and denied client (403); one failed bucket Job, no database or registry Job, roles still absent. |
+| First | Explicit fixture-admin replacement of the bad bucket client; three successful Jobs, expected role grants/logins and all three pinned registry digests. |
+| Repeat | Three fresh successful Jobs; stable bucket identity, sentinel object, role OIDs/password hashes and complete Secret objects. |
+| Unsafe role | Admin marks only its test runtime role superuser. Bucket succeeds, database refuses unsafe attributes and registry does not execute; credentials and unsafe role remain unchanged by the Workflow. |
+| Fresh correction | Admin removes the test superuser flag; a new complete parent succeeds against the original request. |
+
+Parent success must export the exact preflight plus all three actual new Job
+names. Failures may preserve truthful partial preflight/created-Job outputs;
+these are not a completed preparation. The offline-checkable evidence consumer
+rejects downstream execution, unrelated Jobs, leaked future-stage outputs and
+stale request/cluster identities. Expected Job refusals additionally require a
+failed Job condition, the owning worker exit 1 and its exact safe diagnostic;
+workflow wait timeouts, image pulls and controller/artifact failures cannot count.
+The published bucket script suppresses its underlying lookup stderr. Its case
+is a stopping-boundary check with bad-client 403 probes before/after, not proof
+of that Job's individual HTTP cause: another provider lookup error can emit the
+same constant. Per-Job bucket authorization/network diagnosis remains open and
+must not receive retirement or authorization-parity credit from this case.
+Registry logs are private; only exact expected digests, exit codes and constant
+error classifications are uploaded. Failed registry access must still fail CI.
+
+All six Workflows and twelve new Job UIDs remain queryable before owned-cluster
+cleanup. Credential objects are compared within every attempt; only the explicit
+bad-client replacement changes its UID. Final role/password and bucket/object
+comparisons prove no unintended mutation across repeat/refusal/correction.
+Job Pods have no API token. Workflows retain only the reviewed Job grants and
+cannot delete Jobs, rotate/list Secrets, exec or patch workloads/Applications.
+
+Artifacts use `external-parent-<case>` names for Workflow/Job JSON, created-Job
+inventory, worker exits, digests and constant signals. Role reports exclude
+password hashes. Secret snapshots and SQL credential files remain private.
+The one request ref uses existing guarded cleanup, including after failure.
+
+This is complete finite preparation on transient PostgreSQL and direct internal
+S3/emptyDir, pending a successful post-merge main run. It does not establish
+production storage/proxy health, real readiness or adoption, schema migration,
+manifest-byte/layer verification, recovery/export, promotion or host retirement.
 
 ### Read-only PR boundary integration
 

@@ -5,53 +5,9 @@ set -euo pipefail
 [[ -n ${fixture:-} && -f $fixture/owned && ${KUBECONFIG:-} == "$fixture/kubeconfig" ]] || exit 2
 declare -F k a > /dev/null || exit 2
 
-for grant in serviceaccount workflow-access platform-jobs; do
-  k apply -f "gitops/release-workflows/rbac/external-state/$grant.yaml"
-done
-# Credentials/SQL/password hashes stay only in the private fixture directory.
-uv run --locked --offline python - "$fixture" <<'PY'
-import base64, json, secrets, sys
-from pathlib import Path
-directory = Path(sys.argv[1])
-admin, migration, runtime = (secrets.token_urlsafe(32) for _ in range(3))
-host = "postgres.perf-platform.svc.cluster.local:5432/perfeng?sslmode=disable"
-items = []
-for name, values in (
-    ("perfeng-postgres-auth", {"password": admin}),
-    ("perfeng-control-plane-database", {"migration-url": f"postgresql://perfeng_migration:{migration}@{host}",
-        "runtime-url": f"postgresql://perfeng_runtime:{runtime}@{host}"}),
-):
-    labels = {"app.kubernetes.io/managed-by": "perfeng-environment"}
-    if name == "perfeng-control-plane-database":
-        labels["perfeng.io/purpose"] = "control-plane-database"
-    items.append(dict(apiVersion="v1", kind="Secret", metadata=dict(name=name, namespace="perf-platform", labels=labels),
-        immutable=True, type="Opaque", data={k: base64.b64encode(v.encode()).decode() for k, v in values.items()}))
-(directory / "database-secrets.json").write_text(json.dumps(dict(apiVersion="v1", kind="List", items=items)))
-(directory / "database-break-password.sql").write_text("ALTER ROLE perfeng_runtime PASSWORD '" + secrets.token_urlsafe(32) + "';\n")
-(directory / "database-restore-password.sql").write_text("ALTER ROLE perfeng_runtime PASSWORD '" + runtime + "';\n")
-PY
-k create -f "$fixture/database-secrets.json"
-k create -f "$source_dir/postgres-pod.yaml"
-k create -f "$source_dir/postgres-service.yaml"
-k -n perf-platform wait --for=condition=Ready pod/database-ci-postgres --timeout=180s
-sql() {
-  timeout 30s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --request-timeout=20s \
-    -n perf-platform exec -i database-ci-postgres -- psql -X -w -qAt -U postgres -d perfeng -v ON_ERROR_STOP=1 "$@"
-}
-role_snapshot() {
-  sql > "$1" <<'SQL'
-SELECT coalesce(json_agg(json_build_object('oid',oid::text,'name',rolname,'login',rolcanlogin,
-  'superuser',rolsuper,'createDB',rolcreatedb,'createRole',rolcreaterole,'replication',rolreplication,
-  'bypassRLS',rolbypassrls,'password',rolpassword,
-  'connect',has_database_privilege(oid,'perfeng','CONNECT'),
-  'create',has_database_privilege(oid,'perfeng','CREATE')) ORDER BY rolname),'[]'::json)
-FROM pg_authid WHERE rolname IN ('perfeng_migration','perfeng_runtime');
-SQL
-}
-secret_snapshot() {
-  k -n perf-platform get secrets perfeng-postgres-auth perfeng-control-plane-database -o json \
-    | jq -S '.items | sort_by(.metadata.name)' > "$1"
-}
+source "$source_dir/external-state-fixtures.sh"
+database_setup
+
 database_jobs() {
   k -n perf-platform get jobs -l perfeng.io/purpose=release-external-state -o json \
     | jq -r '.items[].metadata.name | select(startswith("perfeng-prepare-db-v1-"))' | sort

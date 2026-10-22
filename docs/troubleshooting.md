@@ -534,6 +534,20 @@ verification leaves M04 live completion pending.
 
 ## Release preflight pilot fails
 
+For complete external-state CI, inspect `external-parent-<case>.workflow.json`,
+the new-Job inventory and owning Job/worker exit artifacts. A bad request digest
+must create no Jobs. Bucket refusal must leave database/registry unexecuted;
+unsafe-role refusal must leave registry unexecuted. Truthful partial preflight
+or created-Job names can survive failure and do not imply a completed parent.
+The bucket v1 worker hides its underlying lookup stderr; its constant proves
+only stage refusal. Bracketing 403 probes establish the test client but cannot
+attribute that Job's failure to authorization rather than another lookup error.
+Use safe registry classifications to distinguish package Read grant problems
+from missing manifests, network or TLS errors; never upload raw logs or add an
+anonymous fallback. Only fixture administration corrects its bad bucket client
+or unsafe role, then submits a fresh Workflow. Preserve failed Jobs and the
+original request. See the [external-state matrix](release-workflows-integration.md#complete-external-state-parent-composition).
+
 For trusted-main maintenance composition, inspect
 `maintenance-parent-<case>.workflow.json` and its safe refusal/result/projection
 files. An observation refusal legitimately retains a successful nested

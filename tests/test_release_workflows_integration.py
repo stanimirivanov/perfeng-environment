@@ -138,6 +138,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             "ledger.sh",
             "recovery.sh",
             "database.sh",
+            "external-state-fixtures.sh",
             "bucket.sh",
             "registry.sh",
             "readiness.sh",
@@ -189,7 +190,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         self.assertIn('source "$source_dir/database.sh"', SCRIPT.read_text())
 
     def test_database_credentials_are_private_generated_secret_inputs(self):
-        source = (FIXTURE / "database.sh").read_text()
+        source = (FIXTURE / "external-state-fixtures.sh").read_text()
         code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run(
@@ -283,7 +284,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
 
     @unittest.skipUnless(BASH, "Bash is unavailable; Linux CI checks the live fixture shell")
     def test_bucket_allocation_diagnostics_exclude_raw_server_log_values(self):
-        source = (FIXTURE / "bucket.sh").read_text()
+        source = (FIXTURE / "external-state-fixtures.sh").read_text()
         function = re.search(r"^bucket_allocation_diagnostics\(\) \{\n.*?^\}", source, re.M | re.S)
         assert function is not None and BASH is not None
         with tempfile.TemporaryDirectory() as temporary:
@@ -312,8 +313,8 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             )
 
     def test_bucket_profiles_match_private_client_secrets_and_only_approved_server_identity(self):
-        source = (FIXTURE / "bucket.sh").read_text()
-        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[0]
+        source = (FIXTURE / "external-state-fixtures.sh").read_text()
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.S)[1]
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run(
                 [sys.executable, "-", temporary],
@@ -776,6 +777,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "ledger.sh",
             FIXTURE / "recovery.sh",
             FIXTURE / "database.sh",
+            FIXTURE / "external-state-fixtures.sh",
             FIXTURE / "bucket.sh",
             FIXTURE / "registry.sh",
             FIXTURE / "readiness.sh",
@@ -783,6 +785,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "preflight.sh",
             FIXTURE / "preflight-parent.sh",
             FIXTURE / "maintenance-parent.sh",
+            FIXTURE / "external-state-parent.sh",
         ):
             syntax = subprocess.run(
                 [BASH, "-n", script.as_posix()], capture_output=True, timeout=20
@@ -793,6 +796,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             "ledger.sh",
             "recovery.sh",
             "database.sh",
+            "external-state-fixtures.sh",
             "bucket.sh",
             "registry.sh",
             "readiness.sh",

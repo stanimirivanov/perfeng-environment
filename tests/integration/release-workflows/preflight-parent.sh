@@ -60,3 +60,4 @@ done
 [[ $(k auth can-i create pods --subresource=exec -n perf-platform --as "$identity" || :) == no ]]
 echo 'Complete preflight passed twice against the actual disposable cluster UID; release composition remains unproven.'
 source "$source_dir/maintenance-parent.sh"
+source "$source_dir/external-state-parent.sh"

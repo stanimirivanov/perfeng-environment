@@ -6,6 +6,11 @@
 - The workflow consumes existing credential Secrets. Their initial issuance remains an explicit bootstrap operation; no Job creates, copies or rotates a Secret.
 - The parent WorkflowTemplate, four versioned child templates, immutable script ConfigMap and namespace-scoped Job permissions are staged with the release-workflows Application. They are absent from the active local root and must be tested only on a disposable `kind` cluster before an operational switch.
 - A repeat creates new, retained Job evidence while preserving bucket, role and credential identities. A failed Job is not retried or deleted automatically.
+- The [trusted-main composition phase](release-workflows-integration.md#complete-external-state-parent-composition)
+  exercises this unchanged parent with the actual disposable UID and exact Git
+  request, shared transient providers and the owner-approved combined CI token
+  ([ADR 0021](decisions/0021-authorize-trusted-main-external-state-parity.md)).
+  Live acceptance remains pending its post-merge main run.
 
 ## Inputs and ownership
 

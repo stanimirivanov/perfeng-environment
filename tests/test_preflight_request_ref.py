@@ -37,7 +37,7 @@ ENVIRONMENT = {
 
 
 class PreflightRequestRefTests(unittest.TestCase):
-    def test_main_workflow_has_no_pr_trigger_or_package_authority(self):
+    def test_main_workflow_has_no_pr_trigger_and_only_approved_authority(self):
         workflow = yaml.safe_load(
             (ROOT / ".github/workflows/release-preflight-main.yml").read_text()
         )
@@ -47,7 +47,7 @@ class PreflightRequestRefTests(unittest.TestCase):
         self.assertEqual(workflow["permissions"], {"contents": "read"})
         job = workflow["jobs"]["preflight-parent"]
         self.assertIn("github.ref == 'refs/heads/main'", job["if"])
-        self.assertEqual(job["permissions"], {"contents": "write"})
+        self.assertEqual(job["permissions"], {"contents": "write", "packages": "read"})
         self.assertEqual(job["runs-on"], "ubuntu-latest")
         self.assertLessEqual(job["timeout-minutes"], 30)
         self.assertFalse(job["steps"][0]["with"]["persist-credentials"])

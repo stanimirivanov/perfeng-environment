@@ -91,7 +91,7 @@ k wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 # Select the actual rendered package and child; do not maintain fixture copies.
 k kustomize gitops/release-workflows | uv run --locked --offline python -c '
 import json, sys, yaml
-names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-release-maintenance-checkpoint-v2"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1"), ("WorkflowTemplate", "perfeng-prepare-execution-registry-v1"), ("WorkflowTemplate", "perfeng-verify-release-readiness-v2"), ("WorkflowTemplate", "perfeng-observe-release-readiness-v1"), ("WorkflowTemplate", "perfeng-release-preflight-v2")}
+names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-release-maintenance-checkpoint-v2"), ("WorkflowTemplate", "perfeng-release-task-selection-v2"), ("WorkflowTemplate", "perfeng-release-external-state-v1"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1"), ("WorkflowTemplate", "perfeng-prepare-execution-registry-v1"), ("WorkflowTemplate", "perfeng-verify-release-readiness-v2"), ("WorkflowTemplate", "perfeng-observe-release-readiness-v1"), ("WorkflowTemplate", "perfeng-release-preflight-v2")}
 items = [o for o in yaml.safe_load_all(sys.stdin) if (o["kind"], o["metadata"]["name"]) in names]
 assert len(items) == len(names)
 print(json.dumps({"apiVersion": "v1", "kind": "List", "items": items}))
@@ -102,12 +102,13 @@ printf '%s' x-access-token > "$fixture/username"
 printf '%s' "$GITHUB_TOKEN" > "$fixture/token"
 k -n argo-workflows create secret generic release-git-read \
   --from-file="username=$fixture/username" --from-file="password=$fixture/token"
+source "$source_dir/registry.sh"
 if [[ $mode == preflight-parent ]]; then
+  registry_credentials
   rm -f "$fixture/token" "$fixture/username"
   source "$source_dir/preflight-parent.sh"
   exit 0
 fi
-source "$source_dir/registry.sh"
 registry_credentials
 rm -f "$fixture/token" "$fixture/username"
 unset GITHUB_TOKEN
