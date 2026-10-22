@@ -48,7 +48,7 @@ finish() {
   fi
   rm -f "$fixture/token" "$fixture/username" "$fixture/registry-approved.secret.json" "$fixture/registry-denied.secret.json"
   if [[ $mode == preflight-parent ]]; then
-    rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json"
+    rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json" "$fixture/argocd-environment-repository-secret.json"
   fi
   exit "$rc"
 }

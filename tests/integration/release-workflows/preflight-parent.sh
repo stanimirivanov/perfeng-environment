@@ -66,3 +66,4 @@ source "$source_dir/runtime-grants.sh"
 source "$source_dir/server.sh"
 source "$source_dir/argocd.sh"
 source "$source_dir/readiness-parent.sh"
+postgres_application_acceptance

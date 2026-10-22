@@ -94,3 +94,88 @@ SQL
   done
   echo 'PostgreSQL chart/PVC restart passed; retained-environment recovery remains unproven.'
 }
+
+postgres_application_state() {
+  local prefix=$1 pv
+  postgres_chart_storage "$prefix.storage.json"
+  pv=$(jq -er .volume "$prefix.storage.json")
+  k get pv "$pv" -o json | jq -S '{uid:.metadata.uid,name:.metadata.name,claim:.spec.claimRef.uid}' > "$prefix.pv.json"
+  k -n perf-platform get service postgres -o json | jq -S '{uid:.metadata.uid,spec}' > "$prefix.service.json"
+  k -n perf-platform get statefulset postgres -o json \
+    | jq -S '{uid:.metadata.uid,selector:.spec.selector,service:.spec.serviceName,claims:.spec.volumeClaimTemplates,
+      images:[.spec.template.spec.containers[].image],secrets:[.spec.template.spec.volumes[]? | .secret.secretName // empty]}' > "$prefix.statefulset.json"
+  external_secrets "$prefix.external.json"
+  server_inputs_snapshot "$prefix.server.json"
+  k -n argocd get secret ci-perfeng-environment-repository -o json | jq -S . > "$prefix.repository.json"
+  role_snapshot "$prefix.roles.json"
+  runtime_acl_snapshot "$prefix.acl.json"
+  migration_snapshot "$prefix.schema.json"
+  sql -d postgres -c "SELECT 'public.chart_ci_canary'::regclass::oid::text || '|' || value FROM public.chart_ci_canary WHERE id=1;" > "$prefix.canary.txt"
+  sql -c "SELECT 'public.migration_ci_sentinel'::regclass::oid::text || '|' || value FROM public.migration_ci_sentinel WHERE id=1;" > "$prefix.sentinel.txt"
+  k -n argocd get applications perfeng-local-root perfeng-local-control-plane -o json \
+    | jq -S '[.items[] | {uid:.metadata.uid,spec,skip:.metadata.annotations["argocd.argoproj.io/skip-reconcile"]}] | sort_by(.uid)' > "$prefix.other-applications.json"
+}
+
+postgres_application_acceptance() {
+  local revision application_uid label field first_pod before_pod name uid
+  declare -F argocd_sync external_secrets server_inputs_snapshot role_snapshot runtime_acl_snapshot migration_snapshot > /dev/null || return 2
+  echo 'PostgreSQL Application: adopt the prepared chart and retained database'
+  revision=$(jq -er '."selection-revision"' "$fixture/parent-parameters.json")
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" postgres "$revision" "$fixture/postgres-application.json"
+  postgres_application_state "$fixture/postgres-application-before"
+  before_pod=$(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}')
+  cmp "$results/postgres-chart-restarted.canary.txt" "$fixture/postgres-application-before.canary.txt"
+  k create -f "$fixture/postgres-application.json"
+  application_uid=$(k -n argocd get application perfeng-local-postgres -o jsonpath='{.metadata.uid}')
+  k -n argocd wait application/perfeng-local-postgres --for="jsonpath={.status.sync.revision}=$revision" --timeout=240s
+  k -n argocd get application perfeng-local-postgres -o json \
+    | jq -e '(.status.conditions // [] | length)==0 and (.status.sync.status=="Synced" or .status.sync.status=="OutOfSync")' > /dev/null
+  for label in first repeat corrected; do
+    if [[ $label == corrected ]]; then
+      k -n perf-platform patch service postgres --type=json \
+        -p '[{"op":"test","path":"/spec/ports/0/name","value":"postgres"},{"op":"replace","path":"/spec/ports/0/name","value":"pg-ci-drift"}]'
+      k -n argocd annotate application perfeng-local-postgres argocd.argoproj.io/refresh=hard --overwrite
+      k -n argocd wait application/perfeng-local-postgres --for=jsonpath='{.status.sync.status}'=OutOfSync --timeout=180s
+      k -n argocd get application perfeng-local-postgres -o json \
+        | jq -e '.spec.syncPolicy.automated=={enabled:false,prune:false,selfHeal:false} and .operation==null and
+          ([.status.resources[] | select(.kind=="Service" and .name=="postgres" and .status=="OutOfSync")]|length)==1' > /dev/null
+      [[ $(k -n perf-platform get service postgres -o jsonpath='{.spec.ports[0].name}') == pg-ci-drift ]]
+      printf '%s\n' 'PostgreSQL Service drift observed without automatic repair' > "$results/postgres-application-drift.outcome.txt"
+    fi
+    argocd_sync perfeng-local-postgres "$label"
+    k -n argocd get application perfeng-local-postgres -o json > "$fixture/postgres-application-current.json"
+    PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" postgres-converged \
+      "$fixture/postgres-application-current.json" "$application_uid" "$label" "$revision"
+    jq '{uid:.metadata.uid,spec,sync:.status.sync,health:.status.health,phase:.status.operationState.phase,case:.status.operationState.operation.info}' \
+      "$fixture/postgres-application-current.json" > "$results/postgres-application-$label.json"
+    k -n perf-platform rollout status statefulset/postgres --timeout=240s
+    k -n perf-platform wait --for=condition=Ready "pod/$database_pod" --timeout=120s
+    postgres_chart_connect "adopt-$label"
+    postgres_chart_observe "adopt-$label"
+    postgres_application_state "$fixture/postgres-application-$label"
+    for field in storage pv service statefulset external server repository roles acl schema other-applications; do
+      cmp "$fixture/postgres-application-before.$field.json" "$fixture/postgres-application-$label.$field.json"
+    done
+    for field in canary sentinel; do
+      cmp "$fixture/postgres-application-before.$field.txt" "$fixture/postgres-application-$label.$field.txt"
+    done
+    if [[ $label == first ]]; then
+      first_pod=$(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}')
+    else
+      [[ $(k -n perf-platform get pod "$database_pod" -o jsonpath='{.metadata.uid}') == "$first_pod" ]]
+    fi
+  done
+  jq -n --arg before "$before_pod" --arg after "$first_pod" '{before:$before,after:$after}' > "$results/postgres-application-pod-uids.json"
+  for label in first repeat corrected; do
+    name=$(jq -er .metadata.name "$results/postgres-chart-adopt-$label.workflow.json")
+    uid=$(jq -er .metadata.uid "$results/postgres-chart-adopt-$label.workflow.json")
+    [[ $(k -n argo-workflows get workflow "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
+    name=$(jq -er .metadata.name "$results/postgres-chart-adopt-$label.client.json")
+    uid=$(jq -er .metadata.uid "$results/postgres-chart-adopt-$label.client.json")
+    [[ $(k -n perf-platform get job "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
+  done
+  k -n argocd get application perfeng-local-root -o json \
+    | jq -e '.metadata.annotations["argocd.argoproj.io/skip-reconcile"]=="true" and .spec.syncPolicy.automated.enabled==false and .operation==null' > /dev/null
+  [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
+  echo 'PostgreSQL Application adoption, native readiness, TCP access and state retention passed; root remains skipped.'
+}
