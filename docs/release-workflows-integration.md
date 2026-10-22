@@ -954,6 +954,48 @@ Application ownership parity, not root/SeaweedFS Application activation,
 complete release adoption/promotion, backup/restore, operational cutover or
 script retirement. Existing production templates/verifiers and host paths remain.
 
+## SeaweedFS Application adoption
+
+After PostgreSQL Application acceptance, the same trusted-main run adopts
+SeaweedFS through its real Application. This reuses ADR 0024's existing exact
+environment repository access; no credential, permission or controller changes
+are introduced. The shared foundation input validator permits only PostgreSQL
+and SeaweedFS, pins their existing source to the selected commit and disables
+automatic sync/self-healing/pruning only in the private CI copy. Production
+Applications and chart defaults remain unchanged.
+
+Require fresh first/repeat/corrected native sync operations with exact compared
+source and sync-result revision, `Synced`/`Healthy` and no conditions. Each
+success runs the original StatefulSet observer and credential-free peer Job:
+proxy 8333 must connect and all established private HTTP/gRPC listener checks
+must return exact connection refusal. Authenticated S3 reads must preserve the
+existing sentinel's metadata and bytes through the real proxy. No alternate
+object store, administered status or synthetic peer replaces these checks.
+
+Change only the live Service port name from `s3` to `s3-ci-drift`, preserving
+numeric 8333 routing and its target. The controller must report that Service
+`OutOfSync` while its drifted name remains and automation stays disabled. A
+fresh manual sync restores the selected name. State comparisons after all three
+successes preserve StatefulSet/Service/proxy ConfigMap/PVC/PV UIDs and binding,
+proxy data, claim/Pod configuration, credentials and object metadata/bytes.
+Tracking metadata is expected to change during adoption and is excluded from
+data comparisons.
+
+Initial adoption may legitimately replace the SeaweedFS Pod; repeat and
+Service-only correction must preserve its adopted UID. Record before/after in
+`seaweedfs-application-pod-uids.json` for later phases. Retain all native Workflow
+and peer Job UIDs. Compare existing PostgreSQL storage, credentials, schema,
+roles/ACLs and canary/sentinel OIDs/bytes before/after the entire phase, and require
+its adopted Pod UID to remain unchanged. Other Application specs/UIDs remain
+unchanged and the root stays skipped. Raw snapshots/logs remain private;
+artifacts contain selected Application status, native/peer evidence and constant
+drift outcomes only.
+
+Live acceptance executes only after merge in the existing owned trusted-main
+kind fixture. It does not activate the root, execute the complete release-adoption
+or promotion parent, prove production S3 IAM/recovery or retire host commands.
+Published templates/verifiers and operator paths remain unchanged.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool

@@ -12,6 +12,10 @@ from scripts import infrastructure_release as infrastructure
 
 APPLICATION = Path("gitops/environments/local/control-plane-application.yaml")
 POSTGRES_APPLICATION = Path("gitops/environments/local/postgres-application.yaml")
+FOUNDATION_APPLICATIONS = {
+    "postgres": POSTGRES_APPLICATION,
+    "seaweedfs": Path("gitops/environments/local/seaweedfs-application.yaml"),
+}
 ENVIRONMENT_REPOSITORY = "https://github.com/stanimirivanov/perfeng-environment.git"
 
 
@@ -37,8 +41,9 @@ def repository_secret(
         assert len(sources) == 2 and all(s["repoURL"] == repository for s in sources)
     elif repository == ENVIRONMENT_REPOSITORY:
         name = "ci-perfeng-environment-repository"
-        source = yaml.safe_load(POSTGRES_APPLICATION.read_text(encoding="utf-8"))["spec"]["source"]
-        assert source["repoURL"] == repository
+        for path in FOUNDATION_APPLICATIONS.values():
+            source = yaml.safe_load(path.read_text(encoding="utf-8"))["spec"]["source"]
+            assert source["repoURL"] == repository
     else:
         raise ValueError("Repository is outside the approved disposable Argo CD sources")
     return {
@@ -60,20 +65,22 @@ def repository_secret(
     }
 
 
-def postgres_application(revision: str) -> dict[str, Any]:
+def foundation_application(revision: str, workload: str) -> dict[str, Any]:
     """Pin the real Application and disable automated reconciliation in CI only."""
+    if workload not in FOUNDATION_APPLICATIONS:
+        raise ValueError("Unsupported foundation Application")
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
-        raise ValueError("PostgreSQL CI source must use a full selected Git commit")
-    application = yaml.safe_load(POSTGRES_APPLICATION.read_text(encoding="utf-8"))
-    assert application["metadata"]["name"] == "perfeng-local-postgres"
+        raise ValueError("Foundation CI source must use a full selected Git commit")
+    application = yaml.safe_load(FOUNDATION_APPLICATIONS[workload].read_text(encoding="utf-8"))
+    assert application["metadata"]["name"] == f"perfeng-local-{workload}"
     assert application["metadata"]["namespace"] == "argocd"
     spec = application["spec"]
     assert spec["project"] == "perfeng-local"
     assert spec["source"] == {
         "repoURL": ENVIRONMENT_REPOSITORY,
         "targetRevision": "main",
-        "path": "charts/postgres",
-        "helm": {"releaseName": "postgres"},
+        "path": f"charts/{workload}",
+        "helm": {"releaseName": workload},
     }
     assert spec["destination"] == {
         "server": "https://kubernetes.default.svc",
@@ -88,9 +95,11 @@ def postgres_application(revision: str) -> dict[str, Any]:
     return application
 
 
-def postgres_converged(value: dict[str, Any], uid: str, case: str, revision: str) -> None:
+def foundation_converged(
+    value: dict[str, Any], uid: str, case: str, revision: str, workload: str
+) -> None:
     """Require this single-source sync to adopt the exact selected chart."""
-    spec = postgres_application(revision)["spec"]
+    spec = foundation_application(revision, workload)["spec"]
     assert value["metadata"]["uid"] == uid and value["spec"] == spec
     status = value["status"]
     assert status["sync"]["status"] == "Synced" and status["health"]["status"] == "Healthy"
@@ -103,6 +112,16 @@ def postgres_converged(value: dict[str, Any], uid: str, case: str, revision: str
     assert state["syncResult"]["source"] == spec["source"]
     assert state["operation"]["info"] == [{"name": "ci-case", "value": case}]
     assert state["operation"]["sync"] == {"revision": revision, "syncStrategy": {"apply": {}}}
+
+
+def postgres_application(revision: str) -> dict[str, Any]:
+    """Preserve the PostgreSQL fixture adapter while sharing foundation validation."""
+    return foundation_application(revision, "postgres")
+
+
+def postgres_converged(value: dict[str, Any], uid: str, case: str, revision: str) -> None:
+    """Validate the existing PostgreSQL single-source adapter."""
+    foundation_converged(value, uid, case, revision, "postgres")
 
 
 def converged(value: dict[str, Any], uid: str, case: str) -> None:
@@ -137,9 +156,13 @@ if __name__ == "__main__":
         )
     elif mode == "converged":
         converged(json.loads(Path(first).read_text(encoding="utf-8")), *rest)
-    elif mode == "postgres":
-        Path(rest[0]).write_text(json.dumps(postgres_application(first)), encoding="utf-8")
-    elif mode == "postgres-converged":
-        postgres_converged(json.loads(Path(first).read_text(encoding="utf-8")), *rest)
+    elif mode in {"postgres", "seaweedfs"}:
+        Path(rest[0]).write_text(json.dumps(foundation_application(first, mode)), encoding="utf-8")
+    elif mode in {"postgres-converged", "seaweedfs-converged"}:
+        foundation_converged(
+            json.loads(Path(first).read_text(encoding="utf-8")),
+            *rest,
+            workload=mode.removesuffix("-converged"),
+        )
     else:
         raise ValueError("Unknown Argo CD fixture operation")
