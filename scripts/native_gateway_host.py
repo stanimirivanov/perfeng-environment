@@ -13,6 +13,8 @@ if __package__:
 else:
     from native_gateway_tool import GatewayError, safe_state
 
+POWERSHELL_TIMEOUT = 40  # Include cold startup, within the doctor's 45-second command budget.
+
 ACL_SCRIPT = """
 $ErrorActionPreference = 'Stop'
 $path = $env:PERFENG_GATEWAY_STATE_PATH
@@ -68,8 +70,15 @@ def powershell(script: str, path: Path) -> str:
             encoding="utf-8",
             errors="replace",
             check=True,
-            timeout=20,
+            timeout=POWERSHELL_TIMEOUT,
         )
+    except subprocess.TimeoutExpired:
+        raise GatewayError(
+            "HOST_SECURITY_TIMEOUT",
+            f"Windows PowerShell security operation exceeded {POWERSHELL_TIMEOUT}s",
+            "inspect Windows host load and gateway state before repeating permission changes; "
+            "no vendor output was printed",
+        ) from None
     except (OSError, subprocess.SubprocessError):
         raise GatewayError(
             "HOST_SECURITY",

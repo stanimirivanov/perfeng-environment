@@ -130,6 +130,44 @@ class GatewayToolTests(unittest.TestCase):
         self.assertNotIn("PSModulePath", run.call_args.kwargs["env"])
         self.assertEqual(Path(run.call_args.args[0][0]).name, "powershell.exe")
         self.assertIn("WindowsPowerShell", run.call_args.args[0][0])
+        self.assertEqual(run.call_args.kwargs["timeout"], host.POWERSHELL_TIMEOUT)
+        self.assertGreater(host.POWERSHELL_TIMEOUT, 20)
+        self.assertLess(host.POWERSHELL_TIMEOUT, 45)
+
+    def test_security_timeout_is_distinct_sanitized_and_never_retried(self):
+        failures = (
+            (
+                subprocess.TimeoutExpired(
+                    ["powershell", "private-command"],
+                    host.POWERSHELL_TIMEOUT,
+                    output="private-output",
+                    stderr="private-error",
+                ),
+                "HOST_SECURITY_TIMEOUT",
+            ),
+            (
+                subprocess.CalledProcessError(
+                    1,
+                    ["powershell", "private-command"],
+                    output="private-output",
+                    stderr="private-error",
+                ),
+                "HOST_SECURITY",
+            ),
+        )
+        for failure, code in failures:
+            with (
+                self.subTest(code=code),
+                patch.dict(host.os.environ, {"SystemRoot": "C:/Windows"}),
+                patch.object(host.subprocess, "run", side_effect=failure) as run,
+                self.assertRaises(tool.GatewayError) as raised,
+            ):
+                host.powershell(host.SECURE_SCRIPT, Path("private-state"))
+            self.assertEqual(raised.exception.code, code)
+            self.assertNotIn("private-output", str(raised.exception))
+            self.assertNotIn("private-error", str(raised.exception))
+            self.assertNotIn("private-command", str(raised.exception))
+            run.assert_called_once()
 
     def test_unpublished_release_fails_closed(self):
         value = selection()
