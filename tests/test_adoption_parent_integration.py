@@ -37,6 +37,7 @@ def evidence(first: bool = True) -> tuple:
     request = json.loads((ROOT / "tests/fixtures/release-request-v1.json").read_text())
     request["environment"]["clusterUID"] = api["clusterUID"]
     request["selection"]["revision"] = parameters["selection-revision"]
+    request["selection"]["lockDigests"] = copy.deepcopy(preflight["lockDigests"])
     raw = (json.dumps(request, sort_keys=True) + "\n").encode()
     digest = "sha256:" + hashlib.sha256(raw).hexdigest()
     parameters["request-sha256"] = preflight["requestDigest"] = digest
@@ -313,6 +314,8 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
                 ("root-corrected", "success"),
                 ("concurrent-a", "success"),
                 ("concurrent-b", "success"),
+                ("changed-request", "changed-request"),
+                ("upgrade-request", "upgrade-request"),
                 ("missing-receipt", "missing-receipt"),
                 ("replaced-receipt", "replaced-receipt"),
             ],

@@ -31,6 +31,17 @@
 
 ## Disposable Argo CD acceptance
 
+For `changed-request` and `upgrade-request`, inspect the scenario's generated
+request/parameter files and safe `.outcome.json` digest/UID reports. Require
+successful nested Git preflight/readiness followed only by plan exit 2. Changed
+bytes must report the current-pointer conflict; upgrade intent must report
+`request/readiness identity differs or adoption is not initial`. Wrong Git path,
+digest, readiness or quota failures do not qualify. Original receipt/pointer
+objects must remain unchanged and candidate receipts absent; no later worker or
+adoption result may appear. Never rewrite a request's bytes to retry or use
+adoption to advance a pointer. See
+[request boundary acceptance](release-workflows-integration.md#adoption-request-boundary-acceptance).
+
 For `missing-receipt` and `replaced-receipt` adoption cases, require successful
 readiness/root/ledger reads and only `plan` failure with exit 2 and
 `current pointer conflicts or references a missing/replaced receipt`. Inspect
@@ -196,6 +207,19 @@ build may print `unknown`. Do not recompile by hand or change PATH: use the
 [managed setup and release selection](native-worker-connectivity.md#managed-setup).
 `PORT_CONFLICT` requires inspection of the exact listener, not killing every
 Caddy/kubectl process. Stop your old independent sessions before `native:up`.
+`RELEASE_TOOLCHAIN` means the selected gateway asset predates the reviewed
+Go 1.27.3 serving profile. Its recorded checksum/compiler provenance must stay
+truthful. Publish and select a patched release through the existing explicit
+handoff; do not relabel the asset, downgrade the gate or delete installed/CA
+state. See [ADR 0029](decisions/0029-require-patched-native-gateway-toolchain.md).
+
+`HOST_SECURITY_TIMEOUT` means the fixed Windows PowerShell operation exceeded
+its 40-second budget, including cold startup. Inspect host load and gateway state
+before repeating a permissions action: it may have applied before timing out.
+The operation is never retried automatically and vendor output remains private.
+This budget stays below the doctor's 45-second command budget; a timeout is not
+evidence of an ACL violation. The explicit ACL checks remain unchanged.
+
 `STATE_PERMISSIONS`/`HOST_SECURITY` require review of the gateway directory's
 Security settings; `task native:permissions` is a separately prompted local
 permission change, never an implicit doctor repair. Previously exposed CA keys

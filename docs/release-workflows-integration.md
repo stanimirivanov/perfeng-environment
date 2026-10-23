@@ -1147,7 +1147,7 @@ nodes to repair the partial attempt.
 
 Use the recovered result as this leg's comparison baseline. Run the same repeat,
 refusal, correction and concurrent retries with full record/workload/data
-retention. Initial has eight adoption Workflow UIDs; recovery has nine, including
+retention. The base cases contribute eight adoption Workflow UIDs in initial and nine in recovery, including
 the failed origin and fresh recovery. Delete only the original Workflow (the
 failed origin in recovery) and prove completed ledger retention. Raw records/logs
 stay private and artifacts remain scenario-specific.
@@ -1162,13 +1162,42 @@ writes or ambiguous responses, promotion or pointer advancement, full-tree healt
 export/restore, production admission or script retirement. Native storage and
 pure recovery tests retain their existing separate, narrower claims.
 
+### Adoption request boundary acceptance
+
+[ADR 0028](decisions/0028-publish-adoption-request-boundary-fixtures.md) records
+owner approval to publish three deterministic requests in each existing temporary
+commit/ref. The original is byte-compatible. Changed-request adds one newline
+with identical parsed JSON; upgrade-request changes only expectedCurrent to the
+original digest. All three pass the v1 schema before publication and bind
+distinct exact-byte identities/paths to the same delivery commit and reviewed
+selection. Ref journaling and conditional cleanup are unchanged.
+
+After successful baseline/recovery/concurrent cases, before retention and
+destructive receipt tests, submit both inputs as fresh complete adoption parents.
+Verify each nested preflight's schema, path, commit, digest, selection and lock
+identities, then actual readiness and native root/ledger reads. Require a healthy
+selected manual root and the original pointer. The candidate receipt must be
+absent both in the workflow and direct API. Only plan may fail, with exit 2 and:
+
+- Changed-request: `current pointer conflicts or references a missing/replaced receipt`.
+- Upgrade-request: `request/readiness identity differs or adoption is not initial`.
+
+No later worker or final result may appear. Original receipt/pointer objects
+must equal their accepted baseline around both attempts; workload/data retention
+and six child skips remain required. Upload safe UID/digest refusal reports and
+generated request/parameter files, keeping raw ledger/logs private. Quota errors
+cannot count as plan refusals. Both scenarios continue the existing retention
+and destructive identity checks. Live proof awaits both post-merge legs; this
+does not implement promotion.
+
 ### Receipt identity refusal acceptance
 
 [ADR 0027](decisions/0027-inject-disposable-adoption-receipt-identity-faults.md)
 records owner approval for destructive receipt fault injection only after the
 existing retention proof in both disposable scenarios. No new runner, scenario,
-request ref or credential permission is added. Initial now has ten adoption
-Workflow UIDs in total; receipt-only has eleven, including its failed origin.
+request ref or credential permission is added. Including request-boundary cases,
+initial now has twelve adoption Workflow UIDs; receipt-only has thirteen,
+including its failed origin.
 
 Recheck cluster identity and require a fresh exact ledger match against the
 accepted baseline. The pure unchanged policy must validate the original

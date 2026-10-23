@@ -56,7 +56,7 @@ def build(output: Path, revision: str, root: Path = tool.ROOT) -> dict[str, obje
     )
     environment = {
         **os.environ,
-        "GOTOOLCHAIN": "go1.26.9",
+        "GOTOOLCHAIN": tool.GO_VERSION,
         "GOFLAGS": "-mod=readonly",
         "CGO_ENABLED": "0",
         "GOVULNDB": "https://vuln.go.dev",
@@ -123,7 +123,7 @@ def build(output: Path, revision: str, root: Path = tool.ROOT) -> dict[str, obje
         "schemaVersion": 1,
         "platform": "windows/amd64",
         "caddyVersion": "v2.11.7",
-        "goVersion": "go1.26.9",
+        "goVersion": tool.GO_VERSION,
         "sourceRevision": revision,
         "development": dirty,
         "sha256": tool.digest(binary),

@@ -56,6 +56,15 @@ Cluster deletion also deletes this ledger. Preserve records outside the cluster 
 
 ## Verification and cutover gate
 
+ADR 0028 adds two owner-approved CI inputs in the same owned temporary commit/ref.
+Equivalent JSON with changed bytes must not reuse the accepted retry identity;
+an upgrade envelope naming the accepted digest must not use adoption as promotion.
+Both fresh parents must complete readiness then refuse precisely at plan before
+any write/result, preserving original ledger objects and absent candidate receipts.
+See [request boundary acceptance](release-workflows-integration.md#adoption-request-boundary-acceptance).
+These cases run before retention/destructive tests in both scenarios; live proof
+awaits post-merge CI. Actual promotion and pointer advancement remain separate.
+
 The separate [kind integration fixture](release-workflows-integration.md#native-ledger-persistence)
 now exercises the unchanged native storage templates: missing reads, receipt-only
 partial state, competing and repeated creates, exact stored bytes/UID binding,

@@ -4,6 +4,7 @@
 - Date: 2026-10-21
 - Milestone: M06 — Production Readiness
 - Supersedes: None
+- Amended by: [ADR 0028](0028-publish-adoption-request-boundary-fixtures.md), expanding publication to three CI request files in the same owned commit/ref
 
 ## TL;DR
 

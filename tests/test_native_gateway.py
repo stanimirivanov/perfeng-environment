@@ -23,7 +23,7 @@ from scripts import native_gateway_release as release
 from scripts import native_gateway_tool as tool
 from scripts.native_gateway_processes import ProcessScope
 
-INFO = "go\tgo1.26.9\ndep\tgithub.com/caddyserver/caddy/v2\tv2.11.7\th1:fixture\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\nbuild\tGOOS=windows\nbuild\tGOARCH=amd64\n"
+INFO = "go\tgo1.27.3\ndep\tgithub.com/caddyserver/caddy/v2\tv2.11.7\th1:fixture\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\nbuild\tGOOS=windows\nbuild\tGOARCH=amd64\n"
 
 
 def redirect_headers(location: str) -> Message:
@@ -37,7 +37,7 @@ def selection(data: bytes = b"binary") -> dict:
         "schemaVersion": 1,
         "platform": "windows/amd64",
         "caddyVersion": "v2.11.7",
-        "goVersion": "go1.26.9",
+        "goVersion": "go1.27.3",
         "release": {
             "tag": "native-gateway-" + "a" * 40,
             "assetId": 7,
@@ -81,7 +81,8 @@ class GatewayToolTests(unittest.TestCase):
     def test_security_provenance_and_platform_are_required(self):
         for info, code in (
             (INFO, None),
-            (INFO.replace("go1.26.9", "go1.26.8"), "TOOL_SECURITY"),
+            (INFO.replace("go1.27.3", "go1.27.2"), "TOOL_SECURITY"),
+            (INFO.replace("go1.27.3", "go1.26.9"), "TOOL_SECURITY"),
             (INFO.replace("v0.60.0", "v0.59.0"), "TOOL_SECURITY"),
             (INFO.replace("v2.11.7", "v2.11.6"), "TOOL_PROVENANCE"),
             (INFO + "=>\t../replacement\t(devel)\n", "TOOL_PROVENANCE"),
@@ -130,12 +131,67 @@ class GatewayToolTests(unittest.TestCase):
         self.assertNotIn("PSModulePath", run.call_args.kwargs["env"])
         self.assertEqual(Path(run.call_args.args[0][0]).name, "powershell.exe")
         self.assertIn("WindowsPowerShell", run.call_args.args[0][0])
+        self.assertEqual(run.call_args.kwargs["timeout"], host.POWERSHELL_TIMEOUT)
+        self.assertGreater(host.POWERSHELL_TIMEOUT, 20)
+        self.assertLess(host.POWERSHELL_TIMEOUT, 45)
+
+    def test_security_timeout_is_distinct_sanitized_and_never_retried(self):
+        failures = (
+            (
+                subprocess.TimeoutExpired(
+                    ["powershell", "private-command"],
+                    host.POWERSHELL_TIMEOUT,
+                    output="private-output",
+                    stderr="private-error",
+                ),
+                "HOST_SECURITY_TIMEOUT",
+            ),
+            (
+                subprocess.CalledProcessError(
+                    1,
+                    ["powershell", "private-command"],
+                    output="private-output",
+                    stderr="private-error",
+                ),
+                "HOST_SECURITY",
+            ),
+        )
+        for failure, code in failures:
+            with (
+                self.subTest(code=code),
+                patch.dict(host.os.environ, {"SystemRoot": "C:/Windows"}),
+                patch.object(host.subprocess, "run", side_effect=failure) as run,
+                self.assertRaises(tool.GatewayError) as raised,
+            ):
+                host.powershell(host.SECURE_SCRIPT, Path("private-state"))
+            self.assertEqual(raised.exception.code, code)
+            self.assertNotIn("private-output", str(raised.exception))
+            self.assertNotIn("private-error", str(raised.exception))
+            self.assertNotIn("private-command", str(raised.exception))
+            run.assert_called_once()
 
     def test_unpublished_release_fails_closed(self):
         value = selection()
         value["release"] = None
         with self.assertRaisesRegex(tool.GatewayError, "RELEASE_UNSELECTED"):
             tool.parse_selection(value)
+
+    def test_retired_go_selection_is_refused_before_state_or_download(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "native-gateway").mkdir()
+            value = selection()
+            value["goVersion"] = "go1.26.9"
+            (root / "native-gateway/serving-release.json").write_text(
+                json.dumps(value), encoding="utf-8"
+            )
+            with (
+                patch.object(tool, "download") as download,
+                self.assertRaisesRegex(tool.GatewayError, "RELEASE_TOOLCHAIN"),
+            ):
+                tool.setup(root)
+            download.assert_not_called()
+            self.assertFalse((root / ".local").exists())
 
     def test_invalid_asset_and_source_inputs_are_rejected(self):
         for field, bad in (
@@ -266,6 +322,17 @@ class GatewayToolTests(unittest.TestCase):
         workflow = yaml.safe_load((tool.ROOT / ".github/workflows/native-gateway.yml").read_text())
         build = workflow["jobs"]["windows-serving"]
         self.assertEqual(build["runs-on"], "windows-latest")
+        self.assertEqual(build["steps"][0]["with"].get("fetch-depth"), 0)
+        self.assertFalse(build["steps"][0]["with"]["persist-credentials"])
+        setup_go = next(
+            step for step in build["steps"] if step.get("uses", "").startswith("actions/setup-go@")
+        )
+        self.assertEqual(setup_go["with"]["go-version-file"], "native-gateway/build/go.mod")
+        for package in ("build", "audit"):
+            self.assertIn(
+                "go " + tool.GO_VERSION.removeprefix("go"),
+                (tool.ROOT / f"native-gateway/{package}/go.mod").read_text().splitlines(),
+            )
         self.assertIn("native_gateway_release build", str(build))
         self.assertIn("native_gateway_smoke", str(build))
         publisher = workflow["jobs"]["publish"]
