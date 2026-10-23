@@ -31,6 +31,16 @@
 
 ## Disposable Argo CD acceptance
 
+For the final bounded root phase, inspect `root-*.application.json`,
+`root-*.children.json` and the constant Namespace-drift outcome. Check the exact
+selected revision, fresh operation marker, complete fourteen-object inventory
+and all six child skip annotations. Root may restore committed foundation specs,
+but must not activate child operations or change workloads/data. A moving `main`,
+missing skip, unexpected operation or retention mismatch is a failure; do not
+enable auto-sync, unskip a child, filter Git sources or repair storage to pass.
+Raw snapshots remain private. Root-only convergence is not full-tree health.
+See [bounded root acceptance](release-workflows-integration.md#bounded-root-reconciliation).
+
 For SeaweedFS Application adoption, inspect `seaweedfs-application-*.json` and
 `seaweedfs-chart-adopt-*` native/peer evidence. A timeout, comparison failure or
 unexpectedly reachable private port is a failure, not the deliberate Service

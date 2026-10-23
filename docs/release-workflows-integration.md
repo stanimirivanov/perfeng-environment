@@ -32,10 +32,14 @@
 - A later CI-only phase runs the selected image's embedded migrator on the
   initially empty disposable schema, with fresh maintenance evidence before
   each attempt. It does not introduce a production migration entrypoint.
-- The final trusted-main phase installs actual Argo CD from the selected
+- A later trusted-main phase installs actual Argo CD from the selected
   infrastructure bootstrap and manually syncs private control-plane sources,
   including real Service drift/correction. This separately approved phase uses
   an ephemeral exact-URL source-token Secret; see [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md).
+- After foundation Application acceptance, the final phase manually reconciles
+  the real root at the selected commit with auto-sync disabled and six children
+  skipped. This proves root-owned object convergence, not full-tree health;
+  see [ADR 0025](decisions/0025-bound-disposable-root-reconciliation.md).
 
 ## Invocation and isolation
 
@@ -840,7 +844,7 @@ remain open. Production verifier code remains two files/708 physical lines.
 
 After foundation chart and selected-server acceptance, trusted-main installs the
 infrastructure lock's Argo CD bootstrap from its validated clean pinned checkout.
-Earlier phases retain the minimal CRD; this final phase installs the actual
+Earlier phases retain the minimal CRD; this phase installs the actual
 controller and never writes Application status.
 
 The owner-approved [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md)
@@ -995,6 +999,38 @@ Live acceptance executes only after merge in the existing owned trusted-main
 kind fixture. It does not activate the root, execute the complete release-adoption
 or promotion parent, prove production S3 IAM/recovery or retire host commands.
 Published templates/verifiers and operator paths remain unchanged.
+
+## Bounded root reconciliation
+
+After both foundation Application phases, ADR 0025 authorizes reconciliation of
+the real root in this disposable trusted-main job only. Render the unchanged
+Kustomize tree and require exactly four Namespaces, three AppProjects and seven
+Applications. Before unskipping root, mark all six non-control-plane children
+`skip-reconcile`: PostgreSQL, SeaweedFS, sample SUT, native search, resource
+metrics and benchmark authority. Missing children are created with the skip
+annotation already present; existing children retain their UIDs. Control-plane
+remains active with its committed manual policy.
+
+Root automatic sync remains disabled. Its canonical source still tracks `main`,
+while each manual operation explicitly selects the request's full commit. A
+moving `main` fails the revision gate; no source rewrite or newer commit is
+silently accepted. First/repeat/corrected operations must report fresh markers,
+exact source/revision, complete root inventory, `Synced`/`Healthy` and no
+conditions. Change only the live `perf-sut` environment label, require actual
+`OutOfSync` with the drift still present, then explicitly correct it by root sync.
+
+Root restores committed foundation source/automation specs. Their separately
+managed skip annotations must survive actual normal apply, with unchanged child
+operation records and UIDs. Compare workload specs/Pod UIDs, credentials,
+database schema/roles/ACLs/canary/sentinel, volume identities/binding and S3
+metadata/bytes after every operation. No rollout is expected or permitted.
+Private state snapshots stay outside artifacts; inspect `root-*.application.json`,
+`root-*.children.json` and `root-drift.outcome.txt` for safe evidence.
+
+This proves root-owned object convergence only. Skipped children do not establish
+full-tree health; no full release-adoption/promotion parent, ledger write,
+retained deployment, production recovery or script retirement is included.
+Actual live acceptance remains pending the post-merge trusted-main run.
 
 ## Verification and remaining gates
 
