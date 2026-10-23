@@ -184,7 +184,7 @@ class ArgoCDIntegrationTests(unittest.TestCase):
     def test_shared_sync_request_preserves_single_and_multi_source_revision_contracts(self):
         assert JQ is not None
         expression = re.search(
-            r"jq --arg label \"\$label\" '(.+?)' > \"\$fixture/argocd-sync.json\"",
+            r"jq --arg label \"\$label\" --arg revision \"\$revision\" '(.+?)' > \"\$fixture/argocd-sync.json\"",
             (FIXTURE / "argocd.sh").read_text(),
             re.S,
         )
@@ -193,11 +193,12 @@ class ArgoCDIntegrationTests(unittest.TestCase):
             yaml.safe_load((ROOT / MODULE.APPLICATION).read_text()),
             MODULE.postgres_application("a" * 40),
             MODULE.foundation_application("a" * 40, "seaweedfs"),
+            yaml.safe_load((ROOT / "gitops/bootstrap/local-root-application.yaml").read_text()),
         ):
             with self.subTest(application=application["metadata"]["name"]):
                 application["metadata"]["resourceVersion"] = "23"
                 completed = subprocess.run(
-                    [JQ, "--arg", "label", "repeat", expression[1]],
+                    [JQ, "--arg", "label", "repeat", "--arg", "revision", "b" * 40, expression[1]],
                     input=json.dumps(application),
                     text=True,
                     capture_output=True,
@@ -215,6 +216,8 @@ class ArgoCDIntegrationTests(unittest.TestCase):
                     if "sources" in spec
                     else {"revision": spec["source"]["targetRevision"]}
                 )
+                if application["metadata"]["name"] == "perfeng-local-root":
+                    selected = {"revision": "b" * 40}
                 self.assertEqual(
                     request["operation"]["sync"], {**selected, "syncStrategy": {"apply": {}}}
                 )

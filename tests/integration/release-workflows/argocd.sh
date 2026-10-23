@@ -7,7 +7,7 @@ declare -F k a migration_snapshot external_secrets role_snapshot > /dev/null || 
 
 echo 'Argo CD: install selected bootstrap and reconcile the selected private sources'
 bootstrap=$(PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" bootstrap .ci/k8s-infrastructure)
-# The root is deliberately excluded: it must never activate other Applications.
+# Keep root excluded until the final bounded phase has skipped all six children.
 k -n argocd annotate application perfeng-local-root argocd.argoproj.io/skip-reconcile=true
 root_uid=$(k -n argocd get application perfeng-local-root -o jsonpath='{.metadata.uid}')
 application_uid=$(k -n argocd get application perfeng-local-control-plane -o jsonpath='{.metadata.uid}')
@@ -66,16 +66,18 @@ role_snapshot "$fixture/argocd-roles-before.json"
 external_secrets "$fixture/argocd-external-before.json"
 
 argocd_sync() {
-  local application=$1 label=$2
+  local application=$1 label=$2 revision=${3:-}
   case "$application" in
     perfeng-local-control-plane|perfeng-local-postgres|perfeng-local-seaweedfs) ;;
+    perfeng-local-root) [[ $revision =~ ^[0-9a-f]{40}$ ]] || return 2 ;;
     *) return 2 ;;
   esac
   echo "Argo CD convergence case: $application $label"
   k -n argocd get application "$application" -o json \
-    | jq --arg label "$label" '{metadata:{resourceVersion:.metadata.resourceVersion},operation:{
+    | jq --arg label "$label" --arg revision "$revision" '{metadata:{resourceVersion:.metadata.resourceVersion},operation:{
       initiatedBy:{username:"disposable-ci"},info:[{name:"ci-case",value:$label}],
-      sync:((if .spec.sources then {revisions:[.spec.sources[].targetRevision]} else {revision:.spec.source.targetRevision} end)
+      sync:((if .metadata.name=="perfeng-local-root" then {revision:$revision}
+        elif .spec.sources then {revisions:[.spec.sources[].targetRevision]} else {revision:.spec.source.targetRevision} end)
         + {syncStrategy:{apply:{}}})}}' > "$fixture/argocd-sync.json"
   k -n argocd patch application "$application" --type=merge --patch-file "$fixture/argocd-sync.json"
   # Wait for this operation, not a previous Succeeded status with the same revision.

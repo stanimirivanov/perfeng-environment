@@ -490,6 +490,16 @@ complete release adoption/promotion, production IAM/recovery/security and
 measured script retirement remain separate; production manifests/verifiers and
 operator paths are unchanged.
 
+Bounded root acceptance follows both foundation Application phases. ADR 0025
+records owner approval to reconcile the actual fourteen-object root tree while
+keeping root automatic sync disabled and all six non-control-plane children
+skipped. Explicit selected-commit first/repeat/corrected operations must prove
+root convergence and Namespace-label drift correction without workload, storage,
+credential or data changes. Root retains its canonical `main` source; a moving
+selection fails. Live proof awaits the post-merge trusted-main run. Full-tree
+health/activation, complete adoption/promotion, production recovery/security and
+measured host-script retirement remain separate; no published contract changes.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
