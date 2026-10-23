@@ -519,6 +519,14 @@ success; ledger bytes/UIDs/provenance and workload/data identities remain intact
 Live proof awaits the post-merge trusted-main run. This does not advance the
 separate partial-write, concurrent or ambiguous-response recovery gates.
 
+Concurrent exact-retry acceptance queues two unchanged complete parents behind
+a bounded native suspended holder of the existing release mutex. Native wait
+status, absence of worker Pods/results and unchanged state must precede release;
+both queued UIDs must then complete with disjoint controller entrypoint intervals,
+fresh verification and exact ledger/result reuse. Live proof awaits the post-merge
+trusted-main run. Initial-create races, partial-write/ambiguous-response recovery,
+external-operator exclusion and production locking remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

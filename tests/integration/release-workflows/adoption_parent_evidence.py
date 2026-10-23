@@ -3,10 +3,12 @@
 import base64
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import readiness_parent_evidence as readiness
+import yaml
 from jsonschema import Draft202012Validator
 
 from tests.release_verifier_support import policy
@@ -154,6 +156,83 @@ def refusal(
     )
 
 
+def waiting(
+    holder: dict[str, Any],
+    workflows: list[dict[str, Any]],
+    workers: list[dict[str, Any]],
+    parameters: dict[str, str],
+) -> None:
+    """Prove both actual production parents queue behind this native suspended holder."""
+    spec = yaml.safe_load(
+        Path("gitops/release-workflows/release-adopt-existing-v2.yaml").read_text(encoding="utf-8")
+    )["spec"]
+    synchronization = spec["synchronization"]
+    assert holder["metadata"]["namespace"] == "argo-workflows"
+    assert holder["spec"]["synchronization"] == synchronization
+    assert holder["spec"]["serviceAccountName"] == spec["serviceAccountName"]
+    assert 0 < holder["spec"]["activeDeadlineSeconds"] <= 300
+    assert holder["status"]["phase"] == "Running"
+    node = holder["status"]["nodes"][holder["metadata"]["name"]]
+    assert node["type"] == "Suspend" and node["phase"] == "Running"
+    holding = holder["status"]["synchronization"]["mutex"]["holding"]
+    key = "argo-workflows/mutex/" + synchronization["mutexes"][0]["name"]
+    assert len(holding) == 1 and holding[0]["mutex"] == key and holding[0]["holder"]
+    assert not workers and len(workflows) == 2
+    assert all(w["metadata"]["uid"] for w in [holder, *workflows])
+    assert len({w["metadata"]["name"] for w in [holder, *workflows]}) == 3
+    assert len({w["metadata"]["uid"] for w in [holder, *workflows]}) == 3
+    for workflow in workflows:
+        assert workflow["metadata"]["namespace"] == "argo-workflows"
+        assert workflow["spec"]["workflowTemplateRef"] == {
+            "name": "perfeng-release-adopt-existing-v2"
+        }
+        assert {
+            p["name"]: p["value"] for p in workflow["spec"]["arguments"]["parameters"]
+        } == parameters
+        status = workflow["status"]
+        assert status["phase"] == "Pending"
+        assert status["storedWorkflowTemplateSpec"]["synchronization"] == synchronization
+        mutex = status["synchronization"]["mutex"]
+        assert mutex["waiting"] == holding and not mutex.get("holding")
+        assert not workflow["spec"].get("suspend")
+        assert not any(n["type"] == "Pod" for n in status.get("nodes", {}).values())
+        assert not readiness.outputs(status)
+        assert all(not readiness.outputs(n) for n in status.get("nodes", {}).values())
+
+
+def serialized(
+    held: dict[str, Any],
+    holder: dict[str, Any],
+    queued: list[dict[str, Any]],
+    completed: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Bind queued UIDs to successful, disjoint controller entrypoint intervals."""
+    assert holder["metadata"]["uid"] == held["metadata"]["uid"]
+    assert holder["metadata"]["name"] == held["metadata"]["name"]
+    assert holder["status"]["phase"] == "Succeeded"
+
+    def interval(workflow: dict[str, Any], kind: str) -> tuple[datetime, datetime]:
+        node = workflow["status"]["nodes"][workflow["metadata"]["name"]]
+        assert node["type"] == kind and node["phase"] == "Succeeded"
+        times = tuple(datetime.fromisoformat(node[k]) for k in ("startedAt", "finishedAt"))
+        assert all(t.utcoffset() == timedelta(0) for t in times) and times[0] <= times[1]
+        return times[0], times[1]
+
+    released = interval(holder, "Suspend")[1]
+    expected = {(w["metadata"]["name"], w["metadata"]["uid"]) for w in queued}
+    assert len(queued) == len(completed) == len(expected) == 2
+    assert len({w["metadata"]["uid"] for w in queued}) == 2
+    assert {(w["metadata"]["name"], w["metadata"]["uid"]) for w in completed} == expected
+    assert all(w["status"]["phase"] == "Succeeded" for w in completed)
+    intervals = sorted(interval(w, "Steps") for w in completed)
+    assert released <= intervals[0][0] and intervals[0][1] <= intervals[1][0]
+    return {
+        "decision": "serialized-exact-retries",
+        "holderUID": holder["metadata"]["uid"],
+        "workflowUIDs": sorted(w["metadata"]["uid"] for w in completed),
+    }
+
+
 if __name__ == "__main__":
     mode, directory, evidence_directory, label = sys.argv[1:]
     fixture, results = Path(directory), Path(evidence_directory)
@@ -161,6 +240,28 @@ if __name__ == "__main__":
     def load(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
 
+    if mode == "waiting":
+        waiting(
+            load(results / "adoption-lock-held.workflow.json"),
+            load(results / "adoption-lock-queued.workflows.json"),
+            load(results / "adoption-lock-queued.workers.json"),
+            load(fixture / "parent-parameters.json"),
+        )
+        sys.exit(0)
+    if mode == "serialized":
+        result = serialized(
+            load(results / "adoption-lock-held.workflow.json"),
+            load(results / "adoption-lock-holder.workflow.json"),
+            load(results / "adoption-lock-queued.workflows.json"),
+            [
+                load(results / f"adoption-parent-concurrent-{suffix}.workflow.json")
+                for suffix in ("a", "b")
+            ],
+        )
+        (results / "adoption-lock.result.json").write_text(
+            json.dumps(result, sort_keys=True), encoding="utf-8"
+        )
+        sys.exit(0)
     workflow = load(results / f"adoption-parent-{label}.workflow.json")
     if mode == "success":
         result = success(

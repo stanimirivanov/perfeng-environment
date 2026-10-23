@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: adoption-lock-ci-
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: adoption-lock
+spec:
+  serviceAccountName: release-adoption
+  entrypoint: hold
+  activeDeadlineSeconds: 300
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  templates:
+    - name: hold
+      suspend: {}

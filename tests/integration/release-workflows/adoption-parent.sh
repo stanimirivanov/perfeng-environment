@@ -33,11 +33,13 @@ adoption_retained() {
     "$fixture/adoption-root.json" "$root_uid" "$adoption_root_case" "$root_revision" "$fixture/root-tree.yaml"
 }
 adoption_case() {
-  local label=$1 expected=$2 workflow rc node_id pod step=root root_mode=converged
+  local label=$1 expected=$2 workflow=${3:-} rc node_id pod step=root root_mode=converged
   case "$expected" in success|refusal|root-drift) ;; *) return 2 ;; esac
   echo "Complete release adoption: $label"
-  workflow=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
-    --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
+  if [[ -z $workflow ]]; then
+    workflow=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
+      --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
+  fi
   if timeout 1830s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
     --namespace argo-workflows wait "$workflow"; then rc=0; else rc=$?; fi
   [[ $rc != 124 && $rc != 137 ]]
@@ -105,6 +107,37 @@ adoption_case root-corrected success
 cmp "$fixture/adoption-first.records.json" "$fixture/adoption-root-corrected.records.json"
 cmp "$results/adoption-parent-first.result.json" "$results/adoption-parent-root-corrected.result.json"
 
+# Hold the real mutex before submitting both retries, making contention observable.
+holder=$(a submit "$source_dir/adoption-lock-workflow.yaml" -o json | jq -er .metadata.name)
+k -n argo-workflows wait "workflow/$holder" --for="jsonpath={.status.nodes.$holder.phase}=Running" --timeout=90s
+concurrent_a=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
+  --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
+concurrent_b=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
+  --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
+for workflow in "$concurrent_a" "$concurrent_b"; do
+  k -n argo-workflows wait "workflow/$workflow" \
+    --for=jsonpath='{.status.synchronization.mutex.waiting[0].mutex}'=argo-workflows/mutex/perfeng-local-external-state --timeout=60s
+done
+a get "$holder" -o json > "$results/adoption-lock-held.workflow.json"
+k -n argo-workflows get workflows "$concurrent_a" "$concurrent_b" -o json \
+  | jq '.items' > "$results/adoption-lock-queued.workflows.json"
+k -n argo-workflows get pods -l "workflows.argoproj.io/workflow in ($holder,$concurrent_a,$concurrent_b)" -o json \
+  | jq '[.items[]|{uid:.metadata.uid}]' > "$results/adoption-lock-queued.workers.json"
+PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" waiting "$fixture" "$results" concurrent
+adoption_records "$fixture/adoption-queued.records.json"
+cmp "$fixture/adoption-first.records.json" "$fixture/adoption-queued.records.json"
+adoption_retained queued
+a resume "$holder"
+timeout 90s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$holder"
+a get "$holder" -o json > "$results/adoption-lock-holder.workflow.json"
+adoption_case concurrent-a success "$concurrent_a"
+adoption_case concurrent-b success "$concurrent_b"
+for label in concurrent-a concurrent-b; do
+  cmp "$fixture/adoption-first.records.json" "$fixture/adoption-$label.records.json"
+  cmp "$results/adoption-parent-first.result.json" "$results/adoption-parent-$label.result.json"
+done
+PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" serialized "$fixture" "$results" concurrent
+
 for permission in 'patch configmaps perfeng-release-ledger' 'delete configmaps perfeng-release-ledger' \
   'create configmaps argo-workflows' 'create jobs perf-platform' 'list secrets argo-workflows' 'create secrets argo-workflows' \
   'patch deployments perf-platform' 'patch applications.argoproj.io argocd'; do
@@ -112,12 +145,12 @@ for permission in 'patch configmaps perfeng-release-ledger' 'delete configmaps p
   [[ $(k auth can-i "$verb" "$resource" -n "$namespace" --as "$adoption_identity" || :) == no ]]
 done
 [[ $(k auth can-i create pods --subresource=exec -n perf-platform --as "$adoption_identity" || :) == no ]]
-for label in first repeat missing-root-read corrected root-drift root-corrected; do
+for label in first repeat missing-root-read corrected root-drift root-corrected concurrent-a concurrent-b; do
   name=$(jq -er .metadata.name "$results/adoption-parent-$label.workflow.json")
   uid=$(jq -er .metadata.uid "$results/adoption-parent-$label.workflow.json")
   [[ $(k -n argo-workflows get workflow "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
 done
-jq -s -e 'length==6 and (map(.metadata.uid)|unique|length)==6' "$results"/adoption-parent-*.workflow.json > /dev/null
+jq -s -e 'length==8 and (map(.metadata.uid)|unique|length)==8' "$results"/adoption-parent-*.workflow.json > /dev/null
 name=$(jq -er .metadata.name "$results/adoption-parent-first.workflow.json")
 k -n argo-workflows delete workflow "$name" --cascade=foreground --wait=true --timeout=90s
 adoption_records "$fixture/adoption-retained.records.json"
