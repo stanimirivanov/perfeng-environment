@@ -562,6 +562,14 @@ independent receipt without resetting history. Live proof awaits PR CI; producti
 templates/grants/jobs/refs are unchanged. Complete-parent ambiguous outcomes,
 promotion, retained recovery and measured retirement remain separate.
 
+The next adoption acceptance slice replaces review-only negative permission
+checks with eleven actual API `Forbidden` checks in the existing native-ledger
+and trusted-main fixtures. All writes use server dry-run with explicit
+ServiceAccount groups; selected receipt/pointer snapshots must stay identical.
+Pod exec remains review-only. This adds no grants, credentials, jobs, scenarios
+or refs. Offline protocol tests do not establish live success; CI proof and
+production token authentication remain separate. No retirement credit is added.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

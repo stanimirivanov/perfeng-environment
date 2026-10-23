@@ -203,13 +203,8 @@ cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-chang
 adoption_case upgrade-request upgrade-request
 cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-upgrade-request.records.json"
 
-for permission in 'patch configmaps perfeng-release-ledger' 'delete configmaps perfeng-release-ledger' \
-  'create configmaps argo-workflows' 'create jobs perf-platform' 'list secrets argo-workflows' 'create secrets argo-workflows' \
-  'patch deployments perf-platform' 'patch applications.argoproj.io argocd'; do
-  read -r verb resource namespace <<< "$permission"
-  [[ $(k auth can-i "$verb" "$resource" -n "$namespace" --as "$adoption_identity" || :) == no ]]
-done
-[[ $(k auth can-i create pods --subresource=exec -n perf-platform --as "$adoption_identity" || :) == no ]]
+source "$source_dir/adoption-authority.sh"
+verify_adoption_authority "$adoption_receipt" adoption_records
 for label in "${adoption_labels[@]}"; do
   name=$(jq -er .metadata.name "$results/adoption-parent-$label.workflow.json")
   uid=$(jq -er .metadata.uid "$results/adoption-parent-$label.workflow.json")

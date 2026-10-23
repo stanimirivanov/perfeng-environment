@@ -972,6 +972,18 @@ must be present before syncing the v2 child templates and parents. Do not edit
 a published ConfigMap or copy code into a template. See the
 [package upgrade and rollback procedure](release-verifier-package.md).
 
+For adoption authority CI, inspect `adoption-authority.tsv`: a complete proof
+ends with the tab-separated `suite verified` row. A refusal must be Kubernetes
+`Forbidden` for the exact impersonated ServiceAccount, operation, API group and
+namespace. Timeout, NotFound, schema/admission rejection and an unexpected grant
+are failures. Raw command output stays in the private fixture directory; do not
+upload it. Check the selected Role/RoleBindings and object identities privately.
+Do not widen permissions or remove `--dry-run=server` to obtain a pass. The helper
+checks unchanged selected ledger snapshots and cluster UID; changed records need
+independent investigation. Exec is review-only and never connects. Explicit
+groups document the effective identity; Kubernetes already defaults those groups
+for ServiceAccount impersonation. These checks do not prove token authentication.
+
 A source-retirement guard failure requires matching Git revision/content hashes
 and active replacements in `deployments/release-workflow-retirements.json`.
 Changing an existing published file or retirement entry is refused. Make a new

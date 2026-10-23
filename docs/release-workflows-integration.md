@@ -1277,6 +1277,36 @@ pointer or delete additional history. Live proof awaits both post-merge legs.
 This does not prove initial-create races, ambiguous API responses, restoration,
 retained recovery or operational cutover.
 
+### Adoption API authorization refusals
+
+Both the native-ledger boundary job and the existing trusted-main adoption
+scenarios source `adoption-authority.sh` before receipt identity fault injection.
+The helper impersonates `release-adoption` with its namespace, all-ServiceAccount
+and authenticated groups explicitly specified. Kubernetes already supplies the
+default ServiceAccount groups when impersonation omits them; this is additional
+API refusal evidence, not a correction to group handling.
+
+Eleven actual API operations must return exit 1 and Kubernetes `Forbidden` for
+the exact user, verb, resource, API group and namespace: patch/delete the receipt
+and pointer, create a workflow ConfigMap or Secret, list Secret names, create a
+Job, patch the control-plane Deployment, and patch the root/control-plane
+Applications. Every write uses server dry-run, including deletion, so an
+unexpected grant cannot persist the probe. Secret listing prints names only;
+an unexpected grant can expose Secret bodies to the client, never to evidence.
+Allowed ledger get/create and denied Pod exec remain authorization reviews;
+connect subresources have no equivalent safe dry-run and no exec is attempted.
+
+Cluster identity is checked before and after. Canonical snapshots of the selected
+receipt and pointer must remain identical. Only constant decisions are uploaded
+in `adoption-authority.tsv`; success requires the terminal `suite verified` row
+(tab separated). Raw API diagnostics and snapshots remain private. Unexpected
+success, transport errors, missing objects, mismatched refusals or changed
+records fail closed. This tests API authorization through privileged fixture
+impersonation, not ServiceAccount token authentication or production admission.
+Offline tests exercise the Bash protocol with an isolated command boundary;
+actual Kubernetes proof awaits the existing CI jobs. No permissions, production
+templates, jobs, credentials, scenarios or request refs are added.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool

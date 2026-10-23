@@ -142,6 +142,12 @@ outstanding. Synthetic fixture readiness is not an adoption authorization.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.
 
+The [API authorization refusal fixture](release-workflows-integration.md#adoption-api-authorization-refusals)
+adds actual `Forbidden` checks to the native-ledger job and both trusted-main
+scenarios before destructive receipt faults. Writes use server dry-run; selected
+ledger snapshots must remain identical. Exec remains a review only. This tests
+impersonated API authorization, not token authentication; live proof awaits CI.
+
 ## Verifier package lifecycle
 
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
