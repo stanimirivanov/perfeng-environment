@@ -89,6 +89,16 @@ is allowed in this test; unrelated comparison/health failures do not qualify.
 The root remains manual, six children remain skipped and workload/data retention
 is checked throughout. Live proof awaits the post-merge trusted-main run.
 
+Concurrent exact-retry acceptance adds a bounded native suspended mutex holder
+and two simultaneously submitted unchanged parents after the baseline exists.
+Both must demonstrably queue without workers/results or state changes, then
+complete with distinct preserved UIDs, non-overlapping controller entrypoint
+intervals and unchanged ledger bytes/provenance after explicit holder release.
+See [complete adoption acceptance](release-workflows-integration.md#complete-existing-release-adoption-parent).
+This local mutex test does not establish initial-create conflict recovery,
+partial-write/ambiguous-response recovery or exclusion of external operators.
+Live proof awaits the post-merge trusted-main run.
+
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.

@@ -1088,12 +1088,34 @@ root observations: incidental root resource-version changes fail acceptance;
 do not pause the controller, fabricate status or automatically retry until green.
 
 Prove denied ledger patch/delete, workflow-configuration writes, Secret listing,
-Job creation, workload mutation and Application sync. Retain six distinct
+Job creation, workload mutation and Application sync. Retain eight distinct
 Workflow UIDs, then foreground-delete **only the original completed disposable
 Workflow** and require complete receipt/pointer objects to survive unchanged.
 Keep raw logs and record/state snapshots private. Uploaded evidence is limited
 to `adoption-parent-*.workflow.json`, worker identity/exit projections, successful
 result JSON and constant refusal/retention outcomes.
+
+Concurrent exact retries are tested only after the baseline exists. Submit the
+CI-only `adoption-lock-workflow.yaml`: one native Suspend template, the existing
+ServiceAccount and the same published release mutex, with a 300-second lifetime.
+Require its root Suspend node to run and its native status to hold that mutex.
+Submit two unchanged production parents before releasing it. Both must report
+`Pending`, the exact mutex/holder identity, the published effective synchronization
+specification and original request parameters, with no worker Pods or results.
+While they wait, require unchanged ledger and workload/data snapshots.
+
+Resume the holder explicitly; timeout or holder failure is not success. Each
+queued UID must later pass the existing complete-parent evidence checks with
+fresh readiness/planning and skipped creates. Require controller entrypoint-node
+intervals to begin after holder completion and not overlap, allowing either
+retry to run first. Preserve full receipt/pointer objects, provenance, result
+identities and all root/child/workload/data boundaries. Keep holder/queue snapshots
+and `adoption-lock.result.json` as non-secret controller evidence. The fixture is
+included in offline Argo lint; it adds no worker image or operator command.
+
+This proves serialization of complete exact retries by the existing local mutex.
+It does not prove racing initial creates, partial writes, ambiguous responses,
+multi-controller/database locking or exclusion of host operators and Argo CD.
 
 Actual acceptance runs only after merge in the existing trusted-main owned kind
 job. This does not prove complete-parent partial-write/concurrent/ambiguous-response

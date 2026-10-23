@@ -309,6 +309,8 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
                 ("corrected", "success"),
                 ("root-drift", "root-drift"),
                 ("root-corrected", "success"),
+                ("concurrent-a", "success"),
+                ("concurrent-b", "success"),
             ],
         )
         self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v2", source)

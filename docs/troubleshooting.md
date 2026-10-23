@@ -52,6 +52,16 @@ selected-commit root sync and submits a fresh adoption parent; it never edits
 ledger records or fabricates status. Inspect the existing private snapshots and
 safe `adoption-parent-root-*` evidence to distinguish refusal from repair.
 
+For concurrent exact retries, inspect `adoption-lock-held.workflow.json`,
+`adoption-lock-queued.*`, the completed holder, both `adoption-parent-concurrent-*`
+cases and `adoption-lock.result.json`. Both parents must wait for the actual
+holder's exact namespaced mutex without workers/results. A missing wait state,
+holder timeout, changed UID, overlapping controller execution or changed ledger
+is a failure. The fixture resumes only its native suspended holder; do not remove
+production synchronization, alter status, rewrite records or retry until green.
+Normal owned-cluster teardown cleans up on failure. This tests exact retries
+against an existing baseline, not initial-create races or external operators.
+
 For the final bounded root phase, inspect `root-*.application.json`,
 `root-*.children.json` and the constant Namespace-drift outcome. Check the exact
 selected revision, fresh operation marker, complete fourteen-object inventory
