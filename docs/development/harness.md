@@ -59,6 +59,12 @@ Operators use `native:setup`, `native:doctor` and `native:up` after the first
 reviewed serving release has been selected. Production connectivity and M03
 acceptance remain separate live tiers.
 
+PR jobs running the full unit suite require a checkout with `fetch-depth: 0`
+and credential persistence disabled. With `GITHUB_BASE_REF` set, the immutable
+verifier retirement audit compares against the merge base with `origin/<base>`
+and reads historical source bytes. The native gateway Windows tier has the same
+history requirement as main validation; a shallow PR merge checkout is insufficient.
+
 
 `make native-target-image-check` is a separate explicit Docker build and isolated
 loopback image verification tier. It can fetch the pinned base and is not an

@@ -304,6 +304,8 @@ class GatewayToolTests(unittest.TestCase):
         workflow = yaml.safe_load((tool.ROOT / ".github/workflows/native-gateway.yml").read_text())
         build = workflow["jobs"]["windows-serving"]
         self.assertEqual(build["runs-on"], "windows-latest")
+        self.assertEqual(build["steps"][0]["with"].get("fetch-depth"), 0)
+        self.assertFalse(build["steps"][0]["with"]["persist-credentials"])
         self.assertIn("native_gateway_release build", str(build))
         self.assertIn("native_gateway_smoke", str(build))
         publisher = workflow["jobs"]["publish"]
