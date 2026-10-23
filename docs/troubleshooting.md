@@ -864,6 +864,18 @@ TLS keys, disable verification, widen grants or reset ledger records to pass it.
 See [the fixture boundary](release-workflows-integration.md#native-receipt-response-loss).
 This does not establish complete-parent ambiguous-outcome recovery.
 
+An empty writer worker list means Pod creation did not complete; inspect the
+saved writer Workflow's `status.message` before diagnosing the proxy. In this
+resource fixture, the PodSpec patch must include both the `fault` ConfigMap
+volume and its mount. Argo's earlier volume-reference selection cannot discover
+a mount introduced by a later patch. Offline Workflow lint alone does not prove
+the generated Pod passes Kubernetes admission.
+Argo's resource executor always appends `-o json`; do not use kubectl `--raw`,
+which rejects that output flag before sending the create. The fixture serves
+fixed discovery locally and uses normal create with no client OpenAPI lookup;
+the exact object still undergoes Kubernetes API validation. The real loopback
+kubectl test covers discovery, accepted create options and withheld response.
+
 For database parity failures, inspect `database-*.workflow.json`, the named Job
 JSON, the non-secret role summary and filtered refusal diagnostics. An expected
 unsafe-role/password refusal must have a failed Job and `psql` exit 1; a pending

@@ -560,9 +560,12 @@ outcome, or run a complete adoption parent against a reviewed Git request.
 [ADR 0030](decisions/0030-inject-disposable-ledger-response-loss.md) records owner
 approval for a separate CI-only TLS proxy in the existing boundary job. Generate
 a native resource fixture from the published receipt-create template, preserving
-manifest meaning and its 60-second deadline. Fixture-only raw-POST/kubeconfig
-flags route just this create through the proxy; no discovery or other API request
-is forwarded. Subsequent observation/retry operations use unchanged production
+manifest meaning and its 60-second deadline. A fixture kubeconfig routes this
+native create through the proxy. Fixed core discovery is served locally, never
+forwarded; `--validate=false` skips only client OpenAPI lookup. Kubernetes still
+validates the actual receipt, and only the fixed create options are accepted.
+Argo appends `-o json`, so kubectl's incompatible `--raw` option cannot be used.
+Subsequent observation/retry operations use unchanged production
 templates directly. The generated fixture is linted offline before submission.
 
 Resume the suspended writer only after its exact receipt and first-Workflow UID
@@ -574,7 +577,8 @@ Both TLS hops remain verified; no system trust store changes. The existing pinne
 Python image runs standard-library HTTP/TLS; certificates are generated using the
 already locked runner dependency. The Pod is non-root, read-only and bounded.
 
-Only one exact bounded receipt POST can reach the API. An upstream 201 must carry
+Only one exact bounded receipt POST, with the pinned field manager/validation
+query, can reach the API. An upstream 201 must carry
 matching immutable content/provenance and a real UID. The proxy then closes the
 client connection before sending any response headers, recording only a safe
 status/UID/content-digest event. Further requests are refused without forwarding.

@@ -21,11 +21,18 @@ controller, production workflow or release contract is introduced.
 Generate a fixture resource template from the published native create-receipt
 template. Preserve its manifest meaning, ownership policy and deadline. Wire
 entrypoint inputs to the same Workflow parameters, serialize the manifest as
-JSON, and supply fixture-only kubectl flags for a raw receipt POST and a public
-kubeconfig. The pinned Argo executor uses kubectl for resource actions; raw POST
-bypasses discovery, avoiding access to unrelated API paths through the proxy.
+JSON, and supply a public fixture kubeconfig. Use normal native kubectl create:
+the pinned Argo executor always adds `-o json`, which kubectl refuses with `--raw`.
+The proxy serves fixed `/api`, `/apis` and `/api/v1` discovery documents locally;
+no discovery request or token is forwarded upstream. Fixture-only `--validate=false`
+avoids client OpenAPI lookup; the actual API still validates/admit-checks the
+exact receipt. Pin the normal `kubectl-create` field manager and allow only its
+exact create query with `fieldValidation=Ignore`, never dry-run or other options.
 Ordinary Argo reporting remains on its direct cluster connection. This transport
 adapter is a fixture copy, not unchanged complete-parent acceptance.
+Declare the caller's ConfigMap volume and mount together in its PodSpec patch.
+Argo resolves referenced Workflow volumes before applying that patch; a mount
+introduced only by the patch cannot rely on a Workflow-level volume declaration.
 Do not set kubectl's request-timeout flag here: client-go adds a timeout query
 parameter, which the exact-route filter refuses. Retain the native 60-second
 Pod deadline, 15-second incoming socket limit and 10-second upstream timeout.
@@ -41,7 +48,7 @@ image and standard-library HTTP/TLS support in the Pod, without new dependencies
 ## Fault and evidence
 
 Allow only one bounded POST to the ledger ConfigMap collection with exactly the
-expected receipt content. Reject other methods, routes, query strings, identities,
+expected receipt content and query. Reject other write methods, routes, options, identities,
 credentials and payloads. The caller token must identify release-adoption; the
 API remains responsible for signature, audience, expiry and RBAC validation.
 The JWT claim filter does not replace Kubernetes authentication. Later attempts
@@ -68,7 +75,8 @@ these records are not accepted releases.
 
 ## Verification, rollback and limits
 
-Run real loopback TLS fault/refusal tests, generated-template/evidence checks,
+Run real loopback TLS fault/refusal tests, an actual isolated kubectl create with
+Argo's output flag, generated-template/evidence checks,
 shell syntax, offline Argo lint and make validate. Actual native execution runs
 in the existing GitHub-hosted CI boundary job, never on a retained local cluster.
 Temporary keys/configuration remain in private runner state and the owned

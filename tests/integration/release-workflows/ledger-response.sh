@@ -73,8 +73,8 @@ from ledger_response_proxy import verify
 def load(path): return json.loads(path.read_text())
 workflow = load(results / "ledger-response-loss.workflow.json")
 workers = load(results / "ledger-response-loss.workers.json")
-assert len(workers) == 1 and workers[0]["uid"] and workers[0]["account"] == "release-adoption"
-assert workers[0]["nodeID"] == workflow["metadata"]["name"] and workers[0]["exitCode"] not in (None, 0)
+assert len(workers) == 1 and workers[0]["uid"] and workers[0]["account"] == "release-adoption", "Writer Pod missing or unexpected identity; inspect ledger-response-loss.workflow.json status.message and worker projection"
+assert workers[0]["nodeID"] == workflow["metadata"]["name"] and workers[0]["exitCode"] not in (None, 0), "Writer did not fail with the expected node identity; inspect worker projection"
 events = [json.loads(line) for line in (directory / "ledger-response-events.jsonl").read_text().splitlines()]
 report = verify(workflow, events, load(directory / "ledger-response-observed.json"), load(directory / "ledger-response-expected.json"))
 (results / "ledger-response-loss.outcome.json").write_text(json.dumps(report, sort_keys=True))

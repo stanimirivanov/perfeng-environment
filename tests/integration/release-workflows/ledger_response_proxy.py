@@ -14,8 +14,10 @@ from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 ROUTE = "/api/v1/namespaces/perfeng-release-ledger/configmaps"
+CREATE_ROUTE = ROUTE + "?fieldManager=kubectl-create&fieldValidation=Ignore"
 ADDRESS = "https://ledger-response-proxy.argo-workflows.svc:8443"
 ACCOUNT = "system:serviceaccount:argo-workflows:release-adoption"
 LIMIT = 256 * 1024
@@ -97,20 +99,24 @@ def fault_workflow(
     template = copy.deepcopy(
         next(t for t in native["spec"]["templates"] if t["name"] == "create-receipt")
     )
-    # Raw POST bypasses discovery. Do not add --request-timeout: client-go adds
-    # it as a query string. The native Pod deadline and proxy timeouts bound I/O.
+    # Argo adds -o json, incompatible with kubectl --raw. Serve fixed discovery
+    # locally and bypass only client OpenAPI validation; API admission still runs.
     template["resource"]["flags"] = [
         "--kubeconfig=/fault/client.json",
-        "--raw=" + ROUTE,
+        "--validate=false",
+        "--field-manager=kubectl-create",
     ]
     template["podSpecPatch"] = json.dumps(
         {
+            # Reference discovery runs before podSpecPatch, so this mount and
+            # its source must be introduced together at the Pod level.
+            "volumes": [{"name": "fault", "configMap": {"name": "ledger-response-proxy"}}],
             "containers": [
                 {
                     "name": "main",
                     "volumeMounts": [{"name": "fault", "mountPath": "/fault", "readOnly": True}],
                 }
-            ]
+            ],
         }
     )
     workflow = copy.deepcopy(ledger)
@@ -119,7 +125,6 @@ def fault_workflow(
         entrypoint="create-receipt",
         suspend=True,
         templates=[template],
-        volumes=[{"name": "fault", "configMap": {"name": "ledger-response-proxy"}}],
     )
     workflow["spec"]["arguments"]["parameters"] = [
         {"name": key, "value": value} for key, value in parameters.items()
@@ -166,7 +171,7 @@ class Proxy(HTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    """Reject other methods/routes; never log headers, tokens, payloads or exceptions."""
+    """Serve fixed discovery and one create; never log credentials or payloads."""
 
     server: Proxy
 
@@ -184,10 +189,47 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = True
 
+    def do_GET(self) -> None:
+        # Fixed discovery does not read/forward API state. Discovery's timeout
+        # query has no effect; only the expected POST can reach upstream.
+        documents = {
+            "/api": {
+                "kind": "APIVersions",
+                "apiVersion": "v1",
+                "versions": ["v1"],
+                "serverAddressByClientCIDRs": [],
+            },
+            "/apis": {"kind": "APIGroupList", "apiVersion": "v1", "groups": []},
+            "/api/v1": {
+                "kind": "APIResourceList",
+                "apiVersion": "v1",
+                "groupVersion": "v1",
+                "resources": [
+                    {
+                        "name": "configmaps",
+                        "singularName": "configmap",
+                        "namespaced": True,
+                        "kind": "ConfigMap",
+                        "verbs": ["create"],
+                    }
+                ],
+            },
+        }
+        document = documents.get(urlsplit(self.path).path)
+        if document is None:
+            self.send_error(403)
+            return
+        data = json.dumps(document).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_POST(self) -> None:
         length = self.headers.get_all("Content-Length", [])
         authorization = self.headers.get_all("Authorization", [])
-        if self.path != ROUTE or self.headers.get("Transfer-Encoding") or len(length) != 1:
+        if self.path != CREATE_ROUTE or self.headers.get("Transfer-Encoding") or len(length) != 1:
             self.send_error(403)
             return
         try:
@@ -230,7 +272,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             connection.request(
                 "POST",
-                ROUTE,
+                CREATE_ROUTE,
                 raw,
                 {"Authorization": authorization[0], "Content-Type": "application/json"},
             )

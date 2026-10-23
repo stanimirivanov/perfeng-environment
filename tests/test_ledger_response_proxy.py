@@ -6,6 +6,7 @@ import http.client
 import importlib.util
 import json
 import os
+import shutil
 import ssl
 import subprocess
 import tempfile
@@ -21,6 +22,7 @@ from test_release_workflows_integration import BASH
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/integration/release-workflows"
+KUBECTL = shutil.which("kubectl")
 SPEC = importlib.util.spec_from_file_location(
     "ledger_response_proxy", FIXTURE / "ledger_response_proxy.py"
 )
@@ -125,7 +127,7 @@ class LedgerResponseProxyTests(unittest.TestCase):
         try:
             connection.request(
                 method,
-                path or PROXY.ROUTE,
+                path or PROXY.CREATE_ROUTE,
                 json.dumps(self.expected).encode() if body is None else body,
                 {"Authorization": "Bearer " + TOKEN} if headers is None else headers,
             )
@@ -137,7 +139,9 @@ class LedgerResponseProxyTests(unittest.TestCase):
     def test_real_tls_commits_once_and_drops_status_line_without_forwarding_again(self):
         with self.assertRaises(http.client.RemoteDisconnected):
             self.call()
-        self.assertEqual(self.api.requests, [(PROXY.ROUTE, "Bearer " + TOKEN, self.expected)])
+        self.assertEqual(
+            self.api.requests, [(PROXY.CREATE_ROUTE, "Bearer " + TOKEN, self.expected)]
+        )
         self.assertEqual(
             self.proxy.events,
             [
@@ -251,9 +255,23 @@ class LedgerResponseProxyTests(unittest.TestCase):
         self.assertEqual(actual, original)
         self.assertEqual(
             flags,
-            ["--kubeconfig=/fault/client.json", "--raw=" + PROXY.ROUTE],
+            [
+                "--kubeconfig=/fault/client.json",
+                "--validate=false",
+                "--field-manager=kubectl-create",
+            ],
         )
         self.assertTrue(patch_spec["containers"][0]["volumeMounts"][0]["readOnly"])
+        # Argo resolves Workflow volume references before this patch. A mount
+        # added here must have its volume in the same patch to produce a valid Pod.
+        volumes = {volume["name"]: volume for volume in patch_spec.get("volumes", [])}
+        for container in patch_spec["containers"]:
+            for mount in container.get("volumeMounts", []):
+                self.assertIn(mount["name"], volumes, "Patched mount has no Pod volume")
+        self.assertEqual(
+            volumes["fault"], {"name": "fault", "configMap": {"name": "ledger-response-proxy"}}
+        )
+        self.assertNotIn("volumes", workflow["spec"])
         pod, service = list(
             yaml.safe_load_all((FIXTURE / "ledger-response-proxy.yaml").read_text())
         )
@@ -268,6 +286,74 @@ class LedgerResponseProxyTests(unittest.TestCase):
             planner["spec"]["templates"][0]["container"]["image"],
         )
         self.assertEqual(service["spec"]["selector"], pod["metadata"]["labels"])
+
+    @unittest.skipUnless(KUBECTL, "kubectl is required for native-client transport acceptance")
+    def test_actual_kubectl_output_flag_and_discovery_reach_only_the_expected_create(self):
+        assert KUBECTL is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "token").write_text(TOKEN)
+            (directory / "receipt.json").write_text(json.dumps(self.expected))
+            config = {
+                "apiVersion": "v1",
+                "kind": "Config",
+                "clusters": [
+                    {
+                        "name": "fault",
+                        "cluster": {
+                            "server": f"https://localhost:{self.proxy.server_port}",
+                            "certificate-authority": str(self.cert),
+                        },
+                    }
+                ],
+                "users": [{"name": "caller", "user": {"tokenFile": str(directory / "token")}}],
+                "contexts": [
+                    {
+                        "name": "fault",
+                        "context": {
+                            "cluster": "fault",
+                            "user": "caller",
+                            "namespace": "argo-workflows",
+                        },
+                    }
+                ],
+                "current-context": "fault",
+            }
+            (directory / "client.json").write_text(json.dumps(config))
+            command = [
+                KUBECTL,
+                "--kubeconfig",
+                str(directory / "client.json"),
+                "--cache-dir",
+                str(directory / "cache"),
+                "create",
+            ]
+            output = ["-f", str(directory / "receipt.json"), "-o", "json"]
+            # The pinned Argo executor always appends -o json. Prove the former
+            # raw transport rejects that combination before making any API call.
+            raw = subprocess.run(
+                [*command, "--raw=" + PROXY.ROUTE, *output],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertNotEqual(raw.returncode, 0)
+            self.assertIn("--raw and --output are mutually exclusive", raw.stderr)
+            self.assertFalse(self.api.requests)
+            result = subprocess.run(
+                [*command, "--validate=false", "--field-manager=kubectl-create", *output],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(
+                self.api.requests,
+                [(PROXY.CREATE_ROUTE, "Bearer " + TOKEN, self.expected)],
+                result.stderr,
+            )
+            self.assertEqual(self.proxy.events[0]["event"], "receipt-committed-response-dropped")
 
     def test_proof_requires_failed_native_worker_committed_uid_and_original_provenance(self):
         workflow = {
