@@ -43,6 +43,9 @@
 - Complete adoption then runs the unchanged production parent against that root,
   checking first/repeat persistence, a root-read refusal, fresh correction and
   ledger retention after deletion of the original disposable Workflow.
+- Trusted-main has two isolated matrix scenarios: `initial` preserves happy
+  first adoption; `receipt-only` exercises receipt-created/pointer-missing recovery
+  using native quota fault injection. See [ADR 0026](decisions/0026-isolate-disposable-adoption-recovery-scenarios.md).
 
 ## Invocation and isolation
 
@@ -1117,9 +1120,45 @@ This proves serialization of complete exact retries by the existing local mutex.
 It does not prove racing initial creates, partial writes, ambiguous responses,
 multi-controller/database locking or exclusion of host operators and Argo CD.
 
+### Receipt-only recovery scenario
+
+Owner-approved `initial` and `receipt-only` matrix legs run the existing job on
+independent runners/owned clusters. Fail-fast is disabled; permissions, credential
+rights, pinned sources and each 30-minute deadline remain unchanged. Initial keeps
+its existing request ref. Recovery appends `-receipt-only` to its run/attempt ref;
+artifact names identify both scenarios. Publisher/cleanup reject unknown scenarios
+and cross-scenario ownership. PR fixtures cannot select receipt-only mode.
+
+Require only `kube-root-ca.crt` in the fresh recovery ledger, then create the CI
+quota with `count/configmaps: "2"`. Wait for hard two/used one before submitting
+the unchanged parent. Readiness, initial planning, receipt creation/readback and
+pointer planning must succeed; only `create-pointer` may fail, with main exit 1
+and exact quota/resource evidence. Require no final result, an absent pointer and
+the actual immutable receipt's exact bytes/UID/provenance. Early results remain
+`null`; no later read/planner may run.
+
+After hard/used two, raise only the fixture quota to three using atomic original
+UID/current-resourceVersion/old-limit tests. Wait for initialized hard three,
+then submit `recovered` as a fresh complete parent. It must skip receipt creation,
+preserve the entire failed Workflow's receipt, create only the pointer with its
+correct receipt UID and publish a schema-valid result. Verify hard/used three
+and retain a safe quota projection. Never edit/delete history or retry successful
+nodes to repair the partial attempt.
+
+Use the recovered result as this leg's comparison baseline. Run the same repeat,
+refusal, correction and concurrent retries with full record/workload/data
+retention. Initial has eight adoption Workflow UIDs; recovery has nine, including
+the failed origin and fresh recovery. Delete only the original Workflow (the
+failed origin in recovery) and prove completed ledger retention. Raw records/logs
+stay private and artifacts remain scenario-specific.
+
+This proves deterministic pointer-admission failure followed by fresh complete
+parent recovery, not a lost response or racing initial creates. Live acceptance
+awaits the post-merge trusted-main run in both scenarios.
+
 Actual acceptance runs only after merge in the existing trusted-main owned kind
-job. This does not prove complete-parent partial-write/concurrent/ambiguous-response
-recovery, promotion or pointer advancement, full-tree health, retained adoption,
+job. This does not prove recovery from racing initial creates, other partial
+writes or ambiguous responses, promotion or pointer advancement, full-tree health, retained adoption,
 export/restore, production admission or script retirement. Native storage and
 pure recovery tests retain their existing separate, narrower claims.
 

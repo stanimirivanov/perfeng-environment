@@ -51,6 +51,40 @@ class PreflightRequestRefTests(unittest.TestCase):
         self.assertEqual(job["runs-on"], "ubuntu-latest")
         self.assertLessEqual(job["timeout-minutes"], 30)
         self.assertFalse(job["steps"][0]["with"]["persist-credentials"])
+        self.assertEqual(
+            job["strategy"],
+            {"fail-fast": False, "matrix": {"adoption-scenario": ["initial", "receipt-only"]}},
+        )
+        execute = next(
+            s for s in job["steps"] if s.get("run") == "make release-workflows-integration"
+        )
+        self.assertEqual(
+            execute["env"]["RELEASE_ADOPTION_SCENARIO"], "${{ matrix.adoption-scenario }}"
+        )
+        upload = next(
+            s for s in job["steps"] if s.get("uses", "").startswith("actions/upload-artifact")
+        )
+        self.assertTrue(upload["with"]["name"].endswith("-${{ matrix.adoption-scenario }}"))
+
+    def test_scenario_refs_are_disjoint_and_cleanup_cannot_cross_scenarios(self):
+        with patch.dict(os.environ, ENVIRONMENT, clear=True):
+            self.assertEqual(MODULE.owned_ref(), REF)
+        for scenario, expected in (("initial", REF), ("receipt-only", REF + "-receipt-only")):
+            with (
+                tempfile.TemporaryDirectory() as temporary,
+                patch.dict(
+                    os.environ, {**ENVIRONMENT, "RELEASE_ADOPTION_SCENARIO": scenario}, clear=True
+                ),
+            ):
+                self.assertEqual(MODULE.owned_ref(), expected)
+                path = Path(temporary)
+                foreign = REF if scenario == "receipt-only" else REF + "-receipt-only"
+                (path / "request-ref.json").write_text(
+                    json.dumps({"ref": foreign, "commit": COMMIT})
+                )
+                with patch.object(MODULE.subprocess, "run") as run, self.assertRaises(ValueError):
+                    MODULE.cleanup(path)
+                run.assert_not_called()
 
     def test_untrusted_context_refused_before_publication(self):
         for key, value in (
@@ -59,6 +93,7 @@ class PreflightRequestRefTests(unittest.TestCase):
             ("RUNNER_ENVIRONMENT", "self-hosted"),
             ("GITHUB_RUN_ID", "123/other"),
             ("GITHUB_REPOSITORY", "foreign/repository"),
+            ("RELEASE_ADOPTION_SCENARIO", "../other"),
         ):
             with (
                 self.subTest(key=key),

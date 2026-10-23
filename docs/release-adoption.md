@@ -99,6 +99,17 @@ This local mutex test does not establish initial-create conflict recovery,
 partial-write/ambiguous-response recovery or exclusion of external operators.
 Live proof awaits the post-merge trusted-main run.
 
+ADR 0026 adds isolated initial and receipt-only CI scenarios without deleting
+history to reset a fixture. In recovery, native quota exhaustion must stop only
+pointer creation after the parent commits a real receipt. After an identity/
+version-guarded quota increase, a fresh unchanged parent must preserve the failed
+Workflow's full receipt and create only the pointer. Both scenarios retain all
+existing retries/refusals/concurrency and data checks, with distinct refs/artifacts.
+Deleting the failed origin must leave the completed ledger unchanged. See
+[receipt-only acceptance](release-workflows-integration.md#receipt-only-recovery-scenario).
+Live proof awaits both post-merge matrix legs. Initial-create races and ambiguous
+API-response recovery remain separate; quota rejection does not simulate either.
+
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.

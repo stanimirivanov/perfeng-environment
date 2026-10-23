@@ -31,6 +31,18 @@
 
 ## Disposable Argo CD acceptance
 
+For receipt-only recovery, choose the scenario-specific trusted-main artifact.
+Require a successful readiness/receipt/pointer-plan prefix and only
+`create-pointer` failure with exit 1 and quota exhaustion naming
+`ci-adoption-receipt-only`, `count/configmaps` and `perfeng-local-current`.
+Unexpected root changes, missing quota initialization or unrelated worker errors
+are failures. Preserve the immutable receipt and absent pointer. The fixture may
+raise only its original quota after UID/resourceVersion/old-limit tests; a fresh
+parent must reuse the receipt and create only the pointer. Do not delete history,
+rewrite provenance or retry successful nodes. Ref cleanup must preserve any
+cross-scenario or moved ref for inspection. See
+[receipt-only acceptance](release-workflows-integration.md#receipt-only-recovery-scenario).
+
 For complete adoption-parent CI, inspect `adoption-parent-*.workflow.json`, worker
 projections, results and constant outcomes. The deliberate root-read refusal must
 follow successful readiness and name `release-adoption`, `perfeng-local-root`,

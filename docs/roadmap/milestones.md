@@ -527,6 +527,15 @@ fresh verification and exact ledger/result reuse. Live proof awaits the post-mer
 trusted-main run. Initial-create races, partial-write/ambiguous-response recovery,
 external-operator exclusion and production locking remain separate.
 
+ADR 0026 records owner approval for two isolated trusted-main scenarios. Initial
+keeps successful first-adoption coverage; receipt-only uses a native quota to
+allow receipt creation but reject the pointer. A guarded quota increase and fresh
+unchanged parent must preserve the failed origin's receipt and create only the
+pointer, then pass all existing cases and retention checks. Refs/artifacts are
+scenario-specific and credential rights unchanged. Live proof awaits both
+post-merge legs; racing initial creates, ambiguous responses, promotion and
+production recovery/cutover/retirement remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
