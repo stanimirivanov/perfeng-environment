@@ -38,7 +38,7 @@ adoption_retained() {
 }
 adoption_case() {
   local label=$1 expected=$2 workflow=${3:-} rc node_id pod step=root root_mode=converged
-  case "$expected" in success|refusal|root-drift|receipt-only) ;; *) return 2 ;; esac
+  case "$expected" in success|refusal|root-drift|receipt-only|missing-receipt|replaced-receipt) ;; *) return 2 ;; esac
   echo "Complete release adoption: $label"
   if [[ -z $workflow ]]; then
     workflow=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
@@ -55,7 +55,7 @@ adoption_case() {
   jq -e 'length>0 and all(.[]; .account=="release-adoption" and .uid!=null and .nodeID!=null)' \
     "$results/adoption-parent-$label.workers.json" > /dev/null
   adoption_records "$fixture/adoption-parent-records.json"
-  if [[ $expected == success || $expected == receipt-only ]]; then
+  if [[ $expected == success || $expected == receipt-only || $expected == *-receipt ]]; then
     k -n argocd get application perfeng-local-control-plane -o json > "$fixture/adoption-parent-application.json"
     k -n perf-platform get statefulset/postgres statefulset/seaweedfs deployment/control-plane service/control-plane -o json > "$fixture/adoption-parent-platform.json"
     jq -s --arg uid "$cluster_uid" '{application:.[0],platform:.[1].items,clusterUID:$uid,
@@ -70,11 +70,16 @@ adoption_case() {
     [[ $rc != 0 ]]
     if [[ $expected == root-drift ]]; then step=plan; root_mode=drifted; fi
     if [[ $expected == receipt-only ]]; then step=create-pointer; fi
+    if [[ $expected == missing-receipt || $expected == replaced-receipt ]]; then step=plan; fi
     node_id=$(jq -er --arg step "$step" '.status.nodes[]|select(.displayName==$step and .type=="Pod" and (.phase=="Failed" or .phase=="Error"))|.id' \
       "$results/adoption-parent-$label.workflow.json")
     pod=$(jq -er --arg id "$node_id" '.[]|select(.nodeID==$id)|.name' "$results/adoption-parent-$label.workers.json")
     k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 > "$fixture/adoption-parent-worker.log"
-    PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" "$expected" "$fixture" "$results" "$label"
+    if [[ $expected == missing-receipt || $expected == replaced-receipt ]]; then
+      PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_identity_evidence.py" "$expected" "$fixture" "$results" "$label"
+    else
+      PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" "$expected" "$fixture" "$results" "$label"
+    fi
     printf '%s\n' "Expected adoption refusal at $step after successful readiness; stored state verified" > "$results/adoption-parent-$label.outcome.txt"
   fi
   adoption_records "$fixture/adoption-$label.records.json"
@@ -198,4 +203,25 @@ cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-retai
 adoption_retained retained
 printf '%s\n' 'Original receipt/pointer bytes, UIDs and provenance survived original Workflow deletion' > "$results/adoption-parent-retention.outcome.txt"
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
-echo 'Complete existing-release adoption accepted; promotion, recovery and retirement remain separate.'
+# Owner-approved destructive faults start only after the completed retention proof.
+cp "$fixture/adoption-retained.records.json" "$fixture/adoption-identity-baseline.json"
+adoption_records "$fixture/adoption-identity-current.json"
+PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_identity_evidence.py" prepare "$fixture" "$results" "$adoption_baseline"
+k delete --raw "/api/v1/namespaces/perfeng-release-ledger/configmaps/$adoption_receipt" \
+  -f "$fixture/adoption-receipt-delete.json" > "$fixture/adoption-receipt-deleted.json"
+k -n "$adoption_namespace" wait --for=delete "configmap/$adoption_receipt" --timeout=60s
+adoption_records "$fixture/adoption-missing-before.records.json"
+adoption_case missing-receipt missing-receipt
+cmp "$fixture/adoption-missing-before.records.json" "$fixture/adoption-missing-receipt.records.json"
+if [[ $scenario == receipt-only ]]; then
+  k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
+    --for=jsonpath='{.status.used.count/configmaps}'=2 --timeout=60s
+fi
+k create -f "$fixture/adoption-receipt-recreate.json" -o json > "$fixture/adoption-receipt-recreated.json"
+adoption_records "$fixture/adoption-replaced-before.records.json"
+adoption_case replaced-receipt replaced-receipt
+cmp "$fixture/adoption-replaced-before.records.json" "$fixture/adoption-replaced-receipt.records.json"
+jq -s --argjson expected "${#adoption_labels[@]}" -e 'length==$expected and (map(.metadata.uid)|unique|length)==$expected' "$results"/adoption-parent-*.workflow.json > /dev/null
+[[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
+
+echo 'Complete adoption identity refusals accepted; promotion, recovery and retirement remain separate.'
