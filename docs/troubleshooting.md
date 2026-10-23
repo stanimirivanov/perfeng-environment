@@ -31,6 +31,17 @@
 
 ## Disposable Argo CD acceptance
 
+For `changed-request` and `upgrade-request`, inspect the scenario's generated
+request/parameter files and safe `.outcome.json` digest/UID reports. Require
+successful nested Git preflight/readiness followed only by plan exit 2. Changed
+bytes must report the current-pointer conflict; upgrade intent must report
+`request/readiness identity differs or adoption is not initial`. Wrong Git path,
+digest, readiness or quota failures do not qualify. Original receipt/pointer
+objects must remain unchanged and candidate receipts absent; no later worker or
+adoption result may appear. Never rewrite a request's bytes to retry or use
+adoption to advance a pointer. See
+[request boundary acceptance](release-workflows-integration.md#adoption-request-boundary-acceptance).
+
 For `missing-receipt` and `replaced-receipt` adoption cases, require successful
 readiness/root/ledger reads and only `plan` failure with exit 2 and
 `current pointer conflicts or references a missing/replaced receipt`. Inspect

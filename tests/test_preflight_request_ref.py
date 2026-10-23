@@ -142,6 +142,44 @@ class PreflightRequestRefTests(unittest.TestCase):
             self.assertEqual(parameters["request-revision"], COMMIT)
             self.assertEqual(calls[-2][1]["parents"], [REVISION])
             self.assertEqual(calls[-1], ("git/refs", {"ref": REF, "sha": COMMIT}))
+            blobs = [
+                base64.b64decode(payload["content"])
+                for path, payload in calls
+                if path == "git/blobs"
+            ]
+            self.assertEqual(len(blobs), 3)
+            self.assertEqual(blobs[1], raw + b"\n")
+            self.assertEqual(json.loads(blobs[1]), json.loads(raw))
+            upgrade = json.loads(blobs[2])
+            original = json.loads(raw)
+            self.assertEqual(
+                upgrade,
+                {
+                    **original,
+                    "promotion": {
+                        **original["promotion"],
+                        "expectedCurrent": parameters["request-sha256"],
+                    },
+                },
+            )
+            tree = next(payload["tree"] for path, payload in calls if path == "git/trees")
+            self.assertEqual([item["path"] for item in tree], list(MODULE.REQUEST_PATHS.values()))
+            digests = []
+            for (label, request_path), content in zip(
+                MODULE.REQUEST_PATHS.items(), blobs, strict=True
+            ):
+                self.assertEqual((directory / f"{label}-request.json").read_bytes(), content)
+                item = json.loads((directory / f"{label}-parameters.json").read_text())
+                self.assertEqual(
+                    item,
+                    {
+                        **parameters,
+                        "request-path": request_path,
+                        "request-sha256": "sha256:" + hashlib.sha256(content).hexdigest(),
+                    },
+                )
+                digests.append(item["request-sha256"])
+            self.assertEqual(len(set(digests)), 3)
             request = json.loads(raw)
             for path, digest in request["selection"]["lockDigests"].items():
                 self.assertEqual(
@@ -155,6 +193,8 @@ class PreflightRequestRefTests(unittest.TestCase):
         ):
             directory = Path(temporary)
             responses = [
+                {"sha": COMMIT},
+                {"sha": COMMIT},
                 {"sha": COMMIT},
                 {"tree": {"sha": COMMIT}},
                 {"sha": COMMIT},

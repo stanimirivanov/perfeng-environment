@@ -35,14 +35,22 @@ def evidence() -> tuple[dict[str, Any], dict[str, Any], dict[str, str], dict[str
         "request-path": "deployments/release-requests/ci.json",
     }
     preflight = {
+        "schemaVersion": 1,
+        "environment": "perfeng-local",
+        "requestPath": parameters["request-path"],
         "kind": "PerfengReleasePreflight",
         "status": "identity-verified",
         "requestRevision": parameters["request-revision"],
         "selectionRevision": parameters["selection-revision"],
         "requestDigest": parameters["request-sha256"],
-        "clusterUID": "owned-cluster",
+        "clusterUID": "00000000-0000-0000-0000-000000000003",
         "lockDigests": {
-            "deployments/local-control-plane.json": "sha256:" + hashlib.sha256(raw).hexdigest()
+            path: "sha256:" + hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+            for path in (
+                "deployments/local-control-plane.json",
+                "deployments/local-infrastructure.json",
+                "deployments/local-native-target.json",
+            )
         },
     }
     resources = []
@@ -84,7 +92,7 @@ def evidence() -> tuple[dict[str, Any], dict[str, Any], dict[str, str], dict[str
         }
     )
     api = {
-        "clusterUID": "owned-cluster",
+        "clusterUID": preflight["clusterUID"],
         "platform": platform,
         "application": {"metadata": {"uid": observations["application"]["uid"]}},
     }
@@ -121,7 +129,7 @@ def evidence() -> tuple[dict[str, Any], dict[str, Any], dict[str, str], dict[str
         "displayName": "cluster-uid",
         "type": "Pod",
         "phase": "Succeeded",
-        "outputs": {"parameters": [{"name": "uid", "value": "owned-cluster"}]},
+        "outputs": {"parameters": [{"name": "uid", "value": preflight["clusterUID"]}]},
     }
     workflow = {
         "metadata": {"name": "parent", "uid": "workflow-uid"},

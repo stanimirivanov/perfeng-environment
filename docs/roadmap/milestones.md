@@ -545,6 +545,14 @@ workload/data identities without downstream writes or adoption results. Live
 proof awaits both post-merge legs. This is deliberate fault injection, not
 ledger repair, restoration or a retained-environment recovery authorization.
 
+ADR 0028 adds two approved request fixtures in each existing owned commit/ref:
+equivalent JSON with different bytes and an upgrade envelope naming the accepted
+digest. Fresh complete parents must pass real preflight/readiness then refuse
+at plan without writes/results, preserving original ledger/workload/data state
+and absent candidate receipts. Existing retention and destructive tests continue.
+Live proof awaits both post-merge scenarios; this does not implement promotion,
+add credential rights or advance script retirement.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

@@ -15,6 +15,11 @@ from jsonschema import Draft202012Validator, ValidationError
 REPOSITORY = "stanimirivanov/perfeng-environment"
 URL = f"https://github.com/{REPOSITORY}.git"
 REQUEST_PATH = "deployments/release-requests/ci-parent-preflight-v1.json"
+REQUEST_PATHS = {
+    "parent": REQUEST_PATH,
+    "changed-request": "deployments/release-requests/ci-changed-request-v1.json",
+    "upgrade-request": "deployments/release-requests/ci-upgrade-request-v1.json",
+}
 
 
 def owned_ref() -> str:
@@ -85,22 +90,48 @@ def publish(directory: Path, cluster_uid: str) -> None:
         path: "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest()
         for path in request["selection"]["lockDigests"]
     }
-    Draft202012Validator(
+    validator = Draft202012Validator(
         json.loads(Path("deployments/release-request-v1.schema.json").read_text())
-    ).validate(request)
-    raw = (json.dumps(request, indent=2) + "\n").encode()
-    (directory / "parent-request.json").write_bytes(raw)
-    # Git Data API avoids changing the checked-out branch, index or credentials.
-    blob = sha(
-        api("git/blobs", {"content": base64.b64encode(raw).decode(), "encoding": "base64"})["sha"]
     )
+    validator.validate(request)
+    raw = (json.dumps(request, indent=2) + "\n").encode()
+    upgrade = {
+        **request,
+        "promotion": {
+            **request["promotion"],
+            "expectedCurrent": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        },
+    }
+    requests = {
+        "parent": raw,
+        "changed-request": raw + b"\n",
+        "upgrade-request": (json.dumps(upgrade, indent=2) + "\n").encode(),
+    }
+    for label, content in requests.items():
+        validator.validate(json.loads(content))
+        (directory / f"{label}-request.json").write_bytes(content)
+    # Git Data API avoids changing the checked-out branch, index or credentials.
+    entries = []
+    for label, content in requests.items():
+        blob = sha(
+            api(
+                "git/blobs",
+                {
+                    "content": base64.b64encode(content).decode(),
+                    "encoding": "base64",
+                },
+            )["sha"]
+        )
+        entries.append(
+            {"path": REQUEST_PATHS[label], "mode": "100644", "type": "blob", "sha": blob}
+        )
     base = api(f"git/commits/{revision}")
     tree = sha(
         api(
             "git/trees",
             {
                 "base_tree": sha(base["tree"]["sha"]),
-                "tree": [{"path": REQUEST_PATH, "mode": "100644", "type": "blob", "sha": blob}],
+                "tree": entries,
             },
         )["sha"]
     )
@@ -117,13 +148,16 @@ def publish(directory: Path, cluster_uid: str) -> None:
     # Persist intent BEFORE ref creation: a lost API response is recoverable.
     journal.write_text(json.dumps({"ref": ref, "commit": commit}) + "\n")
     api("git/refs", {"ref": ref, "sha": commit})  # create-only; conflicts fail closed
-    parameters = {
-        "request-revision": commit,
-        "request-path": REQUEST_PATH,
-        "request-sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
-        "selection-revision": revision,
-    }
-    (directory / "parent-parameters.json").write_text(json.dumps(parameters) + "\n")
+    for label, content in requests.items():
+        parameters = {
+            "request-revision": commit,
+            "request-path": REQUEST_PATHS[label],
+            "request-sha256": "sha256:" + hashlib.sha256(content).hexdigest(),
+            "selection-revision": revision,
+        }
+        (directory / f"{label}-parameters.json").write_text(
+            json.dumps(parameters) + "\n", encoding="utf-8"
+        )
 
 
 def cleanup(directory: Path) -> None:
