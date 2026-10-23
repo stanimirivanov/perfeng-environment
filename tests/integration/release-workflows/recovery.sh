@@ -12,7 +12,7 @@ jq -n --arg revision "$revision" --slurpfile source <(k -n argocd get applicatio
 k -n argocd patch application perfeng-local-root --type=merge --patch-file "$fixture/recovery-root-status.json"
 
 recovery_check() {
-  uv run --locked --offline python - "$1" "$2" "$fixture" "${3:-$2}" > "$results/ledger-recovery-$1.json" <<'PY'
+  uv run --locked --offline python - "$1" "$2" "${4:-$fixture}" "${3:-$2}" > "$results/ledger-recovery-${5:-$1}.json" <<'PY'
 import json, sys
 from pathlib import Path
 from jsonschema import Draft202012Validator

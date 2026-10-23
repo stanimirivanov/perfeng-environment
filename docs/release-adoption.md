@@ -132,6 +132,14 @@ require a separately reviewed recovery decision.
 
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
+The [native receipt response-loss fixture](release-workflows-integration.md#native-receipt-response-loss)
+adds an owner-approved TLS transport fault at the storage boundary: commit one
+receipt but drop the successful response, then require failed native execution,
+fresh direct read/retry/planner checks and retained identity/provenance. It keeps
+coordinator interruption separate and changes no production template or permission.
+Actual kind proof awaits CI; complete-parent ambiguous-response recovery remains
+outstanding. Synthetic fixture readiness is not an adoption authorization.
+
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.
 
 ## Verifier package lifecycle

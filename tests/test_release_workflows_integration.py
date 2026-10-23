@@ -136,6 +136,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         self.assertEqual(seen, {"root", "receipt", "pointer", "create-receipt", "create-pointer"})
         for script in (
             "ledger.sh",
+            "ledger-response.sh",
             "recovery.sh",
             "database.sh",
             "external-state-fixtures.sh",

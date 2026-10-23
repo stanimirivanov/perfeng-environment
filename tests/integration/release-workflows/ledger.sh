@@ -83,8 +83,28 @@ snapshot() {
 source "$source_dir/recovery.sh"
 ledger_case missing observe success
 observations "$results/ledger-missing.workflow.json" | jq -e '.receipt == null and .pointer == null'
+source "$source_dir/ledger-response.sh"
+# Keep coordinator interruption independent: a second receipt, never a reset.
+uv run --locked --offline python - "$fixture" <<'PY'
+import base64, hashlib, json, sys
+from pathlib import Path
+directory = Path(sys.argv[1])
+parameters = json.loads((directory / "ledger-parameters.json").read_text())
+raw = (directory / "ledger-request.json").read_bytes() + b"\n"
+digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+payload = json.loads((directory / "ledger-receipt.json").read_text())
+payload["requestDigest"] = digest
+(directory / "interruption").mkdir()
+(directory / "interruption/ledger-request.json").write_bytes(raw)
+(directory / "interruption/ledger-receipt.json").write_text(json.dumps(payload, sort_keys=True))
+parameters.update(name="receipt." + digest[7:39] + "." + digest[39:], **{
+    "request-b64": base64.b64encode(raw).decode(), "request-digest": digest,
+    "receipt-b64": base64.b64encode(json.dumps(payload, sort_keys=True).encode()).decode()})
+(directory / "ledger-interruption-parameters.json").write_text(json.dumps(parameters))
+PY
 # Interrupt after the persisted write, before any coordinator completion result.
-interrupted=$(ledger_submit receipt-interrupted)
+interrupted=$(a submit "$source_dir/ledger-workflow.yaml" --entrypoint receipt-interrupted \
+  --parameter-file "$fixture/ledger-interruption-parameters.json" -o json | jq -er .metadata.name)
 barrier_deadline=$((SECONDS + 120))
 while :; do
   a get "$interrupted" -o json > "$results/ledger-interruption-barrier.workflow.json"
@@ -95,6 +115,13 @@ while :; do
 done
 a terminate "$interrupted"
 ledger_case receipt receipt-interrupted interrupted "$interrupted"
+interrupted_receipt=$(jq -er .name "$fixture/ledger-interruption-parameters.json")
+k -n "$ledger_namespace" get configmap "$interrupted_receipt" -o json | jq -S . > "$fixture/ledger-interrupted-before.json"
+interruption_read=$(a submit "$source_dir/ledger-workflow.yaml" --entrypoint observe \
+  --parameter-file "$fixture/ledger-interruption-parameters.json" -o json | jq -er .metadata.name)
+ledger_case interruption-observed observe success "$interruption_read"
+observations "$results/ledger-interruption-observed.workflow.json" > "$fixture/ledger-interruption-observed.json"
+recovery_check partial "$fixture/ledger-interruption-observed.json" "$fixture/ledger-interruption-observed.json" "$fixture/interruption" interrupted
 ledger_case partial observe success
 observations "$results/ledger-partial.workflow.json" > "$fixture/ledger-partial.json"
 jq -e --arg name "$receipt_name" '.receipt.metadata.name == $name and .pointer == null' "$fixture/ledger-partial.json"
@@ -115,7 +142,7 @@ ledger_case complete observe success
 observations "$results/ledger-complete.workflow.json" > "$results/ledger-complete.records.json"
 recovery_check complete "$results/ledger-complete.records.json"
 uv run --locked --offline python - "$results/ledger-complete.records.json" "$fixture/ledger-parameters.json" \
-  "$results/ledger-receipt.workflow.json" <<'PY'
+  "$results/ledger-response-loss.workflow.json" <<'PY'
 import json, sys
 from pathlib import Path
 from jsonschema import Draft202012Validator
@@ -159,6 +186,8 @@ fi
 grep -F immutable "$fixture/immutable.error" > "$results/ledger-immutable.txt"
 
 k -n argo-workflows delete workflows -l perfeng.io/fixture=ledger --cascade=foreground --wait=true --timeout=90s
+k -n "$ledger_namespace" get configmap "$interrupted_receipt" -o json | jq -S . > "$fixture/ledger-interrupted-after.json"
+cmp "$fixture/ledger-interrupted-before.json" "$fixture/ledger-interrupted-after.json"
 snapshot "$results/ledger-retained.json"
 cmp "$results/ledger-winner.json" "$results/ledger-retained.json"
 ledger_case retained observe success
