@@ -511,6 +511,14 @@ Live proof awaits the post-merge trusted-main run. Complete-parent recovery,
 promotion/advancement, retained adoption, full-tree activation, production
 admission/export/restore and measured script retirement remain separate.
 
+Root-state refusal coverage extends complete adoption acceptance: deliberate
+root-owned Namespace-label drift must stop a fresh parent at `plan` after
+successful readiness and native reads, with no downstream writes or result.
+Only explicit selected-commit root reconciliation and a fresh parent can restore
+success; ledger bytes/UIDs/provenance and workload/data identities remain intact.
+Live proof awaits the post-merge trusted-main run. This does not advance the
+separate partial-write, concurrent or ambiguous-response recovery gates.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

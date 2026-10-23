@@ -1063,6 +1063,23 @@ one main exit 1, no planner/create operations and no adoption result. Other
 infrastructure failures do not qualify. Stored records must remain unchanged.
 Restore only the checked-in grant and submit a fresh successful correction.
 
+Then change only the live `perf-sut` environment label to `ci-drift` and require
+the actual root to report `OutOfSync`. A fresh complete parent must finish
+readiness and native root/current/receipt reads, then refuse at `plan` with main
+exit 2 and the exact `root is stale, syncing or not at the reviewed selection`
+diagnostic. No create, later planner or adoption result may run. Compare native
+ledger observations with stored objects and require the complete ledger to
+remain unchanged. A passing readiness check cannot waive this root-state gate.
+
+Require the full fourteen-object root inventory at the selected revision, with
+only the `perf-sut` Namespace out of sync, no conditions/active operation, root
+auto-sync disabled and six child skips intact. The label must still be wrong
+after refusal. Reconcile root only through a fresh manual operation at the
+selected commit, require label restoration and exact controller evidence, then
+submit another fresh complete parent. Both creates must again be skipped and
+the original baseline identities, bytes and provenance preserved. Do not patch
+status or ledger records, change the root source or retry completed nodes.
+
 Reuse the root phase's private snapshots for workload specs/Pod UIDs, credentials,
 database schema/roles/ACLs/canaries, volume identities/binding and S3 metadata/bytes.
 All six child skips, child UIDs/operations and root's selected revision/manual
@@ -1071,7 +1088,7 @@ root observations: incidental root resource-version changes fail acceptance;
 do not pause the controller, fabricate status or automatically retry until green.
 
 Prove denied ledger patch/delete, workflow-configuration writes, Secret listing,
-Job creation, workload mutation and Application sync. Retain four distinct
+Job creation, workload mutation and Application sync. Retain six distinct
 Workflow UIDs, then foreground-delete **only the original completed disposable
 Workflow** and require complete receipt/pointer objects to survive unchanged.
 Keep raw logs and record/state snapshots private. Uploaded evidence is limited

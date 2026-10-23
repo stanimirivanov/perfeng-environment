@@ -307,17 +307,112 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
                 ("repeat", "success"),
                 ("missing-root-read", "refusal"),
                 ("corrected", "success"),
+                ("root-drift", "root-drift"),
+                ("root-corrected", "success"),
             ],
         )
         self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v2", source)
         self.assertNotIn("argo retry", source)
         self.assertNotIn("--subresource=status", source)
         self.assertNotIn("delete configmap ", source)
+        self.assertIn(
+            'argocd_sync perfeng-local-root adoption-root-corrected "$root_revision"', source
+        )
         chain = (FIXTURE / "preflight-parent.sh").read_text()
         self.assertLess(
             chain.index('source "$source_dir/root.sh"'),
             chain.index('source "$source_dir/adoption-parent.sh"'),
         )
+
+    def test_plan_refusal_requires_real_root_drift_reads_and_no_later_writes(self):
+        workflow, _, _, _, _, api, _ = evidence(False)
+        nodes = workflow["status"]["nodes"]
+        for name in (
+            "create-receipt",
+            "stored-receipt",
+            "root-after",
+            "pointer-plan",
+            "create-pointer",
+            "stored-pointer",
+            "final-receipt",
+            "final-root",
+            "finish",
+        ):
+            del nodes[name]
+        root = READINESS.outputs(nodes["root"])["observation"]
+        root["status"]["sync"]["status"] = "OutOfSync"
+        root["status"]["resources"] = [
+            {"kind": "Namespace", "name": "perf-sut", "status": "OutOfSync"}
+        ]
+        nodes["root"]["outputs"]["parameters"][0]["value"] = json.dumps(root)
+        nodes["plan"].update(
+            phase="Failed",
+            outputs={"parameters": [{"name": "result", "valueFrom": {"path": "/tmp/result"}}]},
+        )
+        nodes["adoption"].update(phase="Failed", outputs={})
+        workflow["status"]["phase"] = "Failed"
+        workers = [{"nodeID": "plan", "exitCode": 2}]
+        records = sorted([api["receipt"], api["pointer"]], key=lambda o: o["metadata"]["name"])
+        log = "root is stale, syncing or not at the reviewed selection"
+        MODULE.refusal(workflow, workers, log, step="plan", records=records)
+        for change in (
+            "exit",
+            "node",
+            "log",
+            "readiness",
+            "root",
+            "selection",
+            "records",
+            "health",
+            "condition",
+            "other-drift",
+            "result",
+            "downstream",
+        ):
+            with self.subTest(change=change):
+                w, p, stored, text = (
+                    copy.deepcopy(workflow),
+                    copy.deepcopy(workers),
+                    copy.deepcopy(records),
+                    log,
+                )
+                if change == "exit":
+                    p[0]["exitCode"] = 1
+                elif change == "node":
+                    p[0]["nodeID"] = "root"
+                elif change == "log":
+                    text = "image pull failed"
+                elif change == "readiness":
+                    w["status"]["nodes"]["readiness"]["phase"] = "Failed"
+                elif change in {"root", "selection", "health", "condition", "other-drift"}:
+                    value = READINESS.outputs(w["status"]["nodes"]["root"])["observation"]
+                    if change == "health":
+                        value["status"]["health"]["status"] = "Degraded"
+                    elif change == "condition":
+                        value["status"]["conditions"] = [{"type": "ComparisonError"}]
+                    elif change == "other-drift":
+                        value["status"]["resources"][0]["name"] = "perf-platform"
+                    else:
+                        value["status"]["sync"]["status" if change == "root" else "revision"] = (
+                            "Synced" if change == "root" else "c" * 40
+                        )
+                    w["status"]["nodes"]["root"]["outputs"]["parameters"][0]["value"] = json.dumps(
+                        value
+                    )
+                elif change == "records":
+                    stored[0]["metadata"]["uid"] = "replaced"
+                elif change == "result":
+                    w["status"]["nodes"]["plan"]["outputs"] = {
+                        "parameters": [{"name": "result", "value": "{}"}]
+                    }
+                else:
+                    w["status"]["nodes"]["create-pointer"] = {
+                        "id": "write",
+                        "displayName": "create-pointer",
+                        "type": "Pod",
+                    }
+                with self.assertRaises(AssertionError):
+                    MODULE.refusal(w, p, text, step="plan", records=stored)
 
 
 if __name__ == "__main__":

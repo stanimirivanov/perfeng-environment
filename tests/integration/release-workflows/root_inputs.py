@@ -87,9 +87,15 @@ def children(value: dict[str, Any], objects: list[dict[str, Any]], before: dict[
 
 
 def converged(
-    value: dict[str, Any], uid: str, case: str, revision: str, objects: list[dict[str, Any]]
+    value: dict[str, Any],
+    uid: str,
+    case: str,
+    revision: str,
+    objects: list[dict[str, Any]],
+    *,
+    namespace_drift: bool = False,
 ) -> None:
-    """Require actual complete root-object convergence, not full child-tree health."""
+    """Verify root evidence, optionally requiring only the controlled Namespace drift."""
     assert re.fullmatch(r"[0-9a-f]{40}", revision)
     assert value["metadata"]["uid"] == uid and value["spec"] == root_spec()
     assert not value["metadata"].get("deletionTimestamp")
@@ -97,7 +103,8 @@ def converged(
     assert not value.get("operation")
     status = value["status"]
     assert not status.get("conditions")
-    assert status["sync"]["status"] == "Synced" and status["health"]["status"] == "Healthy"
+    assert status["sync"]["status"] == ("OutOfSync" if namespace_drift else "Synced")
+    assert status["health"]["status"] == "Healthy"
     assert status["sync"]["revision"] == revision
     assert status["sync"]["comparedTo"]["source"] == root_spec()["source"]
     assert status["sync"]["comparedTo"]["destination"] == root_spec()["destination"]
@@ -111,7 +118,18 @@ def converged(
     }
     actual = {(o["kind"], o.get("namespace", ""), o["name"]) for o in status["resources"]}
     assert actual == expected and len(status["resources"]) == len(expected)
-    assert all(o["status"] == "Synced" for o in status["resources"])
+    differences = [o for o in status["resources"] if o["status"] != "Synced"]
+    if namespace_drift:
+        assert len(differences) == 1
+        resource = differences[0]
+        assert (
+            resource["kind"],
+            resource.get("namespace", ""),
+            resource["name"],
+            resource["status"],
+        ) == ("Namespace", "", "perf-sut", "OutOfSync")
+    else:
+        assert not differences
 
 
 if __name__ == "__main__":
@@ -129,13 +147,14 @@ if __name__ == "__main__":
             tree(Path(args[0])),
             json.loads(Path(args[1]).read_text(encoding="utf-8")),
         )
-    elif mode == "converged":
+    elif mode in {"converged", "drifted"}:
         converged(
             json.loads(Path(path).read_text(encoding="utf-8")),
             args[0],
             args[1],
             args[2],
             tree(Path(args[3])),
+            namespace_drift=mode == "drifted",
         )
     else:
         raise ValueError("Unknown bounded root evidence operation")
