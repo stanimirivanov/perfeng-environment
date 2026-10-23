@@ -36,10 +36,13 @@
   infrastructure bootstrap and manually syncs private control-plane sources,
   including real Service drift/correction. This separately approved phase uses
   an ephemeral exact-URL source-token Secret; see [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md).
-- After foundation Application acceptance, the final phase manually reconciles
+- After foundation Application acceptance, a bounded phase manually reconciles
   the real root at the selected commit with auto-sync disabled and six children
   skipped. This proves root-owned object convergence, not full-tree health;
   see [ADR 0025](decisions/0025-bound-disposable-root-reconciliation.md).
+- Complete adoption then runs the unchanged production parent against that root,
+  checking first/repeat persistence, a root-read refusal, fresh correction and
+  ledger retention after deletion of the original disposable Workflow.
 
 ## Invocation and isolation
 
@@ -1031,6 +1034,55 @@ This proves root-owned object convergence only. Skipped children do not establis
 full-tree health; no full release-adoption/promotion parent, ledger write,
 retained deployment, production recovery or script retirement is included.
 Actual live acceptance remains pending the post-merge trusted-main run.
+
+## Complete existing-release adoption parent
+
+After bounded root convergence, trusted-main installs the unchanged published
+`perfeng-release-adopt-existing-v2` and `perfeng-plan-release-adoption-v2`, using
+ADR 0017's existing ledger namespace/bootstrap grants and `release-adoption`
+identity. No job permission, source credential, controller or production
+manifest/verifier changes. The same four request parameters still point to the
+existing pinned Git request for this disposable cluster. Generated CI intent is
+test input, not human authorization to adopt a retained environment.
+
+The first submission must run fresh nested readiness/preflight, read the actual
+root and missing records, run all three planner phases, create exactly one
+immutable receipt and the initial current pointer, then verify readbacks before
+publishing a schema-valid result. Compare planner output with the unchanged pure
+policy using actual observations. Bind nested readiness to the selected lock,
+live workload identities/generations and original preflight. Verify exact request
+bytes, receipt payload, first Workflow/request provenance and receipt UID binding
+against actual stored objects. Early planner results must remain JSON `null`.
+
+Submit an exact repeat as a fresh Workflow: both create nodes must be skipped,
+and complete stored objects, original provenance and result identities must be
+unchanged. Revoke only `perfeng-local-root` from the existing Application-read
+Role, retaining control-plane access. A fresh parent must finish readiness then
+fail at its native root read with exact `Forbidden`/identity/resource evidence,
+one main exit 1, no planner/create operations and no adoption result. Other
+infrastructure failures do not qualify. Stored records must remain unchanged.
+Restore only the checked-in grant and submit a fresh successful correction.
+
+Reuse the root phase's private snapshots for workload specs/Pod UIDs, credentials,
+database schema/roles/ACLs/canaries, volume identities/binding and S3 metadata/bytes.
+All six child skips, child UIDs/operations and root's selected revision/manual
+policy remain required after every case. The planner conservatively compares
+root observations: incidental root resource-version changes fail acceptance;
+do not pause the controller, fabricate status or automatically retry until green.
+
+Prove denied ledger patch/delete, workflow-configuration writes, Secret listing,
+Job creation, workload mutation and Application sync. Retain four distinct
+Workflow UIDs, then foreground-delete **only the original completed disposable
+Workflow** and require complete receipt/pointer objects to survive unchanged.
+Keep raw logs and record/state snapshots private. Uploaded evidence is limited
+to `adoption-parent-*.workflow.json`, worker identity/exit projections, successful
+result JSON and constant refusal/retention outcomes.
+
+Actual acceptance runs only after merge in the existing trusted-main owned kind
+job. This does not prove complete-parent partial-write/concurrent/ambiguous-response
+recovery, promotion or pointer advancement, full-tree health, retained adoption,
+export/restore, production admission or script retirement. Native storage and
+pure recovery tests retain their existing separate, narrower claims.
 
 ## Verification and remaining gates
 

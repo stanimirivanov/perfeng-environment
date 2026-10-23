@@ -41,6 +41,22 @@ root_state() {
   k get deployments,statefulsets,daemonsets,cronjobs -A -o json \
     | jq -S '[.items[]|{kind,namespace:.metadata.namespace,name:.metadata.name,uid:.metadata.uid,spec}]|sort_by(.kind,.namespace,.name)' > "$prefix.workloads.json"
 }
+root_retained() {
+  local before=$1 after=$2 field
+  for field in storage pv service statefulset external server repository roles acl schema; do
+    cmp "$before.postgres.$field.json" "$after.postgres.$field.json"
+  done
+  for field in canary sentinel; do
+    cmp "$before.postgres.$field.txt" "$after.postgres.$field.txt"
+  done
+  for field in storage pv service proxy statefulset credentials object; do
+    cmp "$before.seaweedfs.$field.json" "$after.seaweedfs.$field.json"
+  done
+  cmp "$before.seaweedfs.bytes" "$after.seaweedfs.bytes"
+  for field in server pods workloads; do
+    cmp "$before.$field.json" "$after.$field.json"
+  done
+}
 root_state "$fixture/root-before"
 k -n argocd get application perfeng-local-root -o json \
   | jq -e --arg uid "$root_uid" '.metadata.uid==$uid and .spec.syncPolicy.automated=={enabled:false} and .operation==null' > /dev/null
@@ -71,19 +87,7 @@ for label in root-first root-repeat root-corrected; do
   jq '[.items[]|{name:.metadata.name,uid:.metadata.uid,skip:.metadata.annotations["argocd.argoproj.io/skip-reconcile"]}]' \
     "$fixture/root-children-current.json" > "$results/$label.children.json"
   root_state "$fixture/$label"
-  for field in storage pv service statefulset external server repository roles acl schema; do
-    cmp "$fixture/root-before.postgres.$field.json" "$fixture/$label.postgres.$field.json"
-  done
-  for field in canary sentinel; do
-    cmp "$fixture/root-before.postgres.$field.txt" "$fixture/$label.postgres.$field.txt"
-  done
-  for field in storage pv service proxy statefulset credentials object; do
-    cmp "$fixture/root-before.seaweedfs.$field.json" "$fixture/$label.seaweedfs.$field.json"
-  done
-  cmp "$fixture/root-before.seaweedfs.bytes" "$fixture/$label.seaweedfs.bytes"
-  for field in server pods workloads; do
-    cmp "$fixture/root-before.$field.json" "$fixture/$label.$field.json"
-  done
+  root_retained "$fixture/root-before" "$fixture/$label"
 done
 [[ $(k get namespace perf-sut -o jsonpath='{.metadata.labels.perfeng\.io/environment}') == local ]]
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]

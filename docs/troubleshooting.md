@@ -31,6 +31,17 @@
 
 ## Disposable Argo CD acceptance
 
+For complete adoption-parent CI, inspect `adoption-parent-*.workflow.json`, worker
+projections, results and constant outcomes. The deliberate root-read refusal must
+follow successful readiness and name `release-adoption`, `perfeng-local-root`,
+`applications`, `argocd` and `Forbidden`; unrelated API/image/artifact failures
+are not expected refusal. Restore only the checked-in root-read grant before a
+fresh submission. A root change during planning fails conservatively; preserve
+records/evidence and inspect competing syncs or merges rather than pausing the
+controller, retrying successful nodes, patching the ledger or weakening policy.
+Record snapshots and raw logs remain private. See
+[complete adoption acceptance](release-workflows-integration.md#complete-existing-release-adoption-parent).
+
 For the final bounded root phase, inspect `root-*.application.json`,
 `root-*.children.json` and the constant Namespace-drift outcome. Check the exact
 selected revision, fresh operation marker, complete fourteen-object inventory

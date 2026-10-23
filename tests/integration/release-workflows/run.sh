@@ -102,6 +102,7 @@ k kustomize gitops/release-workflows | uv run --locked --offline python -c '
 import json, sys, yaml
 names = {("ConfigMap", "perfeng-release-verifiers-v2"), ("WorkflowTemplate", "perfeng-verify-release-quiescence-v2"), ("WorkflowTemplate", "perfeng-release-maintenance-checkpoint-v2"), ("WorkflowTemplate", "perfeng-release-task-selection-v2"), ("WorkflowTemplate", "perfeng-release-external-state-v1"), ("WorkflowTemplate", "perfeng-adoption-records-v1"), ("ConfigMap", "perfeng-external-state-scripts-v1"), ("WorkflowTemplate", "perfeng-prepare-database-roles-v1"), ("WorkflowTemplate", "perfeng-prepare-bucket-v1"), ("WorkflowTemplate", "perfeng-prepare-execution-registry-v1"), ("WorkflowTemplate", "perfeng-verify-release-readiness-v2"), ("WorkflowTemplate", "perfeng-observe-release-readiness-v1"), ("WorkflowTemplate", "perfeng-release-preflight-v2")}
 names.add(("WorkflowTemplate", "perfeng-release-readiness-v2"))
+names.update(("WorkflowTemplate", name) for name in ("perfeng-plan-release-adoption-v2", "perfeng-release-adopt-existing-v2"))
 items = [o for o in yaml.safe_load_all(sys.stdin) if (o["kind"], o["metadata"]["name"]) in names]
 assert len(items) == len(names)
 print(json.dumps({"apiVersion": "v1", "kind": "List", "items": items}))

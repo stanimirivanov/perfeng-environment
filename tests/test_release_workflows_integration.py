@@ -803,6 +803,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "server.sh",
             FIXTURE / "argocd.sh",
             FIXTURE / "root.sh",
+            FIXTURE / "adoption-parent.sh",
             FIXTURE / "readiness-parent.sh",
         ):
             syntax = subprocess.run(

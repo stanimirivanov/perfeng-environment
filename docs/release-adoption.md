@@ -69,6 +69,17 @@ These test bytes are not an approved Git request or readiness proof; coordinator
 interruption does not simulate loss of the API response. Full adoption,
 ambiguous-response recovery and operational cutover remain separate gates.
 
+The separate trusted-main [complete adoption acceptance](release-workflows-integration.md#complete-existing-release-adoption-parent)
+now follows real chart/server readiness, foundation Application adoption and
+bounded root convergence. It submits the unchanged complete parent with the
+existing pinned CI request, verifying first/exact-repeat/corrected results,
+native persistence/provenance, a root-read refusal after successful readiness,
+and record retention after deletion of the original disposable Workflow. Root
+auto-sync remains disabled and six non-control-plane children remain skipped;
+no full-tree health or retained adoption is claimed. Actual live acceptance is
+pending the post-merge trusted-main run. Complete-parent partial-write/concurrent/
+ambiguous-response recovery, promotion and operational cutover remain separate.
+
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.
