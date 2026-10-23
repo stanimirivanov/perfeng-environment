@@ -63,7 +63,7 @@ def smoke(binary: Path, root: Path = tool.ROOT) -> None:
                 "schemaVersion": 1,
                 "platform": "windows/amd64",
                 "caddyVersion": "v2.11.7",
-                "goVersion": "go1.26.9",
+                "goVersion": tool.GO_VERSION,
                 "release": {
                     "tag": "native-gateway-" + "a" * 40,
                     "assetId": 1,

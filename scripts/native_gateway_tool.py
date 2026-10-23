@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "stanimirivanov/perfeng-environment"
 MAX_BINARY_BYTES = 128 * 1024 * 1024
+GO_VERSION = "go1.27.3"
 
 
 def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -108,15 +109,19 @@ def parse_selection(value: object) -> Selection:
         value["schemaVersion"],
         value["platform"],
         value["caddyVersion"],
-        value["goVersion"],
     ) != (
         1,
         "windows/amd64",
         "v2.11.7",
-        "go1.26.9",
     ):
         raise GatewayError(
             "RELEASE_INVALID", "Unsupported serving lock", "review the gateway release selection"
+        )
+    if value["goVersion"] != GO_VERSION:
+        raise GatewayError(
+            "RELEASE_TOOLCHAIN",
+            f"Serving requires reviewed {GO_VERSION}; the selected asset is not approved",
+            "publish and select a patched gateway release; never relabel an existing asset",
         )
     release = value["release"]
     if release is None:
@@ -217,13 +222,13 @@ def metadata(binary: Path, serving: bool = True) -> str:
         net = re.search(r"^dep\s+golang.org/x/net\s+v(\d+)\.(\d+)\.(\d+)\s", info, re.MULTILINE)
         if (
             go is None
-            or tuple(map(int, go.groups())) != (1, 26, 9)
+            or "go" + ".".join(go.groups()) != GO_VERSION
             or net is None
             or tuple(map(int, net.groups())) < (0, 60, 0)
         ):
             raise GatewayError(
                 "TOOL_SECURITY",
-                "Caddy requires reviewed Go 1.26.9 and x/net >=v0.60.0",
+                f"Caddy requires reviewed {GO_VERSION} and x/net >=v0.60.0",
                 "publish a reviewed patched build; do not bypass the gate",
             )
         if "build\tGOOS=windows" not in info or "build\tGOARCH=amd64" not in info:
@@ -378,7 +383,7 @@ def setup(root: Path = ROOT) -> Path:
         except FileExistsError:
             installed(root)
     print(
-        f"[3/3] PASS Caddy v2.11.7; Go 1.26.9; SHA-256 {selected.sha256}\nExecutable: {target}\nSource: {selected.revision}\nNext: task native:doctor",
+        f"[3/3] PASS Caddy v2.11.7; {GO_VERSION}; SHA-256 {selected.sha256}\nExecutable: {target}\nSource: {selected.revision}\nNext: task native:doctor",
         flush=True,
     )
     return target

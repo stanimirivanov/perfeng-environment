@@ -54,6 +54,14 @@ Automated dependency review is not required. Dependabot updates GitHub Actions o
 
 ## Supply-chain response
 
+[ADR 0029](../decisions/0029-require-patched-native-gateway-toolchain.md) records
+the owner's Go 1.27.3 requirement following the reachable crypto/x509 finding
+[GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). Build/audit modules, CI,
+recorded metadata, smoke fixtures and serving verification must agree. Retain
+the old selected asset's truthful Go 1.26.9 metadata but reject new setup/start
+until a patched release is separately published/selected. No advisory exclusion
+or symbol-level gate reduction is permitted.
+
 The gateway uses govulncheck's binary symbol-level exit status: callable findings
 block publication. Package/module-only observations remain visible in verbose
 CI logs and require review. On 2026-10-13 the locked binary has no symbol or
