@@ -1162,6 +1162,44 @@ writes or ambiguous responses, promotion or pointer advancement, full-tree healt
 export/restore, production admission or script retirement. Native storage and
 pure recovery tests retain their existing separate, narrower claims.
 
+### Receipt identity refusal acceptance
+
+[ADR 0027](decisions/0027-inject-disposable-adoption-receipt-identity-faults.md)
+records owner approval for destructive receipt fault injection only after the
+existing retention proof in both disposable scenarios. No new runner, scenario,
+request ref or credential permission is added. Initial now has ten adoption
+Workflow UIDs in total; receipt-only has eleven, including its failed origin.
+
+Recheck cluster identity and require a fresh exact ledger match against the
+accepted baseline. The pure unchanged policy must validate the original
+receipt/pointer against its verified readiness/root observations. Generate private
+DeleteOptions with the receipt's original UID and current resourceVersion.
+Native `kubectl delete --raw` sends that body to the exact namespace/name URL;
+a changed identity/version must conflict rather than delete a different object.
+Wait for absence and submit a fresh production adoption parent.
+
+Readiness/root/native ledger reads must succeed and match the actual API. Only
+`plan` may fail, with main exit 2 and the exact diagnostic
+`current pointer conflicts or references a missing/replaced receipt`.
+Require no plan/final result and no downstream worker. The pointer and all
+remaining ledger records must equal their pre-attempt snapshots.
+
+Recreate only the same receipt from original immutable payload, labels and
+provenance, dropping server-assigned metadata. In receipt-only, first wait for
+quota usage to fall to two. Native create cannot overwrite an existing winner.
+Require the new receipt's UID to differ while the pointer still binds the old
+UID. A second fresh parent must refuse at the same precise boundary. Preserve
+the full before/after records privately and require exact equality around each
+refusal. Both cases run existing workload/storage/credential/data retention,
+manual-root and six-child skip checks.
+
+Only safe UID decision reports, Workflow/worker evidence and constant outcomes
+are uploaded. No successful adoption result is produced by these cases. Leave
+the deliberate conflict intact until owned-cluster teardown; never repair the
+pointer or delete additional history. Live proof awaits both post-merge legs.
+This does not prove initial-create races, ambiguous API responses, restoration,
+retained recovery or operational cutover.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool

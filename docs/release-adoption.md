@@ -110,6 +110,17 @@ Deleting the failed origin must leave the completed ledger unchanged. See
 Live proof awaits both post-merge matrix legs. Initial-create races and ambiguous
 API-response recovery remain separate; quota rejection does not simulate either.
 
+ADR 0027 authorizes a CI-only destructive extension after those retention checks.
+Both disposable scenarios conditionally delete only the accepted receipt using
+UID/resourceVersion preconditions. A fresh parent must refuse the dangling
+pointer at `plan` after successful readiness. Native recreation preserves the
+original payload/provenance but receives a new UID; another fresh parent must
+refuse that replacement while preserving the original pointer. No record is
+repaired and no recovery success is claimed. See
+[receipt identity refusal acceptance](release-workflows-integration.md#receipt-identity-refusal-acceptance).
+Live proof awaits both post-merge scenarios. Retained ledger changes still
+require a separately reviewed recovery decision.
+
 Offline gates are `make workflow-lint` and `make validate`. On an isolated disposable kind fixture, prove first adoption, exact repeat, receipt-created/pointer-missing recovery, concurrent create conflict and ambiguous response recovery. Test wrong cluster/root revision, lost/replaced receipt UID, foreign ownership, mutable/changed content and root changes before final verification. Prove denial of ConfigMap patch/delete, Secret enumeration, workload writes, Job creation and Application sync. Delete a **disposable Workflow only** and prove receipt/pointer retention. Record the original object UIDs and immutable bytes.
 
 No live adoption or deletion is performed by this implementation task. Pointer advancement, broad health parity, external export/restore, operational command cutover, M06 admission and script retirement remain separate gates. The planner counts toward the original Python retirement limits; no orchestration is hidden from that accounting.

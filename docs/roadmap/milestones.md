@@ -536,6 +536,15 @@ scenario-specific and credential rights unchanged. Live proof awaits both
 post-merge legs; racing initial creates, ambiguous responses, promotion and
 production recovery/cutover/retirement remain separate.
 
+ADR 0027 adds owner-approved missing/replaced receipt refusal acceptance to both
+existing disposable scenarios after retention proof. Only the accepted receipt
+is conditionally deleted with UID/resourceVersion guards and recreated with
+original bytes/provenance but a new UID. Fresh complete parents must refuse at
+the planner after successful readiness, preserving the original pointer and
+workload/data identities without downstream writes or adoption results. Live
+proof awaits both post-merge legs. This is deliberate fault injection, not
+ledger repair, restoration or a retained-environment recovery authorization.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

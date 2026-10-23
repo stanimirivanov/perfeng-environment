@@ -31,6 +31,19 @@
 
 ## Disposable Argo CD acceptance
 
+For `missing-receipt` and `replaced-receipt` adoption cases, require successful
+readiness/root/ledger reads and only `plan` failure with exit 2 and
+`current pointer conflicts or references a missing/replaced receipt`. Inspect
+the safe `.outcome.json` UID report alongside Workflow/worker evidence. The
+pointer must retain its original UID, bytes and receiptUID; replacement must
+preserve payload/provenance but have a different UID. No result or downstream
+worker may appear. The approved destructive fixture runs only after retention
+proof and leaves the conflict intact for cluster teardown. Never apply this
+delete/recreate sequence as a retained-environment repair. A conditional DELETE
+conflict, unexpected create conflict or unrelated refusal must fail acceptance;
+do not retry deletion without preconditions or patch the pointer. See
+[receipt identity refusal acceptance](release-workflows-integration.md#receipt-identity-refusal-acceptance).
+
 For receipt-only recovery, choose the scenario-specific trusted-main artifact.
 Require a successful readiness/receipt/pointer-plan prefix and only
 `create-pointer` failure with exit 1 and quota exhaustion naming
