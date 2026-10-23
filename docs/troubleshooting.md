@@ -851,6 +851,19 @@ exception fails the test. The runner's pure-planner reports use synthetic
 readiness/root status; they are not adoption results or packet-level API-response
 loss evidence. Do not copy these test-only recovery helpers into an operator path.
 
+For native receipt response-loss acceptance, inspect
+`ledger-response-loss.outcome.json`, its failed Workflow/worker projections and
+the fresh direct read/retry artifacts. The CI-only TLS proxy must confirm a
+matching upstream 201 and UID but forward no successful response bytes. A TLS,
+image, mount, authorization or pre-commit failure is not sufficient proof. A
+direct retry must report AlreadyExists while preserving the entire receipt;
+the pure planner must request only the missing pointer. Coordinator interruption
+uses an independent second receipt and remains a separate check. No GitHub token
+is available to this fixture. Do not print private proxy configuration/logs or
+TLS keys, disable verification, widen grants or reset ledger records to pass it.
+See [the fixture boundary](release-workflows-integration.md#native-receipt-response-loss).
+This does not establish complete-parent ambiguous-outcome recovery.
+
 For database parity failures, inspect `database-*.workflow.json`, the named Job
 JSON, the non-secret role summary and filtered refusal diagnostics. An expected
 unsafe-role/password refusal must have a failed Job and `psql` exit 1; a pending

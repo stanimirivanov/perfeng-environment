@@ -520,7 +520,7 @@ not evidence that the full adoption protocol has succeeded.
 
 ### Interrupted coordinator and recovery decisions
 
-The receipt fixture invokes the unchanged native create step, then reaches a
+An independent second receipt invokes the unchanged native create step, then reaches a
 [suspension barrier](https://argo-workflows.readthedocs.io/en/release-4.0/walk-through/suspending/).
 The harness waits at most 120 seconds for that barrier and
 [terminates](https://argo-workflows.readthedocs.io/en/latest/cli/argo_terminate/)
@@ -528,7 +528,9 @@ the fixture Workflow. The case requires a successful create node, a failed
 terminated Workflow and no adoption-result output. A fresh native observation
 must still read the original receipt and its first-attempt provenance.
 
-The runner calls the production `plan_adoption` predicate with those real
+Both response-loss and interruption receipts are read by fresh native operations
+and evaluated independently; both must survive Workflow deletion. The runner
+calls the production `plan_adoption` predicate with those real
 Kubernetes records and explicitly synthetic readiness fields. The fake root
 Application receives synthetic healthy status because no Argo CD controller is
 installed. These samples exercise policy/storage compatibility, not readiness
@@ -552,6 +554,48 @@ for cluster teardown, never silently repaired.
 The barrier establishes coordinator interruption after a confirmed API write.
 It does not drop a Kubernetes response, prove recovery from an unknown transport
 outcome, or run a complete adoption parent against a reviewed Git request.
+
+### Native receipt response loss
+
+[ADR 0030](decisions/0030-inject-disposable-ledger-response-loss.md) records owner
+approval for a separate CI-only TLS proxy in the existing boundary job. Generate
+a native resource fixture from the published receipt-create template, preserving
+manifest meaning and its 60-second deadline. Fixture-only raw-POST/kubeconfig
+flags route just this create through the proxy; no discovery or other API request
+is forwarded. Subsequent observation/retry operations use unchanged production
+templates directly. The generated fixture is linted offline before submission.
+
+Resume the suspended writer only after its exact receipt and first-Workflow UID
+are configured and the proxy is ready. Its public kubeconfig references its
+short-lived ServiceAccount token file and temporary fixture CA. The proxy has
+no token mount and forwards the caller's release-adoption token only to the
+fixed Kubernetes API with the real cluster CA. No GitHub credential is present.
+Both TLS hops remain verified; no system trust store changes. The existing pinned
+Python image runs standard-library HTTP/TLS; certificates are generated using the
+already locked runner dependency. The Pod is non-root, read-only and bounded.
+
+Only one exact bounded receipt POST can reach the API. An upstream 201 must carry
+matching immutable content/provenance and a real UID. The proxy then closes the
+client connection before sending any response headers, recording only a safe
+status/UID/content-digest event. Further requests are refused without forwarding.
+API denial, malformed output, TLS errors or a pre-commit transport failure cannot
+count as a committed-response loss. No token/header/body or exception is logged.
+
+Require the writer to fail without termination or success outputs, with a matching
+release-adoption worker. A fresh direct native observation must read that exact
+receipt with no pointer. A fresh unchanged direct create must report AlreadyExists;
+another read must preserve its full object. The unchanged pure planner, using the
+explicitly synthetic readiness/root inputs above, must skip receipt creation and
+request only the pointer. Existing completion/race/retention cases continue with
+the response-loss receipt's original UID and first-attempt provenance.
+
+Safe proof is `ledger-response-loss.outcome.json`, accompanied by the failed
+Workflow and worker projections. Keys, kubeconfigs, raw proxy logs and expected
+payload configuration stay outside uploaded results. Missing proof or a failed
+TLS/identity/content check fails acceptance; do not bypass TLS, enlarge grants,
+reset history or treat a generic failed Pod as sufficient evidence. Live proof
+awaits the PR's disposable-kind CI run. Complete-parent ambiguous-response
+recovery, promotion and operational cutover remain separate.
 
 The adoption identity must have actual get/create authority in the ledger only,
 with patch/delete and cross-namespace create denied. Workload/Application writes

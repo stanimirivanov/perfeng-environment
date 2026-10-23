@@ -1,0 +1,74 @@
+# One disposable transport fixture; Pod and Service share the owned-cluster lifecycle.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ledger-response-proxy
+  namespace: argo-workflows
+  labels:
+    perfeng.io/fixture: ledger-response-proxy
+spec:
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  restartPolicy: Never
+  activeDeadlineSeconds: 240
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: proxy
+      image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+      command: [python, -B, /fault/proxy.py, /fault]
+      ports:
+        - containerPort: 8443
+      readinessProbe:
+        tcpSocket:
+          port: 8443
+        initialDelaySeconds: 1
+        periodSeconds: 2
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: fault
+          mountPath: /fault
+          readOnly: true
+        - name: tls
+          mountPath: /tls
+          readOnly: true
+        - name: api-ca
+          mountPath: /api
+          readOnly: true
+  volumes:
+    - name: fault
+      configMap:
+        name: ledger-response-proxy
+    - name: tls
+      secret:
+        secretName: ledger-response-proxy-tls
+    - name: api-ca
+      configMap:
+        name: kube-root-ca.crt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-response-proxy
+  namespace: argo-workflows
+spec:
+  selector:
+    perfeng.io/fixture: ledger-response-proxy
+  ports:
+    - port: 8443
+      targetPort: 8443

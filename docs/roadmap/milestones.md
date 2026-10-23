@@ -553,6 +553,15 @@ and absent candidate receipts. Existing retention and destructive tests continue
 Live proof awaits both post-merge scenarios; this does not implement promotion,
 add credential rights or advance script retirement.
 
+ADR 0030 adds the approved native-ledger response-loss prerequisite in the existing
+disposable boundary job: a TLS proxy commits one exact receipt then drops its
+successful response before headers. Failed native execution, fresh direct reads,
+unchanged create conflict, pure-planner partial recovery and completed retention
+must preserve the original bytes/UID/provenance. Coordinator interruption uses an
+independent receipt without resetting history. Live proof awaits PR CI; production
+templates/grants/jobs/refs are unchanged. Complete-parent ambiguous outcomes,
+promotion, retained recovery and measured retirement remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
