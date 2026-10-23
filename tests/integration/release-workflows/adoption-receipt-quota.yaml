@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ci-adoption-receipt-only
+  namespace: perfeng-release-ledger
+  labels:
+    perfeng.io/fixture: receipt-only
+spec:
+  hard:
+    count/configmaps: "2"

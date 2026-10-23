@@ -37,9 +37,11 @@ def success(
     raw_lock: bytes,
     *,
     adoption: bool = False,
+    parent_failed: bool = False,
 ) -> dict[str, Any]:
     """Bind parent output to its nested preflight, native children and live API."""
-    assert workflow["status"]["phase"] == "Succeeded"
+    assert not parent_failed or adoption
+    assert workflow["status"]["phase"] in ({"Failed", "Error"} if parent_failed else {"Succeeded"})
     expected_parent = (
         "perfeng-release-adopt-existing-v2" if adoption else "perfeng-release-readiness-v2"
     )

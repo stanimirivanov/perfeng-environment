@@ -301,8 +301,10 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
     def test_slice_reuses_production_parent_and_keeps_existing_boundaries(self):
         source = (FIXTURE / "adoption-parent.sh").read_text()
         self.assertEqual(
-            re.findall(r"^adoption_case (\S+) (\S+)", source, re.M),
+            re.findall(r"^\s*adoption_case (\S+) (\S+)", source, re.M),
             [
+                ("receipt-only", "receipt-only"),
+                ("recovered", "success"),
                 ("first", "success"),
                 ("repeat", "success"),
                 ("missing-root-read", "refusal"),

@@ -3,6 +3,7 @@
 set -euo pipefail
 [[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent ]] || exit 2
 [[ -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" ]] || exit 2
+[[ ${scenario:-} == initial || ${scenario:-} == receipt-only ]] || exit 2
 declare -F k a root_state root_retained root_child_snapshot > /dev/null || exit 2
 
 k apply -f gitops/release-workflows-bootstrap/ledger-namespace.yaml
@@ -16,9 +17,12 @@ adoption_receipt="receipt.${adoption_hex:0:32}.${adoption_hex:32}"
 [[ -z $(k -n "$adoption_namespace" get configmaps "$adoption_receipt" perfeng-local-current --ignore-not-found -o name) ]]
 root_state "$fixture/adoption-before"
 adoption_root_case=root-corrected
+adoption_labels=()
+adoption_baseline=first
+adoption_origin=first
 
 adoption_records() {
-  k -n "$adoption_namespace" get configmaps "$adoption_receipt" perfeng-local-current -o json \
+  k -n "$adoption_namespace" get configmaps "$adoption_receipt" perfeng-local-current --ignore-not-found -o json \
     | jq -S '.items|sort_by(.metadata.name)' > "$1"
 }
 adoption_retained() {
@@ -34,7 +38,7 @@ adoption_retained() {
 }
 adoption_case() {
   local label=$1 expected=$2 workflow=${3:-} rc node_id pod step=root root_mode=converged
-  case "$expected" in success|refusal|root-drift) ;; *) return 2 ;; esac
+  case "$expected" in success|refusal|root-drift|receipt-only) ;; *) return 2 ;; esac
   echo "Complete release adoption: $label"
   if [[ -z $workflow ]]; then
     workflow=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
@@ -51,32 +55,68 @@ adoption_case() {
   jq -e 'length>0 and all(.[]; .account=="release-adoption" and .uid!=null and .nodeID!=null)' \
     "$results/adoption-parent-$label.workers.json" > /dev/null
   adoption_records "$fixture/adoption-parent-records.json"
-  if [[ $expected == success ]]; then
-    [[ $rc == 0 ]]
-    jq -e 'all(.[]; .exitCode==0)' "$results/adoption-parent-$label.workers.json" > /dev/null
+  if [[ $expected == success || $expected == receipt-only ]]; then
     k -n argocd get application perfeng-local-control-plane -o json > "$fixture/adoption-parent-application.json"
     k -n perf-platform get statefulset/postgres statefulset/seaweedfs deployment/control-plane service/control-plane -o json > "$fixture/adoption-parent-platform.json"
     jq -s --arg uid "$cluster_uid" '{application:.[0],platform:.[1].items,clusterUID:$uid,
-      receipt:(.[2][]|select(.immutable==true)),pointer:(.[2][]|select(.metadata.name=="perfeng-local-current"))}' \
+      receipt:([.[2][]|select(.immutable==true)][0]),pointer:([.[2][]|select(.metadata.name=="perfeng-local-current")][0])}' \
       "$fixture/adoption-parent-application.json" "$fixture/adoption-parent-platform.json" "$fixture/adoption-parent-records.json" > "$fixture/adoption-parent-api.json"
+  fi
+  if [[ $expected == success ]]; then
+    [[ $rc == 0 ]]
+    jq -e 'all(.[]; .exitCode==0)' "$results/adoption-parent-$label.workers.json" > /dev/null
     PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" success "$fixture" "$results" "$label"
   else
     [[ $rc != 0 ]]
     if [[ $expected == root-drift ]]; then step=plan; root_mode=drifted; fi
+    if [[ $expected == receipt-only ]]; then step=create-pointer; fi
     node_id=$(jq -er --arg step "$step" '.status.nodes[]|select(.displayName==$step and .type=="Pod" and (.phase=="Failed" or .phase=="Error"))|.id' \
       "$results/adoption-parent-$label.workflow.json")
     pod=$(jq -er --arg id "$node_id" '.[]|select(.nodeID==$id)|.name' "$results/adoption-parent-$label.workers.json")
     k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 > "$fixture/adoption-parent-worker.log"
     PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" "$expected" "$fixture" "$results" "$label"
-    printf '%s\n' "Expected adoption refusal at $step after successful readiness; ledger untouched" > "$results/adoption-parent-$label.outcome.txt"
+    printf '%s\n' "Expected adoption refusal at $step after successful readiness; stored state verified" > "$results/adoption-parent-$label.outcome.txt"
   fi
   adoption_records "$fixture/adoption-$label.records.json"
   adoption_retained "$label" "$root_mode"
+  adoption_labels+=("$label")
 }
-adoption_case first success
+if [[ $scenario == receipt-only ]]; then
+  # Count only the namespace's root CA plus one receipt; pointer admission must fail.
+  k -n "$adoption_namespace" wait --for=create configmap/kube-root-ca.crt --timeout=60s
+  k -n "$adoption_namespace" get configmaps -o json \
+    | jq -e '([.items[].metadata.name]|sort)==["kube-root-ca.crt"]' > /dev/null
+  k create -f "$source_dir/adoption-receipt-quota.yaml" -o json > "$fixture/adoption-quota-created.json"
+  k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
+    --for=jsonpath='{.status.hard.count/configmaps}'=2 --timeout=60s
+  k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
+    --for=jsonpath='{.status.used.count/configmaps}'=1 --timeout=60s
+  adoption_case receipt-only receipt-only
+  [[ -z $(k -n "$adoption_namespace" get configmap perfeng-local-current --ignore-not-found -o name) ]]
+  k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
+    --for=jsonpath='{.status.used.count/configmaps}'=2 --timeout=60s
+  k -n "$adoption_namespace" get resourcequota ci-adoption-receipt-only -o json > "$fixture/adoption-quota-current.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" quota-patch \
+    "$fixture" "$results" receipt-only > "$fixture/adoption-quota-patch.json"
+  k -n "$adoption_namespace" patch resourcequota ci-adoption-receipt-only --type=json --patch-file "$fixture/adoption-quota-patch.json"
+  k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
+    --for=jsonpath='{.status.hard.count/configmaps}'=3 --timeout=60s
+  adoption_case recovered success
+  jq -S '.[]|select(.immutable==true)' "$fixture/adoption-receipt-only.records.json" > "$fixture/adoption-partial.receipt.json"
+  jq -S '.[]|select(.immutable==true)' "$fixture/adoption-recovered.records.json" > "$fixture/adoption-recovered.receipt.json"
+  cmp "$fixture/adoption-partial.receipt.json" "$fixture/adoption-recovered.receipt.json"
+  k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
+    --for=jsonpath='{.status.used.count/configmaps}'=3 --timeout=60s
+  k -n "$adoption_namespace" get resourcequota ci-adoption-receipt-only -o json \
+    | jq '{uid:.metadata.uid,hard:.status.hard,used:.status.used}' > "$results/adoption-quota-recovered.json"
+  adoption_baseline=recovered
+  adoption_origin=receipt-only
+else
+  adoption_case first success
+fi
 adoption_case repeat success
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-repeat.records.json"
-cmp "$results/adoption-parent-first.result.json" "$results/adoption-parent-repeat.result.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-repeat.records.json"
+cmp "$results/adoption-parent-$adoption_baseline.result.json" "$results/adoption-parent-repeat.result.json"
 
 # Keep the control-plane read so nested readiness succeeds; only root access is revoked.
 adoption_identity=system:serviceaccount:argo-workflows:release-adoption
@@ -85,12 +125,12 @@ k -n argocd patch role release-adoption --type=json \
 [[ $(k auth can-i get applications.argoproj.io/perfeng-local-root -n argocd --as "$adoption_identity" || :) == no ]]
 [[ $(k auth can-i get applications.argoproj.io/perfeng-local-control-plane -n argocd --as "$adoption_identity" || :) == yes ]]
 adoption_case missing-root-read refusal
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-missing-root-read.records.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-missing-root-read.records.json"
 k apply -f gitops/release-workflows-bootstrap/adoption-application-access.yaml
 [[ $(k auth can-i get applications.argoproj.io/perfeng-local-root -n argocd --as "$adoption_identity" || :) == yes ]]
 adoption_case corrected success
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-corrected.records.json"
-cmp "$results/adoption-parent-first.result.json" "$results/adoption-parent-corrected.result.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-corrected.records.json"
+cmp "$results/adoption-parent-$adoption_baseline.result.json" "$results/adoption-parent-corrected.result.json"
 
 # A successful readiness check cannot authorize adoption while the real root drifts.
 k patch namespace perf-sut --type=json \
@@ -99,13 +139,13 @@ k -n argocd annotate application perfeng-local-root argocd.argoproj.io/refresh=h
 k -n argocd wait application/perfeng-local-root --for=jsonpath='{.status.sync.status}'=OutOfSync --timeout=180s
 adoption_case root-drift root-drift
 [[ $(k get namespace perf-sut -o jsonpath='{.metadata.labels.perfeng\.io/environment}') == ci-drift ]]
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-root-drift.records.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-root-drift.records.json"
 argocd_sync perfeng-local-root adoption-root-corrected "$root_revision"
 adoption_root_case=adoption-root-corrected
 [[ $(k get namespace perf-sut -o jsonpath='{.metadata.labels.perfeng\.io/environment}') == local ]]
 adoption_case root-corrected success
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-root-corrected.records.json"
-cmp "$results/adoption-parent-first.result.json" "$results/adoption-parent-root-corrected.result.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-root-corrected.records.json"
+cmp "$results/adoption-parent-$adoption_baseline.result.json" "$results/adoption-parent-root-corrected.result.json"
 
 # Hold the real mutex before submitting both retries, making contention observable.
 holder=$(a submit "$source_dir/adoption-lock-workflow.yaml" -o json | jq -er .metadata.name)
@@ -125,7 +165,7 @@ k -n argo-workflows get pods -l "workflows.argoproj.io/workflow in ($holder,$con
   | jq '[.items[]|{uid:.metadata.uid}]' > "$results/adoption-lock-queued.workers.json"
 PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" waiting "$fixture" "$results" concurrent
 adoption_records "$fixture/adoption-queued.records.json"
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-queued.records.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-queued.records.json"
 adoption_retained queued
 a resume "$holder"
 timeout 90s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$holder"
@@ -133,8 +173,8 @@ a get "$holder" -o json > "$results/adoption-lock-holder.workflow.json"
 adoption_case concurrent-a success "$concurrent_a"
 adoption_case concurrent-b success "$concurrent_b"
 for label in concurrent-a concurrent-b; do
-  cmp "$fixture/adoption-first.records.json" "$fixture/adoption-$label.records.json"
-  cmp "$results/adoption-parent-first.result.json" "$results/adoption-parent-$label.result.json"
+  cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-$label.records.json"
+  cmp "$results/adoption-parent-$adoption_baseline.result.json" "$results/adoption-parent-$label.result.json"
 done
 PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" serialized "$fixture" "$results" concurrent
 
@@ -145,16 +185,16 @@ for permission in 'patch configmaps perfeng-release-ledger' 'delete configmaps p
   [[ $(k auth can-i "$verb" "$resource" -n "$namespace" --as "$adoption_identity" || :) == no ]]
 done
 [[ $(k auth can-i create pods --subresource=exec -n perf-platform --as "$adoption_identity" || :) == no ]]
-for label in first repeat missing-root-read corrected root-drift root-corrected concurrent-a concurrent-b; do
+for label in "${adoption_labels[@]}"; do
   name=$(jq -er .metadata.name "$results/adoption-parent-$label.workflow.json")
   uid=$(jq -er .metadata.uid "$results/adoption-parent-$label.workflow.json")
   [[ $(k -n argo-workflows get workflow "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
 done
-jq -s -e 'length==8 and (map(.metadata.uid)|unique|length)==8' "$results"/adoption-parent-*.workflow.json > /dev/null
-name=$(jq -er .metadata.name "$results/adoption-parent-first.workflow.json")
+jq -s --argjson expected "${#adoption_labels[@]}" -e 'length==$expected and (map(.metadata.uid)|unique|length)==$expected' "$results"/adoption-parent-*.workflow.json > /dev/null
+name=$(jq -er .metadata.name "$results/adoption-parent-$adoption_origin.workflow.json")
 k -n argo-workflows delete workflow "$name" --cascade=foreground --wait=true --timeout=90s
 adoption_records "$fixture/adoption-retained.records.json"
-cmp "$fixture/adoption-first.records.json" "$fixture/adoption-retained.records.json"
+cmp "$fixture/adoption-$adoption_baseline.records.json" "$fixture/adoption-retained.records.json"
 adoption_retained retained
 printf '%s\n' 'Original receipt/pointer bytes, UIDs and provenance survived original Workflow deletion' > "$results/adoption-parent-retention.outcome.txt"
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]

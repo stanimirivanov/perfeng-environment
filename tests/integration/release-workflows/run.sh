@@ -10,6 +10,10 @@ fi
 [[ -n ${RUNNER_TEMP:-} && -d $RUNNER_TEMP && -n ${GITHUB_TOKEN:-} ]] || refuse 'runner temporary directory/read token unavailable.'
 mode=${RELEASE_KIND_MODE:-boundaries}
 [[ $mode == boundaries || $mode == preflight-parent ]] || refuse 'unknown CI mode.'
+scenario=${RELEASE_ADOPTION_SCENARIO:-initial}
+[[ $scenario == initial || $scenario == receipt-only ]] || refuse 'unknown adoption scenario.'
+[[ $mode == preflight-parent || $scenario == initial ]] || refuse 'receipt-only requires trusted-main parent acceptance.'
+export RELEASE_ADOPTION_SCENARIO=$scenario
 if [[ $mode == preflight-parent ]]; then
   [[ ${GITHUB_REF:-} == refs/heads/main && ${GITHUB_REPOSITORY:-} == stanimirivanov/perfeng-environment ]] || refuse 'parent acceptance requires trusted main.'
   [[ ${GITHUB_EVENT_NAME:-} == push || ${GITHUB_EVENT_NAME:-} == workflow_dispatch ]] || refuse 'parent acceptance event is not trusted.'
