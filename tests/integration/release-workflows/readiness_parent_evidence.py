@@ -35,10 +35,15 @@ def success(
     parameters: dict[str, str],
     api: dict[str, Any],
     raw_lock: bytes,
+    *,
+    adoption: bool = False,
 ) -> dict[str, Any]:
     """Bind parent output to its nested preflight, native children and live API."""
     assert workflow["status"]["phase"] == "Succeeded"
-    assert workflow["spec"]["workflowTemplateRef"]["name"] == "perfeng-release-readiness-v2"
+    expected_parent = (
+        "perfeng-release-adopt-existing-v2" if adoption else "perfeng-release-readiness-v2"
+    )
+    assert workflow["spec"]["workflowTemplateRef"]["name"] == expected_parent
     assert {
         p["name"]: p["value"] for p in workflow["spec"]["arguments"]["parameters"]
     } == parameters
@@ -62,7 +67,12 @@ def success(
         observations[name] = outputs(node)["observation"]
     verify = named(workflow, "verify")
     assert verify["phase"] == "Succeeded"
-    root = workflow["status"]["nodes"][workflow["metadata"]["name"]]
+    root = (
+        named(workflow, "readiness", "Steps")
+        if adoption
+        else workflow["status"]["nodes"][workflow["metadata"]["name"]]
+    )
+    assert root["phase"] == "Succeeded"
     result = outputs(root)["result"]
     assert result == outputs(verify)["result"]
     schema = json.loads(

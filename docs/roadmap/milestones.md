@@ -500,6 +500,17 @@ selection fails. Live proof awaits the post-merge trusted-main run. Full-tree
 health/activation, complete adoption/promotion, production recovery/security and
 measured host-script retirement remain separate; no published contract changes.
 
+Complete adoption-parent acceptance follows bounded root convergence. The
+unchanged parent must execute fresh nested readiness, native ledger reads/creates
+and all three planner phases using the existing pinned CI request and grants.
+First/exact-repeat/corrected submissions must bind stored bytes, provenance and
+receipt/pointer UIDs; a root-read refusal after successful readiness must leave
+records unchanged. Deleting only the original disposable Workflow must preserve
+the ledger. Workload/data retention and all six child skips remain required.
+Live proof awaits the post-merge trusted-main run. Complete-parent recovery,
+promotion/advancement, retained adoption, full-tree activation, production
+admission/export/restore and measured script retirement remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
