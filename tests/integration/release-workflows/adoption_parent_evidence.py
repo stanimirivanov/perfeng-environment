@@ -80,18 +80,55 @@ def success(
     return result
 
 
-def refusal(workflow: dict[str, Any], workers: list[dict[str, Any]], log: str) -> None:
-    """Require root-specific Forbidden after readiness, before any ledger operation."""
+def refusal(
+    workflow: dict[str, Any],
+    workers: list[dict[str, Any]],
+    log: str,
+    *,
+    step: str = "root",
+    records: list[dict[str, Any]] | None = None,
+) -> None:
+    """Require the owning refusal boundary; reads may succeed but no later write may run."""
+    assert step in {"root", "plan"}
     assert workflow["status"]["phase"] in {"Failed", "Error"}
     assert workflow["spec"]["workflowTemplateRef"]["name"] == "perfeng-release-adopt-existing-v2"
     assert readiness.named(workflow, "readiness", "Steps")["phase"] == "Succeeded"
-    failed = readiness.named(workflow, "root")
+    failed = readiness.named(workflow, step)
     assert failed["phase"] in {"Failed", "Error"}
     failed_workers = [w for w in workers if w["exitCode"] not in (None, 0)]
     assert len(failed_workers) == 1
-    assert failed_workers[0]["nodeID"] == failed["id"] and failed_workers[0]["exitCode"] == 1
-    for text in ("forbidden", "perfeng-local-root", "release-adoption", "applications", "argocd"):
-        assert text in log
+    assert failed_workers[0]["nodeID"] == failed["id"]
+    assert failed_workers[0]["exitCode"] == (1 if step == "root" else 2)
+    if step == "root":
+        for text in (
+            "forbidden",
+            "perfeng-local-root",
+            "release-adoption",
+            "applications",
+            "argocd",
+        ):
+            assert text in log
+    else:
+        assert "root is stale, syncing or not at the reviewed selection" in log
+        root = record(workflow, "root")
+        policy.application_identity(root, policy.NAMES[0])
+        health = readiness.outputs(readiness.named(workflow, "readiness", "Steps"))["result"]
+        assert root["status"]["sync"]["status"] == "OutOfSync"
+        assert root["status"]["sync"]["revision"] == health["selectionRevision"]
+        assert root["status"]["health"]["status"] == "Healthy" and not root["status"].get(
+            "conditions"
+        )
+        assert root["status"]["sync"]["comparedTo"]["source"] == policy.ROOT_SOURCE
+        assert root["spec"]["syncPolicy"]["automated"] == {"enabled": False}
+        assert "argocd.argoproj.io/skip-reconcile" not in root["metadata"].get("annotations", {})
+        differences = [o for o in root["status"]["resources"] if o["status"] != "Synced"]
+        assert len(differences) == 1
+        assert differences[0]["kind"] == "Namespace" and differences[0]["name"] == "perf-sut"
+        assert not differences[0].get("namespace") and differences[0]["status"] == "OutOfSync"
+        assert records is not None and len(records) == 2
+        observed = [record(workflow, "current"), record(workflow, "existing-receipt")]
+        assert sorted(observed, key=lambda o: o["metadata"]["name"]) == records
+    assert "result" not in readiness.outputs(failed)
     assert "result" not in readiness.outputs(
         workflow["status"]["nodes"][workflow["metadata"]["name"]]
     )
@@ -109,6 +146,8 @@ def refusal(workflow: dict[str, Any], workers: list[dict[str, Any]], log: str) -
         "final-root",
         "finish",
     }
+    if step == "plan":
+        downstream -= {"current", "existing-receipt", "plan"}
     assert not any(
         n["displayName"] in downstream and n["type"] == "Pod"
         for n in workflow["status"]["nodes"].values()
@@ -136,11 +175,15 @@ if __name__ == "__main__":
         (results / f"adoption-parent-{label}.result.json").write_text(
             json.dumps(result, sort_keys=True), encoding="utf-8"
         )
-    elif mode == "refusal":
+    elif mode in {"refusal", "root-drift"}:
         refusal(
             workflow,
             load(results / f"adoption-parent-{label}.workers.json"),
             (fixture / "adoption-parent-worker.log").read_text(encoding="utf-8"),
+            step="plan" if mode == "root-drift" else "root",
+            records=load(fixture / "adoption-parent-records.json")
+            if mode == "root-drift"
+            else None,
         )
     else:
         raise ValueError("Unknown adoption evidence mode")

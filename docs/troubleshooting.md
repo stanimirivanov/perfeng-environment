@@ -42,6 +42,16 @@ controller, retrying successful nodes, patching the ledger or weakening policy.
 Record snapshots and raw logs remain private. See
 [complete adoption acceptance](release-workflows-integration.md#complete-existing-release-adoption-parent).
 
+The adoption `root-drift` case must finish readiness and root/current/receipt
+reads, then fail only at `plan` with main exit 2 and the exact stale-root
+diagnostic. Require the actual root's only difference to be the `perf-sut`
+Namespace label, still `ci-drift`, with selected revision, manual policy and six
+child skips preserved. Unrelated conditions, worker errors or storage changes
+are failures, not this expected refusal. The fixture repairs through a fresh
+selected-commit root sync and submits a fresh adoption parent; it never edits
+ledger records or fabricates status. Inspect the existing private snapshots and
+safe `adoption-parent-root-*` evidence to distinguish refusal from repair.
+
 For the final bounded root phase, inspect `root-*.application.json`,
 `root-*.children.json` and the constant Namespace-drift outcome. Check the exact
 selected revision, fresh operation marker, complete fourteen-object inventory

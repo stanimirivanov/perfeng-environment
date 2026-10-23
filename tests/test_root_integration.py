@@ -110,6 +110,55 @@ class RootIntegrationTests(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     MODULE.tree(path)
 
+    def test_namespace_drift_requires_exactly_one_difference_without_relaxing_identity(self):
+        value = self.observation()
+        value["status"]["sync"]["status"] = "OutOfSync"
+        target = next(
+            o
+            for o in value["status"]["resources"]
+            if o["kind"] == "Namespace" and o["name"] == "perf-sut"
+        )
+        target["status"] = "OutOfSync"
+        MODULE.converged(
+            value, "root-owned", "root-repeat", self.revision, self.objects, namespace_drift=True
+        )
+        with self.assertRaises(AssertionError):
+            MODULE.converged(value, "root-owned", "root-repeat", self.revision, self.objects)
+        for change in (
+            "missing-drift",
+            "other-resource",
+            "second-drift",
+            "revision",
+            "auto",
+            "condition",
+        ):
+            with self.subTest(change=change):
+                current = copy.deepcopy(value)
+                drift = next(o for o in current["status"]["resources"] if o["name"] == "perf-sut")
+                if change == "missing-drift":
+                    drift["status"] = "Synced"
+                elif change == "other-resource":
+                    drift["name"] = "other"
+                elif change == "second-drift":
+                    next(o for o in current["status"]["resources"] if o["name"] == "perf-platform")[
+                        "status"
+                    ] = "OutOfSync"
+                elif change == "revision":
+                    current["status"]["sync"]["revision"] = "b" * 40
+                elif change == "auto":
+                    current["spec"]["syncPolicy"]["automated"]["enabled"] = True
+                else:
+                    current["status"]["conditions"] = [{"type": "ComparisonError"}]
+                with self.assertRaises(AssertionError):
+                    MODULE.converged(
+                        current,
+                        "root-owned",
+                        "root-repeat",
+                        self.revision,
+                        self.objects,
+                        namespace_drift=True,
+                    )
+
     def test_prepare_creates_exactly_six_skipped_documents_without_mutating_source(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "tree.yaml"
