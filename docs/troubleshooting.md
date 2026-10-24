@@ -1017,6 +1017,15 @@ or replaying completed nodes.
 
 ## Complete adoption receipt response-loss acceptance
 
+If the helper refuses before setup, inspect its hosted-runner/scenario/ownership
+guard and caller credential isolation. Trusted-main intentionally needs its
+runner token for temporary-ref cleanup; the response helper must run in the
+dedicated token-cleared subshell, with its inherited EXIT trap disabled. Do not
+unset the caller's credential or weaken the helper guard. Both ordinary failure
+and explicit exit must leave exactly one parent cleanup owner with its original
+credential. Shared bookkeeping is recorded only after both fault and recovery
+cases succeed.
+
 The trusted-main `response-loss` leg is isolated from `initial` and `receipt-only`.
 It uses a CI-only parent copy with a pre-create suspension and scoped receipt
 transport; its recovering submission uses the unchanged production parent.
