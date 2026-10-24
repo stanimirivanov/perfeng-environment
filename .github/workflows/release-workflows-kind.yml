@@ -27,6 +27,8 @@ on:
       - tests/fixtures/readiness-refused-workflow.json
       - tests/integration/release-workflows/**
       - tests/test_release_workflows_integration.py
+      - tests/test_adoption_authority.py
+      - tests/test_ledger_response_proxy.py
       - tests/test_readiness_http_fixture.py
       - tests/test_release_readiness.py
       - tests/test_release_adoption.py

@@ -1,17 +1,12 @@
-"""Exercise the real shell refusal protocol without touching Kubernetes."""
+"""Offline protocol regressions; real authorization is proved in disposable CI."""
 
-import json
 import os
-import ssl
+import re
 import subprocess
 import tempfile
-import threading
 import unittest
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
 
-from test_ledger_response_proxy import KUBECTL, PROXY
 from test_release_workflows_integration import BASH, FIXTURE
 
 HARNESS = r"""
@@ -23,6 +18,7 @@ touch "$fixture/owned"
 export KUBECONFIG=$fixture/kubeconfig
 mode=boundaries
 cluster_uid=owned-cluster
+source_dir=$2
 k() {
   printf '%s\0' "$@" >> "$fixture/calls"
   printf '\n' >> "$fixture/calls"
@@ -38,7 +34,16 @@ k() {
   local args=("$@") ns= verb= resource= group= identity=system:serviceaccount:argo-workflows:release-adoption
   for ((i=0; i<${#args[@]}; i++)); do
     if [[ ${args[i]} == -n ]]; then ns=${args[i+1]}; fi
-    case ${args[i]} in patch|delete|create|get) verb=${args[i]}; resource=${args[i+1]}; break ;; esac
+    case ${args[i]} in patch|delete|create|get) verb=${args[i]}; resource=${args[i+1]};
+      if [[ $resource == -f ]]; then
+        case ${args[i+2]} in
+          */authority-configmap.yaml) resource=configmap ;;
+          */authority-secret.yaml) resource=secret ;;
+          */authority-job.yaml) resource=job ;;
+          *) return 3 ;;
+        esac
+      fi
+      break ;; esac
   done
   case $resource in
     configmap) resource=configmaps ;; secret|secrets) resource=secrets ;;
@@ -47,10 +52,6 @@ k() {
     *) return 3 ;;
   esac
   if [[ $verb == get ]]; then verb=list; fi
-  if [[ $verb == create && -n ${REAL_KUBECTL:-} ]]; then
-    "$REAL_KUBECTL" --kubeconfig "$REAL_CONFIG" --request-timeout=5s "$@"
-    return $?
-  fi
   case $CASE in
     allowed) echo private-server-value; return 0 ;;
     transport) echo 'private-server-value: timeout' >&2; return 1 ;;
@@ -59,16 +60,12 @@ k() {
     wrong-resource) resource=pods ;; wrong-namespace) ns=other ;;
     wrong-group) group=other ;;
   esac
-  local prefix='Error from server (Forbidden): private-server-value:'
-  if [[ $verb == create ]]; then
-    case $resource in
-      configmaps) prefix='error: failed to create configmap: configmaps "ci-adoption-denied" is forbidden:' ;;
-      secrets) prefix='error: failed to create secret secrets "ci-adoption-denied" is forbidden:' ;;
-      jobs) prefix='error: failed to create job: jobs "ci-adoption-denied" is forbidden:' ;;
-    esac
-  fi
+  local qualified=$resource name=''
+  [[ -z $group ]] || qualified="$resource.$group"
+  [[ $CASE != named ]] || name=' "ci-adoption-denied"'
+  local prefix="Error from server (Forbidden): $qualified$name is forbidden:"
   if [[ $CASE == wrong-wrapper && $verb == create ]]; then
-    prefix='error: failed to create configmap: unrelated client error:'
+    prefix='error: unrelated client error:'
   fi
   printf '%s User "%s" cannot %s resource "%s" in API group "%s" in the namespace "%s"\n' \
     "$prefix" \
@@ -81,7 +78,9 @@ snapshot() {
   touch "$fixture/sampled"
 }
 source "$2/adoption-authority.sh"
+if [[ ${SMOKE:-} == yes ]]; then verify_adoption_create_authority; else
 verify_adoption_authority "receipt.$(printf 'a%.0s' {1..32}).$(printf 'b%.0s' {1..32})" snapshot
+fi
 """
 
 
@@ -111,7 +110,11 @@ class AdoptionAuthorityTests(unittest.TestCase):
                 [part.decode() for part in row.split(b"\0") if part]
                 for row in (directory / "calls").read_bytes().splitlines()
             ]
-            report = directory / "results/adoption-authority.tsv"
+            report = directory / (
+                "results/adoption-authority-smoke.tsv"
+                if (environment or {}).get("SMOKE") == "yes"
+                else "results/adoption-authority.tsv"
+            )
             evidence = report.read_text() if report.exists() else ""
         self.assertNotIn("private-server-value", result.stdout + result.stderr + evidence)
         return result, calls, evidence
@@ -140,7 +143,7 @@ class AdoptionAuthorityTests(unittest.TestCase):
                 self.assertIn("--dry-run=server", args)
                 self.assertNotIn("--dry-run=client", args)
                 self.assertNotIn("exec", args)
-        self.assertEqual(evidence.count("\tforbidden\n"), 11)
+        self.assertEqual(evidence.count("\tforbidden\t"), 11)
         self.assertTrue(evidence.endswith("suite\tverified\n"))
         self.assertEqual(sum(args[0] == "get" for args in calls), 2)
 
@@ -165,113 +168,7 @@ class AdoptionAuthorityTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(evidence.endswith("suite\tverified\n"))
                 if case == "allowed":
-                    self.assertEqual(sum("--dry-run=server" in args for args in calls), 1)
-
-    @unittest.skipUnless(KUBECTL, "kubectl is required for actual create diagnostics")
-    def test_actual_typed_create_refusals_pass_only_with_server_dry_run(self):
-        assert KUBECTL is not None
-        requests = []
-
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, format: str, *args: object) -> None:
-                pass
-
-            def do_POST(self):
-                url = urlsplit(self.path)
-                # Typed clients can encode requests as Kubernetes protobuf.
-                body = self.rfile.read(int(self.headers["Content-Length"]))
-                requests.append((url, body, self.headers.get_all("Impersonate-Group")))
-                resource = url.path.rsplit("/", 1)[-1]
-                namespace = url.path.split("/")[-2]
-                group = "batch" if resource == "jobs" else ""
-                message = (
-                    f'{resource} "ci-adoption-denied" is forbidden: User '
-                    '"system:serviceaccount:argo-workflows:release-adoption" cannot create '
-                    f'resource "{resource}" in API group "{group}" in the namespace "{namespace}"'
-                )
-                data = json.dumps(
-                    {
-                        "apiVersion": "v1",
-                        "kind": "Status",
-                        "status": "Failure",
-                        "reason": "Forbidden",
-                        "code": 403,
-                        "message": message,
-                        "details": {"kind": resource, "group": group, "name": "ci-adoption-denied"},
-                    }
-                ).encode()
-                self.send_response(403)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            cert, key = PROXY.certificate(directory, "localhost")
-            tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            tls.load_cert_chain(cert, key)
-            server = HTTPServer(("127.0.0.1", 0), Handler)
-            server.socket = tls.wrap_socket(server.socket, server_side=True)
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
-            try:
-                config = directory / "client.json"
-                config.write_text(
-                    json.dumps(
-                        {
-                            "apiVersion": "v1",
-                            "kind": "Config",
-                            "clusters": [
-                                {
-                                    "name": "test",
-                                    "cluster": {
-                                        "server": f"https://localhost:{server.server_port}",
-                                        "certificate-authority": str(cert),
-                                    },
-                                }
-                            ],
-                            "users": [{"name": "test", "user": {"token": "fixture-only"}}],
-                            "contexts": [
-                                {"name": "test", "context": {"cluster": "test", "user": "test"}}
-                            ],
-                            "current-context": "test",
-                        }
-                    )
-                )
-                result, _, evidence = self.run_case(
-                    "denied",
-                    {
-                        "REAL_KUBECTL": Path(KUBECTL).as_posix(),
-                        "REAL_CONFIG": config.as_posix(),
-                    },
-                )
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertTrue(evidence.endswith("suite\tverified\n"))
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join(timeout=3)
-                self.assertFalse(thread.is_alive())
-        self.assertEqual(
-            [url.path for url, _, _ in requests],
-            [
-                "/api/v1/namespaces/argo-workflows/configmaps",
-                "/api/v1/namespaces/argo-workflows/secrets",
-                "/apis/batch/v1/namespaces/perf-platform/jobs",
-            ],
-        )
-        for url, body, groups in requests:
-            self.assertEqual(parse_qs(url.query)["dryRun"], ["All"])
-            self.assertIn(b"ci-adoption-denied", body)
-            self.assertEqual(
-                groups,
-                [
-                    "system:serviceaccounts",
-                    "system:serviceaccounts:argo-workflows",
-                    "system:authenticated",
-                ],
-            )
+                    self.assertEqual(sum("--dry-run=server" in args for args in calls), 10)
 
     def test_both_fixtures_share_authority_verification_before_destructive_faults(self):
         for file, call, fault in (
@@ -289,6 +186,64 @@ class AdoptionAuthorityTests(unittest.TestCase):
             source = (FIXTURE / file).read_text()
             self.assertIn('source "$source_dir/adoption-authority.sh"', source)
             self.assertLess(source.index(call), source.index(fault))
+
+    def test_named_and_collection_denials_share_the_same_authorization_contract(self):
+        result, _, evidence = self.run_case("named")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(evidence.count("\tforbidden\t"), 11)
+
+    def test_early_smoke_needs_no_ledger_records_and_reports_every_mismatch(self):
+        result, calls, evidence = self.run_case("wrong-wrapper", {"SMOKE": "yes"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(evidence.count("\trefusal-mismatch\t"), 3)
+        self.assertEqual(evidence.count("\tforbidden\t"), 1)
+        self.assertTrue(evidence.endswith("suite\tfailed\n"))
+        self.assertIn("matches=011111", result.stderr)
+
+    def test_create_probes_are_single_object_manifests_and_precede_the_controllers(self):
+        import yaml
+
+        for kind, namespace in (
+            ("ConfigMap", "argo-workflows"),
+            ("Secret", "argo-workflows"),
+            ("Job", "perf-platform"),
+        ):
+            file = FIXTURE / ("authority-" + kind.lower() + ".yaml")
+            documents = list(yaml.safe_load_all(file.read_text()))
+            self.assertEqual(len(documents), 1)
+            self.assertEqual(documents[0]["kind"], kind)
+            self.assertEqual(
+                documents[0]["metadata"], {"name": "ci-adoption-denied", "namespace": namespace}
+            )
+        source = (FIXTURE / "run.sh").read_text()
+        self.assertLess(
+            source.index("verify_adoption_create_authority\n"),
+            source.index('"$fixture/namespace-install.yaml"'),
+        )
+
+    def test_stage_runner_preserves_worker_failure_and_never_marks_it_successful(self):
+        assert BASH is not None
+        source = (FIXTURE / "run.sh").read_text()
+        functions = "\n".join(
+            re.findall(r"^(?:start_stage|complete_stage|run_stage)\(\).*", source, re.M)
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            script = (
+                "set -euo pipefail\nresults=$1\n"
+                + functions
+                + "\nworker() { return 7; }\nrun_stage protocol worker\necho unsafe-success\n"
+            )
+            result = subprocess.run(
+                [BASH, "-c", script, "stage-test", directory.as_posix()],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(result.returncode, 7)
+            self.assertNotIn("unsafe-success", result.stdout)
+            self.assertEqual((directory / "stages.tsv").read_text(), "protocol\tstarted\t0\n")
 
 
 if __name__ == "__main__":

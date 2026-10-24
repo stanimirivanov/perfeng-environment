@@ -985,15 +985,27 @@ ends with the tab-separated `suite verified` row. A refusal must be Kubernetes
 namespace. Timeout, NotFound, schema/admission rejection and an unexpected grant
 are failures. Raw command output stays in the private fixture directory; do not
 upload it. Check the selected Role/RoleBindings and object identities privately.
-Typed ConfigMap, Secret and Job create commands wrap server refusal differently
-from patch/delete/list: their exact `failed to create ... is forbidden:` wrapper
-is valid only with the same complete authorization subject and operation.
-An arbitrary `failed to create` message or the word `forbidden` is insufficient.
+Create probes use manifests and the generic client path. Collection authorization
+does not name the object; a batch resource can appear as `jobs.batch`. Do not add
+per-generator or named-object prefixes to the checker. Inspect the six match
+columns (marker, subject, verb, resource, group, namespace) and exit status in the
+safe TSV. A zero indicates exactly which part failed. Independent probes continue
+only as dry-run/name-only observations; the suite blocks downstream work on any
+mismatch. The early smoke report detects create/list failures before Argo setup.
 Do not widen permissions or remove `--dry-run=server` to obtain a pass. The helper
 checks unchanged selected ledger snapshots and cluster UID; changed records need
 independent investigation. Exec is review-only and never connects. Explicit
 groups document the effective identity; Kubernetes already defaults those groups
 for ServiceAccount impersonation. These checks do not prove token authentication.
+
+For any disposable acceptance failure, inspect `stages.tsv` first. A stage with
+`started` and no `succeeded`, followed by `failed`, identifies the owning boundary.
+Use its safe case report; do not upload private diagnostics to obtain context.
+`run-outcome.json` must bind the intended commit and a nonempty cluster UID, with
+zero overall/cleanup exits. Two qualification passes require the same commit and
+different UIDs. A passing parser unit test, a rerun of another commit or a run with
+failed teardown does not qualify. The controller objects are collected only after
+controller installation, so an early smoke failure does not request missing CRDs.
 
 A source-retirement guard failure requires matching Git revision/content hashes
 and active replacements in `deployments/release-workflow-retirements.json`.

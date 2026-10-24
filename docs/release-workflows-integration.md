@@ -1293,25 +1293,60 @@ Job, patch the control-plane Deployment, and patch the root/control-plane
 Applications. Every write uses server dry-run, including deletion, so an
 unexpected grant cannot persist the probe. Secret listing prints names only;
 an unexpected grant can expose Secret bodies to the client, never to evidence.
-Typed ConfigMap, Secret and Job create generators flatten the API Status error
-into resource-specific `error: failed to create ... is forbidden:` diagnostics.
-Those exact wrappers are accepted alongside `Error from server (Forbidden)`;
-the user, operation, resource, API group and namespace checks still apply.
-An isolated TLS regression exercises all three real kubectl create generators
-and verifies `dryRun=All` and the impersonated groups on their HTTP requests.
+ConfigMap, Secret and Job probes use single-object manifests with generic
+`kubectl create --dry-run=server --validate=false`. API validation remains active;
+only client schema lookup is disabled. Collection creates have no object name
+in the authorization attributes; grouped resources can be qualified (`jobs.batch`)
+in the diagnostic prefix. The check requires the standard server Forbidden marker
+and the complete authorization subject/operation, without guessing those prefixes.
+An early four-case smoke (three creates and name-only Secret listing) runs against
+the real API and actual adoption RBAC before Argo installation or any ledger
+records. The full eleven-operation matrix runs after ledger persistence. Offline
+tests exercise parsing, safe aggregation, manifests and failure propagation;
+they do not substitute a fake API for Kubernetes authorization proof.
 Allowed ledger get/create and denied Pod exec remain authorization reviews;
 connect subresources have no equivalent safe dry-run and no exec is attempted.
 
 Cluster identity is checked before and after. Canonical snapshots of the selected
 receipt and pointer must remain identical. Only constant decisions are uploaded
-in `adoption-authority.tsv`; success requires the terminal `suite verified` row
-(tab separated). Raw API diagnostics and snapshots remain private. Unexpected
+in `adoption-authority.tsv` and the early `adoption-authority-smoke.tsv`; success
+requires the terminal `suite verified` row (tab separated). Each API row includes
+exit status and six 0/1 matches: marker, subject, verb, resource, group, namespace.
+Independent probes are collected even after a mismatch; any mismatch fails the
+suite and blocks downstream work. Raw API diagnostics and snapshots remain private. Unexpected
 success, transport errors, missing objects, mismatched refusals or changed
 records fail closed. This tests API authorization through privileged fixture
 impersonation, not ServiceAccount token authentication or production admission.
 Offline tests exercise the Bash protocol with an isolated command boundary;
 actual Kubernetes proof awaits the existing CI jobs. No permissions, production
 templates, jobs, credentials, scenarios or request refs are added.
+
+### Disposable run qualification and stage evidence
+
+`stages.tsv` identifies bootstrap, authority smoke, controllers, registry
+prerequisite, maintenance, ledger, database, bucket, registry, readiness, observer,
+preflight and cleanup boundaries. The trusted-main branch has its own parent
+stage. Started/succeeded/failed states preserve the worker exit code; the wrapper
+never catches a source failure and continues. This separates a prerequisite or
+fixture failure from a policy refusal. Existing bucket allocation and registry
+error categories remain the detailed diagnostics for their stages.
+
+After teardown, `run-outcome.json` records the exact checked-out commit,
+`kube-system` UID, overall exit code and cleanup exit code. A passing qualification
+requires a nonempty UID, zero exits, both successful authority reports and all
+boundary stages completed. `kubernetes-version.json` records the actual pinned
+client/server versions. No token, Secret body or raw client diagnostic is added.
+
+For approved pre-handoff acceptance, dispatch the existing workflow on the issue
+branch: `gh workflow run release-workflows-kind.yml --ref feature/issue-N`.
+Observe the resulting run's exact `headSha`; never qualify a different revision.
+The PR #231 stabilization requires two successful runs of the same final commit
+on fresh clusters, with distinct namespace UIDs and successful cleanup. A PR run
+can supply one pass. Every code correction resets this qualification. Record run
+URLs and safe evidence in the PR, then pause for review. No retained cluster,
+self-hosted runner, extra token right or trusted-main dispatch is authorized by
+this command. Future integration changes require actual disposable acceptance
+before handoff when dispatch is authorized; offline tests alone are insufficient.
 
 ## Verification and remaining gates
 

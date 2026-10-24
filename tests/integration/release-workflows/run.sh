@@ -28,12 +28,23 @@ export PATH="$fixture/bin:$PATH"
 source_dir=tests/integration/release-workflows
 results="$RUNNER_TEMP/release-workflows-results"
 mkdir -p "$fixture/bin" "$results"
+current_stage=bootstrap
+printf 'stage\tstate\texit\nbootstrap\tstarted\t0\n' > "$results/stages.tsv"
+start_stage() { current_stage=$1; printf '%s\tstarted\t0\n' "$1" >> "$results/stages.tsv"; echo "Stage: $1"; }
+complete_stage() { printf '%s\tsucceeded\t0\n' "$current_stage" >> "$results/stages.tsv"; current_stage=''; }
+run_stage() { start_stage "$1"; shift; "$@"; complete_stage; }
 k() { kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --request-timeout=20s "$@"; }
 a() { argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows "$@"; }
 finish() {
   rc=$?
   trap - EXIT
   set +e
+  if [[ -n $current_stage ]]; then
+    [[ $rc != 0 ]] || rc=1
+    printf '%s\tfailed\t%s\n' "$current_stage" "$rc" >> "$results/stages.tsv"
+    echo "Failed stage: $current_stage (exit $rc); inspect stages.tsv and the stage's safe case reports" >&2
+  fi
+  cleanup_rc=0
   if [[ $mode == preflight-parent && -f $fixture/request-ref.json ]]; then
     uv run --locked --offline python "$source_dir/request_ref.py" cleanup "$fixture"
     ref_rc=$?
@@ -44,12 +55,27 @@ finish() {
     if [[ $ref_rc != 0 ]]; then rc=$ref_rc; fi
   fi
   if [[ -f $fixture/owned ]]; then
-    k -n argo-workflows get workflows -o json > "$results/workflows.json"
+    if [[ -f $fixture/controller-ready ]]; then
+      k -n argo-workflows get workflows -o json > "$results/workflows.json"
+    fi
     k -n argo-workflows get pods -o wide > "$results/pods.txt"
+    printf 'cleanup\tstarted\t0\n' >> "$results/stages.tsv"
     timeout 120s kind delete cluster --name perfeng-local
     cleanup_rc=$?
+    if [[ $cleanup_rc == 0 ]]; then cleanup_state=succeeded; else cleanup_state=failed; fi
+    printf 'cleanup\t%s\t%s\n' "$cleanup_state" "$cleanup_rc" >> "$results/stages.tsv"
     if [[ $rc == 0 && $cleanup_rc != 0 ]]; then rc=$cleanup_rc; fi
   fi
+  uv run --locked --offline python - "$results/run-outcome.json" "$(git rev-parse HEAD)" "${cluster_uid:-}" "$rc" "$cleanup_rc" <<'PY'
+import json, sys
+from pathlib import Path
+path, commit, uid, rc, cleanup = sys.argv[1:]
+Path(path).write_text(json.dumps({"schemaVersion": 1, "commit": commit, "clusterUID": uid,
+    "exitCode": int(rc), "cleanupExitCode": int(cleanup),
+    "outcome": "passed" if rc == "0" and cleanup == "0" and uid else "failed"}) + "\n")
+PY
+  outcome_rc=$?
+  if [[ $rc == 0 && $outcome_rc != 0 ]]; then rc=$outcome_rc; fi
   rm -f "$fixture/token" "$fixture/username" "$fixture/registry-approved.secret.json" "$fixture/registry-denied.secret.json"
   if [[ $mode == preflight-parent ]]; then
     rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json" "$fixture/argocd-environment-repository-secret.json"
@@ -93,11 +119,21 @@ touch "$fixture/owned"
 timeout 360s kind create cluster --name perfeng-local --kubeconfig "$KUBECONFIG" \
   --image "$(jq -r .compatibility.nodeImage deployments/local-infrastructure.json)" --wait 120s
 for namespace in argo-workflows argocd perf-platform; do k create namespace "$namespace"; done
+cluster_uid=$(k get namespace kube-system -o jsonpath='{.metadata.uid}')
+k version -o json > "$results/kubernetes-version.json"
+# No ledger records or controllers are needed to prove these real API denials.
+k apply -f gitops/release-workflows-bootstrap/ledger-namespace.yaml
+k apply -f gitops/release-workflows/rbac/adoption
+source "$source_dir/adoption-authority.sh"
+complete_stage
+run_stage authority-smoke verify_adoption_create_authority
+start_stage controllers
 download "$(jq -r .workflows.url "$source_dir/toolchain.json")" "$fixture/namespace-install.yaml" \
   "$(jq -r .workflows.sha256 "$source_dir/toolchain.json")"
 k -n argo-workflows apply --server-side -f "$fixture/namespace-install.yaml"
 k -n argo-workflows rollout status deployment/workflow-controller --timeout=300s
 k -n argo-workflows rollout status deployment/argo-server --timeout=300s
+touch "$fixture/controller-ready"
 k apply -f "$source_dir/application-crd.yaml"
 k wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 
@@ -118,13 +154,18 @@ printf '%s' "$GITHUB_TOKEN" > "$fixture/token"
 k -n argo-workflows create secret generic release-git-read \
   --from-file="username=$fixture/username" --from-file="password=$fixture/token"
 source "$source_dir/registry.sh"
+complete_stage
+start_stage registry-prerequisite
 if [[ $mode == preflight-parent ]]; then
   registry_credentials
+  complete_stage
   rm -f "$fixture/token" "$fixture/username"
-  source "$source_dir/preflight-parent.sh"
+  run_stage preflight-parent source "$source_dir/preflight-parent.sh"
   exit 0
 fi
 registry_credentials
+complete_stage
+start_stage maintenance
 rm -f "$fixture/token" "$fixture/username"
 unset GITHUB_TOKEN
 for application in gitops/bootstrap/local-root-application.yaml gitops/environments/local/control-plane-application.yaml; do
@@ -211,11 +252,12 @@ for permission in 'patch deployments perf-platform' 'delete pods perf-platform' 
   [[ $answer == no ]] || { echo "Denial not proven: $permission" >&2; exit 1; }
 done
 echo 'Maintenance child integration passed; synthetic input is not release acceptance.'
+complete_stage
 # Reuse this exact private cluster/context; the sourced phase has no bootstrap CLI.
-source "$source_dir/ledger.sh"
-source "$source_dir/database.sh"
-source "$source_dir/bucket.sh"
-registry_cases
-source "$source_dir/readiness.sh"
-source "$source_dir/observer.sh"
-source "$source_dir/preflight.sh"
+run_stage ledger source "$source_dir/ledger.sh"
+run_stage database source "$source_dir/database.sh"
+run_stage bucket source "$source_dir/bucket.sh"
+run_stage registry registry_cases
+run_stage readiness source "$source_dir/readiness.sh"
+run_stage observer source "$source_dir/observer.sh"
+run_stage preflight source "$source_dir/preflight.sh"
