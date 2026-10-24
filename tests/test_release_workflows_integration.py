@@ -786,6 +786,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
         for script in (
             SCRIPT,
             FIXTURE / "ledger.sh",
+            FIXTURE / "adoption-authority.sh",
             FIXTURE / "recovery.sh",
             FIXTURE / "database.sh",
             FIXTURE / "external-state-fixtures.sh",
@@ -814,6 +815,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             self.assertNotIn(b"\r", script.read_bytes())
         for script in (
             "ledger.sh",
+            "adoption-authority.sh",
             "recovery.sh",
             "database.sh",
             "external-state-fixtures.sh",

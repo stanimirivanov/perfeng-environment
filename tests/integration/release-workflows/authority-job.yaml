@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ci-adoption-denied
+  namespace: perf-platform
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: probe
+          image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
+          command: [python, -c, 'raise SystemExit(1)']

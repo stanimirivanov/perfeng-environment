@@ -195,14 +195,7 @@ observations "$results/ledger-retained.workflow.json" | jq -S . > "$results/ledg
 jq -S . "$results/ledger-complete.records.json" > "$fixture/ledger-complete.sorted.json"
 cmp "$fixture/ledger-complete.sorted.json" "$results/ledger-retained.records.json"
 recovery_check retained "$results/ledger-retained.records.json"
+source "$source_dir/adoption-authority.sh"
+verify_adoption_authority "$receipt_name" snapshot
 recovery_refusals
-ledger_identity=system:serviceaccount:argo-workflows:release-adoption
-for permission in 'get configmaps perfeng-release-ledger yes' 'create configmaps perfeng-release-ledger yes' \
-  'patch configmaps perfeng-release-ledger no' 'delete configmaps perfeng-release-ledger no' \
-  'create configmaps argo-workflows no' 'list secrets argo-workflows no' \
-  'patch deployments perf-platform no' 'patch applications.argoproj.io argocd no'; do
-  read -r verb resource namespace expected_answer <<< "$permission"
-  answer=$(k auth can-i "$verb" "$resource" --namespace "$namespace" --as "$ledger_identity" || :)
-  [[ $answer == "$expected_answer" ]] || { echo "Unexpected ledger authority: $permission" >&2; exit 1; }
-done
 echo 'Native ledger persistence passed; fixture records are not accepted releases.'

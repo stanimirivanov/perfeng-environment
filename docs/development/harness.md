@@ -93,6 +93,16 @@ is live read-only acceptance, not deployment or certificate provisioning.
 
 ## Extending the harness
 
+Integration behavior needs actual disposable acceptance before PR handoff when
+the owner has authorized dispatch. Use the existing `release-workflows-kind.yml`
+manual event on the exact issue-branch commit; preserve all hosted-runner,
+ownership, credential and cleanup guards. The current stabilization requires two
+clean-cluster passes of one commit, including successful cleanup and distinct
+cluster UIDs. A subsequent source change invalidates that evidence. Record run
+URLs, commit and safe outcomes in the PR. Do not call offline mocks real API
+acceptance or broaden permissions to make a negative test pass. See the
+[qualification evidence](../release-workflows-integration.md#disposable-run-qualification-and-stage-evidence).
+
 `task kubernetes:acceptance` previews the M04 decision-loop/recovery exercise
 without processes, network or writes. Its separately confirmed execution path
 can submit Runs, explicitly approve a selected baseline and gracefully restart
