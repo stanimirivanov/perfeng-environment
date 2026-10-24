@@ -1060,3 +1060,22 @@ the fixture; retained environments have no authorization to use this test.
 
 Offline verification does not run this main-only parent scenario. Its live proof
 remains pending until the post-merge trusted-main leg succeeds.
+
+
+## Complete adoption initial receipt-create conflict acceptance
+
+The main-only `receipt-create-conflict` leg must reach the real pre-receipt
+barrier, then create exactly the planned receipt through the owned fixture
+writer before resumption. No response proxy should exist. The pinned native
+Argo worker reports AlreadyExists with exit 64 and the context
+`error when creating "/tmp/manifest.yaml"`, naming the selected ConfigMap.
+Exit 1, timeout, Forbidden or an error for another object does not qualify.
+Inspect the safe `adoption-receipt-create-conflict.outcome.json` and privately
+retained worker evidence. Preserve the winning receipt; do not delete it to
+retry. The fresh unchanged `recovered` parent must skip receipt creation and
+create only the missing pointer, retaining the full original receipt snapshot.
+See [initial receipt conflict acceptance](release-workflows-integration.md#complete-parent-initial-receipt-create-conflict).
+
+A failure in an earlier prerequisite, including the selected migrator Job,
+means this scenario has not run. Do not mark adoption qualified from its offline
+tests or mask the prerequisite by relaxing deadlines or refusal checks.

@@ -1,4 +1,4 @@
-"""Generate and verify the explicitly adapted complete-parent transport fixture."""
+"""Generate and verify bounded complete-parent create-fault fixtures."""
 
 import copy
 import json
@@ -37,14 +37,18 @@ def controller_form(value: Any) -> Any:
 def template(
     parent: dict[str, Any], native: dict[str, Any], operation: str = "receipt"
 ) -> dict[str, Any]:
-    """Preserve parent semantics except a bounded barrier and one create transport."""
-    assert operation in {"receipt", "pointer"}
+    """Add a bounded barrier; adapt transport only for the response-loss cases."""
+    assert operation in {"receipt", "pointer", "conflict"}
     barrier = POINTER_BARRIER if operation == "pointer" else BARRIER
-    create_name = "create-" + operation
+    create_name = "create-" + ("receipt" if operation == "conflict" else operation)
     result = copy.deepcopy(parent)
     result["metadata"] = {"name": NAME, "namespace": "argo-workflows"}
     steps = result["spec"]["templates"][0]["steps"]
     index = next(i for i, group in enumerate(steps) if group[0]["name"] == create_name)
+    if operation == "conflict":
+        steps.insert(index, [{"name": barrier, "template": barrier}])
+        result["spec"]["templates"].append({"name": barrier, "suspend": {}})
+        return result
     create = steps[index][0]
     assert create.pop("templateRef") == {
         "name": native["metadata"]["name"],
@@ -68,8 +72,9 @@ def template(
 def expected_record(
     workflow: dict[str, Any], raw: bytes, operation: str = "receipt"
 ) -> dict[str, Any]:
-    """Bind transport authorization to the actual plan, input bytes and origin UID."""
-    assert operation in {"receipt", "pointer"}
+    """Bind the expected create to the actual plan, input bytes and origin UID."""
+    assert operation in {"receipt", "pointer", "conflict"}
+    operation = "receipt" if operation == "conflict" else operation
     barrier_name = POINTER_BARRIER if operation == "pointer" else BARRIER
     assert workflow["spec"]["workflowTemplateRef"]["name"] == NAME
     assert workflow["spec"].get("shutdown") is None
@@ -127,8 +132,11 @@ def verify(
     events: list[dict[str, Any]],
     expected: dict[str, Any],
     operation: str = "receipt",
+    *,
+    winner: dict[str, Any] | None = None,
+    diagnostic: str = "",
 ) -> dict[str, Any]:
-    """Require real readiness and an exact committed record after response loss."""
+    """Require real readiness, the exact create fault and preserved committed state."""
     parent = yaml.safe_load(
         Path("gitops/release-workflows/release-adopt-existing-v2.yaml").read_text()
     )
@@ -156,13 +164,22 @@ def verify(
     assert expected == expected_record(workflow, raw, operation)
     barrier = POINTER_BARRIER if operation == "pointer" else BARRIER
     assert readiness.named(workflow, barrier, "Suspend")["phase"] == "Succeeded"
-    failed = readiness.named(workflow, "create-" + operation)
+    kind = "receipt" if operation == "conflict" else operation
+    failed = readiness.named(workflow, "create-" + kind)
     assert failed["phase"] in {"Failed", "Error"}
-    assert failed["templateName"] == "fault-create-" + operation
+    if operation == "conflict":
+        assert failed["templateRef"] == {
+            "name": native["metadata"]["name"],
+            "template": "create-receipt",
+        }
+    else:
+        assert failed["templateName"] == "fault-create-" + operation
     assert all(w["account"] == "release-adoption" and w["uid"] for w in workers)
     nonzero = [w for w in workers if w["exitCode"] not in (None, 0)]
     assert (
-        len(nonzero) == 1 and nonzero[0]["nodeID"] == failed["id"] and nonzero[0]["exitCode"] == 1
+        len(nonzero) == 1
+        and nonzero[0]["nodeID"] == failed["id"]
+        and nonzero[0]["exitCode"] == (64 if operation == "conflict" else 1)
     )
     assert not failed.get("outputs", {}).get("parameters")
     assert "result" not in readiness.outputs(
@@ -193,16 +210,31 @@ def verify(
         assert api["pointer"] is None
         committed = receipt
     assert proxy.record_matches(expected, committed)
-    assert len(events) == 1
-    assert events[0] == {
-        "event": operation + "-committed-response-dropped",
-        "upstreamStatus": 201,
-        "uid": committed["metadata"]["uid"],
-        "contentDigest": proxy.digest(expected),
-        "successfulResponsesForwarded": 0,
-    }
+    if operation == "conflict":
+        assert events == [] and winner == committed
+        wanted_error = (
+            'Error from server (AlreadyExists): error when creating "/tmp/manifest.yaml": '
+            f'configmaps "{expected["metadata"]["name"]}" already exists'
+        )
+        # This is the raw error emitted by the pinned Argo executor, observed in
+        # qualified native-ledger runs; structured log copies also escape quotes.
+        assert wanted_error in diagnostic
+        assert wanted_error in failed["message"]
+    else:
+        assert len(events) == 1
+        assert events[0] == {
+            "event": operation + "-committed-response-dropped",
+            "upstreamStatus": 201,
+            "uid": committed["metadata"]["uid"],
+            "contentDigest": proxy.digest(expected),
+            "successfulResponsesForwarded": 0,
+        }
     report = {
-        "decision": "complete-parent-" + operation + "-response-loss-observed",
+        "decision": (
+            "complete-parent-receipt-create-conflict-observed"
+            if operation == "conflict"
+            else "complete-parent-" + operation + "-response-loss-observed"
+        ),
         "workflowUID": workflow["metadata"]["uid"],
         "receiptUID": receipt["metadata"]["uid"],
         "contentDigest": proxy.digest(expected),
@@ -215,8 +247,14 @@ def verify(
 if __name__ == "__main__":
     mode, directory, evidence = sys.argv[1:4]
     operation = sys.argv[4] if len(sys.argv) == 5 else "receipt"
-    assert operation in {"receipt", "pointer"}
-    label = "pointer-response-loss" if operation == "pointer" else "response-loss"
+    assert operation in {"receipt", "pointer", "conflict"}
+    label = (
+        "receipt-create-conflict"
+        if operation == "conflict"
+        else "pointer-response-loss"
+        if operation == "pointer"
+        else "response-loss"
+    )
     barrier = POINTER_BARRIER if operation == "pointer" else BARRIER
     fixture, results = Path(directory), Path(evidence)
 
@@ -234,7 +272,8 @@ if __name__ == "__main__":
         assert workflow["status"]["phase"] == "Running"
         assert readiness.named(workflow, barrier, "Suspend")["phase"] == "Running"
         assert not any(
-            n["displayName"] == "create-" + operation and n["type"] == "Pod"
+            n["displayName"] == "create-" + ("receipt" if operation == "conflict" else operation)
+            and n["type"] == "Pod"
             for n in workflow["status"]["nodes"].values()
         )
         print(
@@ -251,13 +290,21 @@ if __name__ == "__main__":
             Path("deployments/local-control-plane.json").read_bytes(),
             load(fixture / "adoption-parent-api.json"),
             load(results / f"adoption-parent-{label}.workers.json"),
-            [
+            []
+            if operation == "conflict"
+            else [
                 json.loads(line)
                 for line in (fixture / "ledger-response-events.jsonl").read_text().splitlines()
             ],
             load(fixture / "ledger-response-expected.json"),
             operation,
+            winner=load(fixture / "adoption-conflict-winner.json")
+            if operation == "conflict"
+            else None,
+            diagnostic=(fixture / "adoption-parent-worker.log").read_text()
+            if operation == "conflict"
+            else "",
         )
         (results / f"adoption-{label}.outcome.json").write_text(json.dumps(report, sort_keys=True))
     else:
-        raise ValueError("Unknown response-loss fixture mode")
+        raise ValueError("Unknown create-fault fixture mode")

@@ -61,6 +61,7 @@ class PreflightRequestRefTests(unittest.TestCase):
                         "receipt-only",
                         "response-loss",
                         "pointer-response-loss",
+                        "receipt-create-conflict",
                     ]
                 },
             },
@@ -84,6 +85,7 @@ class PreflightRequestRefTests(unittest.TestCase):
             ("receipt-only", REF + "-receipt-only"),
             ("response-loss", REF + "-response-loss"),
             ("pointer-response-loss", REF + "-pointer-response-loss"),
+            ("receipt-create-conflict", REF + "-receipt-create-conflict"),
         ):
             with (
                 tempfile.TemporaryDirectory() as temporary,

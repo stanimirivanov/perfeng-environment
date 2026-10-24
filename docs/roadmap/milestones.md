@@ -588,6 +588,14 @@ retention gates continue; production templates and rights remain unchanged.
 Full-parent live proof awaits the post-merge main-only leg. Initial-parent races,
 promotion, retained recovery and measured retirement remain separate.
 
+ADR 0033 adds the approved fifth `receipt-create-conflict` scenario: after real
+readiness/planning, a fixture writer creates the exact receipt before resuming the
+unchanged native create. Require actual AlreadyExists, preserved winner identity
+and a fresh unchanged parent creating only the pointer. No proxy, new grants or
+production template changes are introduced. Live proof awaits post-merge main
+acceptance and its migrator prerequisite. Pointer conflicts, promotion, retained
+recovery, operational cutover and measured retirement remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

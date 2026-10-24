@@ -16,6 +16,7 @@ from unittest.mock import patch
 import yaml
 from test_adoption_parent_integration import FIXTURE, READINESS, ROOT, evidence
 from test_adoption_parent_integration import MODULE as ADOPTION
+from test_adoption_receipt_recovery import recovered
 from test_ledger_response_proxy import PROXY
 from test_release_workflows_integration import BASH
 
@@ -132,7 +133,144 @@ def pointer_failure():
     return args + [workers, events, expected]
 
 
+def conflict_failure():
+    args = failure()
+    workflow, _, _, _, _, _, workers, events, _ = args
+    workflow["status"]["storedWorkflowTemplateSpec"] = MODULE.template(*sources(), "conflict")[
+        "spec"
+    ]
+    node = workflow["status"]["nodes"]["create-receipt"]
+    del node["templateName"]
+    node["templateRef"] = {"name": sources()[1]["metadata"]["name"], "template": "create-receipt"}
+    # Pinned Argo v4.1.5's actual native AlreadyExists shape from qualified kind
+    # runs: executor exit 64, a manifest-path context, and an unescaped final line.
+    node["message"] = (
+        "main: Error (exit code 64): no more retries Error from server (AlreadyExists): "
+        'error when creating "/tmp/manifest.yaml": configmaps "'
+        + args[-1]["metadata"]["name"]
+        + '" already exists'
+    )
+    workers[0]["exitCode"] = 64
+    events.clear()
+    return args
+
+
+def conflict_keywords(args):
+    return {
+        "winner": copy.deepcopy(args[5]["receipt"]),
+        "diagnostic": args[0]["status"]["nodes"]["create-receipt"]["message"],
+    }
+
+
 class AdoptionResponseLossTests(unittest.TestCase):
+    def test_conflict_barrier_reverses_to_exact_production_parent(self):
+        parent, native = sources()
+        generated = MODULE.template(parent, native, "conflict")
+        spec = generated["spec"]
+        self.assertEqual(spec["templates"].pop(), {"name": MODULE.BARRIER, "suspend": {}})
+        steps = spec["templates"][0]["steps"]
+        barrier = next(i for i, group in enumerate(steps) if group[0]["name"] == MODULE.BARRIER)
+        del steps[barrier]
+        self.assertEqual(
+            steps[barrier][0]["templateRef"],
+            {"name": native["metadata"]["name"], "template": "create-receipt"},
+        )
+        self.assertEqual(spec, parent["spec"])
+
+    def test_conflict_requires_native_already_exists_and_unchanged_winner(self):
+        args = conflict_failure()
+        report = MODULE.verify(*args, operation="conflict", **conflict_keywords(args))
+        self.assertEqual(report["decision"], "complete-parent-receipt-create-conflict-observed")
+        for mutation in (
+            "diagnostic",
+            "object-name",
+            "exit",
+            "timeout",
+            "uid",
+            "winner",
+            "transport",
+            "downstream",
+            "result",
+            "readiness",
+            "plan",
+            "message",
+        ):
+            with self.subTest(mutation=mutation):
+                values = copy.deepcopy(args)
+                kwargs = conflict_keywords(values)
+                nodes = values[0]["status"]["nodes"]
+                if mutation == "diagnostic":
+                    kwargs["diagnostic"] = "Forbidden: configmaps already exists"
+                elif mutation == "object-name":
+                    kwargs["diagnostic"] = kwargs["diagnostic"].replace(
+                        values[-1]["metadata"]["name"], "foreign"
+                    )
+                elif mutation == "exit":
+                    values[6][0]["exitCode"] = 1
+                elif mutation == "timeout":
+                    values[6][0]["exitCode"] = 137
+                elif mutation == "uid":
+                    values[5]["receipt"]["metadata"]["uid"] = "replaced"
+                elif mutation == "winner":
+                    kwargs["winner"]["binaryData"]["request.json"] = "eA=="
+                elif mutation == "transport":
+                    values[0]["status"]["storedWorkflowTemplateSpec"] = MODULE.template(*sources())[
+                        "spec"
+                    ]
+                elif mutation == "downstream":
+                    nodes["stored-receipt"] = {
+                        "displayName": "stored-receipt",
+                        "type": "Pod",
+                        "phase": "Succeeded",
+                    }
+                elif mutation == "result":
+                    nodes["adoption"]["outputs"] = {
+                        "parameters": [{"name": "result", "value": "{}"}]
+                    }
+                elif mutation == "readiness":
+                    nodes["readiness"]["phase"] = "Failed"
+                elif mutation == "plan":
+                    nodes["plan"]["outputs"]["parameters"][0]["value"] = "foreign"
+                elif mutation == "message":
+                    nodes["create-receipt"]["message"] = "DeadlineExceeded"
+                with self.assertRaises(AssertionError):
+                    MODULE.verify(*values, operation="conflict", **kwargs)
+
+    def test_conflict_retry_creates_only_pointer_and_preserves_winning_receipt(self):
+        original = conflict_failure()[5]["receipt"]
+        args = recovered()
+        self.assertEqual(args[5]["receipt"], original)
+        report = ADOPTION.success(*args, receipt_only=True)
+        self.assertEqual(report["receiptUID"], original["metadata"]["uid"])
+        self.assertNotEqual(
+            args[0]["metadata"]["uid"],
+            original["metadata"]["annotations"]["perfeng.io/first-workflow-uid"],
+        )
+        for name in ("create-receipt", "create-pointer"):
+            bad = copy.deepcopy(args)
+            node = bad[0]["status"]["nodes"][name]
+            if name == "create-receipt":
+                node.update(type="Pod", phase="Succeeded")
+            else:
+                node.update(type="Skipped", phase="Skipped")
+            with self.assertRaises(AssertionError):
+                ADOPTION.success(*bad, receipt_only=True)
+
+    def test_conflict_shell_creates_winner_before_resume_without_proxy(self):
+        shell = (FIXTURE / "adoption-response.sh").read_text()
+        conflict_branch = shell.split("if [[ $response_kind == conflict ]]; then", 1)[1].split(
+            "\nelse", 1
+        )[0]
+        self.assertIn(
+            'k create -f "$fixture/ledger-response-expected.json" -o json', conflict_branch
+        )
+        self.assertNotIn("proxy", conflict_branch)
+        self.assertLess(
+            shell.index('> "$fixture/adoption-conflict-winner.json"'),
+            shell.index('a resume "$response_workflow"'),
+        )
+        self.assertIn('"$fixture/adoption-$scenario.records.json"', shell)
+
     def test_pointer_fault_requires_committed_data_and_no_downstream_result(self):
         args = pointer_failure()
         self.assertEqual(MODULE.expected_record(args[0], args[3], "pointer"), args[-1])
@@ -238,7 +376,8 @@ class AdoptionResponseLossTests(unittest.TestCase):
         assert BASH is not None
         parent = (FIXTURE / "adoption-parent.sh").read_text()
         invocation = parent.split(
-            "elif [[ $scenario == response-loss || $scenario == pointer-response-loss ]]; then\n", 1
+            "elif [[ $scenario == response-loss || $scenario == pointer-response-loss || $scenario == receipt-create-conflict ]]; then\n",
+            1,
         )[1].split("\nelse", 1)[0]
         definition = re.search(r"^adoption_response_case\(\) \{\n.*?^\}", parent, re.M | re.S)
         definitions = definition.group(0) if definition else ""
@@ -247,6 +386,8 @@ class AdoptionResponseLossTests(unittest.TestCase):
             ("success", 0),
             ("pointer-success", 0),
             ("pointer-exit", 23),
+            ("conflict-success", 0),
+            ("conflict-exit", 23),
             ("command-failure", 1),
             ("explicit-exit", 23),
             ("wrong-mode", 2),
@@ -264,7 +405,7 @@ class AdoptionResponseLossTests(unittest.TestCase):
 "$BASH" -c '[[ -z ${GITHUB_TOKEN:-} && -z ${GH_TOKEN:-} ]]'
 echo started > "$fixture/started"
 if [[ $test_case == command-failure ]]; then false; fi
-if [[ $test_case == explicit-exit || $test_case == pointer-exit ]]; then exit 23; fi
+if [[ $test_case == explicit-exit || $test_case == pointer-exit || $test_case == conflict-exit ]]; then exit 23; fi
 adoption_labels+=("$scenario" "$response_recovery")
 adoption_baseline=$response_recovery
 adoption_origin=$scenario
@@ -282,6 +423,7 @@ KUBECONFIG=$fixture/kubeconfig
 mode=preflight-parent
 scenario=response-loss
 [[ $test_case != pointer-* ]] || scenario=pointer-response-loss
+[[ $test_case != conflict-* ]] || scenario=receipt-create-conflict
 [[ $test_case != wrong-mode ]] || mode=boundaries
 [[ $test_case != wrong-scenario ]] || scenario=initial
 adoption_labels=()
@@ -329,15 +471,19 @@ echo returned > "$fixture/returned"
                         "success",
                         "pointer-success",
                         "pointer-exit",
+                        "conflict-success",
+                        "conflict-exit",
                         "command-failure",
                         "explicit-exit",
                     },
                 )
                 self.assertEqual(
-                    (directory / "returned").exists(), case in {"success", "pointer-success"}
+                    (directory / "returned").exists(),
+                    case in {"success", "pointer-success", "conflict-success"},
                 )
                 self.assertEqual(
-                    (directory / "completed").exists(), case in {"success", "pointer-success"}
+                    (directory / "completed").exists(),
+                    case in {"success", "pointer-success", "conflict-success"},
                 )
                 self.assertNotIn("sentinel", result.stdout + result.stderr)
 
@@ -550,14 +696,31 @@ sleep() { :; }
     def test_pointer_cli_binds_committed_pointer_to_actual_plan(self):
         self.check_cli("pointer")
 
+    def test_conflict_cli_roundtrip(self):
+        self.check_cli("conflict")
+
     def check_cli(self, operation):
-        args = pointer_failure() if operation == "pointer" else failure()
-        label = "pointer-response-loss" if operation == "pointer" else "response-loss"
+        args = (
+            conflict_failure()
+            if operation == "conflict"
+            else pointer_failure()
+            if operation == "pointer"
+            else failure()
+        )
+        label = (
+            "receipt-create-conflict"
+            if operation == "conflict"
+            else "pointer-response-loss"
+            if operation == "pointer"
+            else "response-loss"
+        )
         workflow, parameters, preflight, raw, _, api, workers, events, expected = args
         barrier = copy.deepcopy(workflow)
         barrier["status"]["phase"] = "Running"
         barrier["status"]["nodes"]["barrier"]["phase"] = "Running"
-        del barrier["status"]["nodes"]["create-" + operation]
+        del barrier["status"]["nodes"][
+            "create-" + ("receipt" if operation == "conflict" else operation)
+        ]
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             for name, value in (
@@ -570,6 +733,11 @@ sleep() { :; }
                 ("ledger-response-expected.json", expected),
             ):
                 (directory / name).write_text(json.dumps(value), encoding="utf-8")
+            if operation == "conflict":
+                (directory / "adoption-conflict-winner.json").write_text(json.dumps(api["receipt"]))
+                (directory / "adoption-parent-worker.log").write_text(
+                    workflow["status"]["nodes"]["create-receipt"]["message"]
+                )
             (directory / "parent-request.json").write_bytes(raw)
             (directory / "ledger-response-events.jsonl").write_text(
                 "\n".join(json.dumps(event) for event in events), encoding="utf-8"
@@ -599,7 +767,11 @@ sleep() { :; }
             run("verify")
             self.assertEqual(
                 json.loads((directory / f"adoption-{label}.outcome.json").read_text()),
-                MODULE.verify(*args, operation=operation),
+                MODULE.verify(
+                    *args,
+                    operation=operation,
+                    **conflict_keywords(args) if operation == "conflict" else {},
+                ),
             )
             barrier["status"]["nodes"]["barrier"]["phase"] = "Succeeded"
             (directory / "adoption-response-barrier.workflow.json").write_text(

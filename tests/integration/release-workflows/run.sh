@@ -11,7 +11,7 @@ fi
 mode=${RELEASE_KIND_MODE:-boundaries}
 [[ $mode == boundaries || $mode == preflight-parent ]] || refuse 'unknown CI mode.'
 scenario=${RELEASE_ADOPTION_SCENARIO:-initial}
-[[ $scenario == initial || $scenario == receipt-only || $scenario == response-loss || $scenario == pointer-response-loss ]] || refuse 'unknown adoption scenario.'
+[[ $scenario == initial || $scenario == receipt-only || $scenario == response-loss || $scenario == pointer-response-loss || $scenario == receipt-create-conflict ]] || refuse 'unknown adoption scenario.'
 [[ $mode == preflight-parent || $scenario == initial ]] || refuse 'recovery scenarios require trusted-main parent acceptance.'
 export RELEASE_ADOPTION_SCENARIO=$scenario
 if [[ $mode == preflight-parent ]]; then

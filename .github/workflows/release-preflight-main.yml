@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        adoption-scenario: [initial, receipt-only, response-loss, pointer-response-loss]
+        adoption-scenario: [initial, receipt-only, response-loss, pointer-response-loss, receipt-create-conflict]
     permissions:
       contents: write
       packages: read
