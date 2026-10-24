@@ -1079,3 +1079,28 @@ See [initial receipt conflict acceptance](release-workflows-integration.md#compl
 A failure in an earlier prerequisite, including the selected migrator Job,
 means this scenario has not run. Do not mark adoption qualified from its offline
 tests or mask the prerequisite by relaxing deadlines or refusal checks.
+
+
+## Selected migrator deadline and missing worker evidence
+
+If trusted-main stops at `Selected migration image: runtime-role` with
+`DeadlineExceeded`, an empty final worker list does not show whether the Pod
+pulled its image, scheduled, started or reached PostgreSQL. The Job controller
+may delete its Pod before the native Argo wait returns. Inspect the new
+`migration-image-runtime-role.startup.json` alongside the Job and Workflow.
+
+`ErrImagePull`/`ImagePullBackOff` with `authorization` warrants checking the exact
+selected private package's Actions Read grant; `manifest-missing`, `tls` and
+`network` are distinct diagnostic hints. `Unschedulable` indicates scheduling;
+`CreateContainerConfigError` indicates startup configuration. Running/terminated
+states and exit codes distinguish executable startup from Pending failures.
+No raw vendor message or credential is retained in the public report. `Other`,
+a failed watch, incomplete stream or no owned Pod observation means the evidence
+is limited; do not infer authorization, execution or a successful refusal.
+
+The report is diagnostic only. A timeout must not qualify as the expected
+PostgreSQL CREATE denial, and increasing a deadline or changing credentials is
+not an implicit repair. Inspect the classified boundary, establish the cause,
+then make a scoped correction. Main run 40095134325 proves the previous
+post-wait evidence-loss defect; it does not establish the migrator timeout cause.
+See [selected migration-image parity](release-workflows-integration.md#selected-migration-image-parity).

@@ -225,6 +225,30 @@ and Workflows plus three fresh checkpoint Workflows remain queryable before
 normal owned-cluster cleanup. Database Pod, role/password and Secret identities
 remain unchanged. No failed Job is replaced or retried.
 
+Startup diagnosis additionally uses a bounded native Pod watch during the existing
+Argo wait. Its raw stream and stderr stay in the private fixture directory and
+are removed after projection. `migration-image-<case>.startup.json` retains only
+UUIDs of Pods controlled by the exact selected Job, allowlisted lifecycle and
+scheduling/waiting reasons, numeric exit codes and constant authorization,
+manifest-missing, TLS or network signals. Messages, node names, image URLs,
+credentials and Pod specs are not uploaded. Unknown reasons become `Other`.
+
+The observer is bounded to 275 seconds plus a five-second forced termination
+grace, and is stopped/reaped immediately after the unchanged 270-second native
+wait. The migration Job retains its 180-second deadline. Native wait status is
+preserved. Capture and project before later worker-log/assertion failures; a Pod
+deleted by deadline cleanup still has its earlier startup states recorded.
+Watch failure, incomplete streams, missing owned Pods and observation/size limits
+are explicit diagnostic limitations. These reports never satisfy migration
+success or the expected PostgreSQL runtime-role refusal. Signal patterns are
+hints for investigation, not proof of a particular package authorization defect.
+
+Completed main run 40095134325 retained a deadline-expired Job and an empty worker
+list because the old harness inspected Pods only after the terminal wait. This
+establishes evidence loss, not the underlying startup/timeout cause. New live
+evidence first runs after merge under the unchanged main-only guard; no timeout
+increase, retry, grant change or speculative migrator repair is introduced.
+
 Live OCI/schema acceptance first runs after merge. This phase establishes
 selected migrator/schema parity only: it does not upgrade a retained database,
 test a populated upgrade or restore, grant runtime table privileges, run the
