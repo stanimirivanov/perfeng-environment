@@ -73,13 +73,26 @@ assert checkpoint["clusterUID"] == sys.argv[3]
 PY
   migration_name=$(a submit "$source_dir/migration-image-workflow.yaml" -p "image=$image" \
     -p "credential-key=$migration_key" -p "application-name=migration-ci-$migration_label" -o json | jq -er .metadata.name)
+  # Native Job deadline cleanup can delete a Pending Pod before argo wait returns.
+  # Keep the watch private; project only the selected Job's allowlisted signals.
+  timeout --kill-after=5s 275s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
+    -n perf-platform get pods -l batch.kubernetes.io/job-name --watch --output-watch-events -o json \
+    > "$fixture/migration-startup.watch.json" 2> "$fixture/migration-startup.watch.log" &
+  migration_watch_pid=$!
   if timeout 270s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$migration_name"; then migration_rc=0; else migration_rc=$?; fi
+  kill "$migration_watch_pid" 2> /dev/null || true
+  if wait "$migration_watch_pid"; then migration_watch_rc=0; else migration_watch_rc=$?; fi
   a get "$migration_name" -o json > "$results/migration-image-$migration_label.workflow.json"
   k -n perf-platform get jobs -l perfeng.io/purpose=ci-migration-image -o json \
     | jq -er --arg label "migration-ci-$migration_label" '.items[] | select(any(.spec.template.spec.containers[].env[]; .name == "PGAPPNAME" and .value == $label)) | .metadata.name' > "$fixture/migration-job-name"
   [[ $(wc -l < "$fixture/migration-job-name") == 1 ]]
   job=$(cat "$fixture/migration-job-name")
   k -n perf-platform get job "$job" -o json > "$results/migration-image-$migration_label.job.json"
+  uv run --locked --offline python "$source_dir/migration_image_evidence.py" startup \
+    "$fixture/migration-startup.watch.json" "$results/migration-image-$migration_label.job.json" \
+    "$source_dir/migration-image.json" "$migration_watch_rc" "$migration_rc" \
+    > "$results/migration-image-$migration_label.startup.json"
+  rm -f "$fixture/migration-startup.watch.json" "$fixture/migration-startup.watch.log"
   k -n perf-platform get pods -l "batch.kubernetes.io/job-name=$job" -o json > "$fixture/migration-pods.json"
   jq '[.items[] | {uid:.metadata.uid,containers:[.status.containerStatuses[]? | {name,exitCode:.state.terminated.exitCode,waitingReason:.state.waiting.reason}]}]' \
     "$fixture/migration-pods.json" > "$results/migration-image-$migration_label.worker.json"

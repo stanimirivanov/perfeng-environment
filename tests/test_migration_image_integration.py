@@ -1,5 +1,6 @@
 """Offline checks for selected-image migration identity, freshness and schema evidence."""
 
+import copy
 import importlib.util
 import json
 import re
@@ -24,6 +25,245 @@ SPEC.loader.exec_module(EVIDENCE)
 class MigrationImageIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.contract = json.loads((FIXTURE / "migration-image.json").read_text())
+
+    def startup_objects(self):
+        manifest = yaml.safe_load((FIXTURE / "migration-image-workflow.yaml").read_text())
+        job = yaml.safe_load(manifest["spec"]["templates"][0]["resource"]["manifest"])
+        job["metadata"].update(
+            name="migration-image-ci-test", uid="00000000-0000-0000-0000-000000000001"
+        )
+        job["spec"]["template"]["spec"]["containers"][0]["image"] = self.contract["image"]
+        pod = {
+            "kind": "Pod",
+            "metadata": {
+                "namespace": "perf-platform",
+                "uid": "00000000-0000-0000-0000-000000000002",
+                "ownerReferences": [
+                    {
+                        "kind": "Job",
+                        "name": job["metadata"]["name"],
+                        "uid": job["metadata"]["uid"],
+                        "controller": True,
+                    }
+                ],
+            },
+            "spec": {"nodeName": "private-node", "secret": "must-never-be-emitted"},
+            "status": {
+                "phase": "Pending",
+                "containerStatuses": [
+                    {
+                        "name": "migrate",
+                        "state": {
+                            "waiting": {
+                                "reason": "ErrImagePull",
+                                "message": "unauthorized https://user:secret@registry/private",
+                            }
+                        },
+                    }
+                ],
+            },
+        }
+        return job, pod
+
+    def test_startup_retains_owned_image_pull_evidence_after_pod_deletion(self):
+        job, pod = self.startup_objects()
+        stream = "\n".join(
+            json.dumps({"type": kind, "object": pod}) for kind in ("ADDED", "MODIFIED", "DELETED")
+        )
+        report = EVIDENCE.startup(stream, job, self.contract, 143, 1)
+        self.assertEqual(report["purpose"], "diagnostic-only")
+        self.assertEqual(report["nativeWaitExitCode"], 1)
+        self.assertEqual(report["watch"], "interrupted")
+        self.assertEqual(report["limitations"], [])
+        self.assertEqual(len(report["observations"]), 1)
+        value = report["observations"][0]
+        self.assertEqual(value["waitingReason"], "ErrImagePull")
+        self.assertEqual(value["signals"], ["authorization"])
+        for secret in ("secret", "private-node", "https", "user", "registry", "must-never"):
+            self.assertNotIn(secret, json.dumps(report))
+
+    def test_startup_rejects_foreign_pods_and_preserves_diagnostic_limits(self):
+        job, pod = self.startup_objects()
+        for change in ("uid", "name", "kind", "controller", "namespace"):
+            with self.subTest(change=change):
+                foreign = copy.deepcopy(pod)
+                if change == "namespace":
+                    foreign["metadata"]["namespace"] = "foreign"
+                else:
+                    foreign["metadata"]["ownerReferences"][0][change] = "foreign"
+                report = EVIDENCE.startup(
+                    json.dumps({"type": "ADDED", "object": foreign}), job, self.contract, 1, 64
+                )
+                self.assertEqual(report["observations"], [])
+                self.assertIn("no-owned-pod-observed", report["limitations"])
+                self.assertEqual(report["watch"], "failed")
+        stream = json.dumps({"type": "ADDED", "object": pod}) + '\n{"type":'
+        report = EVIDENCE.startup(stream, job, self.contract, 143, 1)
+        self.assertEqual(len(report["observations"]), 1)
+        self.assertIn("incomplete-or-invalid-stream", report["limitations"])
+        report = EVIDENCE.startup(
+            json.dumps({"type": "ERROR", "object": {"message": "secret"}}), job, self.contract, 0, 0
+        )
+        self.assertIn("api-watch-error", report["limitations"])
+        self.assertNotIn("secret", json.dumps(report))
+
+    def test_startup_distinguishes_states_and_redacts_unknown_values(self):
+        job, pod = self.startup_objects()
+        cases = (
+            (
+                {"waiting": {"reason": "ImagePullBackOff", "message": "manifest unknown"}},
+                "waiting",
+                "manifest-missing",
+            ),
+            (
+                {"waiting": {"reason": "CreateContainerConfigError", "message": "secret missing"}},
+                "waiting",
+                None,
+            ),
+            (
+                {
+                    "waiting": {
+                        "reason": "private-secret",
+                        "message": "x509 certificate signed by unknown authority",
+                    }
+                },
+                "waiting",
+                "tls",
+            ),
+            (
+                {"waiting": {"reason": "ContainerCreating", "message": "no such host"}},
+                "waiting",
+                "network",
+            ),
+            ({"running": {"startedAt": "private-secret"}}, "running", None),
+            ({"terminated": {"exitCode": 1, "message": "private-secret"}}, "terminated", None),
+        )
+        for state, expected_state, signal in cases:
+            with self.subTest(state=expected_state, signal=signal):
+                pod["status"]["containerStatuses"][0]["state"] = state
+                report = EVIDENCE.startup(
+                    json.dumps({"type": "MODIFIED", "object": pod}), job, self.contract, 0, 1
+                )
+                observed = report["observations"][0]
+                self.assertEqual(observed["containerState"], expected_state)
+                self.assertEqual(observed["signals"], [signal] if signal else [])
+                self.assertNotIn("private-secret", json.dumps(report))
+                if expected_state == "terminated":
+                    self.assertEqual(observed["exitCode"], 1)
+        pod["status"] = {
+            "phase": "Pending",
+            "conditions": [
+                {
+                    "type": "PodScheduled",
+                    "status": "False",
+                    "reason": "Unschedulable",
+                    "message": "private-secret",
+                }
+            ],
+        }
+        pod["spec"].pop("nodeName")
+        observed = EVIDENCE.startup(
+            json.dumps({"type": "ADDED", "object": pod}), job, self.contract, 0, 1
+        )["observations"][0]
+        self.assertFalse(observed["scheduled"])
+        self.assertEqual(observed["schedulingReason"], "Unschedulable")
+
+    def test_startup_cli_projects_only_safe_report_and_binds_selected_job(self):
+        job, pod = self.startup_objects()
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            watch, selected, contract = (
+                directory / name for name in ("watch.json", "job.json", "contract.json")
+            )
+            watch.write_text(json.dumps({"type": "ADDED", "object": pod}))
+            selected.write_text(json.dumps(job))
+            contract.write_text(json.dumps(self.contract))
+            import sys
+
+            command = [
+                sys.executable,
+                str(FIXTURE / "migration_image_evidence.py"),
+                "startup",
+                str(watch),
+                str(selected),
+                str(contract),
+                "143",
+                "64",
+            ]
+            process = subprocess.run(command, capture_output=True, text=True, timeout=20)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual(
+                json.loads(process.stdout),
+                EVIDENCE.startup(watch.read_text(), job, self.contract, 143, 64),
+            )
+            job["spec"]["template"]["spec"]["containers"][0]["image"] = "foreign"
+            selected.write_text(json.dumps(job))
+            process = subprocess.run(command, capture_output=True, text=True, timeout=20)
+            self.assertNotEqual(process.returncode, 0)
+            self.assertNotIn("foreign", process.stderr)
+
+    def test_startup_watch_is_stopped_before_post_wait_log_failure_paths(self):
+        shell = (FIXTURE / "migration-image.sh").read_text()
+        self.assertLess(shell.index("migration_watch_pid=$!"), shell.index("if timeout 270s argo"))
+        self.assertLess(
+            shell.index('wait "$migration_watch_pid"'), shell.index('a get "$migration_name"')
+        )
+        self.assertLess(
+            shell.index('migration_image_evidence.py" startup'), shell.index('logs "job/$job"')
+        )
+        self.assertIn('"$migration_watch_rc" "$migration_rc"', shell)
+        self.assertNotIn('"$results/migration-startup.watch', shell)
+
+    @unittest.skipUnless(BASH, "Bash unavailable")
+    def test_native_wait_codes_survive_watch_completion_and_failure(self):
+        assert BASH is not None
+        shell = (FIXTURE / "migration-image.sh").read_text()
+        block = (
+            "  timeout --kill-after=5s 275s kubectl"
+            + shell.split("  timeout --kill-after=5s 275s kubectl", 1)[1].split(
+                '\n  a get "$migration_name"', 1
+            )[0]
+        )
+        # Exercise the real coordinator block with inert command boundaries.
+        # A failed watch must not replace the native wait's captured exit code.
+        for native_code, watch_code in ((0, 0), (1, 0), (64, 7), (124, 7), (137, 0)):
+            with (
+                self.subTest(native=native_code, watch=watch_code),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                script = (
+                    """set -euo pipefail
+fixture=$1
+KUBECONFIG=$fixture/kubeconfig
+migration_name=owned-workflow
+timeout() {
+  if [[ $1 == --kill-after=* ]]; then shift; fi
+  shift
+  "$@"
+}
+kubectl() { echo '{"type":"BOOKMARK"}'; return "$watch_code"; }
+argo() {
+  wait "$migration_watch_pid" || true
+  return "$native_code"
+}
+"""
+                    + f"native_code={native_code}\nwatch_code={watch_code}\n"
+                    + block
+                    + """
+printf '%s %s' "$migration_rc" "$migration_watch_rc"
+"""
+                )
+                process = subprocess.run(
+                    [BASH, "-s", "--", Path(temporary).as_posix()],
+                    input=script,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                self.assertEqual(process.returncode, 0, process.stderr)
+                codes = process.stdout.split()
+                self.assertEqual(int(codes[0]), native_code)
+                self.assertEqual(int(codes[1]), watch_code)
 
     def schema(self):
         return {

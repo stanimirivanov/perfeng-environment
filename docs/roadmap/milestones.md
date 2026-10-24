@@ -596,6 +596,13 @@ production template changes are introduced. Live proof awaits post-merge main
 acceptance and its migrator prerequisite. Pointer conflicts, promotion, retained
 recovery, operational cutover and measured retirement remain separate.
 
+Before adding more dependent adoption scenarios, the next prerequisite slice
+retains sanitized migrator startup observations through native Job deadline
+cleanup. The previous completed main run lost the Pod before inspection and
+never reached adoption. The bounded observer preserves native deadlines and
+acceptance rules; it diagnoses startup and does not claim a timeout root cause,
+live qualification, promotion or retirement credit.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

@@ -1,10 +1,146 @@
-"""Verify disposable image/schema observations without database or Kubernetes clients."""
+"""Verify migration evidence and project private native-watch startup observations."""
 
 import json
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
+
+UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
+WAITING = {
+    "ContainerCreating",
+    "PodInitializing",
+    "ErrImagePull",
+    "ImagePullBackOff",
+    "CreateContainerConfigError",
+    "CreateContainerError",
+    "RunContainerError",
+    "CrashLoopBackOff",
+    "InvalidImageName",
+    "ImageInspectError",
+}
+
+
+def startup(stream: str, job: dict, contract: dict, watch_code: int, wait_code: int) -> dict:
+    """Retain bounded owned-Pod states; never emit messages, specs or URLs."""
+    metadata = job["metadata"]
+    job_uid = metadata["uid"]
+    assert UUID.fullmatch(job_uid) and metadata["namespace"] == "perf-platform"
+    container = job["spec"]["template"]["spec"]["containers"]
+    assert len(container) == 1 and container[0]["name"] == "migrate"
+    assert container[0]["image"] == contract["image"]
+    assert container[0]["command"] == ["/usr/local/bin/migrate"]
+    report = {
+        "schemaVersion": 1,
+        "purpose": "diagnostic-only",
+        "jobUID": job_uid,
+        "nativeWaitExitCode": wait_code,
+        "watch": "complete"
+        if watch_code == 0
+        else "interrupted"
+        if watch_code in {124, 137, 143}
+        else "failed",
+        "limitations": [],
+        "observations": [],
+    }
+    limits, observations = report["limitations"], report["observations"]
+    # Kubernetes may put registry URLs or credentials in messages. Only fixed
+    # signals derived from them may cross the private fixture/artifact boundary.
+    patterns = {
+        "authorization": r"unauthorized|forbidden|authentication required|status code (401|403)",
+        "manifest-missing": r"manifest_unknown|name_unknown|manifest unknown|404 not found",
+        "tls": r"x509|tls handshake|certificate signed by unknown authority",
+        "network": r"no such host|connection refused|i/o timeout|context deadline exceeded|network is unreachable",
+    }
+
+    def pod_observation(pod: dict) -> None:
+        meta = pod.get("metadata", {})
+        if meta.get("namespace") != "perf-platform" or not any(
+            owner.get("kind") == "Job"
+            and owner.get("uid") == job_uid
+            and owner.get("name") == metadata["name"]
+            and owner.get("controller") is True
+            for owner in meta.get("ownerReferences", [])
+        ):
+            return
+        uid = meta.get("uid", "")
+        if not isinstance(uid, str) or not UUID.fullmatch(uid):
+            limits.append("invalid-pod-identity")
+            return
+        status = pod.get("status", {})
+        phase = status.get("phase")
+        value = {
+            "podUID": uid,
+            "phase": phase
+            if phase in {"Pending", "Running", "Succeeded", "Failed", "Unknown"}
+            else "Other",
+            "scheduled": bool(pod.get("spec", {}).get("nodeName")),
+            "schedulingReason": None,
+            "containerState": "absent",
+            "waitingReason": None,
+            "exitCode": None,
+            "signals": [],
+        }
+        conditions = [c for c in status.get("conditions", []) if c.get("type") == "PodScheduled"]
+        if conditions and conditions[0].get("status") == "False":
+            reason = conditions[0].get("reason")
+            value["schedulingReason"] = (
+                reason if reason in {"Unschedulable", "SchedulingGated"} else "Other"
+            )
+        containers = [c for c in status.get("containerStatuses", []) if c.get("name") == "migrate"]
+        if len(containers) == 1:
+            state = containers[0].get("state", {})
+            if "waiting" in state:
+                reason = state["waiting"].get("reason")
+                value["containerState"] = "waiting"
+                value["waitingReason"] = reason if reason in WAITING else "Other"
+                message = state["waiting"].get("message", "")
+                if isinstance(message, str):
+                    value["signals"] = [
+                        name
+                        for name, pattern in patterns.items()
+                        if re.search(pattern, message, re.I)
+                    ]
+            elif "running" in state:
+                value["containerState"] = "running"
+            elif "terminated" in state:
+                value["containerState"] = "terminated"
+                code = state["terminated"].get("exitCode")
+                value["exitCode"] = code if type(code) is int and 0 <= code <= 255 else None
+        if value not in observations:
+            if len(observations) < 128:
+                observations.append(value)
+            else:
+                limits.append("observation-limit")
+
+    decoder = json.JSONDecoder()
+    position = 0
+    while position < len(stream):
+        if stream[position].isspace():
+            position += 1
+            continue
+        try:
+            event, position = decoder.raw_decode(stream, position)
+        except json.JSONDecodeError:
+            limits.append("incomplete-or-invalid-stream")
+            break
+        try:
+            if not isinstance(event, dict):
+                limits.append("invalid-watch-event")
+            elif event.get("type") == "ERROR":
+                limits.append("api-watch-error")
+            elif event.get("type") in {"ADDED", "MODIFIED", "DELETED"}:
+                pod = event["object"]
+                if pod.get("kind") == "Pod":
+                    pod_observation(pod)
+            elif event.get("type") != "BOOKMARK":
+                limits.append("unknown-watch-event")
+        except (KeyError, TypeError, AttributeError):
+            limits.append("invalid-watch-event")
+    if not observations:
+        limits.append("no-owned-pod-observed")
+    report["limitations"] = sorted(set(limits))
+    return report
 
 
 def validate_schema(snapshot: dict, contract: dict) -> None:
@@ -112,7 +248,22 @@ def check(directory: Path, contract: dict) -> None:
 
 if __name__ == "__main__":
     try:
-        check(Path(sys.argv[1]), json.loads(Path(sys.argv[2]).read_text()))
+        if sys.argv[1] == "startup":
+            watch, job_path, contract_path, watch_code, wait_code = sys.argv[2:]
+            with Path(watch).open(encoding="utf-8", errors="replace") as source:
+                stream = source.read(4_194_305)
+            report = startup(
+                stream[:4_194_304],
+                json.loads(Path(job_path).read_text()),
+                json.loads(Path(contract_path).read_text()),
+                int(watch_code),
+                int(wait_code),
+            )
+            if len(stream) > 4_194_304:
+                report["limitations"].append("watch-size-limit")
+            print(json.dumps(report, sort_keys=True))
+        else:
+            check(Path(sys.argv[1]), json.loads(Path(sys.argv[2]).read_text()))
     except (AssertionError, ValueError, KeyError, TypeError) as error:
         print(f"Migration image evidence refused ({type(error).__name__})", file=sys.stderr)
         sys.exit(1)
