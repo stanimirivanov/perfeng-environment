@@ -166,6 +166,15 @@ record snapshots, UIDs and original receipt provenance. Existing retention and
 refusal checks continue. Production templates/rights remain unchanged; live proof
 awaits post-merge trusted-main execution.
 
+[Initial receipt-create conflict acceptance](release-workflows-integration.md#complete-parent-initial-receipt-create-conflict)
+adds ADR 0033's fifth approved isolated scenario. A fixture writer wins the exact
+receipt create after real planning; the unchanged native worker must refuse with
+AlreadyExists. A fresh production retry preserves the winner's full snapshot,
+UID and planned origin provenance, skips receipt creation and creates only the
+pointer. No proxy or new rights are introduced. Live proof awaits post-merge
+trusted-main execution; pointer conflicts, promotion and retained recovery remain
+separate gates.
+
 ## Verifier package lifecycle
 
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).

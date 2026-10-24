@@ -1431,6 +1431,35 @@ and retention checks. No record is reset or repaired. Full-parent live proof
 awaits the post-merge main-only leg; this does not implement promotion or retained
 recovery.
 
+## Complete-parent initial receipt-create conflict
+
+ADR 0033 adds the owner-approved fifth trusted-main `receipt-create-conflict`
+scenario with its own ref/artifact and clean cluster. The existing CI parent
+identity/barrier is reused, but only the pre-receipt Suspend is added: receipt
+creation retains the production native `templateRef` and transport. No response
+proxy or TLS fixture is created. Removing the barrier restores the exact parent.
+
+After successful real readiness, absent-ledger observations and recomputed plan,
+the administrative fixture writer creates exactly the planned immutable receipt
+and privately saves the API response. Planned provenance names the paused origin;
+this simulates a competing create, not a second production Workflow. Resume only
+after that create succeeds. Require the native receipt worker's actual
+AlreadyExists for the selected receipt, executor exit 64, no downstream worker
+and no adoption result. Qualified pinned-executor evidence includes the context
+`error when creating "/tmp/manifest.yaml"`; timeout or generic conflict text does
+not qualify. The fresh API receipt must equal the complete saved winner snapshot,
+and the pointer must remain absent. The safe report is
+`adoption-receipt-create-conflict.outcome.json`; raw diagnostics stay private.
+
+The fresh unchanged `recovered` parent must create only the missing pointer,
+reverify and publish a result while preserving the complete receipt, UID and
+original provenance. Continue all existing refusal/concurrency/retention checks
+before the already approved receipt identity faults. Keep GitHub credentials in
+the sole cleanup owner outside the token-free fixture subshell. No records are
+reset. Full-parent proof awaits post-merge trusted-main execution and its earlier
+migrator prerequisite; offline tests do not establish a live pass. Pointer
+conflicts, promotion and retained-environment recovery remain separate gates.
+
 ## Verification and remaining gates
 
 Offline tests check CI authority/artifact boundaries, fixture contracts, tool

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Only the approved trusted-main response-loss scenarios may adapt transport.
+# Only approved trusted-main create-fault scenarios may suspend the parent.
 set -euo pipefail
-[[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent && ( ${scenario:-} == response-loss || ${scenario:-} == pointer-response-loss ) ]] || exit 2
+[[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent && ( ${scenario:-} == response-loss || ${scenario:-} == pointer-response-loss || ${scenario:-} == receipt-create-conflict ) ]] || exit 2
 [[ ${GITHUB_ACTIONS:-} == true && ${RUNNER_ENVIRONMENT:-} == github-hosted && ${RUNNER_OS:-} == Linux ]] || exit 2
 [[ -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" && -z ${GITHUB_TOKEN:-} ]] || exit 2
 declare -F k a adoption_case adoption_records > /dev/null || exit 2
@@ -13,6 +13,8 @@ if [[ $scenario == pointer-response-loss ]]; then
   response_barrier=pointer-response-barrier
   response_recovery=pointer-recovered
 fi
+
+if [[ $scenario == receipt-create-conflict ]]; then response_kind=conflict; fi
 
 PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" template "$fixture" "$results" "$response_kind" \
   > "$fixture/adoption-response.template.json"
@@ -38,6 +40,10 @@ else
   jq -e 'length==0' "$fixture/adoption-response-before.records.json" > /dev/null
 fi
 
+if [[ $response_kind == conflict ]]; then
+  # The admin fixture writer wins after the actual planner, before native create.
+  k create -f "$fixture/ledger-response-expected.json" -o json > "$fixture/adoption-conflict-winner.json"
+else
 uv run --locked --offline python - "$fixture" "$source_dir" <<'PY'
 import json, sys
 from pathlib import Path
@@ -58,15 +64,17 @@ k -n argo-workflows create secret tls ledger-response-proxy-tls \
   --cert="$fixture/ledger-response.crt" --key="$fixture/ledger-response.key"
 k create -f "$source_dir/ledger-response-proxy.yaml"
 k -n argo-workflows wait pod/ledger-response-proxy --for=condition=Ready --timeout=90s
+fi
+
 a resume "$response_workflow"
 adoption_case "$scenario" "$scenario" "$response_workflow"
-# Fresh production submission has no transport override. Receipt loss recovers
+# Fresh production submission has no adaptation. Receipt loss/conflict recovers
 # only the pointer; pointer loss must reuse both records without any create.
 adoption_case "$response_recovery" success
 if [[ $response_kind == pointer ]]; then
   cmp "$fixture/adoption-$scenario.records.json" "$fixture/adoption-$response_recovery.records.json"
 else
-  jq -S '.[]|select(.immutable==true)' "$fixture/adoption-response-loss.records.json" > "$fixture/adoption-response.receipt.json"
+  jq -S '.[]|select(.immutable==true)' "$fixture/adoption-$scenario.records.json" > "$fixture/adoption-response.receipt.json"
   jq -S '.[]|select(.immutable==true)' "$fixture/adoption-recovered.records.json" > "$fixture/adoption-recovered.receipt.json"
   cmp "$fixture/adoption-response.receipt.json" "$fixture/adoption-recovered.receipt.json"
 fi
