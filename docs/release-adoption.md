@@ -148,6 +148,16 @@ scenarios before destructive receipt faults. Writes use server dry-run; selected
 ledger snapshots must remain identical. Exec remains a review only. This tests
 impersonated API authorization, not token authentication; live proof awaits CI.
 
+[Complete-parent receipt response loss](release-workflows-integration.md#complete-parent-receipt-response-loss)
+adds ADR 0031's owner-approved third trusted-main scenario. A CI-only adapted
+parent must fail at a receipt write whose committed API response is dropped;
+fresh direct observations bind its original bytes/UID/provenance. A fresh
+unchanged parent must then create only the missing pointer, followed by all
+existing retention/refusal checks. No production template or permission changes.
+Live proof awaits the post-merge main-only scenario; native-ledger evidence alone
+does not satisfy it. Pointer response loss, promotion and retained recovery remain
+separate gates.
+
 ## Verifier package lifecycle
 
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).

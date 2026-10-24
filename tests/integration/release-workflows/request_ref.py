@@ -39,9 +39,9 @@ def owned_ref() -> str:
     if not all(re.fullmatch(r"[1-9][0-9]{0,19}", item) for item in (run, attempt)):
         raise ValueError("invalid run identity")
     scenario = os.environ.get("RELEASE_ADOPTION_SCENARIO", "initial")
-    if scenario not in {"initial", "receipt-only"}:
+    if scenario not in {"initial", "receipt-only", "response-loss"}:
         raise ValueError("invalid adoption scenario")
-    suffix = "-receipt-only" if scenario == "receipt-only" else ""
+    suffix = "" if scenario == "initial" else "-" + scenario
     return f"refs/heads/ci/preflight/{run}-{attempt}{suffix}"
 
 

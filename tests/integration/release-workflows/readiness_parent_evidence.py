@@ -38,13 +38,17 @@ def success(
     *,
     adoption: bool = False,
     parent_failed: bool = False,
+    response_loss: bool = False,
 ) -> dict[str, Any]:
     """Bind parent output to its nested preflight, native children and live API."""
     assert not parent_failed or adoption
+    assert not response_loss or (adoption and parent_failed)
     assert workflow["status"]["phase"] in ({"Failed", "Error"} if parent_failed else {"Succeeded"})
     expected_parent = (
         "perfeng-release-adopt-existing-v2" if adoption else "perfeng-release-readiness-v2"
     )
+    if response_loss:
+        expected_parent = "perfeng-adoption-response-ci"
     assert workflow["spec"]["workflowTemplateRef"]["name"] == expected_parent
     assert {
         p["name"]: p["value"] for p in workflow["spec"]["arguments"]["parameters"]

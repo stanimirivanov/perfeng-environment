@@ -11,8 +11,8 @@ fi
 mode=${RELEASE_KIND_MODE:-boundaries}
 [[ $mode == boundaries || $mode == preflight-parent ]] || refuse 'unknown CI mode.'
 scenario=${RELEASE_ADOPTION_SCENARIO:-initial}
-[[ $scenario == initial || $scenario == receipt-only ]] || refuse 'unknown adoption scenario.'
-[[ $mode == preflight-parent || $scenario == initial ]] || refuse 'receipt-only requires trusted-main parent acceptance.'
+[[ $scenario == initial || $scenario == receipt-only || $scenario == response-loss ]] || refuse 'unknown adoption scenario.'
+[[ $mode == preflight-parent || $scenario == initial ]] || refuse 'recovery scenarios require trusted-main parent acceptance.'
 export RELEASE_ADOPTION_SCENARIO=$scenario
 if [[ $mode == preflight-parent ]]; then
   [[ ${GITHUB_REF:-} == refs/heads/main && ${GITHUB_REPOSITORY:-} == stanimirivanov/perfeng-environment ]] || refuse 'parent acceptance requires trusted main.'

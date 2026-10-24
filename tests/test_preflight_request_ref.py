@@ -53,7 +53,10 @@ class PreflightRequestRefTests(unittest.TestCase):
         self.assertFalse(job["steps"][0]["with"]["persist-credentials"])
         self.assertEqual(
             job["strategy"],
-            {"fail-fast": False, "matrix": {"adoption-scenario": ["initial", "receipt-only"]}},
+            {
+                "fail-fast": False,
+                "matrix": {"adoption-scenario": ["initial", "receipt-only", "response-loss"]},
+            },
         )
         execute = next(
             s for s in job["steps"] if s.get("run") == "make release-workflows-integration"
@@ -69,7 +72,11 @@ class PreflightRequestRefTests(unittest.TestCase):
     def test_scenario_refs_are_disjoint_and_cleanup_cannot_cross_scenarios(self):
         with patch.dict(os.environ, ENVIRONMENT, clear=True):
             self.assertEqual(MODULE.owned_ref(), REF)
-        for scenario, expected in (("initial", REF), ("receipt-only", REF + "-receipt-only")):
+        for scenario, expected in (
+            ("initial", REF),
+            ("receipt-only", REF + "-receipt-only"),
+            ("response-loss", REF + "-response-loss"),
+        ):
             with (
                 tempfile.TemporaryDirectory() as temporary,
                 patch.dict(
@@ -78,7 +85,7 @@ class PreflightRequestRefTests(unittest.TestCase):
             ):
                 self.assertEqual(MODULE.owned_ref(), expected)
                 path = Path(temporary)
-                foreign = REF if scenario == "receipt-only" else REF + "-receipt-only"
+                foreign = REF if scenario != "initial" else REF + "-receipt-only"
                 (path / "request-ref.json").write_text(
                     json.dumps({"ref": foreign, "commit": COMMIT})
                 )

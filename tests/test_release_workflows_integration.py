@@ -137,6 +137,7 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
         for script in (
             "ledger.sh",
             "ledger-response.sh",
+            "adoption-response.sh",
             "recovery.sh",
             "database.sh",
             "external-state-fixtures.sh",
@@ -806,6 +807,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
             FIXTURE / "argocd.sh",
             FIXTURE / "root.sh",
             FIXTURE / "adoption-parent.sh",
+            FIXTURE / "adoption-response.sh",
             FIXTURE / "readiness-parent.sh",
         ):
             syntax = subprocess.run(
@@ -816,6 +818,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
         for script in (
             "ledger.sh",
             "adoption-authority.sh",
+            "adoption-response.sh",
             "recovery.sh",
             "database.sh",
             "external-state-fixtures.sh",

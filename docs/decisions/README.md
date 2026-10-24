@@ -126,3 +126,4 @@ How will the assumptions and consequences be verified?
 | [0028](0028-publish-adoption-request-boundary-fixtures.md) | Proposed | Publish two approved additional CI requests in the same owned commit/ref and prove complete adoption refuses changed retry identity and upgrade intent. |
 | [0029](0029-require-patched-native-gateway-toolchain.md) | Proposed | Require owner-approved Go 1.27.3 throughout the gateway boundary and reject old-toolchain setup/start without relabeling the existing selected asset. |
 | [0030](0030-inject-disposable-ledger-response-loss.md) | Proposed | Drop one committed native receipt response in disposable CI through an approved TLS proxy; require direct read/retry/retention proof without changing production templates. |
+| [0031](0031-exercise-complete-adoption-response-loss.md) | Proposed | Extend the approved proxy to a third trusted-main scenario; bind complete-parent receipt response loss to unchanged-parent pointer-only recovery. |

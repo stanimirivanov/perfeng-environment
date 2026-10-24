@@ -1013,3 +1013,31 @@ Changing an existing published file or retirement entry is refused. Make a new
 version; retain old installed objects and in-flight Workflows. A missing v1
 source path in the current checkout does not authorize deleting that resource
 or replaying completed nodes.
+
+
+## Complete adoption receipt response-loss acceptance
+
+The trusted-main `response-loss` leg is isolated from `initial` and `receipt-only`.
+It uses a CI-only parent copy with a pre-create suspension and scoped receipt
+transport; its recovering submission uses the unchanged production parent.
+See [the scenario](release-workflows-integration.md#complete-parent-receipt-response-loss)
+and [ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md).
+
+A failed Workflow alone is not the expected healthy fault signal. Require
+`adoption-response-loss.outcome.json`, a failed `create-receipt` worker after
+successful readiness/plan, a single exact committed-response event, the matching
+receipt UID/content and an absent pointer. Missing events, API denial, timeout,
+TLS failure or downstream workers must fail acceptance. Configuration, raw proxy
+events and worker diagnostics remain private in the owned runner state.
+
+If barrier setup fails, inspect the private barrier Workflow and planner boundary
+before changing the proxy. If fault proof fails, check the failed node, worker
+projection and private event against the direct API read; do not classify generic
+network failure as a committed write. Recovery must submit a fresh production
+parent and preserve the full original receipt. It must skip receipt creation,
+create only the pointer and pass existing retention/refusal checks. Never delete
+or replace ledger history to make this case pass. Owned-cluster teardown removes
+the fixture; retained environments have no authorization to use this test.
+
+Offline verification does not run this main-only parent scenario. Its live proof
+remains pending until the post-merge trusted-main leg succeeds.
