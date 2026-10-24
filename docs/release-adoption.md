@@ -158,6 +158,14 @@ Live proof awaits the post-merge main-only scenario; native-ledger evidence alon
 does not satisfy it. Pointer response loss, promotion and retained recovery remain
 separate gates.
 
+[Pointer response loss](release-workflows-integration.md#complete-parent-pointer-response-loss)
+adds ADR 0032's fourth owner-approved isolated scenario. A committed pointer with
+a lost API response must leave both records intact despite the failed origin.
+A fresh unchanged parent must reverify and skip both creates, preserving complete
+record snapshots, UIDs and original receipt provenance. Existing retention and
+refusal checks continue. Production templates/rights remain unchanged; live proof
+awaits post-merge trusted-main execution.
+
 ## Verifier package lifecycle
 
 The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).

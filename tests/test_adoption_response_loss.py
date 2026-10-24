@@ -90,19 +90,163 @@ def failure():
     return args + [workers, events, expected]
 
 
+def pointer_failure():
+    args = list(evidence(True))[:6]
+    workflow, _, _, _, _, api = args
+    workflow["spec"]["workflowTemplateRef"]["name"] = MODULE.NAME
+    workflow["status"]["phase"] = "Error"
+    workflow["status"]["storedWorkflowTemplateSpec"] = MODULE.template(*sources(), "pointer")[
+        "spec"
+    ]
+    nodes = workflow["status"]["nodes"]
+    nodes["adoption"].update(phase="Error", outputs={})
+    nodes["create-pointer"].update(phase="Error", outputs={}, templateName="fault-create-pointer")
+    nodes["barrier"] = {
+        "id": "barrier",
+        "displayName": MODULE.POINTER_BARRIER,
+        "type": "Suspend",
+        "phase": "Succeeded",
+    }
+    for name in ("stored-pointer", "final-receipt", "final-root", "finish"):
+        del nodes[name]
+    expected = copy.deepcopy(api["pointer"])
+    for key in ("uid", "resourceVersion"):
+        del expected["metadata"][key]
+    workers = [
+        {
+            "nodeID": "create-pointer",
+            "account": "release-adoption",
+            "uid": "writer-uid",
+            "exitCode": 1,
+        }
+    ]
+    events = [
+        {
+            "event": "pointer-committed-response-dropped",
+            "upstreamStatus": 201,
+            "uid": api["pointer"]["metadata"]["uid"],
+            "contentDigest": PROXY.digest(expected),
+            "successfulResponsesForwarded": 0,
+        }
+    ]
+    return args + [workers, events, expected]
+
+
 class AdoptionResponseLossTests(unittest.TestCase):
+    def test_pointer_fault_requires_committed_data_and_no_downstream_result(self):
+        args = pointer_failure()
+        self.assertEqual(MODULE.expected_record(args[0], args[3], "pointer"), args[-1])
+        report = MODULE.verify(*args, operation="pointer")
+        self.assertEqual(report["pointerUID"], "pointer-uid")
+        self.assertEqual(report["receiptUID"], "receipt-uid")
+        for mutation in (
+            "pointer-data",
+            "receipt-uid",
+            "missing-pointer",
+            "origin",
+            "plan",
+            "event",
+            "timeout",
+            "downstream",
+            "owner",
+            "immutable",
+            "mixed-data",
+        ):
+            with self.subTest(mutation=mutation):
+                values = copy.deepcopy(args)
+                workflow, _, _, _, _, api, workers, events, _ = values
+                nodes = workflow["status"]["nodes"]
+                if mutation == "pointer-data":
+                    api["pointer"]["data"]["requestDigest"] = "foreign"
+                elif mutation == "receipt-uid":
+                    api["receipt"]["metadata"]["uid"] = "foreign"
+                elif mutation == "missing-pointer":
+                    api["pointer"] = None
+                elif mutation == "origin":
+                    api["receipt"]["metadata"]["annotations"]["perfeng.io/first-workflow-uid"] = (
+                        "foreign"
+                    )
+                elif mutation == "plan":
+                    nodes["pointer-plan"]["outputs"]["parameters"][0]["value"] = "foreign"
+                elif mutation == "event":
+                    events[0]["uid"] = "receipt-uid"
+                elif mutation == "timeout":
+                    workers[0]["exitCode"] = 137
+                elif mutation == "downstream":
+                    nodes["finish"] = {"displayName": "finish", "type": "Pod", "phase": "Succeeded"}
+                elif mutation == "owner":
+                    api["pointer"]["metadata"]["ownerReferences"] = [{"uid": "workflow"}]
+                elif mutation == "immutable":
+                    api["pointer"]["immutable"] = True
+                else:
+                    api["pointer"]["binaryData"] = {"unapproved": "eA=="}
+                with self.assertRaises((AssertionError, KeyError, ValueError)):
+                    MODULE.verify(*values, operation="pointer")
+
+    def test_pointer_generator_changes_only_pointer_transport_and_barrier(self):
+        parent, native = sources()
+        generated = MODULE.template(parent, native, "pointer")
+        spec = generated["spec"]
+        steps = spec["templates"][0]["steps"]
+        index = next(
+            i for i, group in enumerate(steps) if group[0]["name"] == MODULE.POINTER_BARRIER
+        )
+        self.assertEqual(steps[index - 1][0]["name"], "pointer-plan")
+        self.assertEqual(steps[index + 1][0]["name"], "create-pointer")
+        del steps[index]
+        create = steps[index][0]
+        self.assertEqual(create.pop("template"), "fault-create-pointer")
+        create["templateRef"] = {"name": native["metadata"]["name"], "template": "create-pointer"}
+        barrier, resource = spec["templates"][1:]
+        self.assertEqual(barrier, {"name": MODULE.POINTER_BARRIER, "suspend": {}})
+        spec["templates"] = spec["templates"][:1]
+        self.assertEqual(spec, parent["spec"])
+        original = next(t for t in native["spec"]["templates"] if t["name"] == "create-pointer")
+        resource["name"] = "create-pointer"
+        resource.pop("podSpecPatch")
+        resource["resource"].pop("flags")
+        self.assertEqual(
+            json.loads(resource["resource"]["manifest"]),
+            yaml.safe_load(original["resource"]["manifest"]),
+        )
+        resource["resource"]["manifest"] = original["resource"]["manifest"]
+        self.assertEqual(resource, original)
+
+    def test_pointer_retry_skips_both_creates_and_keeps_full_original_records(self):
+        fault = pointer_failure()
+        retry = list(evidence(False))
+        original = fault[5]
+        w, _, _, _, _, api, _ = retry
+        w["metadata"]["uid"] = "00000000-0000-0000-0000-000000000003"
+        api["receipt"] = copy.deepcopy(original["receipt"])
+        api["pointer"] = copy.deepcopy(original["pointer"])
+        for name in ("existing-receipt", "stored-receipt", "final-receipt"):
+            w["status"]["nodes"][name]["outputs"]["parameters"][0]["value"] = json.dumps(
+                api["receipt"]
+            )
+        result = ADOPTION.success(*retry)
+        self.assertEqual(result["receiptUID"], original["receipt"]["metadata"]["uid"])
+        self.assertEqual(result["pointerUID"], original["pointer"]["metadata"]["uid"])
+        for name in ("create-receipt", "create-pointer"):
+            bad = copy.deepcopy(retry)
+            bad[0]["status"]["nodes"][name].update(type="Pod", phase="Succeeded")
+            with self.assertRaises(AssertionError):
+                ADOPTION.success(*bad)
+
     @unittest.skipUnless(BASH, "Bash required for the runner credential boundary")
     def test_runner_token_is_hidden_only_in_fixture_and_cleanup_survives_every_exit(self):
         assert BASH is not None
         parent = (FIXTURE / "adoption-parent.sh").read_text()
-        invocation = parent.split("elif [[ $scenario == response-loss ]]; then\n", 1)[1].split(
-            "\nelse", 1
-        )[0]
+        invocation = parent.split(
+            "elif [[ $scenario == response-loss || $scenario == pointer-response-loss ]]; then\n", 1
+        )[1].split("\nelse", 1)[0]
         definition = re.search(r"^adoption_response_case\(\) \{\n.*?^\}", parent, re.M | re.S)
         definitions = definition.group(0) if definition else ""
         guards = (FIXTURE / "adoption-response.sh").read_text().split("\nPYTHONPATH=", 1)[0]
         for case, code in (
             ("success", 0),
+            ("pointer-success", 0),
+            ("pointer-exit", 23),
             ("command-failure", 1),
             ("explicit-exit", 23),
             ("wrong-mode", 2),
@@ -120,10 +264,10 @@ class AdoptionResponseLossTests(unittest.TestCase):
 "$BASH" -c '[[ -z ${GITHUB_TOKEN:-} && -z ${GH_TOKEN:-} ]]'
 echo started > "$fixture/started"
 if [[ $test_case == command-failure ]]; then false; fi
-if [[ $test_case == explicit-exit ]]; then exit 23; fi
-adoption_labels+=(response-loss recovered)
-adoption_baseline=recovered
-adoption_origin=response-loss
+if [[ $test_case == explicit-exit || $test_case == pointer-exit ]]; then exit 23; fi
+adoption_labels+=("$scenario" "$response_recovery")
+adoption_baseline=$response_recovery
+adoption_origin=$scenario
 echo completed > "$fixture/completed"
 """
                 )
@@ -137,6 +281,7 @@ source_dir=$fixture
 KUBECONFIG=$fixture/kubeconfig
 mode=preflight-parent
 scenario=response-loss
+[[ $test_case != pointer-* ]] || scenario=pointer-response-loss
 [[ $test_case != wrong-mode ]] || mode=boundaries
 [[ $test_case != wrong-scenario ]] || scenario=initial
 adoption_labels=()
@@ -152,8 +297,10 @@ trap 'if [[ ${GITHUB_TOKEN:-} == runner-sentinel && ${GH_TOKEN:-} == alias-senti
                     + "\n"
                     + invocation
                     + """
-[[ ${adoption_labels[*]} == 'response-loss recovered' ]]
-[[ $adoption_baseline == recovered && $adoption_origin == response-loss ]]
+expected_recovery=recovered
+[[ $scenario != pointer-response-loss ]] || expected_recovery=pointer-recovered
+[[ ${adoption_labels[*]} == "$scenario $expected_recovery" ]]
+[[ $adoption_baseline == "$expected_recovery" && $adoption_origin == "$scenario" ]]
 "$BASH" -c '[[ $GITHUB_TOKEN == runner-sentinel && $GH_TOKEN == alias-sentinel ]]'
 echo returned > "$fixture/returned"
 """
@@ -177,10 +324,21 @@ echo returned > "$fixture/returned"
                 self.assertEqual((directory / "cleanup").read_text().splitlines(), ["restored"])
                 self.assertEqual(
                     (directory / "started").exists(),
-                    case in {"success", "command-failure", "explicit-exit"},
+                    case
+                    in {
+                        "success",
+                        "pointer-success",
+                        "pointer-exit",
+                        "command-failure",
+                        "explicit-exit",
+                    },
                 )
-                self.assertEqual((directory / "returned").exists(), case == "success")
-                self.assertEqual((directory / "completed").exists(), case == "success")
+                self.assertEqual(
+                    (directory / "returned").exists(), case in {"success", "pointer-success"}
+                )
+                self.assertEqual(
+                    (directory / "completed").exists(), case in {"success", "pointer-success"}
+                )
                 self.assertNotIn("sentinel", result.stdout + result.stderr)
 
     def test_generated_parent_reverses_to_exact_published_composition(self):
@@ -213,7 +371,7 @@ echo returned > "$fixture/returned"
 
     def test_committed_response_matches_actual_plan_and_failed_worker(self):
         args = failure()
-        self.assertEqual(MODULE.expected_receipt(args[0], args[3]), args[-1])
+        self.assertEqual(MODULE.expected_record(args[0], args[3]), args[-1])
         result = MODULE.verify(*args)
         self.assertEqual(result["receiptUID"], "receipt-uid")
         self.assertEqual(result["workflowUID"], args[0]["metadata"]["uid"])
@@ -318,11 +476,12 @@ echo returned > "$fixture/returned"
         self.assertIn("${scenario:-} == response-loss", shell)
         self.assertIn("-z ${GITHUB_TOKEN:-}", shell)
         self.assertLess(
-            shell.index('a resume "$response_workflow"'), shell.index("adoption_case response-loss")
+            shell.index('a resume "$response_workflow"'),
+            shell.index('adoption_case "$scenario" "$scenario"'),
         )
         self.assertLess(
-            shell.index("adoption_case response-loss"),
-            shell.index("adoption_case recovered success"),
+            shell.index('adoption_case "$scenario" "$scenario"'),
+            shell.index('adoption_case "$response_recovery" success'),
         )
         self.assertNotIn("--request-timeout", shell)
         parent = (FIXTURE / "adoption-parent.sh").read_text()
@@ -368,6 +527,7 @@ echo returned > "$fixture/returned"
                     """set -euo pipefail
 fixture=$1
 response_workflow=fixture
+response_barrier=receipt-response-barrier
 k() { local index; index=$(cat "$fixture/count"); echo $((index+1)) > "$fixture/count"; cat "$fixture/state-$index.json"; }
 sleep() { :; }
 """
@@ -385,18 +545,25 @@ sleep() { :; }
                 )
 
     def test_cli_binds_barrier_plan_and_failed_parent_to_safe_report(self):
-        args = failure()
+        self.check_cli("receipt")
+
+    def test_pointer_cli_binds_committed_pointer_to_actual_plan(self):
+        self.check_cli("pointer")
+
+    def check_cli(self, operation):
+        args = pointer_failure() if operation == "pointer" else failure()
+        label = "pointer-response-loss" if operation == "pointer" else "response-loss"
         workflow, parameters, preflight, raw, _, api, workers, events, expected = args
         barrier = copy.deepcopy(workflow)
         barrier["status"]["phase"] = "Running"
         barrier["status"]["nodes"]["barrier"]["phase"] = "Running"
-        del barrier["status"]["nodes"]["create-receipt"]
+        del barrier["status"]["nodes"]["create-" + operation]
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             for name, value in (
                 ("adoption-response-barrier.workflow.json", barrier),
-                ("adoption-parent-response-loss.workflow.json", workflow),
-                ("adoption-parent-response-loss.workers.json", workers),
+                (f"adoption-parent-{label}.workflow.json", workflow),
+                (f"adoption-parent-{label}.workers.json", workers),
                 ("parent-parameters.json", parameters),
                 ("parent-first.result.json", preflight),
                 ("adoption-parent-api.json", api),
@@ -416,6 +583,7 @@ sleep() { :; }
                         mode,
                         str(directory),
                         str(directory),
+                        operation,
                     ],
                     cwd=ROOT,
                     env={**os.environ, "PYTHONPATH": str(ROOT)},
@@ -426,12 +594,12 @@ sleep() { :; }
                 )
 
             generated = json.loads(run("template").stdout)
-            self.assertEqual(generated, MODULE.template(*sources()))
+            self.assertEqual(generated, MODULE.template(*sources(), operation))
             self.assertEqual(json.loads(run("expected").stdout), expected)
             run("verify")
             self.assertEqual(
-                json.loads((directory / "adoption-response-loss.outcome.json").read_text()),
-                MODULE.verify(*args),
+                json.loads((directory / f"adoption-{label}.outcome.json").read_text()),
+                MODULE.verify(*args, operation=operation),
             )
             barrier["status"]["nodes"]["barrier"]["phase"] = "Succeeded"
             (directory / "adoption-response-barrier.workflow.json").write_text(

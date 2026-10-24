@@ -1017,6 +1017,16 @@ or replaying completed nodes.
 
 ## Complete adoption receipt response-loss acceptance
 
+The separate `pointer-response-loss` scenario faults the later pointer write.
+See [pointer response loss](release-workflows-integration.md#complete-parent-pointer-response-loss).
+Require the typed pointer event, directly observed pointer data/receipt UID and
+an exit-1 pointer worker after successful receipt readback and pointer planning.
+Its fresh `pointer-recovered` submission must skip both creates and preserve
+complete snapshots of both records. A receipt event, missing pointer, changed
+receipt UID, timeout or successful downstream worker is a failure. Do not delete
+the pointer to make the fixture resemble receipt-only recovery. Full-parent live
+proof remains post-merge in the isolated main-only matrix leg.
+
 If the helper refuses before setup, inspect its hosted-runner/scenario/ownership
 guard and caller credential isolation. Trusted-main intentionally needs its
 runner token for temporary-ref cleanup; the response helper must run in the

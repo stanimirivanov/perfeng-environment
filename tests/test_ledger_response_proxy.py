@@ -58,6 +58,7 @@ class API(HTTPServer):
         self.requests = []
         self.status = 201
         self.mismatch = False
+        self.pointer_mismatch = False
 
 
 class APIHandler(BaseHTTPRequestHandler):
@@ -73,6 +74,8 @@ class APIHandler(BaseHTTPRequestHandler):
         response["metadata"].update(uid="committed-uid", resourceVersion="7")
         if self.server.mismatch:
             response["immutable"] = False
+        if self.server.pointer_mismatch:
+            response["data"]["receiptUID"] = "foreign"
         if self.server.status != 201:
             response = {"message": "private-upstream-detail"}
         data = json.dumps(response).encode()
@@ -83,6 +86,93 @@ class APIHandler(BaseHTTPRequestHandler):
 
 
 class LedgerResponseProxyTests(unittest.TestCase):
+    expected: dict[str, Any]
+
+    def use_pointer(self):
+        self.expected = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": "perfeng-local-current",
+                "namespace": "perfeng-release-ledger",
+                "labels": {
+                    "app.kubernetes.io/managed-by": "perfeng-environment",
+                    "perfeng.io/purpose": "current-release",
+                },
+            },
+            "data": {
+                "requestDigest": "sha256:" + "a" * 64,
+                "clusterUID": "cluster-uid",
+                "receiptName": "receipt." + "a" * 32 + "." + "a" * 32,
+                "receiptUID": "receipt-uid",
+            },
+        }
+        self.api.expected = self.expected
+        self.proxy = PROXY.Proxy(
+            ("127.0.0.1", 0), self.expected, f"localhost:{self.api.server_port}", self.context
+        )
+        self.proxy.tls = self.tls
+        self.start(self.proxy)
+
+    def test_pointer_tls_commits_only_exact_data_and_drops_once(self):
+        self.use_pointer()
+        changed = copy.deepcopy(self.expected)
+        changed["data"]["receiptUID"] = "foreign"
+        self.assertEqual(self.call(body=json.dumps(changed).encode()), (403, b""))
+        self.assertFalse(self.api.requests)
+        with self.assertRaises(http.client.RemoteDisconnected):
+            self.call()
+        self.assertEqual(len(self.api.requests), 1)
+        self.assertEqual(
+            self.proxy.events,
+            [
+                {
+                    "event": "pointer-committed-response-dropped",
+                    "upstreamStatus": 201,
+                    "uid": "committed-uid",
+                    "contentDigest": PROXY.digest(self.expected),
+                    "successfulResponsesForwarded": 0,
+                }
+            ],
+        )
+        self.assertEqual(self.call(), (410, b""))
+        self.assertEqual(len(self.api.requests), 1)
+        self.assertNotIn(TOKEN, json.dumps(self.proxy.events))
+
+    def test_pointer_upstream_data_mismatch_cannot_qualify(self):
+        self.use_pointer()
+        self.api.pointer_mismatch = True
+        with self.assertRaises(http.client.RemoteDisconnected):
+            self.call()
+        self.assertEqual(self.proxy.events, [{"event": "upstream-failed"}])
+
+    def test_pointer_expected_shape_is_narrow_and_record_data_is_exact(self):
+        self.use_pointer()
+        for change in (
+            "name",
+            "namespace",
+            "labels",
+            "data",
+            "immutable",
+            "binaryData",
+            "ownerReferences",
+        ):
+            expected = copy.deepcopy(self.expected)
+            if change in {"name", "namespace"}:
+                expected["metadata"][change] = "other"
+            elif change == "labels":
+                expected["metadata"][change] = {}
+            elif change == "data":
+                expected[change]["unapproved"] = "value"
+            elif change == "ownerReferences":
+                expected["metadata"][change] = [{"uid": "workflow"}]
+            elif change == "immutable":
+                expected[change] = True
+            else:
+                expected[change] = {"unapproved": "eA=="}
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                PROXY.record_kind(expected)
+
     @classmethod
     def setUpClass(cls):
         cls.directory = tempfile.TemporaryDirectory()
@@ -289,6 +379,14 @@ class LedgerResponseProxyTests(unittest.TestCase):
 
     @unittest.skipUnless(KUBECTL, "kubectl is required for native-client transport acceptance")
     def test_actual_kubectl_output_flag_and_discovery_reach_only_the_expected_create(self):
+        self.check_kubectl_transport()
+
+    @unittest.skipUnless(KUBECTL, "kubectl is required for native-client transport acceptance")
+    def test_pointer_actual_kubectl_preserves_data_and_committed_response_proof(self):
+        self.use_pointer()
+        self.check_kubectl_transport()
+
+    def check_kubectl_transport(self):
         assert KUBECTL is not None
         executable = KUBECTL
 
@@ -375,7 +473,9 @@ class LedgerResponseProxyTests(unittest.TestCase):
                 [(PROXY.CREATE_ROUTE, "Bearer " + TOKEN, self.expected)],
                 result.stderr,
             )
-            self.assertEqual(self.proxy.events[0]["event"], "receipt-committed-response-dropped")
+            self.assertEqual(
+                self.proxy.events[0]["event"], self.proxy.kind + "-committed-response-dropped"
+            )
 
     def test_proof_requires_failed_native_worker_committed_uid_and_original_provenance(self):
         workflow = {

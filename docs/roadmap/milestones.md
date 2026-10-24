@@ -580,6 +580,14 @@ production templates remain unchanged. Live proof awaits post-merge trusted-main
 CI; pointer response loss, initial-parent races, promotion, retained recovery and
 measured script retirement remain separate.
 
+ADR 0032 adds the approved fourth `pointer-response-loss` scenario. Preserve real
+receipt creation/readback and pointer planning, fault only the exact pointer
+create response, and require a fresh unchanged parent to skip both creates while
+preserving both full records/UIDs/provenance. Existing refusal/concurrency/
+retention gates continue; production templates and rights remain unchanged.
+Full-parent live proof awaits the post-merge main-only leg. Initial-parent races,
+promotion, retained recovery and measured retirement remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

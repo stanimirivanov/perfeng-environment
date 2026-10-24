@@ -43,11 +43,13 @@
 - Complete adoption then runs the unchanged production parent against that root,
   checking first/repeat persistence, a root-read refusal, fresh correction and
   ledger retention after deletion of the original disposable Workflow.
-- Trusted-main has three isolated scenarios: `initial` preserves first adoption;
+- Trusted-main has four isolated scenarios: `initial` preserves first adoption;
   `receipt-only` exercises quota-blocked pointer recovery; `response-loss` exercises
   a committed receipt with its response dropped, followed by unchanged-parent
-  recovery. See [ADR 0026](decisions/0026-isolate-disposable-adoption-recovery-scenarios.md)
-  and [ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md).
+  recovery; `pointer-response-loss` requires reuse of both committed records.
+  See [ADR 0026](decisions/0026-isolate-disposable-adoption-recovery-scenarios.md),
+  [ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md) and
+  [ADR 0032](decisions/0032-exercise-pointer-create-response-loss.md).
 
 ## Invocation and isolation
 
@@ -1397,6 +1399,37 @@ recovering parent; neither offline evidence tests nor the native-ledger job prov
 this scenario passed live. Full-parent live proof awaits post-merge trusted-main
 CI. Pointer response loss, promotion and retained-environment recovery remain
 separate.
+
+### Complete-parent pointer response loss
+
+[ADR 0032](decisions/0032-exercise-pointer-create-response-loss.md) authorizes the
+fourth isolated trusted-main `pointer-response-loss` leg, including its distinct
+temporary ref/artifact. It reuses the existing parent generator, token-free
+subshell, TLS proxy and ServiceAccount identity. Production templates and token
+rights remain unchanged.
+
+The fixture preserves normal receipt creation/readback and both initial planner
+phases. Its native barrier is immediately before pointer creation. Recompute the
+exact pointer against the real receipt UID, root and readiness; only that receipt
+may exist before proxy setup/resume. The proxy permits one exact pointer create
+and must validate every data field plus namespace/name, ownership and assigned
+UID. A changed receipt reference, extra binary data, immutable pointer or owner
+reference cannot qualify. Receipt response-loss behavior remains separately
+verified.
+
+Require an exit-1 pointer worker after successful prior phases, no downstream
+worker/result, and one `pointer-committed-response-dropped` event proving HTTP
+201 and zero successful responses forwarded. Fresh direct API reads must bind
+both records to the actual plan and event. `adoption-pointer-response-loss.outcome.json`
+is the safe fault report; raw events and setup material remain private.
+
+The fresh `pointer-recovered` production submission must skip both creates and
+produce a freshly verified result. Compare complete receipt/pointer snapshots
+before/after retry; preserve both UIDs and original receipt provenance. Use that
+recovered result as the leg's baseline for existing retries, refusals, concurrency
+and retention checks. No record is reset or repaired. Full-parent live proof
+awaits the post-merge main-only leg; this does not implement promotion or retained
+recovery.
 
 ## Verification and remaining gates
 

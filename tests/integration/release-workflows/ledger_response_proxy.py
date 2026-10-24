@@ -1,4 +1,4 @@
-"""Disposable CI transport fault: commit one exact receipt, then drop its response."""
+"""Disposable CI transport fault: commit one exact ledger record, drop its response."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import copy
 import hashlib
 import http.client
 import json
+import re
 import socket
 import ssl
 import sys
@@ -92,12 +93,75 @@ def receipt_matches(expected: dict[str, Any], actual: dict[str, Any]) -> bool:
     )
 
 
+def record_kind(expected: dict[str, Any]) -> str:
+    """Permit only the two explicitly approved ledger create shapes."""
+    metadata = expected.get("metadata", {})
+    if (
+        expected.get("apiVersion") != "v1"
+        or expected.get("kind") != "ConfigMap"
+        or metadata.get("namespace") != "perfeng-release-ledger"
+        or metadata.get("ownerReferences")
+    ):
+        raise ValueError("Unexpected ledger record")
+    if (
+        re.fullmatch(r"receipt\.[0-9a-f]{32}\.[0-9a-f]{32}", metadata.get("name", ""))
+        and expected.get("immutable") is True
+        and set(expected.get("binaryData", {})) == {"request.json", "receipt.json"}
+        and not expected.get("data")
+    ):
+        return "receipt"
+    if (
+        metadata.get("name") == "perfeng-local-current"
+        and metadata.get("labels")
+        == {
+            "app.kubernetes.io/managed-by": "perfeng-environment",
+            "perfeng.io/purpose": "current-release",
+        }
+        and set(expected.get("data", {}))
+        == {"requestDigest", "clusterUID", "receiptName", "receiptUID"}
+        and all(isinstance(v, str) and v for v in expected["data"].values())
+        and expected.get("immutable", False) is False
+        and not expected.get("binaryData")
+    ):
+        return "pointer"
+    raise ValueError("Unexpected ledger record")
+
+
+def record_matches(expected: dict[str, Any], actual: dict[str, Any]) -> bool:
+    """Compare all record data while allowing API-assigned metadata only."""
+    kind = record_kind(expected)
+    if kind == "receipt":
+        return (
+            receipt_matches(expected, actual)
+            and not actual.get("data")
+            and not actual.get("metadata", {}).get("ownerReferences")
+        )
+    return (
+        isinstance(actual, dict)
+        and isinstance(actual.get("metadata"), dict)
+        and all(actual.get(key) == expected.get(key) for key in ("apiVersion", "kind", "data"))
+        and not actual.get("binaryData")
+        and actual.get("immutable", False) is False
+        and all(
+            actual["metadata"].get(key) == expected["metadata"][key]
+            for key in ("name", "namespace", "labels")
+        )
+        and actual["metadata"].get("annotations", {}) == expected["metadata"].get("annotations", {})
+        and not actual["metadata"].get("ownerReferences")
+        and bool(actual["metadata"].get("uid"))
+    )
+
+
 def fault_workflow(
-    native: dict[str, Any], ledger: dict[str, Any], parameters: dict[str, str]
+    native: dict[str, Any],
+    ledger: dict[str, Any],
+    parameters: dict[str, str],
+    operation: str = "receipt",
 ) -> dict[str, Any]:
-    """Copy the published receipt create, changing only fixture identity/transport."""
+    """Copy a published ledger create, changing only fixture identity/transport."""
+    assert operation in {"receipt", "pointer"}
     template = copy.deepcopy(
-        next(t for t in native["spec"]["templates"] if t["name"] == "create-receipt")
+        next(t for t in native["spec"]["templates"] if t["name"] == "create-" + operation)
     )
     # Argo adds -o json, incompatible with kubectl --raw. Serve fixed discovery
     # locally and bypass only client OpenAPI validation; API admission still runs.
@@ -122,7 +186,7 @@ def fault_workflow(
     workflow = copy.deepcopy(ledger)
     workflow["metadata"]["generateName"] = "ledger-response-ci-"
     workflow["spec"].update(
-        entrypoint="create-receipt",
+        entrypoint="create-" + operation,
         suspend=True,
         templates=[template],
     )
@@ -144,6 +208,7 @@ class Proxy(HTTPServer):
     ):
         super().__init__(address, Handler)
         self.expected = expected
+        self.kind = record_kind(expected)
         self.upstream = upstream
         self.context = context
         self.attempted = False
@@ -283,13 +348,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(502)
                 return
             committed = json.loads(body, object_pairs_hook=unique_object)
-            if not receipt_matches(self.server.expected, committed):
+            if not record_matches(self.server.expected, committed):
                 raise ValueError
             # Never send even the HTTP status line for the committed response.
             self.connection.shutdown(socket.SHUT_RDWR)
             self.close_connection = True
             self.server.event(
-                "receipt-committed-response-dropped",
+                self.server.kind + "-committed-response-dropped",
                 upstreamStatus=201,
                 uid=committed["metadata"]["uid"],
                 contentDigest=digest(self.server.expected),
