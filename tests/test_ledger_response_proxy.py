@@ -290,6 +290,31 @@ class LedgerResponseProxyTests(unittest.TestCase):
     @unittest.skipUnless(KUBECTL, "kubectl is required for native-client transport acceptance")
     def test_actual_kubectl_output_flag_and_discovery_reach_only_the_expected_create(self):
         assert KUBECTL is not None
+        executable = KUBECTL
+
+        def invoke(
+            arguments: list[str], stage: str, budget: int
+        ) -> subprocess.CompletedProcess[str]:
+            try:
+                return subprocess.run(
+                    [executable, *arguments],
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    timeout=budget,
+                )
+            except subprocess.TimeoutExpired:
+                self.fail(
+                    f"kubectl stage={stage} exceeded {budget}s; "
+                    f"upstream creates={len(self.api.requests)}; no retry performed"
+                )
+
+        # The first host-client launch includes the Windows shim/runtime startup.
+        # Isolate that budget from the loopback API contract and never retry a write.
+        startup = invoke(["version", "--client", "-o", "json"], "client-startup", 120)
+        self.assertEqual(startup.returncode, 0, "Native client startup failed")
+        self.assertIn("gitVersion", json.loads(startup.stdout)["clientVersion"])
+        self.assertFalse(self.api.requests)
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             (directory / "token").write_text(TOKEN)
@@ -321,7 +346,6 @@ class LedgerResponseProxyTests(unittest.TestCase):
             }
             (directory / "client.json").write_text(json.dumps(config))
             command = [
-                KUBECTL,
                 "--kubeconfig",
                 str(directory / "client.json"),
                 "--cache-dir",
@@ -331,20 +355,18 @@ class LedgerResponseProxyTests(unittest.TestCase):
             output = ["-f", str(directory / "receipt.json"), "-o", "json"]
             # The pinned Argo executor always appends -o json. Prove the former
             # raw transport rejects that combination before making any API call.
-            raw = subprocess.run(
+            raw = invoke(
                 [*command, "--raw=" + PROXY.ROUTE, *output],
-                capture_output=True,
-                text=True,
-                timeout=30,
+                "flag-validation",
+                30,
             )
             self.assertNotEqual(raw.returncode, 0)
             self.assertIn("--raw and --output are mutually exclusive", raw.stderr)
             self.assertFalse(self.api.requests)
-            result = subprocess.run(
+            result = invoke(
                 [*command, "--validate=false", "--field-manager=kubectl-create", *output],
-                capture_output=True,
-                text=True,
-                timeout=30,
+                "create-response-loss",
+                30,
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(result.stdout, "")

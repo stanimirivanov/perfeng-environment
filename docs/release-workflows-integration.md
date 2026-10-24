@@ -1293,6 +1293,12 @@ Job, patch the control-plane Deployment, and patch the root/control-plane
 Applications. Every write uses server dry-run, including deletion, so an
 unexpected grant cannot persist the probe. Secret listing prints names only;
 an unexpected grant can expose Secret bodies to the client, never to evidence.
+Typed ConfigMap, Secret and Job create generators flatten the API Status error
+into resource-specific `error: failed to create ... is forbidden:` diagnostics.
+Those exact wrappers are accepted alongside `Error from server (Forbidden)`;
+the user, operation, resource, API group and namespace checks still apply.
+An isolated TLS regression exercises all three real kubectl create generators
+and verifies `dryRun=All` and the impersonated groups on their HTTP requests.
 Allowed ledger get/create and denied Pod exec remain authorization reviews;
 connect subresources have no equivalent safe dry-run and no exec is attempted.
 

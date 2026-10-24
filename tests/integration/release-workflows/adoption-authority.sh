@@ -14,7 +14,7 @@ authority_k() {
 }
 
 authority_denied() {
-  local label=$1 verb=$2 resource=$3 namespace=$4 group=$5 rc message
+  local label=$1 verb=$2 resource=$3 namespace=$4 group=$5 rc message wrapped=''
   shift 5
   local diagnostic="$fixture/authority-$label.private"
   if authority_k "$@" > "$diagnostic" 2>&1; then
@@ -22,7 +22,15 @@ authority_denied() {
     return 1
   else rc=$?; fi
   message=$(< "$diagnostic")
-  if [[ $rc != 1 || $message != *'Error from server (Forbidden)'* \
+  # Typed create generators flatten StatusError into resource-specific errors.
+  # Retain their exact prefixes and the complete authorization subject below.
+  case "$verb/$resource" in
+    create/configmaps) wrapped='error: failed to create configmap: configmaps "ci-adoption-denied" is forbidden:' ;;
+    create/secrets) wrapped='error: failed to create secret secrets "ci-adoption-denied" is forbidden:' ;;
+    create/jobs) wrapped='error: failed to create job: jobs "ci-adoption-denied" is forbidden:' ;;
+  esac
+  if [[ $rc != 1 \
+    || ( $message != *'Error from server (Forbidden)'* && ( -z $wrapped || $message != "$wrapped"* ) ) \
     || $message != *'User "system:serviceaccount:argo-workflows:release-adoption"'* \
     || $message != *"cannot $verb resource \"$resource\""* \
     || $message != *"in API group \"$group\""* \

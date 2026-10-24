@@ -875,6 +875,13 @@ which rejects that output flag before sending the create. The fixture serves
 fixed discovery locally and uses normal create with no client OpenAPI lookup;
 the exact object still undergoes Kubernetes API validation. The real loopback
 kubectl test covers discovery, accepted create options and withheld response.
+Its first `version --client` invocation has a separate 120-second startup budget;
+flag validation and response-loss stages keep 30-second budgets, close stdin and
+never retry the create. Timeout diagnostics name the stage and upstream-create
+count without dumping client output. A startup or flag-validation timeout is not
+TLS/response-loss evidence. The Windows CI delay was not reproduced locally;
+its underlying runner/shim stall remains unproven. Do not add a kubectl request
+timeout query to this exact-route proxy test: it changes the selected POST URL.
 
 For database parity failures, inspect `database-*.workflow.json`, the named Job
 JSON, the non-secret role summary and filtered refusal diagnostics. An expected
@@ -978,6 +985,10 @@ ends with the tab-separated `suite verified` row. A refusal must be Kubernetes
 namespace. Timeout, NotFound, schema/admission rejection and an unexpected grant
 are failures. Raw command output stays in the private fixture directory; do not
 upload it. Check the selected Role/RoleBindings and object identities privately.
+Typed ConfigMap, Secret and Job create commands wrap server refusal differently
+from patch/delete/list: their exact `failed to create ... is forbidden:` wrapper
+is valid only with the same complete authorization subject and operation.
+An arbitrary `failed to create` message or the word `forbidden` is insufficient.
 Do not widen permissions or remove `--dry-run=server` to obtain a pass. The helper
 checks unchanged selected ledger snapshots and cluster UID; changed records need
 independent investigation. Exec is review-only and never connects. Explicit
