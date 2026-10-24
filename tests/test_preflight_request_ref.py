@@ -55,7 +55,14 @@ class PreflightRequestRefTests(unittest.TestCase):
             job["strategy"],
             {
                 "fail-fast": False,
-                "matrix": {"adoption-scenario": ["initial", "receipt-only", "response-loss"]},
+                "matrix": {
+                    "adoption-scenario": [
+                        "initial",
+                        "receipt-only",
+                        "response-loss",
+                        "pointer-response-loss",
+                    ]
+                },
             },
         )
         execute = next(
@@ -76,6 +83,7 @@ class PreflightRequestRefTests(unittest.TestCase):
             ("initial", REF),
             ("receipt-only", REF + "-receipt-only"),
             ("response-loss", REF + "-response-loss"),
+            ("pointer-response-loss", REF + "-pointer-response-loss"),
         ):
             with (
                 tempfile.TemporaryDirectory() as temporary,
