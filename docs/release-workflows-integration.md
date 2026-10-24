@@ -43,9 +43,11 @@
 - Complete adoption then runs the unchanged production parent against that root,
   checking first/repeat persistence, a root-read refusal, fresh correction and
   ledger retention after deletion of the original disposable Workflow.
-- Trusted-main has two isolated matrix scenarios: `initial` preserves happy
-  first adoption; `receipt-only` exercises receipt-created/pointer-missing recovery
-  using native quota fault injection. See [ADR 0026](decisions/0026-isolate-disposable-adoption-recovery-scenarios.md).
+- Trusted-main has three isolated scenarios: `initial` preserves first adoption;
+  `receipt-only` exercises quota-blocked pointer recovery; `response-loss` exercises
+  a committed receipt with its response dropped, followed by unchanged-parent
+  recovery. See [ADR 0026](decisions/0026-isolate-disposable-adoption-recovery-scenarios.md)
+  and [ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md).
 
 ## Invocation and isolation
 
@@ -1347,6 +1349,45 @@ URLs and safe evidence in the PR, then pause for review. No retained cluster,
 self-hosted runner, extra token right or trusted-main dispatch is authorized by
 this command. Future integration changes require actual disposable acceptance
 before handoff when dispatch is authorized; offline tests alone are insufficient.
+
+### Complete-parent receipt response loss
+
+[ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md) records
+owner approval for a third trusted-main `response-loss` scenario. Its temporary
+request ref and uploaded artifact use the same scenario-qualified ownership and
+cleanup checks as `receipt-only`. Job permissions, private source access and the
+main-only execution guard are unchanged.
+
+The failed origin uses a generated CI-only parent copy. It preserves the complete
+published composition except for a bounded native suspension after the real
+planner and the existing exact-receipt transport adapter on receipt creation.
+Offline checks reverse those differences to the exact published parent/resource
+templates; live evidence also checks the controller-stored fixture composition.
+The production templates themselves are unchanged.
+
+At the barrier, recompute the actual plan and bind the proxy to its exact receipt
+and originating Workflow UID. Require an empty ledger, start the existing TLS
+proxy and explicitly resume. Successful real readiness/planning must precede a
+failed receipt-create worker, with no downstream write or adoption result. A
+single proxy event must prove HTTP 201, matching content digest/UID and zero
+successful responses forwarded. Fresh direct reads must find only that receipt.
+Timeout, denial, TLS failure, missing event or wrong provenance cannot qualify.
+
+A fresh submission of the unchanged production parent then uses direct transport,
+skips receipt creation and creates only the absent pointer. Compare the full
+receipt before/after recovery. All existing repeat, refusal, concurrency,
+authority, Workflow-deletion retention and later identity-fault checks continue.
+No ledger record is removed to reset this scenario.
+
+Safe fault proof is `adoption-response-loss.outcome.json`, accompanied by
+`adoption-parent-response-loss.workflow.json` and its worker projection. Recovery
+is verified by `adoption-parent-recovered.workflow.json`, its result and retained
+record comparisons. TLS material, raw proxy events, worker logs and configuration
+remain private. The fixture copy is explicitly distinguished from the unchanged
+recovering parent; neither offline evidence tests nor the native-ledger job prove
+this scenario passed live. Full-parent live proof awaits post-merge trusted-main
+CI. Pointer response loss, promotion and retained-environment recovery remain
+separate.
 
 ## Verification and remaining gates
 

@@ -570,6 +570,16 @@ Pod exec remains review-only. This adds no grants, credentials, jobs, scenarios
 or refs. Offline protocol tests do not establish live success; CI proof and
 production token authentication remain separate. No retirement credit is added.
 
+ADR 0031 adds the approved third trusted-main `response-loss` scenario. A generated
+complete-parent fixture changes only the pre-receipt suspension and receipt
+transport; real readiness/planning and an exact committed-response event must
+precede failed execution with no pointer/result. A fresh unchanged production
+parent must recover by creating only the missing pointer while retaining receipt
+bytes/UID/provenance, then pass all existing checks. Credential rights and
+production templates remain unchanged. Live proof awaits post-merge trusted-main
+CI; pointer response loss, initial-parent races, promotion, retained recovery and
+measured script retirement remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
