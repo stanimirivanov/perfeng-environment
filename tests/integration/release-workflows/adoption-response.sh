@@ -54,5 +54,3 @@ adoption_case recovered success
 jq -S '.[]|select(.immutable==true)' "$fixture/adoption-response-loss.records.json" > "$fixture/adoption-response.receipt.json"
 jq -S '.[]|select(.immutable==true)' "$fixture/adoption-recovered.records.json" > "$fixture/adoption-recovered.receipt.json"
 cmp "$fixture/adoption-response.receipt.json" "$fixture/adoption-recovered.receipt.json"
-adoption_baseline=recovered
-adoption_origin=response-loss

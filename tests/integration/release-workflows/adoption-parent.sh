@@ -100,6 +100,18 @@ adoption_case() {
   adoption_retained "$label" "$root_mode"
   adoption_labels+=("$label")
 }
+adoption_response_case() {
+  # Keep the runner credential and sole cleanup owner outside the fault fixture,
+  # including explicit exits from its guards. Only successful cases are tracked.
+  (
+    trap - EXIT
+    unset GITHUB_TOKEN GH_TOKEN
+    source "$source_dir/adoption-response.sh"
+  )
+  adoption_labels+=(response-loss recovered)
+  adoption_baseline=recovered
+  adoption_origin=response-loss
+}
 if [[ $scenario == receipt-only ]]; then
   # Count only the namespace's root CA plus one receipt; pointer admission must fail.
   k -n "$adoption_namespace" wait --for=create configmap/kube-root-ca.crt --timeout=60s
@@ -131,7 +143,7 @@ if [[ $scenario == receipt-only ]]; then
   adoption_baseline=recovered
   adoption_origin=receipt-only
 elif [[ $scenario == response-loss ]]; then
-  source "$source_dir/adoption-response.sh"
+  adoption_response_case
 else
   adoption_case first success
 fi

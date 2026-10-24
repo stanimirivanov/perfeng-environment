@@ -1365,6 +1365,15 @@ Offline checks reverse those differences to the exact published parent/resource
 templates; live evidence also checks the controller-stored fixture composition.
 The production templates themselves are unchanged.
 
+Trusted-main retains its runner GitHub credential for the owned temporary-ref
+cleanup. Invoke the response-loss helper in a subshell that clears `GITHUB_TOKEN`
+and `GH_TOKEN` and disables its inherited EXIT trap. The unchanged helper guard
+therefore sees no runner token, including in subprocesses. Only the parent owns
+cleanup and retains its original exported credentials even if the helper exits
+explicitly. After success, the caller records the two verified Workflow labels
+and recovery baseline/origin; child shell variables are not imported. A failed
+helper must abort before that bookkeeping or later cases.
+
 At the barrier, recompute the actual plan and bind the proxy to its exact receipt
 and originating Workflow UID. Require an empty ledger, start the existing TLS
 proxy and explicitly resume. Successful real readiness/planning must precede a

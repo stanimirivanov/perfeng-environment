@@ -4,6 +4,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -90,6 +91,98 @@ def failure():
 
 
 class AdoptionResponseLossTests(unittest.TestCase):
+    @unittest.skipUnless(BASH, "Bash required for the runner credential boundary")
+    def test_runner_token_is_hidden_only_in_fixture_and_cleanup_survives_every_exit(self):
+        assert BASH is not None
+        parent = (FIXTURE / "adoption-parent.sh").read_text()
+        invocation = parent.split("elif [[ $scenario == response-loss ]]; then\n", 1)[1].split(
+            "\nelse", 1
+        )[0]
+        definition = re.search(r"^adoption_response_case\(\) \{\n.*?^\}", parent, re.M | re.S)
+        definitions = definition.group(0) if definition else ""
+        guards = (FIXTURE / "adoption-response.sh").read_text().split("\nPYTHONPATH=", 1)[0]
+        for case, code in (
+            ("success", 0),
+            ("command-failure", 1),
+            ("explicit-exit", 23),
+            ("wrong-mode", 2),
+            ("wrong-scenario", 2),
+            ("unowned", 2),
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                if case != "unowned":
+                    (directory / "owned").touch()
+                helper = (
+                    guards
+                    + """
+[[ -z ${GITHUB_TOKEN:-} && -z ${GH_TOKEN:-} ]]
+"$BASH" -c '[[ -z ${GITHUB_TOKEN:-} && -z ${GH_TOKEN:-} ]]'
+echo started > "$fixture/started"
+if [[ $test_case == command-failure ]]; then false; fi
+if [[ $test_case == explicit-exit ]]; then exit 23; fi
+adoption_labels+=(response-loss recovered)
+adoption_baseline=recovered
+adoption_origin=response-loss
+echo completed > "$fixture/completed"
+"""
+                )
+                (directory / "adoption-response.sh").write_text(
+                    helper, encoding="utf-8", newline="\n"
+                )
+                script = (
+                    """set -euo pipefail
+fixture=$1
+source_dir=$fixture
+KUBECONFIG=$fixture/kubeconfig
+mode=preflight-parent
+scenario=response-loss
+[[ $test_case != wrong-mode ]] || mode=boundaries
+[[ $test_case != wrong-scenario ]] || scenario=initial
+adoption_labels=()
+adoption_baseline=first
+adoption_origin=first
+k() { :; }
+a() { :; }
+adoption_case() { :; }
+adoption_records() { :; }
+trap 'if [[ ${GITHUB_TOKEN:-} == runner-sentinel && ${GH_TOKEN:-} == alias-sentinel ]]; then echo restored >> "$fixture/cleanup"; else echo lost >> "$fixture/cleanup"; fi' EXIT
+"""
+                    + definitions
+                    + "\n"
+                    + invocation
+                    + """
+[[ ${adoption_labels[*]} == 'response-loss recovered' ]]
+[[ $adoption_baseline == recovered && $adoption_origin == response-loss ]]
+"$BASH" -c '[[ $GITHUB_TOKEN == runner-sentinel && $GH_TOKEN == alias-sentinel ]]'
+echo returned > "$fixture/returned"
+"""
+                )
+                result = subprocess.run(
+                    [BASH, "-c", script, "credential-boundary", directory.as_posix()],
+                    env={
+                        **os.environ,
+                        "GITHUB_ACTIONS": "true",
+                        "RUNNER_ENVIRONMENT": "github-hosted",
+                        "RUNNER_OS": "Linux",
+                        "GITHUB_TOKEN": "runner-sentinel",
+                        "GH_TOKEN": "alias-sentinel",
+                        "test_case": case,
+                    },
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                self.assertEqual(result.returncode, code, result.stderr)
+                self.assertEqual((directory / "cleanup").read_text().splitlines(), ["restored"])
+                self.assertEqual(
+                    (directory / "started").exists(),
+                    case in {"success", "command-failure", "explicit-exit"},
+                )
+                self.assertEqual((directory / "returned").exists(), case == "success")
+                self.assertEqual((directory / "completed").exists(), case == "success")
+                self.assertNotIn("sentinel", result.stdout + result.stderr)
+
     def test_generated_parent_reverses_to_exact_published_composition(self):
         parent, native = sources()
         original = copy.deepcopy(parent)
