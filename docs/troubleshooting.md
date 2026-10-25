@@ -2,6 +2,13 @@
 
 ## TL;DR
 
+- Trusted-main `missing-read-grant` is an intentional readiness refusal. The
+  pinned native Application observer returns 64 with the exact Forbidden get
+  diagnostic; Python preflight's wrong-digest case returns 2. The earlier
+  verifier expected 1 and rejected the correct native refusal in run
+  40207959980. Preserve the denial and restore only the fixture's existing
+  RoleBinding through its explicit correction step. Do not grant broader access
+  or accept arbitrary nonzero exits to repair an evidence-check mismatch.
 - Trusted-main `[PREREQUISITE:argocd-bootstrap]`: inspect
   `argocd-startup.failure.json` for fixed startup categories and allowlisted Pod
   status and UID-correlated event categories. `rate-limit` suggests checking

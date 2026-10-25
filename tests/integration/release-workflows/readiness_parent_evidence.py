@@ -139,7 +139,9 @@ def refusal(
     assert failed["phase"] in {"Failed", "Error"}
     nonzero = [w for w in workers if w["exitCode"] not in (None, 0)]
     assert len(nonzero) == 1 and nonzero[0]["nodeID"] == failed["id"]
-    assert nonzero[0]["exitCode"] == (2 if step == "verify-identities" else 1)
+    # The observed native Forbidden exits 64; Python's digest refusal exits 2.
+    assert nonzero[0]["exitCode"] == (2 if step == "verify-identities" else 64)
+    assert nonzero[0]["account"] == "release-readiness" and nonzero[0]["uid"]
     root = workflow["status"]["nodes"][workflow["metadata"]["name"]]
     assert "result" not in outputs(root)
     nodes = list(workflow["status"]["nodes"].values())
@@ -158,13 +160,18 @@ def refusal(
         nested = named(workflow, "preflight", "Steps")
         assert nested["phase"] == "Succeeded" and outputs(nested)["result"] == preflight
         assert all(named(workflow, n)["phase"] == "Succeeded" for n in ("postgres", "seaweedfs"))
-        for text in (
-            "forbidden",
-            "perfeng-local-control-plane",
-            "system:serviceaccount:argo-workflows:release-readiness",
-            "argocd",
-        ):
-            assert text in log
+        assert failed["templateRef"] == {
+            "name": "perfeng-observe-release-readiness-v1",
+            "template": "application",
+        }
+        wanted_error = (
+            'Error from server (Forbidden): applications.argoproj.io "perfeng-local-control-plane" '
+            'is forbidden: User "system:serviceaccount:argo-workflows:release-readiness" cannot get '
+            'resource "applications" in API group "argoproj.io" in the namespace "argocd"'
+        )
+        assert failed["message"] == "main: Error (exit code 64): no more retries " + wanted_error
+        # The same worker may emit raw stderr or a structured log's escaped string.
+        assert wanted_error in log or json.dumps(wanted_error)[1:-1] in log
 
 
 if __name__ == "__main__":
