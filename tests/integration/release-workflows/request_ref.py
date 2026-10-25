@@ -45,6 +45,7 @@ def owned_ref() -> str:
         "response-loss",
         "pointer-response-loss",
         "receipt-create-conflict",
+        "pointer-create-conflict",
     }:
         raise ValueError("invalid adoption scenario")
     suffix = "" if scenario == "initial" else "-" + scenario

@@ -3,7 +3,7 @@
 set -euo pipefail
 [[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent ]] || exit 2
 [[ -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" ]] || exit 2
-[[ ${scenario:-} == initial || ${scenario:-} == receipt-only || ${scenario:-} == response-loss || ${scenario:-} == pointer-response-loss || ${scenario:-} == receipt-create-conflict ]] || exit 2
+[[ ${scenario:-} == initial || ${scenario:-} == receipt-only || ${scenario:-} == response-loss || ${scenario:-} == pointer-response-loss || ${scenario:-} == receipt-create-conflict || ${scenario:-} == pointer-create-conflict ]] || exit 2
 declare -F k a root_state root_retained root_child_snapshot > /dev/null || exit 2
 
 k apply -f gitops/release-workflows-bootstrap/ledger-namespace.yaml
@@ -39,7 +39,7 @@ adoption_retained() {
 adoption_case() {
   local label=$1 expected=$2 workflow=${3:-} rc node_id pod step=root root_mode=converged
   local parameters="$fixture/parent-parameters.json" requested_digest requested_hex response_kind=receipt
-  case "$expected" in success|refusal|root-drift|receipt-only|response-loss|pointer-response-loss|receipt-create-conflict|missing-receipt|replaced-receipt|changed-request|upgrade-request) ;; *) return 2 ;; esac
+  case "$expected" in success|refusal|root-drift|receipt-only|response-loss|pointer-response-loss|receipt-create-conflict|pointer-create-conflict|missing-receipt|replaced-receipt|changed-request|upgrade-request) ;; *) return 2 ;; esac
   if [[ $expected == *-request ]]; then parameters="$fixture/$label-parameters.json"; fi
   echo "Complete release adoption: $label"
   if [[ -z $workflow ]]; then
@@ -57,7 +57,7 @@ adoption_case() {
   jq -e 'length>0 and all(.[]; .account=="release-adoption" and .uid!=null and .nodeID!=null)' \
     "$results/adoption-parent-$label.workers.json" > /dev/null
   adoption_records "$fixture/adoption-parent-records.json"
-  if [[ $expected == success || $expected == receipt-only || $expected == *response-loss || $expected == *-receipt || $expected == *-request ]]; then
+  if [[ $expected == success || $expected == receipt-only || $expected == *response-loss || $expected == *-create-conflict || $expected == *-receipt || $expected == *-request ]]; then
     printf '%s\n' null > "$fixture/adoption-requested-receipt.json"
     if [[ $expected == *-request ]]; then
       requested_digest=$(jq -er '."request-sha256"' "$parameters")
@@ -80,7 +80,8 @@ adoption_case() {
     [[ $rc != 0 ]]
     if [[ $expected == root-drift ]]; then step=plan; root_mode=drifted; fi
     if [[ $expected == receipt-only ]]; then step=create-pointer; fi
-    if [[ $expected == receipt-create-conflict ]]; then step=create-receipt; fi
+    if [[ $expected == receipt-create-conflict ]]; then step=create-receipt; response_kind=conflict; fi
+    if [[ $expected == pointer-create-conflict ]]; then step=create-pointer; response_kind=pointer-conflict; fi
     if [[ $expected == response-loss ]]; then step=create-receipt; fi
     if [[ $expected == pointer-response-loss ]]; then step=create-pointer; response_kind=pointer; fi
     if [[ $expected == *-receipt || $expected == *-request ]]; then step=plan; fi
@@ -88,8 +89,8 @@ adoption_case() {
       "$results/adoption-parent-$label.workflow.json")
     pod=$(jq -er --arg id "$node_id" '.[]|select(.nodeID==$id)|.name' "$results/adoption-parent-$label.workers.json")
     k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 > "$fixture/adoption-parent-worker.log"
-    if [[ $expected == receipt-create-conflict ]]; then
-      PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" verify "$fixture" "$results" conflict
+    if [[ $expected == *-create-conflict ]]; then
+      PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" verify "$fixture" "$results" "$response_kind"
     elif [[ $expected == *response-loss ]]; then
       k -n argo-workflows logs ledger-response-proxy -c proxy --limit-bytes=16384 > "$fixture/ledger-response-events.jsonl"
       PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" verify "$fixture" "$results" "$response_kind"
@@ -106,7 +107,7 @@ adoption_case() {
 }
 adoption_response_case() {
   local recovered=recovered
-  if [[ $scenario == pointer-response-loss ]]; then recovered=pointer-recovered; fi
+  if [[ $scenario == pointer-response-loss || $scenario == pointer-create-conflict ]]; then recovered=pointer-recovered; fi
   # Keep the runner credential and sole cleanup owner outside the fault fixture,
   # including explicit exits from its guards. Only successful cases are tracked.
   (
@@ -148,7 +149,7 @@ if [[ $scenario == receipt-only ]]; then
     | jq '{uid:.metadata.uid,hard:.status.hard,used:.status.used}' > "$results/adoption-quota-recovered.json"
   adoption_baseline=recovered
   adoption_origin=receipt-only
-elif [[ $scenario == response-loss || $scenario == pointer-response-loss || $scenario == receipt-create-conflict ]]; then
+elif [[ $scenario == response-loss || $scenario == pointer-response-loss || $scenario == receipt-create-conflict || $scenario == pointer-create-conflict ]]; then
   adoption_response_case
 else
   adoption_case first success

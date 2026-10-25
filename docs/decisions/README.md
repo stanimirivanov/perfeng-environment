@@ -130,3 +130,4 @@ How will the assumptions and consequences be verified?
 | [0032](0032-exercise-pointer-create-response-loss.md) | Proposed | Add an isolated pointer-response-loss scenario; require a fresh unchanged parent to reuse both ledger records without rewriting either. |
 | [0033](0033-exercise-initial-receipt-create-conflict.md) | Proposed | Add isolated initial receipt-create conflict acceptance; retain the winner and recover with a fresh parent creating only the pointer. |
 | [0034](0034-bound-disposable-acceptance-fixture-lifetimes.md) | Proposed | Use the owner-approved 60-minute disposable acceptance budget with aligned observer lifetime, unchanged readiness deadlines and sanitized startup diagnostics. |
+| [0035](0035-exercise-initial-pointer-create-conflict.md) | Proposed | Add isolated initial pointer-create conflict acceptance; preserve the real receipt and winning pointer, then require unchanged-parent reuse without either create. |

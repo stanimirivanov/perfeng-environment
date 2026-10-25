@@ -998,7 +998,7 @@ remain open. Production verifier code remains two files/708 physical lines.
 
 ## Actual Argo CD convergence
 
-Trusted-main's existing five jobs have an owner-approved 60-minute budget
+Trusted-main's six scenario jobs have an owner-approved 60-minute budget
 ([ADR 0034](decisions/0034-bound-disposable-acceptance-fixture-lifetimes.md)). The
 shared credential-bearing S3 observer has the same bounded 3600-second deadline
 and sleep, and remains subject to owned cluster cleanup. Run 40191776524 reached
@@ -1575,7 +1575,33 @@ before the already approved receipt identity faults. Keep GitHub credentials in
 the sole cleanup owner outside the token-free fixture subshell. No records are
 reset. Full-parent proof awaits post-merge trusted-main execution and its earlier
 migrator prerequisite; offline tests do not establish a live pass. Pointer
-conflicts, promotion and retained-environment recovery remain separate gates.
+conflict live acceptance, promotion and retained recovery remain separate gates.
+
+## Complete-parent initial pointer-create conflict
+
+[ADR 0035](decisions/0035-exercise-initial-pointer-create-conflict.md) adds the
+approved sixth `pointer-create-conflict` leg with its own temporary ref/artifact
+and unchanged 60-minute ceiling. The CI parent adds only a Suspend immediately
+before the original native pointer templateRef. Real readiness, receipt creation,
+receipt readback and exact pointer planning must precede the barrier. The existing
+fixture writer creates exactly the planned pointer; no proxy or alternate
+transport is created. Preserve the original receipt and full winning API response.
+
+Resume and require native pointer AlreadyExists, exit 64 and the manifest-path
+context naming `perfeng-local-current`. Require no downstream worker or adoption
+result. The winning pointer must equal fresh API state, and the original receipt
+must equal its actual readback. Both conflict modes explicitly collect fresh
+Application/platform/ledger state before verification; stale API evidence cannot
+qualify. The safe report is `adoption-pointer-create-conflict.outcome.json`;
+raw worker diagnostics and the saved winner remain private.
+
+A fresh unchanged `pointer-recovered` parent must reverify, skip both creates and
+preserve both full canonical records, UIDs and receipt provenance. Continue the
+existing refusal, concurrency and retention checks before approved final receipt
+identity faults. No reset, overwrite, credential right, production template,
+deadline or response-proxy change is introduced. Live proof remains post-merge
+behind the main-only guard; offline checks do not qualify prerequisites, adoption,
+promotion, retained recovery or measured retirement.
 
 ## Verification and remaining gates
 
