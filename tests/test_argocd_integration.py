@@ -98,7 +98,7 @@ class ArgoCDIntegrationTests(unittest.TestCase):
         source = (FIXTURE / "argocd.sh").read_text()
         function = re.search(r"argocd_rollout\(\) \{.*?\n\}", source, re.S)
         assert function is not None
-        for rollout, diagnostic in ((0, 0), (42, 0), (42, 1)):
+        for rollout, diagnostic in ((0, 0), (42, 0), (42, 1), (42, 2)):
             with (
                 self.subTest(rollout=rollout, diagnostic=diagnostic),
                 tempfile.TemporaryDirectory() as temporary,
@@ -111,6 +111,7 @@ k() {
   if [[ $3 == rollout ]]; then return "$ROLLOUT"; fi
   echo collected > "$fixture/collected"
   if [[ $3 == logs ]]; then printf '%s' 'credential-sentinel'; return 0; fi
+  if [[ $4 == events && $DIAGNOSTIC == 2 ]]; then echo credential-sentinel >&2; return 1; fi
   printf '%s' '{"items":[]}'
 }
 timeout() {
@@ -146,13 +147,54 @@ timeout() {
                 self.assertFalse((directory / "argocd-startup-private.json").exists())
                 self.assertFalse((directory / "argocd-startup-private.error").exists())
                 self.assertFalse((directory / "argocd-startup-private.log").exists())
+                self.assertFalse((directory / "argocd-startup-private.events.json").exists())
                 if rollout:
                     expected = (
                         {"schemaVersion": 1, "diagnostics": "unavailable"}
-                        if diagnostic
-                        else {"schemaVersion": 1, "pods": [], "logSignals": []}
+                        if diagnostic == 1
+                        else {
+                            "schemaVersion": 1,
+                            "pods": [],
+                            "logSignals": [],
+                            "events": "unavailable" if diagnostic == 2 else "collected",
+                        }
                     )
                     self.assertEqual(json.loads(report.read_text()), expected)
+
+    def test_event_categories_require_selected_pod_uid_and_never_publish_messages(self):
+        pod = {
+            "metadata": {"uid": "selected", "labels": {"app.kubernetes.io/name": "argocd-redis"}}
+        }
+        for message, categories in (
+            ("429 Too Many Requests credential-sentinel", ["rate-limit"]),
+            ("403 Forbidden credential-sentinel", ["http-authorization", "authorization"]),
+            ("503 Service Unavailable credential-sentinel", ["registry-unavailable"]),
+            ("no such host credential-sentinel", ["network"]),
+            ("x509 credential-sentinel", ["tls"]),
+            ("unclassified credential-sentinel", []),
+        ):
+            event: dict[str, Any] = {
+                "involvedObject": {"uid": "selected", "kind": "Pod", "namespace": "argocd"},
+                "reason": "Failed",
+                "message": message,
+            }
+            with self.subTest(message=message):
+                report = MODULE.bootstrap_diagnostics({"items": [pod]}, events={"items": [event]})
+                self.assertEqual(
+                    report["pods"][0]["events"], [{"reason": "Failed", "signals": categories}]
+                )
+                self.assertNotIn("credential-sentinel", json.dumps(report))
+                for key, value in (("uid", "old-pod"), ("kind", "Secret"), ("namespace", "other")):
+                    foreign = copy.deepcopy(event)
+                    foreign["involvedObject"][key] = value
+                    report = MODULE.bootstrap_diagnostics(
+                        {"items": [pod]}, events={"items": [foreign]}
+                    )
+                    self.assertEqual(report["pods"][0]["events"], [])
+        event["reason"] = "credential-sentinel"
+        report = MODULE.bootstrap_diagnostics({"items": [pod]}, events={"items": [event]})
+        self.assertEqual(report["pods"][0]["events"][0]["reason"], "unknown")
+        self.assertNotIn("credential-sentinel", json.dumps(report))
 
     def test_seaweedfs_uses_only_reviewed_pin_and_automation_overrides(self):
         path = ROOT / MODULE.FOUNDATION_APPLICATIONS["seaweedfs"]

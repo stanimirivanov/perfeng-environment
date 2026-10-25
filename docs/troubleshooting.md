@@ -4,9 +4,19 @@
 
 - Trusted-main `[PREREQUISITE:argocd-bootstrap]`: inspect
   `argocd-startup.failure.json` for fixed startup categories and allowlisted Pod
-  status. Raw messages/logs are withheld. `diagnostics: unavailable` means capture
-  failed, not that Redis is healthy. Preserve the original rollout failure;
+  status and UID-correlated event categories. `rate-limit` suggests checking
+  registry throttling; `http-authorization` requires checking the selected
+  registry access; `registry-unavailable`, `network` and `tls` require checking
+  the corresponding registry/node path. These are diagnostic hints, not proof
+  that a permission or image change is required. `events: unavailable` means
+  event capture failed. Raw messages/logs are withheld. `diagnostics: unavailable`
+  means capture failed, not that Redis is healthy. Preserve the original rollout failure;
   choose a remedy from evidence before changing pins, credentials or deadlines.
+- CRD readiness no longer calls the null-sensitive condition wait before the
+  naming controller initializes status. Exact accepted-kind readiness precedes
+  `Established=True`; both CRDs share the original 90-second outer bound. A
+  timeout still means bootstrap failed; do not treat initialized names alone as
+  an established CRD.
 - A completed `bucket-ci-observer` during later retention checks previously came
   from its 900-second lifetime. Its bound now matches the approved 60-minute
   trusted-main job budget. Rerun through the owned disposable workflow; do not
