@@ -253,7 +253,7 @@ def verify(
 ) -> dict[str, Any]:
     """Require real readiness, the exact create fault and preserved committed state."""
     parent = yaml.safe_load(
-        Path("gitops/release-workflows/release-adopt-existing-v2.yaml").read_text()
+        Path("gitops/release-workflows/release-adopt-existing-v3.yaml").read_text()
     )
     native = yaml.safe_load(Path("gitops/release-workflows/adoption-records.yaml").read_text())
     wanted = template(parent, native, operation)["spec"]
@@ -380,7 +380,7 @@ if __name__ == "__main__":
 
     if mode == "template":
         parent = yaml.safe_load(
-            Path("gitops/release-workflows/release-adopt-existing-v2.yaml").read_text()
+            Path("gitops/release-workflows/release-adopt-existing-v3.yaml").read_text()
         )
         native = yaml.safe_load(Path("gitops/release-workflows/adoption-records.yaml").read_text())
         print(json.dumps(template(parent, native, operation)))

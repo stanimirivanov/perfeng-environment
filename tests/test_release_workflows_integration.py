@@ -279,7 +279,7 @@ registry_selected_image_prerequisite
     def test_fixture_selects_the_existing_restricted_child_and_pinned_tools(self):
         workflow = yaml.safe_load((FIXTURE / "workflow.yaml").read_text())
         child = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/verify-release-quiescence-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/verify-release-quiescence-v3.yaml").read_text()
         )
         self.assertEqual(workflow["spec"]["serviceAccountName"], "release-maintenance-checkpoint")
         self.assertEqual(workflow["spec"]["activeDeadlineSeconds"], 300)
@@ -706,7 +706,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
     def test_readiness_fixture_reuses_the_published_child_and_pinned_runtime(self):
         workflow = yaml.safe_load((FIXTURE / "readiness-workflow.yaml").read_text())
         child = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/verify-release-readiness-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/verify-release-readiness-v3.yaml").read_text()
         )
         template = child["spec"]["templates"][0]
         spec = workflow["spec"]
@@ -839,7 +839,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
     def test_preflight_wrapper_uses_unchanged_children_with_explicit_synthetic_uid(self):
         workflow = yaml.safe_load((FIXTURE / "preflight-workflow.yaml").read_text())
         production = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/release-preflight-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/release-preflight-v3.yaml").read_text()
         )
         self.assertEqual(
             workflow["spec"]["serviceAccountName"], production["spec"]["serviceAccountName"]
@@ -935,7 +935,7 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
     @unittest.skipUnless(BASH, "Bash unavailable; Linux CI executes the schema path guard")
     def test_preflight_schema_guard_refuses_unsafe_names_before_file_access(self):
         production = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/release-preflight-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/release-preflight-v3.yaml").read_text()
         )
         script = next(t for t in production["spec"]["templates"] if t["name"] == "validate-schema")[
             "container"

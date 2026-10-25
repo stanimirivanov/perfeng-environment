@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: perfeng-release-maintenance-checkpoint-v2
+  name: perfeng-release-maintenance-checkpoint-v3
   namespace: argo-workflows
   annotations:
     argocd.argoproj.io/sync-wave: '1'
@@ -25,11 +25,11 @@ spec:
       steps:
         - - name: preflight
             templateRef:
-              name: perfeng-release-preflight-v2
+              name: perfeng-release-preflight-v3
               template: preflight
         - - name: observe
             templateRef:
-              name: perfeng-verify-release-quiescence-v2
+              name: perfeng-verify-release-quiescence-v3
               template: run
             arguments:
               parameters:

@@ -64,7 +64,7 @@ No additional operator command or production wrapper is introduced.
 After startup, a CI-only helper creates a schema-valid request with the actual
 `kube-system` UID and the checked-out main commit's raw lock digests. The request
 is a child Git commit published through a create-only unique ref. The unchanged
-`perfeng-release-preflight-v2` parent runs twice with that exact request SHA and
+`perfeng-release-preflight-v3` parent runs twice with that exact request SHA and
 the distinct selection SHA. Both results must match, validate against the result
 schema and bind the actual UID. Workflow UIDs and the private Git Secret must
 remain unchanged, with Kubernetes writes and Pod exec denied.
@@ -89,7 +89,7 @@ application delivery, promotion, recovery or script retirement.
 ### Complete maintenance-parent composition
 
 After both complete preflights pass, the same trusted-main job submits the
-unchanged `perfeng-release-maintenance-checkpoint-v2` parent. It reuses the
+unchanged `perfeng-release-maintenance-checkpoint-v3` parent. It reuses the
 existing request parameters, Git ref, token and granted ServiceAccount; no new
 CI authorization or production permission is added. Fixture administration
 creates the two reviewed Application specs with automatic sync disabled and
@@ -133,7 +133,7 @@ acceptance of this trusted-main phase.
 After maintenance composition, the same main-only job reuses the one exact
 request/ref for `perfeng-release-external-state-v1`. The owner approved adding
 `packages: read` alongside its existing contents write. The unchanged parent
-performs real Git preflight and the v2 lock-selection guard before native bucket,
+performs real Git preflight and the v3 lock-selection guard before native bucket,
 database-role and registry Jobs. Shared setup functions preserve existing child
 fixtures and generate only disposable credentials; no second production
 bootstrap path or runtime Python module is introduced.
@@ -552,8 +552,8 @@ pins and compatibility together; production infrastructure locks are independent
 ## What runs and what is synthetic
 
 The job renders the real staged Kustomize root, extracts only the immutable
-`perfeng-release-verifiers-v2` ConfigMap and
-`perfeng-verify-release-quiescence-v2`, `perfeng-adoption-records-v1` and
+`perfeng-release-verifiers-v3` ConfigMap and
+`perfeng-verify-release-quiescence-v3`, `perfeng-adoption-records-v1` and
 `perfeng-prepare-database-roles-v1` and `perfeng-prepare-bucket-v1`
 WorkflowTemplates, plus the immutable
 `perfeng-external-state-scripts-v1` ConfigMap, then installs the unchanged maintenance RBAC and its named
@@ -869,7 +869,7 @@ promotion and non-local acceptance remain separate. Original scripts are retaine
 ## Readiness verifier runtime and HTTP parity
 
 The final sourced `readiness.sh` phase invokes the unchanged
-`perfeng-verify-release-readiness-v2` child through a step-only wrapper using
+`perfeng-verify-release-readiness-v3` child through a step-only wrapper using
 `release-readiness`. Argo fetches the selected repository at the exact CI commit
 using the existing Git-read Secret. The non-root verifier mounts the published
 two-module package and checks the selected lock before making HTTP requests.
@@ -956,7 +956,7 @@ separate. Production verifier code remains two files/708 physical lines.
 ## Git, schema and preflight identity
 
 The final `preflight.sh` phase installs the unchanged
-`perfeng-release-preflight-v2` and existing narrow `release-preflight` grants.
+`perfeng-release-preflight-v3` and existing narrow `release-preflight` grants.
 Argo's Git artifact driver fetches the actual committed CI request and a
 separately pinned reviewed selection from the original private repository,
 using the existing Git-read Secret. The pinned schema CLI and mounted identity
@@ -1072,7 +1072,7 @@ is no script-retirement credit.
 ## Complete release-readiness parent
 
 After actual Argo CD convergence, the same trusted-main job submits the unchanged
-`perfeng-release-readiness-v2` with only the existing four request parameters.
+`perfeng-release-readiness-v3` with only the existing four request parameters.
 It consumes the same pinned Git request, selected commit and actual cluster UID.
 No synthetic preflight/resource arguments, alternate HTTP peer or copied parent
 are supplied. Existing credentials, token exposure and job permissions remain
@@ -1239,7 +1239,7 @@ Actual live acceptance remains pending the post-merge trusted-main run.
 ## Complete existing-release adoption parent
 
 After bounded root convergence, trusted-main installs the unchanged published
-`perfeng-release-adopt-existing-v2` and `perfeng-plan-release-adoption-v2`, using
+`perfeng-release-adopt-existing-v3` and `perfeng-plan-release-adoption-v3`, using
 ADR 0017's existing ledger namespace/bootstrap grants and `release-adoption`
 identity. No job permission, source credential, controller or production
 manifest/verifier changes. The same four request parameters still point to the
@@ -1285,8 +1285,10 @@ Reuse the root phase's private snapshots for workload specs/Pod UIDs, credential
 database schema/roles/ACLs/canaries, volume identities/binding and S3 metadata/bytes.
 All six child skips, child UIDs/operations and root's selected revision/manual
 policy remain required after every case. The planner conservatively compares
-root observations: incidental root resource-version changes fail acceptance;
-do not pause the controller, fabricate status or automatically retry until green.
+root observations: only generation, resourceVersion and reconciledAt refresh
+bookkeeping is excluded from equality under ADR 0036. Both samples must pass
+root validation and every other field must match. Do not pause the controller,
+fabricate status or automatically retry until green.
 
 Prove denied ledger patch/delete, workflow-configuration writes, Secret listing,
 Job creation, workload mutation and Application sync. Retain eight distinct

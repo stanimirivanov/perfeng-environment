@@ -43,7 +43,7 @@ adoption_case() {
   if [[ $expected == *-request ]]; then parameters="$fixture/$label-parameters.json"; fi
   echo "Complete release adoption: $label"
   if [[ -z $workflow ]]; then
-    workflow=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
+    workflow=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v3 \
       --parameter-file "$parameters" -o json | jq -er .metadata.name)
   fi
   if timeout 1830s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
@@ -190,9 +190,9 @@ cmp "$results/adoption-parent-$adoption_baseline.result.json" "$results/adoption
 # Hold the real mutex before submitting both retries, making contention observable.
 holder=$(a submit "$source_dir/adoption-lock-workflow.yaml" -o json | jq -er .metadata.name)
 k -n argo-workflows wait "workflow/$holder" --for="jsonpath={.status.nodes.$holder.phase}=Running" --timeout=90s
-concurrent_a=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
+concurrent_a=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v3 \
   --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
-concurrent_b=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v2 \
+concurrent_b=$(a submit --from workflowtemplate/perfeng-release-adopt-existing-v3 \
   --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
 for workflow in "$concurrent_a" "$concurrent_b"; do
   k -n argo-workflows wait "workflow/$workflow" \

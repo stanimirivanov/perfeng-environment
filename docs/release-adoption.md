@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- Use `perfeng-release-adopt-existing-v2` only for a deliberately reviewed adoption of an existing local selection.
+- Use `perfeng-release-adopt-existing-v3` only for a deliberately reviewed adoption of an existing local selection.
 - Native Argo operations create immutable receipt bytes and the initial current pointer in `perfeng-release-ledger`; exact retries preserve the original record.
 - Conflicting, foreign, changed or dangling state is refused. This entrypoint cannot advance, patch or delete a current pointer.
 - The result is an adopted baseline, not executed promotion, full platform acceptance, migration authorization or backup/recovery proof.
@@ -18,7 +18,7 @@ Apply the separately reviewed bootstrap resources, including `ledger-namespace.y
 
 ## Submission and observed revision
 
-Use the [preflight submission procedure](release-preflight-workflow.md#disposable-kind-verification) with `--from workflowtemplate/perfeng-release-adopt-existing-v2` and the same four pinned inputs. The request must select `perfeng-local`, manual activation and `expectedCurrent: null`; in this distinct adoption entrypoint, those bytes identify the baseline, not permission to deploy over an existing environment. Requests larger than 64 KiB are refused by the local ledger profile.
+Use the [preflight submission procedure](release-preflight-workflow.md#disposable-kind-verification) with `--from workflowtemplate/perfeng-release-adopt-existing-v3` and the same four pinned inputs. The request must select `perfeng-local`, manual activation and `expectedCurrent: null`; in this distinct adoption entrypoint, those bytes identify the baseline, not permission to deploy over an existing environment. Requests larger than 64 KiB are refused by the local ledger profile.
 
 The root must report the exact selected Git commit, `Synced`/`Healthy`, the existing owned root source/project/destination and no active operation or condition. Fresh [readiness](release-readiness.md) must match that request/cluster/selection. Its scope remains control-plane/foundation readiness, not full platform acceptance. The root tracks `main`: if a later request commit is merged there before adoption, the root's resolved revision may no longer match the selection. Keep the request at a separately reviewed pinned Git commit/branch and exclude concurrent merges and operator syncs during adoption. The workflow never pins, pauses or syncs the root to make a mismatch pass.
 
@@ -29,7 +29,7 @@ fresh readiness/preflight -> exact root observation + existing ledger reads
   -> final pointer/receipt/root verification -> adopted-baseline result
 ```
 
-The parent retains the local release mutex and a 1,800-second deadline. Each native record operation has a 60-second Pod deadline; planner Pods have 180 seconds. The mutex does not exclude host operators or Argo CD. Submit a fresh Workflow for retry; do not reuse successful nodes with `argo retry` or memoize verification. Root versions are compared conservatively: even an incidental root update requires inspection and a fresh attempt.
+The parent retains the local release mutex and a 1,800-second deadline. Each native record operation has a 60-second Pod deadline; planner Pods have 180 seconds. The mutex does not exclude host operators or Argo CD. Submit a fresh Workflow for retry; do not reuse successful nodes with `argo retry` or memoize verification. Both root samples must pass the same ownership, identity, health, sync and selected-revision checks. Cross-sample comparison ignores only `metadata.generation`, `metadata.resourceVersion` and `status.reconciledAt`; every other field must remain equal. [ADR 0036](decisions/0036-tolerate-root-reconciliation-bookkeeping.md) records the owner-approved boundary. This permits ordinary controller refresh, not semantic drift, active operations or new syncs. Sampled checks cannot detect every intervening change that reverted before the next read.
 
 ## Records and authority
 
@@ -177,9 +177,9 @@ separate gates.
 
 ## Verifier package lifecycle
 
-The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
-Request and result data schemas remain v1. Published v1 source is recoverable
-from the retirement index; installed v1 objects are retained with pruning off.
-Use a fresh Workflow after upgrading; do not resume successful v1 nodes as v2
+The staged entrypoint uses the [v3 verifier package](release-verifier-package.md).
+Request and result data schemas remain v1. Published v1/v2 source is recoverable
+from the retirement index; installed v1/v2 objects are retained with pruning off.
+Use a fresh Workflow after upgrading; do not resume successful older-version nodes as v3
 verification. The active operator path and outstanding live acceptance gates
 remain unchanged.

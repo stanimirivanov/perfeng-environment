@@ -45,7 +45,7 @@ def success(
     assert not response_loss or (adoption and parent_failed)
     assert workflow["status"]["phase"] in ({"Failed", "Error"} if parent_failed else {"Succeeded"})
     expected_parent = (
-        "perfeng-release-adopt-existing-v2" if adoption else "perfeng-release-readiness-v2"
+        "perfeng-release-adopt-existing-v3" if adoption else "perfeng-release-readiness-v3"
     )
     if response_loss:
         expected_parent = "perfeng-adoption-response-ci"

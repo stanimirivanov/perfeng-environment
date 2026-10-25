@@ -78,7 +78,7 @@ class AdoptionConcurrencyTests(unittest.TestCase):
     def test_holder_has_only_native_suspend_and_matches_published_mutex(self):
         holder, queued, parameters = snapshots()
         production = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/release-adopt-existing-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/release-adopt-existing-v3.yaml").read_text()
         )
         self.assertEqual(holder["spec"]["synchronization"], production["spec"]["synchronization"])
         self.assertEqual(holder["spec"]["templates"], [{"name": "hold", "suspend": {}}])

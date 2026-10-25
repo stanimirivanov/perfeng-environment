@@ -30,7 +30,7 @@ preflight_case() {
   preflight_label=$1 preflight_input=$2 preflight_step=$3 preflight_refusal=$4 preflight_source=$5
   echo "Git preflight case: $preflight_label"
   if [[ $preflight_source == parent ]]; then
-    preflight_workflow=$(a submit --from workflowtemplate/perfeng-release-preflight-v2 \
+    preflight_workflow=$(a submit --from workflowtemplate/perfeng-release-preflight-v3 \
       --parameter-file "$preflight_input" -o json | jq -er .metadata.name)
   else
     [[ $preflight_source == fixture ]]

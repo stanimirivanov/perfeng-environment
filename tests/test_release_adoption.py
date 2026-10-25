@@ -65,6 +65,19 @@ class ReleaseAdoptionTests(unittest.TestCase):
     ) -> dict[str, Any]:
         return policy.plan_adoption(self.raw, self.readiness, self.root, receipt, pointer, after)
 
+    def test_normal_root_refresh_preserves_each_ledger_decision(self) -> None:
+        self.root["metadata"]["generation"] = 10
+        self.root["status"]["reconciledAt"] = "2026-10-25T20:14:13Z"
+        receipt, pointer = self.records()
+        after = deepcopy(self.root)
+        after["metadata"].update(generation=11, resourceVersion="9814")
+        after["status"]["reconciledAt"] = "2026-10-25T20:17:35Z"
+        originals = deepcopy((self.root, after))
+        for r, p in ((None, None), (receipt, None), (receipt, pointer)):
+            with self.subTest(receipt=r is not None, pointer=p is not None):
+                self.assertEqual(self.plan(r, p, after), self.plan(r, p, self.root))
+        self.assertEqual((self.root, after), originals)
+
     def records(self) -> tuple[dict[str, Any], dict[str, Any]]:
         value = self.plan()
         receipt = {
@@ -151,7 +164,7 @@ class ReleaseAdoptionTests(unittest.TestCase):
                 if case == "partial":
                     observed["pointer"] = None
                 elif case == "changed-root":
-                    after["root"]["metadata"]["resourceVersion"] = "11"
+                    after["root"]["status"]["health"]["status"] = "Degraded"
                 elif case == "dangling":
                     observed["receipt"] = None
                 elif case == "replaced":
@@ -235,9 +248,37 @@ class ReleaseAdoptionTests(unittest.TestCase):
                 self.plan()
             self.root = original
         after = deepcopy(self.root)
-        after["metadata"]["resourceVersion"] = "11"
+        after["metadata"].setdefault("annotations", {})["ci.example/change"] = "changed"
         with self.assertRaisesRegex(ValueError, "changed during"):
             self.plan(after=after)
+
+    def test_refresh_does_not_hide_other_root_changes_or_invalid_fresh_samples(self) -> None:
+        changes = (
+            lambda obj: obj["metadata"].update(uid="recreated"),
+            lambda obj: obj["metadata"].update(resourceVersion=""),
+            lambda obj: obj["metadata"].update(deletionTimestamp="now"),
+            lambda obj: obj["metadata"].update(annotations={"unexpected": "annotation"}),
+            lambda obj: obj["spec"]["syncPolicy"].update(retry={"limit": 2}),
+            lambda obj: obj.update(operation={"sync": {}}),
+            lambda obj: obj["status"]["health"].update(status="Degraded"),
+            lambda obj: obj["status"]["sync"].update(status="OutOfSync"),
+            lambda obj: obj["status"]["sync"].update(revision="c" * 40),
+            lambda obj: obj["status"]["sync"]["comparedTo"].update(source={}),
+            lambda obj: obj["status"].update(conditions=[{"type": "ComparisonError"}]),
+            lambda obj: obj["status"]["operationState"].update(phase="Running"),
+            lambda obj: obj["status"].update(resources=[{"kind": "Secret"}]),
+            lambda obj: obj["status"].update(extra="unknown"),
+            lambda obj: obj.update(extra="unknown"),
+        )
+        for index, change in enumerate(changes):
+            with self.subTest(change=index):
+                after = deepcopy(self.root)
+                after["metadata"].update(generation=11, resourceVersion="9814")
+                after["status"]["reconciledAt"] = "2026-10-25T20:17:35Z"
+                change(after)
+                for first, last in ((self.root, after), (after, self.root)):
+                    with self.assertRaises(ValueError):
+                        policy.plan_adoption(self.raw, self.readiness, first, None, None, last)
 
     def test_receipt_ownership_content_mutability_and_recreation_conflicts_refuse(self) -> None:
         receipt, pointer = self.records()
@@ -350,9 +391,9 @@ class ReleaseAdoptionTests(unittest.TestCase):
             [{"apiGroups": [""], "resources": ["configmaps"], "verbs": ["get", "create"]}],
         )
         self.assertEqual(role["metadata"]["namespace"], policy.NAMESPACE)
-        parent = yaml.safe_load((DIRECTORY / "release-adopt-existing-v2.yaml").read_text())
+        parent = yaml.safe_load((DIRECTORY / "release-adopt-existing-v3.yaml").read_text())
         steps = [group[0] for group in parent["spec"]["templates"][0]["steps"]]
-        self.assertEqual(steps[0]["templateRef"]["name"], "perfeng-release-readiness-v2")
+        self.assertEqual(steps[0]["templateRef"]["name"], "perfeng-release-readiness-v3")
         self.assertEqual(steps[-1]["name"], "finish")
         self.assertEqual(
             [s["name"] for s in steps[-4:]],

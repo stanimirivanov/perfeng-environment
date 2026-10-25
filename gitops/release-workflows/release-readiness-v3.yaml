@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: perfeng-release-readiness-v2
+  name: perfeng-release-readiness-v3
   namespace: argo-workflows
   annotations:
     argocd.argoproj.io/sync-wave: '1'
@@ -25,7 +25,7 @@ spec:
       steps:
         - - name: preflight
             templateRef:
-              name: perfeng-release-preflight-v2
+              name: perfeng-release-preflight-v3
               template: preflight
         - - name: postgres
             templateRef:
@@ -57,7 +57,7 @@ spec:
               template: service
         - - name: verify
             templateRef:
-              name: perfeng-verify-release-readiness-v2
+              name: perfeng-verify-release-readiness-v3
               template: run
             arguments:
               parameters:

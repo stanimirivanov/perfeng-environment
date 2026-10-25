@@ -7,7 +7,7 @@
   complete parent twice. It is CI test input, not deployment approval; live
   acceptance remains pending until the post-merge job passes.
 
-- The staged [WorkflowTemplate](../gitops/release-workflows/release-preflight-v2.yaml)
+- The staged [WorkflowTemplate](../gitops/release-workflows/release-preflight-v3.yaml)
   checks a reviewed v1 request against exact Git checkouts, deployment-lock
   bytes and the observed `kube-system` UID. Its output is a versioned Workflow
   parameter, not a release receipt or permission to deploy.
@@ -74,7 +74,7 @@ request and selection commits:
 ```powershell
 $env:KUBECONFIG = (Resolve-Path .local/perfeng-local.kubeconfig).Path
 argo --context kind-perfeng-local -n argo-workflows submit `
-  --from workflowtemplate/perfeng-release-preflight-v2 `
+  --from workflowtemplate/perfeng-release-preflight-v3 `
   -p request-revision=<reviewed-request-commit> `
   -p request-path=deployments/release-requests/<name>.json `
   -p request-sha256=sha256:<exact-request-bytes-hash> `
@@ -134,9 +134,9 @@ adopt a running environment.
 
 ## Verifier package lifecycle
 
-The staged entrypoint uses the [v2 verifier package](release-verifier-package.md).
-Request and result data schemas remain v1. Published v1 source is recoverable
-from the retirement index; installed v1 objects are retained with pruning off.
-Use a fresh Workflow after upgrading; do not resume successful v1 nodes as v2
+The staged entrypoint uses the [v3 verifier package](release-verifier-package.md).
+Request and result data schemas remain v1. Published v1/v2 source is recoverable
+from the retirement index; installed v1/v2 objects are retained with pruning off.
+Use a fresh Workflow after upgrading; do not resume successful older-version nodes as v3
 verification. The active operator path and outstanding live acceptance gates
 remain unchanged.

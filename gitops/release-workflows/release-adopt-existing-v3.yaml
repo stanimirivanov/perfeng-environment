@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: perfeng-release-adopt-existing-v2
+  name: perfeng-release-adopt-existing-v3
   namespace: argo-workflows
   annotations:
     argocd.argoproj.io/sync-wave: '1'
@@ -25,7 +25,7 @@ spec:
       steps:
         - - name: readiness
             templateRef:
-              name: perfeng-release-readiness-v2
+              name: perfeng-release-readiness-v3
               template: verify-readiness
         - - name: root
             templateRef:
@@ -46,7 +46,7 @@ spec:
                     + ''.'' + sprig.substr(39, 71, workflow.parameters[''request-sha256'']) }}'
         - - name: plan
             templateRef:
-              name: perfeng-plan-release-adoption-v2
+              name: perfeng-plan-release-adoption-v3
               template: run
             arguments:
               parameters:
@@ -87,7 +87,7 @@ spec:
               template: root
         - - name: pointer-plan
             templateRef:
-              name: perfeng-plan-release-adoption-v2
+              name: perfeng-plan-release-adoption-v3
               template: run
             arguments:
               parameters:
@@ -136,7 +136,7 @@ spec:
               template: root
         - - name: finish
             templateRef:
-              name: perfeng-plan-release-adoption-v2
+              name: perfeng-plan-release-adoption-v3
               template: run
             arguments:
               parameters:

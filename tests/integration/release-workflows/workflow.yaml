@@ -17,7 +17,7 @@ spec:
       steps:
         - - name: observe
             templateRef:
-              name: perfeng-verify-release-quiescence-v2
+              name: perfeng-verify-release-quiescence-v3
               template: run
             arguments:
               parameters:

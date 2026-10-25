@@ -1007,7 +1007,7 @@ raw worker logs and Git Secret snapshots private. Restore the original parameter
 file and submit a fresh Workflow for correction; never change the fixture to a
 live UID or use child evidence as deployment approval.
 
-The current staged entrypoints use `perfeng-release-verifiers-v2`; data schemas
+The current staged entrypoints use `perfeng-release-verifiers-v3`; data schemas
 remain v1. If a Pod cannot mount the package, inspect the staged Application
 revision and the immutable ConfigMap in `argo-workflows`. Both Python files
 must be present before syncing the v2 child templates and parents. Do not edit
@@ -1051,6 +1051,18 @@ or replaying completed nodes.
 
 
 ## Complete adoption receipt response-loss acceptance
+
+For `root changed during adoption` from older v2 planners, compare retained
+root samples before treating the refusal as semantic drift. Run 40227060836's
+initial and receipt-only legs differed only in generation/resourceVersion and
+reconciledAt from normal Argo CD refresh. Use the reviewed v3 package under
+[ADR 0036](decisions/0036-tolerate-root-reconciliation-bookkeeping.md) and a fresh
+Workflow; never patch a published verifier or edit ledger records to recover.
+v3 validates both root samples and tolerates only those three paths. Any other
+change still requires inspection. A root that becomes unhealthy, out of sync,
+foreign or otherwise invalid now refuses at that validation before comparison.
+Do not pause reconciliation or increase deadlines to avoid normal refresh.
+Offline replay does not prove the full live adoption chain has passed.
 
 If any create-fault scenario stops before resume, inspect
 `adoption-<scenario>.barrier.json`. `terminal-parent` means the parent ended

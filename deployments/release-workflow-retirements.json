@@ -99,6 +99,94 @@
         "gitops/release-workflows/verifiers-v2/release_policy_v2.py",
         "gitops/release-workflows/verifiers-v2/release_runtime_v2.py"
       ]
+    },
+    {
+      "path": "gitops/release-workflows/plan-release-adoption-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "365f49d40001c2f787bbe8e276316026a92651a273493d725307c559102e96f8",
+      "kubernetesName": "perfeng-plan-release-adoption-v2",
+      "replacedBy": [
+        "gitops/release-workflows/plan-release-adoption-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-adopt-existing-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "d695b4bc4272623d83240ffc8bf00d68a585516d56d064ed1951733623298301",
+      "kubernetesName": "perfeng-release-adopt-existing-v2",
+      "replacedBy": [
+        "gitops/release-workflows/release-adopt-existing-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-maintenance-checkpoint-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "63010d991b2c6dd71649435a16ec14435cba901960469330aff6e8ca55b75754",
+      "kubernetesName": "perfeng-release-maintenance-checkpoint-v2",
+      "replacedBy": [
+        "gitops/release-workflows/release-maintenance-checkpoint-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-preflight-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "4472db12dc015d2955a5d2b44e587f81b9138b647f5f4d6d18a37af4bf0cdaa3",
+      "kubernetesName": "perfeng-release-preflight-v2",
+      "replacedBy": [
+        "gitops/release-workflows/release-preflight-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-readiness-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "aa16c32f639d86a131fdad8335e030143c1da8c97691cbe73e6e3abf89772881",
+      "kubernetesName": "perfeng-release-readiness-v2",
+      "replacedBy": [
+        "gitops/release-workflows/release-readiness-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/release-task-selection-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "83f32128f45ff82d88275cb9d084193f2356f8ace3ccb3ab622faa4b1c1ca0fb",
+      "kubernetesName": "perfeng-release-task-selection-v2",
+      "replacedBy": [
+        "gitops/release-workflows/release-task-selection-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/verify-release-quiescence-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "3b41824e15447b765b15ab7ee9a80219d1998f735386d7beeab9fa3df7e08a43",
+      "kubernetesName": "perfeng-verify-release-quiescence-v2",
+      "replacedBy": [
+        "gitops/release-workflows/verify-release-quiescence-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/verify-release-readiness-v2.yaml",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "be5caee4a513f5662c72183123d0eecc4ab205279b1de3594b3a5d8bd23a4f89",
+      "kubernetesName": "perfeng-verify-release-readiness-v2",
+      "replacedBy": [
+        "gitops/release-workflows/verify-release-readiness-v3.yaml"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/verifiers-v2/release_policy_v2.py",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "8d773a7b88936263685e4e50f31bffc2d47c0f34987f997faf15d729d255558e",
+      "replacedBy": [
+        "gitops/release-workflows/verifiers-v3/release_policy_v3.py"
+      ]
+    },
+    {
+      "path": "gitops/release-workflows/verifiers-v2/release_runtime_v2.py",
+      "sourceRevision": "560b3309ba4d591d307675157569672149cd5672",
+      "sha256": "00e8b1c2483ea7ba8f7125a91b35d36f0defe0249e093c0142e3f0800ab8ee23",
+      "replacedBy": [
+        "gitops/release-workflows/verifiers-v3/release_runtime_v3.py"
+      ]
     }
   ]
 }

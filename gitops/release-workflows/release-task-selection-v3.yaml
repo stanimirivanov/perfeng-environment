@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: perfeng-release-task-selection-v2
+  name: perfeng-release-task-selection-v3
   namespace: argo-workflows
   annotations:
     argocd.argoproj.io/sync-wave: '-1'
@@ -37,7 +37,7 @@ spec:
         image: python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
         command:
           - python
-          - /opt/release/release_runtime_v2.py
+          - /opt/release/release_runtime_v3.py
         args:
           - selection
         env:
@@ -58,12 +58,12 @@ spec:
       volumes:
         - name: verifier
           configMap:
-            name: perfeng-release-verifiers-v2
+            name: perfeng-release-verifiers-v3
             items:
-              - key: release_policy_v2.py
-                path: release_policy_v2.py
-              - key: release_runtime_v2.py
-                path: release_runtime_v2.py
+              - key: release_policy_v3.py
+                path: release_policy_v3.py
+              - key: release_runtime_v3.py
+                path: release_runtime_v3.py
         - name: scratch
           emptyDir: {}
       podSpecPatch: '{"securityContext":{"fsGroup":10001,"fsGroupChangePolicy":"OnRootMismatch"}}'

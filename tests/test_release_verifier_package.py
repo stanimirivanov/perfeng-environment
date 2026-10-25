@@ -113,7 +113,7 @@ class ReleaseVerifierPackageTests(unittest.TestCase):
         files = sorted(directory.rglob("*.py"))
         self.assertEqual(
             [p.relative_to(directory).as_posix() for p in files],
-            ["verifiers-v2/release_policy_v2.py", "verifiers-v2/release_runtime_v2.py"],
+            ["verifiers-v3/release_policy_v3.py", "verifiers-v3/release_runtime_v3.py"],
         )
         counts = [len(p.read_text().splitlines()) for p in files]
         self.assertLessEqual(sum(counts), 708)
@@ -125,14 +125,14 @@ class ReleaseVerifierPackageTests(unittest.TestCase):
                     for module in node.names:
                         self.assertIn(
                             module.name.split(".")[0],
-                            sys.stdlib_module_names | {"release_policy_v2"},
+                            sys.stdlib_module_names | {"release_policy_v3"},
                         )
                 if isinstance(node, ast.ImportFrom):
                     assert node.module is not None
                     self.assertIn(node.module.split(".")[0], sys.stdlib_module_names)
         kustomization = yaml.safe_load((directory / "kustomization.yaml").read_text())
         package = kustomization["configMapGenerator"][1]
-        self.assertEqual(package["name"], "perfeng-release-verifiers-v2")
+        self.assertEqual(package["name"], "perfeng-release-verifiers-v3")
         self.assertEqual(package["namespace"], "argo-workflows")
         self.assertEqual(
             set(package["files"]), {p.relative_to(directory).as_posix() for p in files}
@@ -148,7 +148,7 @@ class ReleaseVerifierPackageTests(unittest.TestCase):
                         continue
                     self.assertEqual(kind, "container", "embedded Python is forbidden")
                     self.assertEqual(
-                        body["command"], ["python", "/opt/release/release_runtime_v2.py"]
+                        body["command"], ["python", "/opt/release/release_runtime_v3.py"]
                     )
                     modes.add(body["args"][0])
                     volumes = {v["name"]: v for v in template["volumes"]}
@@ -160,7 +160,7 @@ class ReleaseVerifierPackageTests(unittest.TestCase):
         self.assertEqual(modes, {"readiness", "quiescence", "adoption", "preflight", "selection"})
 
     def test_retirement_gate_rejects_unaudited_or_inactive_replacements(self):
-        path, replacement = PREFIX + "scripts/old.py", PREFIX + "verifiers-v2/new.py"
+        path, replacement = PREFIX + "scripts/old.py", PREFIX + "verifiers-v3/new.py"
         raw = b"print('old')\n"
         entry = {
             "path": path,

@@ -37,7 +37,7 @@ with patch.dict(
 def sources():
     return tuple(
         yaml.safe_load((ROOT / "gitops/release-workflows" / name).read_text())
-        for name in ("release-adopt-existing-v2.yaml", "adoption-records.yaml")
+        for name in ("release-adopt-existing-v3.yaml", "adoption-records.yaml")
     )
 
 
@@ -888,7 +888,7 @@ echo returned > "$fixture/returned"
         self.assertNotIn("--request-timeout", shell.split('" expected ', 1)[1])
         parent = (FIXTURE / "adoption-parent.sh").read_text()
         self.assertIn('source "$source_dir/adoption-response.sh"', parent)
-        self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v2", parent)
+        self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v3", parent)
 
     @unittest.skipUnless(BASH and shutil.which("jq"), "Bash and jq required for barrier polling")
     def test_barrier_poll_allows_uninitialized_status_and_refuses_terminal_phase(self):
