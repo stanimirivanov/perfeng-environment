@@ -233,13 +233,41 @@ def validate_source(lock: InfrastructureLock, read: Callable[[str], bytes]) -> N
         "https://raw.githubusercontent.com/argoproj/argo-cd/"
         f"{lock.argocd_version}/manifests/install.yaml"
     )
-    if not isinstance(kustomization, Mapping) or dict(kustomization) != {
+    expected_bootstrap = {
         "apiVersion": "kustomize.config.k8s.io/v1beta1",
         "kind": "Kustomization",
         "namespace": lock.argocd_namespace,
         "resources": ["namespace.yaml", expected_manifest],
-    }:
+    }
+    redis_bootstrap = expected_bootstrap | {
+        "images": [
+            {
+                "name": "public.ecr.aws/docker/library/redis",
+                "newName": "docker.io/library/redis",
+                "digest": "sha256:08ad0b1d280850169a790dba1393ff7a90aef951fc19632cf4d3ce4f78e679ba",
+            }
+        ],
+        "patches": [{"path": "redis-pull-policy.yaml"}],
+    }
+    # Retain the previous exact shape for an explicitly selected rollback.
+    if not isinstance(kustomization, Mapping) or dict(kustomization) not in (
+        expected_bootstrap,
+        redis_bootstrap,
+    ):
         raise ValueError("Pinned Argo CD bootstrap differs from the environment contract")
+    if "patches" in kustomization:
+        patch_path = str(PurePosixPath(lock.argocd_bootstrap).with_name("redis-pull-policy.yaml"))
+        if yaml.safe_load(read(patch_path)) != {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {"name": "argocd-redis"},
+            "spec": {
+                "template": {
+                    "spec": {"containers": [{"name": "redis", "imagePullPolicy": "IfNotPresent"}]}
+                }
+            },
+        }:
+            raise ValueError("Pinned Redis pull-policy patch differs from the environment contract")
 
     namespace_path = str(PurePosixPath(lock.argocd_bootstrap).with_name("namespace.yaml"))
     namespace = yaml.safe_load(read(namespace_path))

@@ -1027,10 +1027,13 @@ environment, arbitrary messages and raw logs are excluded. Failed collection or
 formatting emits only `diagnostics: unavailable`; the original rollout failure
 still determines the outcome. Run 40202197628 has four Redis rollout timeouts;
 its retained initial-leg report shows `ErrImagePull` after successful init. The
-fifth leg has an independent initial-null CRD failure. The exact public Redis
-tag is discoverable, but the CI pull cause
-remains unknown until event evidence is retained. No speculative image,
-credential, permission or rollout-timeout change is included.
+fifth leg has an independent initial-null CRD failure. Run 40214268159 later
+retained UID-correlated Redis rate-limit events in two jobs after successful
+init; the specific quota/account/IP attribution is unavailable. Selected provider
+revision `4017bdda1e6d1f14592e2112ab78c1e67f710981` now supplies the approved
+Docker Hub multi-platform digest and `IfNotPresent` policy. Actual cold-pull and
+complete-parent acceptance await the post-merge main-only path. No additional
+credentials, permissions, scenarios or deadlines are introduced.
 
 After foundation chart and selected-server acceptance, trusted-main installs the
 infrastructure lock's Argo CD bootstrap from its validated clean pinned checkout.

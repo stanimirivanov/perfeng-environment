@@ -106,7 +106,7 @@ class InfrastructureLockTests(unittest.TestCase):
     def test_loads_complete_immutable_selection(self) -> None:
         lock = self.load()
 
-        self.assertEqual(lock.revision, "5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7")
+        self.assertEqual(lock.revision, "4017bdda1e6d1f14592e2112ab78c1e67f710981")
         self.assertEqual(lock.profile, "local-kind/perfeng-local")
         self.assertEqual(lock.context, "kind-perfeng-local")
         self.assertEqual(lock.argocd_version, "v3.5.2")
@@ -141,6 +141,109 @@ class InfrastructureLockTests(unittest.TestCase):
 
     def test_validates_executable_profile_and_gitops_compatibility(self) -> None:
         infrastructure_lock.validate_source(self.lock, self.read)
+
+    def select_redis_overlay(self) -> None:
+        configuration = yaml.safe_load(self.files[self.lock.argocd_bootstrap])
+        configuration["images"] = [
+            {
+                "name": "public.ecr.aws/docker/library/redis",
+                "newName": "docker.io/library/redis",
+                "digest": "sha256:08ad0b1d280850169a790dba1393ff7a90aef951fc19632cf4d3ce4f78e679ba",
+            }
+        ]
+        configuration["patches"] = [{"path": "redis-pull-policy.yaml"}]
+        self.files[self.lock.argocd_bootstrap] = yaml.safe_dump(configuration).encode()
+        path = str(Path(self.lock.argocd_bootstrap).with_name("redis-pull-policy.yaml")).replace(
+            "\\", "/"
+        )
+        self.files[path] = yaml.safe_dump(
+            {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "metadata": {"name": "argocd-redis"},
+                "spec": {
+                    "template": {
+                        "spec": {
+                            "containers": [{"name": "redis", "imagePullPolicy": "IfNotPresent"}]
+                        }
+                    }
+                },
+            }
+        ).encode()
+
+    def test_validates_reviewed_redis_overlay_from_pinned_source(self) -> None:
+        self.select_redis_overlay()
+        infrastructure_lock.validate_source(self.lock, self.read)
+
+    def test_rejects_partial_or_unreviewed_redis_transforms(self) -> None:
+        self.select_redis_overlay()
+        original = copy.deepcopy(self.files)
+        for change in (
+            "registry",
+            "digest",
+            "image-target",
+            "patch-path",
+            "missing-images",
+            "missing-patches",
+            "extra",
+        ):
+            with self.subTest(change=change):
+                self.files = copy.deepcopy(original)
+                configuration = yaml.safe_load(self.files[self.lock.argocd_bootstrap])
+                if change == "registry":
+                    configuration["images"][0]["newName"] = "example.test/redis"
+                elif change == "digest":
+                    configuration["images"][0]["digest"] = "sha256:" + "0" * 64
+                elif change == "image-target":
+                    configuration["images"][0]["name"] = "other/redis"
+                elif change == "patch-path":
+                    configuration["patches"][0]["path"] = "../redirect.yaml"
+                elif change.startswith("missing-"):
+                    del configuration[change.removeprefix("missing-")]
+                else:
+                    configuration["labels"] = []
+                self.files[self.lock.argocd_bootstrap] = yaml.safe_dump(configuration).encode()
+                with self.assertRaisesRegex(ValueError, "Argo CD bootstrap"):
+                    infrastructure_lock.validate_source(self.lock, self.read)
+
+    def test_rejects_missing_or_changed_pinned_pull_policy_patch(self) -> None:
+        self.select_redis_overlay()
+        original = copy.deepcopy(self.files)
+        path = str(Path(self.lock.argocd_bootstrap).with_name("redis-pull-policy.yaml")).replace(
+            "\\", "/"
+        )
+        for change in (
+            "missing",
+            "name",
+            "namespace",
+            "container",
+            "always",
+            "never",
+            "image",
+            "extra",
+        ):
+            with self.subTest(change=change):
+                self.files = copy.deepcopy(original)
+                if change == "missing":
+                    del self.files[path]
+                else:
+                    document = yaml.safe_load(self.files[path])
+                    container = document["spec"]["template"]["spec"]["containers"][0]
+                    if change == "name":
+                        document["metadata"]["name"] = "other"
+                    elif change == "namespace":
+                        document["metadata"]["namespace"] = "argocd"
+                    elif change == "container":
+                        container["name"] = "secret-init"
+                    elif change in {"always", "never"}:
+                        container["imagePullPolicy"] = change.title()
+                    elif change == "image":
+                        container["image"] = "example.test/redis"
+                    else:
+                        document["spec"]["replicas"] = 2
+                    self.files[path] = yaml.safe_dump(document).encode()
+                with self.assertRaises(ValueError):
+                    infrastructure_lock.validate_source(self.lock, self.read)
 
     def test_rejects_cluster_topology_drift(self) -> None:
         cluster = yaml.safe_load(self.files[self.lock.cluster_configuration])

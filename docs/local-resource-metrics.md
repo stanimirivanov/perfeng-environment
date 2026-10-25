@@ -15,10 +15,13 @@
 ## Selected ownership and trust
 
 `deployments/local-infrastructure.json` and CI select infrastructure revision
-`5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7`, including the serving-CSR usage fix.
+`4017bdda1e6d1f14592e2112ab78c1e67f710981`, retaining the serving-CSR usage fix
+and selecting the approved Argo CD Redis source/pull-policy correction.
 Cluster identity, node image, placement topology and Argo CD 3.5.2 remain unchanged.
 The metrics Application selects that same commit's `charts/resource-metrics` 1.0.0,
 which pins the official Metrics Server 0.9.0 image by digest.
+The metrics chart and implementation are byte-for-byte unchanged from the prior
+provider selection. CA, Secret references, placement and sync policy are unchanged.
 
 The consumer owns the Project/Application and existing `monitoring` namespace.
 The chart owns its eight reviewed workload/RBAC/API resources. It creates no namespace,
@@ -46,7 +49,7 @@ never use Helm install/upgrade for this package.
 Keep Docker Desktop running and use the dedicated environment kubeconfig/context.
 Certificate operations are separate, mutating provider actions requiring maintenance
 coordination, identity checks and explicit confirmation. Follow the selected provider's
-[resource-metrics guide](https://github.com/stanimirivanov/k8s-infrastructure/blob/5970bffa1f3d200e73d5a55e0cd4ef34ed9ef3b7/docs/resource-metrics.md).
+[resource-metrics guide](https://github.com/stanimirivanov/k8s-infrastructure/blob/4017bdda1e6d1f14592e2112ab78c1e67f710981/docs/resource-metrics.md).
 Run those commands from `k8s-infrastructure` with `--state-root ../perfeng-environment`.
 
 For an existing cluster with completed serving bootstrap/approvals and the matching
