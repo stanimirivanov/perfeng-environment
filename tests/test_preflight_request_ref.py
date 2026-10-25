@@ -49,7 +49,7 @@ class PreflightRequestRefTests(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", job["if"])
         self.assertEqual(job["permissions"], {"contents": "write", "packages": "read"})
         self.assertEqual(job["runs-on"], "ubuntu-latest")
-        self.assertLessEqual(job["timeout-minutes"], 30)
+        self.assertLessEqual(job["timeout-minutes"], 60)  # Owner-approved ceiling, ADR 0034.
         self.assertFalse(job["steps"][0]["with"]["persist-credentials"])
         self.assertEqual(
             job["strategy"],

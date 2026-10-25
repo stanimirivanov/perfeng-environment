@@ -6,6 +6,29 @@ set -euo pipefail
 declare -F k a migration_snapshot external_secrets role_snapshot > /dev/null || exit 2
 
 echo 'Argo CD: install selected bootstrap and reconcile the selected private sources'
+argocd_rollout() {
+  local rc=0 container containers
+  if k -n argocd rollout status "$1" --timeout=240s; then return 0; else rc=$?; fi
+  case "$1" in
+    deployment/argocd-redis) containers='secret-init redis' ;;
+    deployment/argocd-repo-server) containers=argocd-repo-server ;;
+    statefulset/argocd-application-controller) containers=argocd-application-controller ;;
+    *) return "$rc" ;;
+  esac
+  : > "$fixture/argocd-startup-private.log"
+  for container in $containers; do
+    k -n argocd logs "$1" -c "$container" --tail=40 --limit-bytes=8192 --pod-running-timeout=1s --request-timeout=5s \
+      >> "$fixture/argocd-startup-private.log" 2>> "$fixture/argocd-startup-private.error" || true
+  done
+  if k -n argocd get pods -o json > "$fixture/argocd-startup-private.json" 2> "$fixture/argocd-startup-private.error" \
+    && timeout --kill-after=5s 20s env PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" bootstrap-diagnostics \
+      "$fixture/argocd-startup-private.json" "$fixture/argocd-startup-private.log" > "$results/argocd-startup.failure.json" 2> "$fixture/argocd-startup-private.error"; then :; else
+    printf '%s\n' '{"schemaVersion":1,"diagnostics":"unavailable"}' > "$results/argocd-startup.failure.json"
+  fi
+  rm -f "$fixture/argocd-startup-private.json" "$fixture/argocd-startup-private.error" "$fixture/argocd-startup-private.log" || true
+  echo '[PREREQUISITE:argocd-bootstrap] Controller rollout failed; inspect argocd-startup.failure.json for sanitized status and fixed signal categories. No raw controller logs were published; do not change credentials or extend readiness deadlines without evidence.' >&2
+  return "$rc"
+}
 bootstrap=$(PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" bootstrap .ci/k8s-infrastructure)
 # Keep root excluded until the final bounded phase has skipped all six children.
 k -n argocd annotate application perfeng-local-root argocd.argoproj.io/skip-reconcile=true
@@ -37,9 +60,9 @@ rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.jso
 k -n argocd get secret ci-perfeng-k8s-repository -o json | jq -S . > "$fixture/argocd-repository-before.json"
 k apply --server-side -k "$bootstrap"
 k wait --for=condition=Established crd/applications.argoproj.io crd/appprojects.argoproj.io --timeout=90s
-k -n argocd rollout status deployment/argocd-redis --timeout=240s
-k -n argocd rollout status deployment/argocd-repo-server --timeout=240s
-k -n argocd rollout status statefulset/argocd-application-controller --timeout=240s
+argocd_rollout deployment/argocd-redis
+argocd_rollout deployment/argocd-repo-server
+argocd_rollout statefulset/argocd-application-controller
 k apply -f gitops/environments/local/project.yaml
 k apply -f gitops/release-workflows-bootstrap/readiness-application-access.yaml
 # Require an actual comparison after project/repository discovery before sync.

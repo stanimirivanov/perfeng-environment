@@ -8,7 +8,7 @@ metadata:
     perfeng.io/fixture: bucket-observer
 spec:
   automountServiceAccountToken: false
-  activeDeadlineSeconds: 900
+  activeDeadlineSeconds: 3600
   securityContext:
     runAsNonRoot: true
     runAsUser: 10001
@@ -23,7 +23,7 @@ spec:
       args:
         - |
           printf '[default]\ns3 =\n    addressing_style = path\n[profile denied]\ns3 =\n    addressing_style = path\n' > /tmp/awsconfig
-          sleep 900
+          sleep 3600
       env:
         - name: HOME
           value: /tmp

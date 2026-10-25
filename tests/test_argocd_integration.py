@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,6 +27,133 @@ JQ = shutil.which("jq")
 
 
 class ArgoCDIntegrationTests(unittest.TestCase):
+    def test_shared_observer_covers_the_approved_owning_job_budget(self):
+        workflow = yaml.safe_load(
+            (ROOT / ".github/workflows/release-preflight-main.yml").read_text()
+        )
+        job = workflow["jobs"]["preflight-parent"]
+        observer = yaml.safe_load((FIXTURE / "bucket-observer.yaml").read_text())
+        self.assertEqual(job["timeout-minutes"], 60)
+        budget = job["timeout-minutes"] * 60
+        self.assertEqual(observer["spec"]["activeDeadlineSeconds"], budget)
+        command = observer["spec"]["containers"][0]["args"][0]
+        sleeper = re.search(r"sleep (\d+)", command)
+        assert sleeper is not None
+        self.assertEqual(int(sleeper[1]), budget)
+        self.assertFalse(observer["spec"]["automountServiceAccountToken"])
+
+    def test_startup_report_never_publishes_arbitrary_status_or_spec_text(self):
+        secret = "credential-sentinel"
+        pod = {
+            "metadata": {"name": secret, "labels": {"app.kubernetes.io/name": "argocd-redis"}},
+            "spec": {"containers": [{"env": [{"value": secret}], "args": [secret]}]},
+            "status": {
+                "phase": "Pending",
+                "message": secret,
+                "initContainerStatuses": [
+                    {
+                        "name": "secret-init",
+                        "state": {
+                            "waiting": {
+                                "reason": "ImagePullBackOff",
+                                "message": "unauthorized " + secret,
+                            }
+                        },
+                    }
+                ],
+                "containerStatuses": [
+                    {"name": secret, "state": {"terminated": {"reason": secret, "message": secret}}}
+                ],
+            },
+        }
+        result = MODULE.bootstrap_diagnostics({"items": [pod]})
+        self.assertNotIn(secret, json.dumps(result))
+        status = result["pods"][0]
+        self.assertEqual(status["component"], "argocd-redis")
+        self.assertEqual(status["phase"], "Pending")
+        self.assertEqual(status["signals"], ["authorization"])
+        logged = MODULE.bootstrap_diagnostics({"items": [pod]}, "invalid argument " + secret)
+        self.assertEqual(logged["logSignals"], ["configuration"])
+        self.assertNotIn(secret, json.dumps(logged))
+        self.assertEqual(
+            status["containers"][0],
+            {
+                "kind": "init",
+                "name": "secret-init",
+                "state": "waiting",
+                "reason": "ImagePullBackOff",
+            },
+        )
+        self.assertEqual(status["containers"][1]["reason"], "unknown")
+        pod["status"]["phase"] = secret
+        self.assertEqual(
+            MODULE.bootstrap_diagnostics({"items": [pod]})["pods"][0]["phase"], "unknown"
+        )
+        pod["metadata"]["labels"]["app.kubernetes.io/name"] = secret
+        self.assertEqual(MODULE.bootstrap_diagnostics({"items": [pod]})["pods"], [])
+
+    @unittest.skipUnless(BASH, "Bash required for rollout failure protocol")
+    def test_rollout_preserves_failure_when_diagnostics_fail_and_success_never_collects(self):
+        assert BASH is not None
+        source = (FIXTURE / "argocd.sh").read_text()
+        function = re.search(r"argocd_rollout\(\) \{.*?\n\}", source, re.S)
+        assert function is not None
+        for rollout, diagnostic in ((0, 0), (42, 0), (42, 1)):
+            with (
+                self.subTest(rollout=rollout, diagnostic=diagnostic),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                directory = Path(temporary)
+                script = (
+                    r"""set -euo pipefail
+fixture=$1; results=$1; source_dir=$2
+k() {
+  if [[ $3 == rollout ]]; then return "$ROLLOUT"; fi
+  echo collected > "$fixture/collected"
+  if [[ $3 == logs ]]; then printf '%s' 'credential-sentinel'; return 0; fi
+  printf '%s' '{"items":[]}'
+}
+timeout() {
+  [[ $1 == --kill-after=5s && $2 == 20s ]] || return 90
+  if [[ $DIAGNOSTIC == 1 ]]; then echo credential-sentinel >&2; return 1; fi
+  [[ $3 == env && $4 == PYTHONPATH=. && $5 == uv && $9 == python ]] || return 91
+  shift 9
+  PYTHONPATH=. "$PYTHON_BIN" "$@"
+}
+"""
+                    + function[0]
+                    + "\nargocd_rollout deployment/argocd-redis\n"
+                )
+                process = subprocess.run(
+                    [BASH, "-s", "--", directory.as_posix(), FIXTURE.as_posix()],
+                    input=script,
+                    env={
+                        **os.environ,
+                        "ROLLOUT": str(rollout),
+                        "DIAGNOSTIC": str(diagnostic),
+                        "PYTHON_BIN": Path(sys.executable).as_posix(),
+                    },
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                self.assertEqual(process.returncode, rollout, process.stderr)
+                self.assertNotIn("credential-sentinel", process.stdout + process.stderr)
+                report = directory / "argocd-startup.failure.json"
+                self.assertEqual(report.exists(), rollout != 0)
+                self.assertEqual((directory / "collected").exists(), rollout != 0)
+                self.assertFalse((directory / "argocd-startup-private.json").exists())
+                self.assertFalse((directory / "argocd-startup-private.error").exists())
+                self.assertFalse((directory / "argocd-startup-private.log").exists())
+                if rollout:
+                    expected = (
+                        {"schemaVersion": 1, "diagnostics": "unavailable"}
+                        if diagnostic
+                        else {"schemaVersion": 1, "pods": [], "logSignals": []}
+                    )
+                    self.assertEqual(json.loads(report.read_text()), expected)
+
     def test_seaweedfs_uses_only_reviewed_pin_and_automation_overrides(self):
         path = ROOT / MODULE.FOUNDATION_APPLICATIONS["seaweedfs"]
         raw = path.read_bytes()
