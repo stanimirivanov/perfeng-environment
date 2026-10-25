@@ -1087,7 +1087,7 @@ this fixture performs no rollout during these attempts.
 | Case | Required owning boundary |
 |:--|:--|
 | Wrong request digest | Preflight identity Pod exits 2 with the exact byte-digest refusal; no foundation/Application/Deployment/Service/verification step runs. |
-| Revoked Application-read grant | Nested preflight and both foundation observers succeed; the named Application observer exits 1 with its own forbidden diagnostic, before Deployment/Service/HTTP verification. |
+| Revoked Application-read grant | Nested preflight and both foundation observers succeed; the named native Application observer exits 64 with the exact get-denial diagnostic for its ServiceAccount, resource, API group and namespace, before Deployment/Service/HTTP verification. |
 | Explicit grant restoration | Reapply only the existing bootstrap Role/Binding, prove named read access, then submit a fresh parent whose full result matches the first. |
 
 Both failures must leave the parent result unresolved and publish no
@@ -1096,6 +1096,17 @@ is permitted for the access refusal. Worker/node identity, exit code and exact
 owning diagnostics distinguish intended refusals from image, artifact, network
 or timeout failures. Keep raw worker logs private and upload constant outcomes,
 Workflow/worker projections and validated results only.
+
+Run 40207959980's `pointer-create-conflict` leg reached first/repeat readiness
+and correctly refused the revoked Application read. Its recorded native worker
+exited 64; the former verifier and invented offline fixture expected 1. This
+was an acceptance-contract defect after the API correctly denied the read.
+The corrected check binds the dedicated worker UID/account/node, native
+`application` templateRef and exact recorded node diagnostic. The matching
+worker log may contain raw stderr or the structured logger's escaped form;
+unrelated forbidden text cannot qualify. Python's wrong-digest refusal retains
+its separate exit-2 contract. Neither 64 alone nor any generic nonzero exit is
+accepted. No production template, access grant, scenario or deadline changes.
 
 Compare existing workload/Pod/RBAC/PV/PVC identities, ConfigMap/Secret data,
 schema/roles, Git/repository credentials and database/object-store sentinels

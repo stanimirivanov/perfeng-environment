@@ -164,12 +164,28 @@ def refused(step):
         "phase": "Failed",
         "outputs": copy.deepcopy(unresolved),
     }
-    workers = [{"nodeID": step, "exitCode": 2 if step == "verify-identities" else 1}]
+    workers = [
+        {
+            "nodeID": step,
+            "exitCode": 2 if step == "verify-identities" else 64,
+            "account": "release-readiness",
+            "uid": "worker-uid",
+        }
+    ]
     log = (
         "Preflight refused: request bytes differ from the submitted digest\n"
         if step == "verify-identities"
-        else "applications.argoproj.io perfeng-local-control-plane forbidden system:serviceaccount:argo-workflows:release-readiness argocd"
+        else 'Error from server (Forbidden): applications.argoproj.io "perfeng-local-control-plane" '
+        'is forbidden: User "system:serviceaccount:argo-workflows:release-readiness" cannot get '
+        'resource "applications" in API group "argoproj.io" in the namespace "argocd"'
     )
+    if step == "application":
+        # Native worker contract observed in trusted-main run 40207959980.
+        nodes[step]["message"] = "main: Error (exit code 64): no more retries " + log
+        nodes[step]["templateRef"] = {
+            "name": "perfeng-observe-release-readiness-v1",
+            "template": "application",
+        }
     return workflow, workers, log, preflight
 
 
@@ -246,6 +262,48 @@ class ReadinessParentIntegrationTests(unittest.TestCase):
                         MODULE.refusal(
                             w, p, step, log_value if change == "timeout" else log, preflight
                         )
+
+    def test_native_forbidden_requires_exact_executor_identity_and_diagnostic(self):
+        original = refused("application")
+        for structured in (False, True):
+            workflow, workers, log, preflight = copy.deepcopy(original)
+            if structured:
+                log = json.dumps({"level": "fatal", "msg": "no more retries " + log})
+            MODULE.refusal(workflow, workers, "application", log, preflight)
+        for change in ("legacy-exit", "account", "uid", "template", "node-message", "log-message"):
+            with self.subTest(change=change):
+                workflow, workers, log, preflight = copy.deepcopy(original)
+                if change == "legacy-exit":
+                    workers[0]["exitCode"] = 1
+                elif change == "account":
+                    workers[0]["account"] = "other"
+                elif change == "uid":
+                    workers[0]["uid"] = ""
+                elif change == "template":
+                    workflow["status"]["nodes"]["application"]["templateRef"]["template"] = "other"
+                elif change == "node-message":
+                    workflow["status"]["nodes"]["application"]["message"] = "connection timed out"
+                else:
+                    log = "connection timed out"
+                with self.assertRaises(AssertionError):
+                    MODULE.refusal(workflow, workers, "application", log, preflight)
+        for old, new in (
+            ("(Forbidden)", "(Unauthorized)"),
+            ("perfeng-local-control-plane", "other-application"),
+            ("release-readiness", "release-adoption"),
+            ("cannot get", "cannot patch"),
+            ('resource "applications"', 'resource "appprojects"'),
+            ('API group "argoproj.io"', 'API group "other.io"'),
+            ('namespace "argocd"', 'namespace "argo-workflows"'),
+        ):
+            with self.subTest(old=old, new=new):
+                workflow, workers, log, preflight = copy.deepcopy(original)
+                log = log.replace(old, new)
+                workflow["status"]["nodes"]["application"]["message"] = (
+                    "main: Error (exit code 64): no more retries " + log
+                )
+                with self.assertRaises(AssertionError):
+                    MODULE.refusal(workflow, workers, "application", log, preflight)
 
     def test_phase_uses_complete_parent_after_real_argocd_without_synthetic_parameters(self):
         source = (FIXTURE / "readiness-parent.sh").read_text()

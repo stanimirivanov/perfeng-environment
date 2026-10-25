@@ -646,6 +646,15 @@ fresh API state before verification. Credential rights, production templates,
 proxy scope and per-job deadlines remain unchanged. Full live proof remains
 post-merge; promotion, retained recovery and measured retirement stay open.
 
+Run 40207959980's pointer-create-conflict leg passed real Argo CD convergence
+and first/repeat complete readiness, then exposed an acceptance-contract defect:
+the intentional native Application-read Forbidden worker exited 64 while the
+verifier and offline fixture expected 1. The corrective slice binds the observed
+native code to the exact worker/template/denied get diagnostic, retaining all
+no-downstream/no-result checks and Python preflight's exit 2. It adds no rights,
+scenario, job, deadline or production template. The run did not reach adoption;
+full post-merge acceptance, promotion and retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
