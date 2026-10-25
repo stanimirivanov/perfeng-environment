@@ -2,6 +2,14 @@
 
 ## TL;DR
 
+- The selected infrastructure release `4017bdda1e6d...` uses digest-pinned
+  Docker Hub Redis with `IfNotPresent` after two prior CI jobs reported
+  ECR Public pull throttling. Existing clusters receive this bootstrap change
+  only through explicit application by the supported owner. Inspect the running
+  image/policy and bounded event evidence before choosing a remedy; registry
+  quotas and cold-pull availability still require live acceptance. Provider
+  rollback restores the lock, CI and metrics source pins together; preserve
+  request history, certificates, credentials and retained resources.
 - Trusted-main `missing-read-grant` is an intentional readiness refusal. The
   pinned native Application observer returns 64 with the exact Forbidden get
   diagnostic; Python preflight's wrong-digest case returns 2. The earlier

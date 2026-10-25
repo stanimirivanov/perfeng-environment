@@ -655,6 +655,17 @@ no-downstream/no-result checks and Python preflight's exit 2. It adds no rights,
 scenario, job, deadline or production template. The run did not reach adoption;
 full post-merge acceptance, promotion and retirement remain open.
 
+Infrastructure PR #49 preserves Redis image content while selecting its canonical
+Docker Hub index digest and `IfNotPresent` after two jobs in run 40214268159
+reported pull throttling. The consumer now selects merged provider revision
+`4017bdda1e6d1f14592e2112ab78c1e67f710981` in its lock, existing CI checkouts
+and metrics Application. Metrics chart bytes/values, topology and credentials
+remain unchanged. The source validator admits exactly the approved overlay
+and retains the previous exact bootstrap shape for explicit rollback. Historical
+request examples remain unchanged; fresh disposable publication calculates the
+new raw lock hashes. No live bootstrap is performed by this selection, and
+cold-pull/full adoption acceptance, promotion and retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

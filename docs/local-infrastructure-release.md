@@ -46,6 +46,33 @@ isolated runtime wrapper; certificate mutation commands are not exposed there.
 utilities, while `gitops.py` manages consumer credentials, Applications and
 workload health. Neither contains a cluster or Argo CD controller lifecycle.
 
+## Selected Redis bootstrap correction
+
+The selected provider revision is
+`4017bdda1e6d1f14592e2112ab78c1e67f710981`, merged in infrastructure PR #49.
+Its [Redis decision](https://github.com/stanimirivanov/k8s-infrastructure/blob/4017bdda1e6d1f14592e2112ab78c1e67f710981/docs/decisions/0011-pin-local-argocd-redis-image.md)
+keeps Argo CD v3.5.2 and selects canonical Docker Hub Redis at the same
+multi-platform content digest as the prior ECR Public image, with `IfNotPresent`.
+Both pinned CI checkouts and the metrics Application select that provider
+revision together. The metrics chart, implementation and Application values
+are unchanged. Cluster/context/node image, topology, namespaces and credentials
+retain their existing contracts.
+
+The consumer validates the exact approved image transformation and patch from
+the pinned Git commit. Partial or arbitrary overrides fail. The prior exact
+official-only bootstrap shape remains valid for an explicitly selected rollback;
+there is no automatic provider fallback. Restore the lock, CI and metrics pins
+together when rolling back. Historical request examples retain their committed
+bytes and hashes; the existing disposable publisher calculates fresh hashes for
+each new current-selection request.
+
+This selection does not execute substrate bootstrap. Apply later through the
+supported explicit owner path and require bounded controller readiness. Redis's
+Pod may be replaced; no namespace, Secret or ledger deletion is part of the
+change. The metrics Application retains its existing sync policy and unchanged
+chart content. Docker Hub still has pull limits, and actual cold-pull and complete
+release acceptance remain live gates.
+
 ## Immutable execution
 
 Validate the selection without Docker, Kubernetes, network access, or importing
