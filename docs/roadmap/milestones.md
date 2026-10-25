@@ -666,6 +666,15 @@ request examples remain unchanged; fresh disposable publication calculates the
 new raw lock hashes. No live bootstrap is performed by this selection, and
 cold-pull/full adoption acceptance, promotion and retirement remain open.
 
+Before extending adoption acceptance, the next harness prerequisite retains
+bounded safe barrier diagnostics for the four existing create-fault scenarios.
+Run 40218694008 reached bounded root convergence but lost pre-barrier parent
+evidence on three legs. Terminal parent, API-read failure and timeout now remain
+distinct refusals before fault setup/resume, with the same deadline and no new
+rights or scenarios. The underlying parent failure is unproven until fresh
+trusted-main observations are retained. This change supplies no live adoption,
+promotion or script-retirement credit.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

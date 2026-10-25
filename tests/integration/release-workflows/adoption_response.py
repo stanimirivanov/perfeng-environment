@@ -20,6 +20,119 @@ CONFLICTS = {"conflict", "pointer-conflict"}
 POINTERS = {"pointer", "pointer-conflict"}
 
 
+def barrier_diagnostics(workflow: Any, pods: Any, barrier: str, observation: str) -> dict[str, Any]:
+    """Project private API observations into bounded fixed-vocabulary diagnostics."""
+
+    def mapping(value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def vocabulary(value: Any, allowed: set[str]) -> str:
+        return value if isinstance(value, str) and value in allowed else "unknown"
+
+    def signals(value: Any) -> list[str]:
+        message = str(value)[:16384].lower()
+        return [
+            name
+            for name, markers in (
+                ("forbidden", ("forbidden",)),
+                ("unauthorized", ("unauthorized",)),
+                ("not-found", ("notfound", "not found")),
+                ("deadline", ("deadline",)),
+                ("image-pull", ("imagepull",)),
+                ("template-resolution", ("failed to resolve",)),
+            )
+            if any(marker in message for marker in markers)
+        ]
+
+    phases = {"Pending", "Running", "Succeeded", "Failed", "Error", "Skipped", "Omitted"}
+    steps = {BARRIER, POINTER_BARRIER, "fault-create-receipt", "fault-create-pointer"}
+    for path in Path("gitops/release-workflows").glob("*.yaml"):
+        resource = yaml.safe_load(path.read_text())
+        for item in resource.get("spec", {}).get("templates", []):
+            steps.add(item["name"])
+            for group in item.get("steps", []):
+                steps.update(step["name"] for step in group)
+    status = mapping(mapping(workflow).get("status"))
+    nodes = mapping(status.get("nodes"))
+    ready = status.get("phase") == "Running" and any(
+        mapping(node).get("displayName") == barrier
+        and mapping(node).get("type") == "Suspend"
+        and mapping(node).get("phase") == "Running"
+        for node in nodes.values()
+    )
+    decision = {
+        "terminal": "terminal-parent",
+        "timeout": "barrier-timeout",
+        "api-error": "api-read-failed",
+    }.get(observation, "invalid-observation")
+    if observation == "ready" and ready:
+        decision = "barrier-ready"
+    items = mapping(pods).get("items")
+    pod_list = items[:256] if isinstance(items, list) else []
+    records = []
+    for node_id, raw_node in list(nodes.items())[:256]:
+        node = mapping(raw_node)
+        containers = []
+        for raw_pod in pod_list:
+            pod = mapping(raw_pod)
+            annotations = mapping(mapping(pod.get("metadata")).get("annotations"))
+            if annotations.get("workflows.argoproj.io/node-id") != node_id:
+                continue
+            pod_status = mapping(pod.get("status"))
+            for field in ("initContainerStatuses", "containerStatuses"):
+                statuses = pod_status.get(field)
+                for raw_container in statuses[:16] if isinstance(statuses, list) else []:
+                    container = mapping(raw_container)
+                    state = mapping(container.get("state"))
+                    kind = next(
+                        (key for key in ("waiting", "running", "terminated") if key in state),
+                        "unknown",
+                    )
+                    detail = mapping(state.get(kind))
+                    code = detail.get("exitCode")
+                    containers.append(
+                        {
+                            "name": vocabulary(container.get("name"), {"main", "wait", "init"}),
+                            "state": kind,
+                            "reason": vocabulary(
+                                detail.get("reason"),
+                                {
+                                    "Completed",
+                                    "Error",
+                                    "OOMKilled",
+                                    "ContainerCreating",
+                                    "PodInitializing",
+                                    "ErrImagePull",
+                                    "ImagePullBackOff",
+                                    "CreateContainerConfigError",
+                                    "CrashLoopBackOff",
+                                },
+                            ),
+                            "exitCode": code if type(code) is int and 0 <= code <= 255 else None,
+                        }
+                    )
+        records.append(
+            {
+                "step": vocabulary(node.get("displayName"), steps),
+                "type": vocabulary(
+                    node.get("type"),
+                    {"Pod", "Steps", "StepGroup", "Suspend", "Retry", "DAG", "Skipped"},
+                ),
+                "phase": vocabulary(node.get("phase"), phases),
+                "signals": signals(node.get("message", "")),
+                "containers": containers[:16],
+            }
+        )
+    return {
+        "decision": decision,
+        "workflowPhase": vocabulary(status.get("phase"), phases),
+        "workflowSignals": signals(status.get("message", "")),
+        "podsObserved": isinstance(items, list),
+        "nodesTruncated": len(nodes) > 256,
+        "nodes": records,
+    }
+
+
 def controller_form(value: Any) -> Any:
     """Ignore only Argo's empty struct fields and false owner-reference default."""
     if isinstance(value, list):
@@ -271,6 +384,31 @@ if __name__ == "__main__":
         )
         native = yaml.safe_load(Path("gitops/release-workflows/adoption-records.yaml").read_text())
         print(json.dumps(template(parent, native, operation)))
+    elif mode == "barrier":
+
+        def observation_file(name: str) -> Any:
+            try:
+                return load(fixture / name)
+            except (OSError, ValueError):
+                return None
+
+        report = barrier_diagnostics(
+            observation_file("adoption-response-barrier.workflow.json"),
+            observation_file("adoption-response-barrier.pods.json"),
+            barrier,
+            (fixture / "adoption-response-barrier.state.txt").read_text().strip(),
+        )
+        (results / f"adoption-{label}.barrier.json").write_text(json.dumps(report, sort_keys=True))
+        if report["decision"] != "barrier-ready":
+            print(
+                "Adoption barrier failed: "
+                + report["decision"]
+                + "; inspect adoption-"
+                + label
+                + ".barrier.json before retrying",
+                file=sys.stderr,
+            )
+            sys.exit(1)
     elif mode == "expected":
         workflow = load(fixture / "adoption-response-barrier.workflow.json")
         assert workflow["status"]["phase"] == "Running"

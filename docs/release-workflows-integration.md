@@ -1523,6 +1523,19 @@ explicitly. After success, the caller records the two verified Workflow labels
 and recovery baseline/origin; child shell variables are not imported. A failed
 helper must abort before that bookkeeping or later cases.
 
+All four create-fault scenarios retain `adoption-<scenario>.barrier.json` before
+fault setup or resume. The existing 240-second poll distinguishes a running
+barrier on a running parent, a terminal parent, an API read failure and deadline
+expiry. Each API read is bounded to ten seconds. Only `barrier-ready` continues;
+an unavailable Pod observation does not hide a Workflow failure. The report
+contains bounded, allowlisted step/type/phase, container state/reason/exit code
+and fixed message categories, including parent-level errors without nodes.
+Raw Workflow/Pod responses, messages, arguments, outputs and logs stay private.
+Unknown fields become `unknown`; truncated node lists are marked. A category is
+diagnostic evidence, not proof of the underlying cause or adoption acceptance.
+Inspect this report before changing a grant, template or deadline, then confirm
+the cause with the relevant prerequisite evidence. A failed report blocks setup.
+
 At the barrier, recompute the actual plan and bind the proxy to its exact receipt
 and originating Workflow UID. Require an empty ledger, start the existing TLS
 proxy and explicitly resume. Successful real readiness/planning must precede a

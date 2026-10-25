@@ -1052,6 +1052,19 @@ or replaying completed nodes.
 
 ## Complete adoption receipt response-loss acceptance
 
+If any create-fault scenario stops before resume, inspect
+`adoption-<scenario>.barrier.json`. `terminal-parent` means the parent ended
+before the required suspension; use the reported step, phase, native container
+exit code and fixed failure categories to identify the failing prerequisite.
+`api-read-failed` means the Workflow read failed; `barrier-timeout` means the
+barrier was not positively observed within the unchanged 240-second bound.
+`invalid-observation` refuses inconsistent evidence. `podsObserved: false`
+means Pod diagnostics were unavailable, not that no worker ran. Unknown or
+truncated entries are incomplete diagnostics. Raw messages and API responses
+remain private, and categories alone do not prove authorization or startup
+causes. Confirm the cause before changing permissions or deadlines. A missing
+barrier report is a harness/reporting failure, never a successful fault case.
+
 The separate `pointer-response-loss` scenario faults the later pointer write.
 See [pointer response loss](release-workflows-integration.md#complete-parent-pointer-response-loss).
 Require the typed pointer event, directly observed pointer data/receipt UID and

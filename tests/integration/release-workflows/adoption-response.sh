@@ -25,13 +25,25 @@ response_workflow=$(a submit --from workflowtemplate/perfeng-adoption-response-c
   --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
 # A native Suspend immediately after the real planner is the only setup barrier.
 response_deadline=$((SECONDS + 240))
+response_state=timeout
 while ((SECONDS < response_deadline)); do
-  k -n argo-workflows get workflow "$response_workflow" -o json > "$fixture/adoption-response-barrier.workflow.json"
-  if jq -e --arg barrier "$response_barrier" 'any(.status.nodes[]?; .displayName==$barrier and .type=="Suspend" and .phase=="Running")' \
-    "$fixture/adoption-response-barrier.workflow.json" > /dev/null; then break; fi
-  jq -e '.status.phase==null or .status.phase=="" or .status.phase=="Pending" or .status.phase=="Running"' "$fixture/adoption-response-barrier.workflow.json" > /dev/null
+  if ! k -n argo-workflows get workflow "$response_workflow" --request-timeout=10s -o json \
+    > "$fixture/adoption-response-barrier.workflow.json" 2> "$fixture/adoption-response-barrier.error.log"; then
+    printf '%s\n' null > "$fixture/adoption-response-barrier.workflow.json"
+    response_state=api-error; break
+  fi
+  if jq -e --arg barrier "$response_barrier" '.status.phase=="Running" and any(.status.nodes[]?; .displayName==$barrier and .type=="Suspend" and .phase=="Running")' \
+    "$fixture/adoption-response-barrier.workflow.json" > /dev/null; then response_state=ready; break; fi
+  if ! jq -e '.status.phase==null or .status.phase=="" or .status.phase=="Pending" or .status.phase=="Running"' \
+    "$fixture/adoption-response-barrier.workflow.json" > /dev/null; then response_state=terminal; break; fi
   sleep 2
 done
+printf '%s\n' "$response_state" > "$fixture/adoption-response-barrier.state.txt"
+if ! k -n argo-workflows get pods -l "workflows.argoproj.io/workflow=$response_workflow" --request-timeout=10s -o json \
+  > "$fixture/adoption-response-barrier.pods.json" 2> "$fixture/adoption-response-barrier-pods.error.log"; then
+  printf '%s\n' null > "$fixture/adoption-response-barrier.pods.json"
+fi
+PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" barrier "$fixture" "$results" "$response_kind"
 PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" expected "$fixture" "$results" "$response_kind" \
   > "$fixture/ledger-response-expected.json"
 adoption_records "$fixture/adoption-response-before.records.json"
