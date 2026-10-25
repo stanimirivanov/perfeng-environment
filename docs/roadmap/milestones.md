@@ -612,6 +612,13 @@ failed later at the runtime SQL connection boundary. No further role escalation
 or credential substitution is introduced. New prerequisite live evidence remains post-merge; image pull does not qualify
 migration/adoption or advance script retirement.
 
+The post-PR-245 main run exposed a prerequisite observer race before SQL:
+value-less kubectl 1.35 JSONPath wait accepted an existing empty image ID.
+The next corrective slice filters empty IDs inside the native wait, retains
+independent fresh-read refusal and adds real-client watch regression coverage.
+No grant, deadline, scenario or production-template changes are included.
+Live main-only SQL/adoption acceptance and measured retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

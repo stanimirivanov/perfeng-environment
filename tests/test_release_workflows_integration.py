@@ -64,6 +64,8 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
             ("inspection", 1, "inspection", "Docker availability"),
             ("kubelet-success", 0, None, "kind kubelet pulled"),
             ("kubelet-denied", 1, "authorization", "Runner pull passed"),
+            ("kubelet-empty", 1, "unclassified", "Runner pull passed"),
+            ("kubelet-missing", 1, "unclassified", "Runner pull passed"),
         ):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
@@ -102,6 +104,10 @@ class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
                             ]
                         }
                     }
+                elif case == "kubelet-empty":
+                    pod["status"]["containerStatuses"][0]["imageID"] = ""
+                elif case == "kubelet-missing":
+                    del pod["status"]["containerStatuses"][0]["imageID"]
                 (directory / "pod-result.json").write_text(json.dumps(pod))
                 script = (
                     """set -euo pipefail

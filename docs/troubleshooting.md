@@ -1131,6 +1131,15 @@ are withheld.
   a Kubernetes delivery boundary; another package Admin grant is not the next
   action. The failure occurs before expensive parent setup.
 
+If the report instead has `exitCode: 0`, `imagePulled: false` and no classified
+pull error, distinguish a premature observer result from registry denial. Run
+40188553698 exposed this combination: kubectl 1.35's value-less JSONPath wait
+accepted an existing empty image ID. The fixture now filters empty strings
+before wait can succeed and still requires a fresh non-empty single-container
+observation. Changing package grants or accepting exit 0 alone cannot repair or
+qualify that boundary. The native-client regression covers empty-to-populated
+watch events without registry or cluster access; live acceptance stays separate.
+
 The probe has an empty database URL and no credentials/API token. Its process
 may exit unsuccessfully; only the kubelet image ID is the prerequisite signal.
 A passing pull never qualifies migration or adoption. Rerun the full workflow

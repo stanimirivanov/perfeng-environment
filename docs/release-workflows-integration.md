@@ -207,6 +207,16 @@ PostgreSQL and every release parent. A passed runner pull followed by a failed
 node pull points to Secret data/type/namespace/reference or node registry
 access, rather than another request for a broader package role.
 
+The wait filters for `imageID>""`, then independently reads the Pod and requires
+exactly one `pull` container with a non-empty image ID. In pinned kubectl 1.35,
+a value-less JSONPath wait accepts an existing empty string. Run 40188553698
+therefore returned wait exit 0 before an image ID existed, and the fresh read
+correctly refused it. A real-client loopback API regression now requires the
+returned Pod to contain the populated ID after an empty-ID watch event.
+The filter uses `>` because that client's wait parser splits `!=` at its single
+equals sign. This preserves native watch deadlines and does not qualify SQL,
+migration or adoption. See the pinned [wait implementation](https://github.com/kubernetes/kubectl/blob/v0.35.0/pkg/cmd/wait/json.go).
+
 The probe gets no Kubernetes API token or database credentials. The pinned
 `/usr/local/bin/migrate` receives an explicitly empty `PERFENG_DATABASE_URL`;
 its reviewed `postgres.Open` rejects that value before any connection. A
