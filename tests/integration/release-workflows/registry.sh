@@ -149,8 +149,10 @@ PY
   rm -f "$fixture/selected-image.secret.json"
   k create -f "$fixture/selected-image.pod.json" > /dev/null
   local rc=0 signals
+  # A value-less wait accepts imageID="" in kubectl 1.35. Filter empty strings;
+  # use > rather than != because its wait parser splits on a single '='.
   if timeout --kill-after=5s 100s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --request-timeout=100s -n perf-platform wait pod/selected-image-prerequisite \
-    --for=jsonpath='{.status.containerStatuses[0].imageID}' --timeout=95s > "$fixture/selected-image-kubelet.log" 2>&1; then :; else rc=$?; fi
+    --for=jsonpath='{.status.containerStatuses[?(@.imageID>"")].imageID}' --timeout=95s > "$fixture/selected-image-kubelet.log" 2>&1; then :; else rc=$?; fi
   k -n perf-platform get pod selected-image-prerequisite -o json > "$fixture/selected-image-kubelet.json"
   signals=$(registry_signals "$fixture/selected-image-kubelet.json")
   local report_rc=0
