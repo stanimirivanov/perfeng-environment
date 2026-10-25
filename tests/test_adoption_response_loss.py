@@ -133,15 +133,16 @@ def pointer_failure():
     return args + [workers, events, expected]
 
 
-def conflict_failure():
-    args = failure()
+def conflict_failure(kind="receipt"):
+    args = pointer_failure() if kind == "pointer" else failure()
+    operation = "pointer-conflict" if kind == "pointer" else "conflict"
     workflow, _, _, _, _, _, workers, events, _ = args
-    workflow["status"]["storedWorkflowTemplateSpec"] = MODULE.template(*sources(), "conflict")[
+    workflow["status"]["storedWorkflowTemplateSpec"] = MODULE.template(*sources(), operation)[
         "spec"
     ]
-    node = workflow["status"]["nodes"]["create-receipt"]
+    node = workflow["status"]["nodes"]["create-" + kind]
     del node["templateName"]
-    node["templateRef"] = {"name": sources()[1]["metadata"]["name"], "template": "create-receipt"}
+    node["templateRef"] = {"name": sources()[1]["metadata"]["name"], "template": "create-" + kind}
     # Pinned Argo v4.1.5's actual native AlreadyExists shape from qualified kind
     # runs: executor exit 64, a manifest-path context, and an unescaped final line.
     node["message"] = (
@@ -155,14 +156,133 @@ def conflict_failure():
     return args
 
 
-def conflict_keywords(args):
+def conflict_keywords(args, kind="receipt"):
     return {
-        "winner": copy.deepcopy(args[5]["receipt"]),
-        "diagnostic": args[0]["status"]["nodes"]["create-receipt"]["message"],
+        "winner": copy.deepcopy(args[5][kind]),
+        "diagnostic": args[0]["status"]["nodes"]["create-" + kind]["message"],
     }
 
 
 class AdoptionResponseLossTests(unittest.TestCase):
+    @unittest.skipUnless(
+        BASH and shutil.which("jq"), "Bash and jq required for fresh conflict observation"
+    )
+    def test_conflicts_collect_fresh_api_state_before_verification(self):
+        assert BASH is not None
+        source = (FIXTURE / "adoption-parent.sh").read_text()
+        snapshot = source.split('  adoption_records "$fixture/adoption-parent-records.json"\n', 1)[
+            1
+        ].split("  if [[ $expected == success ]]; then", 1)[0]
+        for kind in ("receipt", "pointer"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                api = conflict_failure(kind)[5]
+                records = [api["receipt"]] + ([api["pointer"]] if api["pointer"] else [])
+                (directory / "adoption-parent-records.json").write_text(json.dumps(records))
+                (directory / "adoption-parent-api.json").write_text('{"stale":true}')
+                script = (
+                    """set -euo pipefail
+fixture=$1; expected=$2; cluster_uid=owned-cluster
+k() { if [[ $2 == argocd ]]; then printf '%s' '{"metadata":{"uid":"fresh"}}'; else printf '%s' '{"items":[]}'; fi; }
+"""
+                    + snapshot
+                )
+                result = subprocess.run(
+                    [
+                        BASH,
+                        "-c",
+                        script,
+                        "fresh-api",
+                        directory.as_posix(),
+                        kind + "-create-conflict",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                fresh = json.loads((directory / "adoption-parent-api.json").read_text())
+                self.assertNotIn("stale", fresh)
+                self.assertEqual(fresh["receipt"], api["receipt"])
+                self.assertEqual(fresh["pointer"], api["pointer"])
+                self.assertEqual(fresh["application"]["metadata"]["uid"], "fresh")
+
+    def test_pointer_conflict_barrier_reverses_to_exact_production_parent(self):
+        parent, native = sources()
+        generated = MODULE.template(parent, native, "pointer-conflict")
+        spec = generated["spec"]
+        self.assertEqual(spec["templates"].pop(), {"name": MODULE.POINTER_BARRIER, "suspend": {}})
+        steps = spec["templates"][0]["steps"]
+        barrier = next(
+            i for i, group in enumerate(steps) if group[0]["name"] == MODULE.POINTER_BARRIER
+        )
+        del steps[barrier]
+        self.assertEqual(
+            steps[barrier][0]["templateRef"],
+            {"name": native["metadata"]["name"], "template": "create-pointer"},
+        )
+        self.assertEqual(spec, parent["spec"])
+
+    def test_pointer_conflict_requires_native_refusal_and_preserves_both_records(self):
+        args = conflict_failure("pointer")
+        report = MODULE.verify(
+            *args, operation="pointer-conflict", **conflict_keywords(args, "pointer")
+        )
+        self.assertEqual(report["decision"], "complete-parent-pointer-create-conflict-observed")
+        self.assertEqual(report["pointerUID"], args[5]["pointer"]["metadata"]["uid"])
+        for mutation in (
+            "exit",
+            "authorization",
+            "name",
+            "winner",
+            "pointer",
+            "receipt",
+            "provenance",
+            "plan",
+            "transport",
+            "events",
+            "downstream",
+            "result",
+        ):
+            with self.subTest(mutation=mutation):
+                values = copy.deepcopy(args)
+                kwargs = conflict_keywords(values, "pointer")
+                nodes = values[0]["status"]["nodes"]
+                if mutation == "exit":
+                    values[6][0]["exitCode"] = 1
+                elif mutation == "authorization":
+                    kwargs["diagnostic"] = "Forbidden: already exists"
+                elif mutation == "name":
+                    kwargs["diagnostic"] = kwargs["diagnostic"].replace(
+                        "perfeng-local-current", "other"
+                    )
+                elif mutation == "winner":
+                    kwargs["winner"]["metadata"]["uid"] = "other"
+                elif mutation == "pointer":
+                    values[5]["pointer"]["data"]["receiptUID"] = "other"
+                elif mutation == "receipt":
+                    values[5]["receipt"]["metadata"]["uid"] = "other"
+                elif mutation == "provenance":
+                    values[5]["pointer"]["metadata"]["annotations"] = {"unexpected": "other"}
+                elif mutation == "plan":
+                    nodes["pointer-plan"]["outputs"]["parameters"][0]["value"] = "other"
+                elif mutation == "transport":
+                    nodes["create-pointer"]["templateRef"]["template"] = "create-receipt"
+                elif mutation == "events":
+                    values[7].append({"event": "pointer-committed-response-dropped"})
+                elif mutation == "downstream":
+                    nodes["stored-pointer"] = {
+                        "displayName": "stored-pointer",
+                        "type": "Pod",
+                        "phase": "Succeeded",
+                    }
+                elif mutation == "result":
+                    nodes["adoption"]["outputs"] = {
+                        "parameters": [{"name": "result", "value": "{}"}]
+                    }
+                with self.assertRaises(AssertionError):
+                    MODULE.verify(*values, operation="pointer-conflict", **kwargs)
+
     def test_conflict_barrier_reverses_to_exact_production_parent(self):
         parent, native = sources()
         generated = MODULE.template(parent, native, "conflict")
@@ -258,9 +378,9 @@ class AdoptionResponseLossTests(unittest.TestCase):
 
     def test_conflict_shell_creates_winner_before_resume_without_proxy(self):
         shell = (FIXTURE / "adoption-response.sh").read_text()
-        conflict_branch = shell.split("if [[ $response_kind == conflict ]]; then", 1)[1].split(
-            "\nelse", 1
-        )[0]
+        conflict_branch = shell.split(
+            "if [[ $response_kind == conflict || $response_kind == pointer-conflict ]]; then", 1
+        )[1].split("\nelse", 1)[0]
         self.assertIn(
             'k create -f "$fixture/ledger-response-expected.json" -o json', conflict_branch
         )
@@ -351,7 +471,12 @@ class AdoptionResponseLossTests(unittest.TestCase):
         self.assertEqual(resource, original)
 
     def test_pointer_retry_skips_both_creates_and_keeps_full_original_records(self):
-        fault = pointer_failure()
+        self.check_pointer_retry(pointer_failure())
+
+    def test_pointer_conflict_retry_preserves_both_records_without_creates(self):
+        self.check_pointer_retry(conflict_failure("pointer"))
+
+    def check_pointer_retry(self, fault):
         retry = list(evidence(False))
         original = fault[5]
         w, _, _, _, _, api, _ = retry
@@ -376,7 +501,7 @@ class AdoptionResponseLossTests(unittest.TestCase):
         assert BASH is not None
         parent = (FIXTURE / "adoption-parent.sh").read_text()
         invocation = parent.split(
-            "elif [[ $scenario == response-loss || $scenario == pointer-response-loss || $scenario == receipt-create-conflict ]]; then\n",
+            "elif [[ $scenario == response-loss || $scenario == pointer-response-loss || $scenario == receipt-create-conflict || $scenario == pointer-create-conflict ]]; then\n",
             1,
         )[1].split("\nelse", 1)[0]
         definition = re.search(r"^adoption_response_case\(\) \{\n.*?^\}", parent, re.M | re.S)
@@ -388,6 +513,8 @@ class AdoptionResponseLossTests(unittest.TestCase):
             ("pointer-exit", 23),
             ("conflict-success", 0),
             ("conflict-exit", 23),
+            ("pointer-conflict-success", 0),
+            ("pointer-conflict-exit", 23),
             ("command-failure", 1),
             ("explicit-exit", 23),
             ("wrong-mode", 2),
@@ -405,7 +532,7 @@ class AdoptionResponseLossTests(unittest.TestCase):
 "$BASH" -c '[[ -z ${GITHUB_TOKEN:-} && -z ${GH_TOKEN:-} ]]'
 echo started > "$fixture/started"
 if [[ $test_case == command-failure ]]; then false; fi
-if [[ $test_case == explicit-exit || $test_case == pointer-exit || $test_case == conflict-exit ]]; then exit 23; fi
+if [[ $test_case == explicit-exit || $test_case == pointer-exit || $test_case == conflict-exit || $test_case == pointer-conflict-exit ]]; then exit 23; fi
 adoption_labels+=("$scenario" "$response_recovery")
 adoption_baseline=$response_recovery
 adoption_origin=$scenario
@@ -424,6 +551,7 @@ mode=preflight-parent
 scenario=response-loss
 [[ $test_case != pointer-* ]] || scenario=pointer-response-loss
 [[ $test_case != conflict-* ]] || scenario=receipt-create-conflict
+[[ $test_case != pointer-conflict-* ]] || scenario=pointer-create-conflict
 [[ $test_case != wrong-mode ]] || mode=boundaries
 [[ $test_case != wrong-scenario ]] || scenario=initial
 adoption_labels=()
@@ -440,7 +568,7 @@ trap 'if [[ ${GITHUB_TOKEN:-} == runner-sentinel && ${GH_TOKEN:-} == alias-senti
                     + invocation
                     + """
 expected_recovery=recovered
-[[ $scenario != pointer-response-loss ]] || expected_recovery=pointer-recovered
+[[ $scenario != pointer-response-loss && $scenario != pointer-create-conflict ]] || expected_recovery=pointer-recovered
 [[ ${adoption_labels[*]} == "$scenario $expected_recovery" ]]
 [[ $adoption_baseline == "$expected_recovery" && $adoption_origin == "$scenario" ]]
 "$BASH" -c '[[ $GITHUB_TOKEN == runner-sentinel && $GH_TOKEN == alias-sentinel ]]'
@@ -473,17 +601,31 @@ echo returned > "$fixture/returned"
                         "pointer-exit",
                         "conflict-success",
                         "conflict-exit",
+                        "pointer-conflict-success",
+                        "pointer-conflict-exit",
                         "command-failure",
                         "explicit-exit",
                     },
                 )
                 self.assertEqual(
                     (directory / "returned").exists(),
-                    case in {"success", "pointer-success", "conflict-success"},
+                    case
+                    in {
+                        "success",
+                        "pointer-success",
+                        "conflict-success",
+                        "pointer-conflict-success",
+                    },
                 )
                 self.assertEqual(
                     (directory / "completed").exists(),
-                    case in {"success", "pointer-success", "conflict-success"},
+                    case
+                    in {
+                        "success",
+                        "pointer-success",
+                        "conflict-success",
+                        "pointer-conflict-success",
+                    },
                 )
                 self.assertNotIn("sentinel", result.stdout + result.stderr)
 
@@ -699,16 +841,23 @@ sleep() { :; }
     def test_conflict_cli_roundtrip(self):
         self.check_cli("conflict")
 
+    def test_pointer_conflict_cli_roundtrip(self):
+        self.check_cli("pointer-conflict")
+
     def check_cli(self, operation):
         args = (
-            conflict_failure()
+            conflict_failure("pointer")
+            if operation == "pointer-conflict"
+            else conflict_failure()
             if operation == "conflict"
             else pointer_failure()
             if operation == "pointer"
             else failure()
         )
         label = (
-            "receipt-create-conflict"
+            "pointer-create-conflict"
+            if operation == "pointer-conflict"
+            else "receipt-create-conflict"
             if operation == "conflict"
             else "pointer-response-loss"
             if operation == "pointer"
@@ -718,9 +867,8 @@ sleep() { :; }
         barrier = copy.deepcopy(workflow)
         barrier["status"]["phase"] = "Running"
         barrier["status"]["nodes"]["barrier"]["phase"] = "Running"
-        del barrier["status"]["nodes"][
-            "create-" + ("receipt" if operation == "conflict" else operation)
-        ]
+        kind = "pointer" if operation in MODULE.POINTERS else "receipt"
+        del barrier["status"]["nodes"]["create-" + kind]
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             for name, value in (
@@ -733,10 +881,10 @@ sleep() { :; }
                 ("ledger-response-expected.json", expected),
             ):
                 (directory / name).write_text(json.dumps(value), encoding="utf-8")
-            if operation == "conflict":
-                (directory / "adoption-conflict-winner.json").write_text(json.dumps(api["receipt"]))
+            if operation in MODULE.CONFLICTS:
+                (directory / "adoption-conflict-winner.json").write_text(json.dumps(api[kind]))
                 (directory / "adoption-parent-worker.log").write_text(
-                    workflow["status"]["nodes"]["create-receipt"]["message"]
+                    workflow["status"]["nodes"]["create-" + kind]["message"]
                 )
             (directory / "parent-request.json").write_bytes(raw)
             (directory / "ledger-response-events.jsonl").write_text(
@@ -770,7 +918,7 @@ sleep() { :; }
                 MODULE.verify(
                     *args,
                     operation=operation,
-                    **conflict_keywords(args) if operation == "conflict" else {},
+                    **conflict_keywords(args, kind) if operation in MODULE.CONFLICTS else {},
                 ),
             )
             barrier["status"]["nodes"]["barrier"]["phase"] = "Succeeded"

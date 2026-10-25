@@ -1074,6 +1074,17 @@ remains pending until the post-merge trusted-main leg succeeds.
 
 ## Complete adoption initial receipt-create conflict acceptance
 
+The sibling `pointer-create-conflict` scenario pauses only after real receipt
+creation/readback and pointer planning. Its fixture writer creates the exact
+planned pointer; the unchanged native pointer create must report AlreadyExists
+with exit 64, manifest-path context and the exact pointer name. Inspect
+`adoption-pointer-create-conflict.outcome.json`. Preserve both records: a fresh
+unchanged `pointer-recovered` parent must skip both creates and retain complete
+bytes, UIDs and receipt provenance. Missing readiness, stale API snapshots,
+wrong-object/Forbidden/timeout errors or proxy events cannot qualify. No proxy
+should exist in either create-conflict case. Do not delete a winning pointer to
+retry. See [pointer conflict acceptance](release-workflows-integration.md#complete-parent-initial-pointer-create-conflict).
+
 The main-only `receipt-create-conflict` leg must reach the real pre-receipt
 barrier, then create exactly the planned receipt through the owned fixture
 writer before resumption. No response proxy should exist. The pinned native

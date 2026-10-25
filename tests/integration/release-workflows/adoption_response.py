@@ -16,6 +16,8 @@ from tests.release_verifier_support import policy
 NAME = "perfeng-adoption-response-ci"
 BARRIER = "receipt-response-barrier"
 POINTER_BARRIER = "pointer-response-barrier"
+CONFLICTS = {"conflict", "pointer-conflict"}
+POINTERS = {"pointer", "pointer-conflict"}
 
 
 def controller_form(value: Any) -> Any:
@@ -38,14 +40,14 @@ def template(
     parent: dict[str, Any], native: dict[str, Any], operation: str = "receipt"
 ) -> dict[str, Any]:
     """Add a bounded barrier; adapt transport only for the response-loss cases."""
-    assert operation in {"receipt", "pointer", "conflict"}
-    barrier = POINTER_BARRIER if operation == "pointer" else BARRIER
-    create_name = "create-" + ("receipt" if operation == "conflict" else operation)
+    assert operation in {"receipt", "pointer", *CONFLICTS}
+    barrier = POINTER_BARRIER if operation in POINTERS else BARRIER
+    create_name = "create-" + ("pointer" if operation in POINTERS else "receipt")
     result = copy.deepcopy(parent)
     result["metadata"] = {"name": NAME, "namespace": "argo-workflows"}
     steps = result["spec"]["templates"][0]["steps"]
     index = next(i for i, group in enumerate(steps) if group[0]["name"] == create_name)
-    if operation == "conflict":
+    if operation in CONFLICTS:
         steps.insert(index, [{"name": barrier, "template": barrier}])
         result["spec"]["templates"].append({"name": barrier, "suspend": {}})
         return result
@@ -73,8 +75,8 @@ def expected_record(
     workflow: dict[str, Any], raw: bytes, operation: str = "receipt"
 ) -> dict[str, Any]:
     """Bind the expected create to the actual plan, input bytes and origin UID."""
-    assert operation in {"receipt", "pointer", "conflict"}
-    operation = "receipt" if operation == "conflict" else operation
+    assert operation in {"receipt", "pointer", *CONFLICTS}
+    operation = "pointer" if operation in POINTERS else "receipt"
     barrier_name = POINTER_BARRIER if operation == "pointer" else BARRIER
     assert workflow["spec"]["workflowTemplateRef"]["name"] == NAME
     assert workflow["spec"].get("shutdown") is None
@@ -162,15 +164,15 @@ def verify(
         response_loss=True,
     )
     assert expected == expected_record(workflow, raw, operation)
-    barrier = POINTER_BARRIER if operation == "pointer" else BARRIER
+    barrier = POINTER_BARRIER if operation in POINTERS else BARRIER
     assert readiness.named(workflow, barrier, "Suspend")["phase"] == "Succeeded"
-    kind = "receipt" if operation == "conflict" else operation
+    kind = "pointer" if operation in POINTERS else "receipt"
     failed = readiness.named(workflow, "create-" + kind)
     assert failed["phase"] in {"Failed", "Error"}
-    if operation == "conflict":
+    if operation in CONFLICTS:
         assert failed["templateRef"] == {
             "name": native["metadata"]["name"],
-            "template": "create-receipt",
+            "template": "create-" + kind,
         }
     else:
         assert failed["templateName"] == "fault-create-" + operation
@@ -179,7 +181,7 @@ def verify(
     assert (
         len(nonzero) == 1
         and nonzero[0]["nodeID"] == failed["id"]
-        and nonzero[0]["exitCode"] == (64 if operation == "conflict" else 1)
+        and nonzero[0]["exitCode"] == (64 if operation in CONFLICTS else 1)
     )
     assert not failed.get("outputs", {}).get("parameters")
     assert "result" not in readiness.outputs(
@@ -196,21 +198,21 @@ def verify(
         "final-root",
         "finish",
     }
-    if operation == "pointer":
+    if operation in POINTERS:
         downstream -= {"stored-receipt", "root-after", "pointer-plan", "create-pointer"}
     assert not any(
         n["displayName"] in downstream and n["type"] == "Pod"
         for n in workflow["status"]["nodes"].values()
     )
     receipt = api["receipt"]
-    if operation == "pointer":
+    if operation in POINTERS:
         assert receipt == adoption.record(workflow, "stored-receipt")
         committed = api["pointer"]
     else:
         assert api["pointer"] is None
         committed = receipt
     assert proxy.record_matches(expected, committed)
-    if operation == "conflict":
+    if operation in CONFLICTS:
         assert events == [] and winner == committed
         wanted_error = (
             'Error from server (AlreadyExists): error when creating "/tmp/manifest.yaml": '
@@ -231,15 +233,15 @@ def verify(
         }
     report = {
         "decision": (
-            "complete-parent-receipt-create-conflict-observed"
-            if operation == "conflict"
+            "complete-parent-" + kind + "-create-conflict-observed"
+            if operation in CONFLICTS
             else "complete-parent-" + operation + "-response-loss-observed"
         ),
         "workflowUID": workflow["metadata"]["uid"],
         "receiptUID": receipt["metadata"]["uid"],
         "contentDigest": proxy.digest(expected),
     }
-    if operation == "pointer":
+    if operation in POINTERS:
         report["pointerUID"] = committed["metadata"]["uid"]
     return report
 
@@ -247,15 +249,17 @@ def verify(
 if __name__ == "__main__":
     mode, directory, evidence = sys.argv[1:4]
     operation = sys.argv[4] if len(sys.argv) == 5 else "receipt"
-    assert operation in {"receipt", "pointer", "conflict"}
+    assert operation in {"receipt", "pointer", *CONFLICTS}
     label = (
-        "receipt-create-conflict"
+        "pointer-create-conflict"
+        if operation == "pointer-conflict"
+        else "receipt-create-conflict"
         if operation == "conflict"
         else "pointer-response-loss"
         if operation == "pointer"
         else "response-loss"
     )
-    barrier = POINTER_BARRIER if operation == "pointer" else BARRIER
+    barrier = POINTER_BARRIER if operation in POINTERS else BARRIER
     fixture, results = Path(directory), Path(evidence)
 
     def load(path: Path) -> Any:
@@ -272,7 +276,7 @@ if __name__ == "__main__":
         assert workflow["status"]["phase"] == "Running"
         assert readiness.named(workflow, barrier, "Suspend")["phase"] == "Running"
         assert not any(
-            n["displayName"] == "create-" + ("receipt" if operation == "conflict" else operation)
+            n["displayName"] == "create-" + ("pointer" if operation in POINTERS else "receipt")
             and n["type"] == "Pod"
             for n in workflow["status"]["nodes"].values()
         )
@@ -291,7 +295,7 @@ if __name__ == "__main__":
             load(fixture / "adoption-parent-api.json"),
             load(results / f"adoption-parent-{label}.workers.json"),
             []
-            if operation == "conflict"
+            if operation in CONFLICTS
             else [
                 json.loads(line)
                 for line in (fixture / "ledger-response-events.jsonl").read_text().splitlines()
@@ -299,10 +303,10 @@ if __name__ == "__main__":
             load(fixture / "ledger-response-expected.json"),
             operation,
             winner=load(fixture / "adoption-conflict-winner.json")
-            if operation == "conflict"
+            if operation in CONFLICTS
             else None,
             diagnostic=(fixture / "adoption-parent-worker.log").read_text()
-            if operation == "conflict"
+            if operation in CONFLICTS
             else "",
         )
         (results / f"adoption-{label}.outcome.json").write_text(json.dumps(report, sort_keys=True))

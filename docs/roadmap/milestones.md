@@ -628,6 +628,15 @@ logs; three Redis rollout timeouts remain unproven. Readiness deadlines, grants,
 jobs/scenarios/refs and production templates are unchanged. Full post-merge
 adoption acceptance, promotion and measured retirement remain open.
 
+ADR 0035 adds the owner-approved sixth `pointer-create-conflict` leg. Preserve
+real receipt creation/readback and pointer planning, suspend only before native
+pointer creation, then let the fixture writer create exactly the planned pointer.
+Require native AlreadyExists refusal and an unchanged-parent retry that skips
+both creates and preserves both complete records. Both conflict modes capture
+fresh API state before verification. Credential rights, production templates,
+proxy scope and per-job deadlines remain unchanged. Full live proof remains
+post-merge; promotion, retained recovery and measured retirement stay open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
