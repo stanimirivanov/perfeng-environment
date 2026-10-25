@@ -603,6 +603,15 @@ never reached adoption. The bounded observer preserves native deadlines and
 acceptance rules; it diagnoses startup and does not claim a timeout root cause,
 live qualification, promotion or retirement credit.
 
+Early trusted-main prerequisites now separate authenticated runner image access
+from actual kind kubelet credential delivery before controllers/database setup.
+Both use the same generated pull-auth payload and the locked image; failures
+provide safe category-specific remediation. The owner reports package Admin
+Actions access; its subsequent initial-leg rerun passed migration parity and
+failed later at the runtime SQL connection boundary. No further role escalation
+or credential substitution is introduced. New prerequisite live evidence remains post-merge; image pull does not qualify
+migration/adoption or advance script retirement.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

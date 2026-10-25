@@ -19,6 +19,40 @@ FIXTURE = ROOT / "tests/integration/release-workflows"
 
 
 class RuntimeGrantsIntegrationTests(unittest.TestCase):
+    @unittest.skipUnless(BASH and shutil.which("jq"), "Bash and jq required")
+    def test_connection_failure_is_explained_without_accepting_a_policy_refusal(self):
+        assert BASH is not None
+        source = (FIXTURE / "runtime-grants.sh").read_text()
+        function = re.search(r"^runtime_probe_refuse\(\) \{\n.*?^\}", source, re.M | re.S)
+        assert function is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            prefix = Path(temporary) / "probe"
+            for code in (2, 3, 137, None):
+                with self.subTest(code=code):
+                    prefix.with_suffix(".worker.json").write_text(
+                        json.dumps(
+                            [
+                                {
+                                    "containers": [{"name": "probe", "exitCode": code}],
+                                    "private": "credential-sentinel",
+                                }
+                            ]
+                        )
+                    )
+                    result = subprocess.run(
+                        [BASH, "-s", "--", prefix.as_posix()],
+                        input=function[0] + '\nruntime_probe_refuse "$1"\n',
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    self.assertNotIn("credential-sentinel", result.stderr)
+                    self.assertIn(
+                        "database-connection" if code == 2 else "RUNTIME-POLICY", result.stderr
+                    )
+                    self.assertEqual(prefix.with_suffix(".failure.txt").read_text(), result.stderr)
+
     def test_grants_are_the_exact_supported_transaction(self):
         with patch.object(control_plane_migration.control_plane_database, "psql") as psql:
             control_plane_migration.grant_runtime(Path("unused"))

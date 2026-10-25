@@ -35,6 +35,212 @@ BASH = next(
 
 
 class ReleaseWorkflowsIntegrationTests(unittest.TestCase):
+    @unittest.skipUnless(BASH, "Bash required for prerequisite command boundaries")
+    def test_selected_image_prerequisites_fail_early_without_leaking_credentials(self):
+        assert BASH is not None
+        source = (FIXTURE / "registry.sh").read_text()
+        definitions = (
+            "registry_signals() {"
+            + source.split("registry_signals() {", 1)[1].split("registry_case() {", 1)[0]
+        )
+        image = json.loads((FIXTURE / "migration-image.json").read_text())["image"]
+        config = {
+            "auths": {
+                "ghcr.io": {
+                    "username": "actor",
+                    "password": "private-sentinel",
+                    "auth": "encoded-sentinel",
+                }
+            }
+        }
+        for case, expected_code, signal, remedy in (
+            ("success", 0, None, "Prerequisite passed"),
+            ("authorization", 1, "authorization", "Admin is sufficient"),
+            ("missing", 1, "manifest-missing", "locked digest exists"),
+            ("tls", 1, "tls", "certificate trust"),
+            ("network", 1, "network", "runner DNS"),
+            ("timeout", 1, "timeout", "runner DNS"),
+            ("platform", 1, "platform", "linux/amd64 image"),
+            ("inspection", 1, "inspection", "Docker availability"),
+            ("kubelet-success", 0, None, "kind kubelet pulled"),
+            ("kubelet-denied", 1, "authorization", "Runner pull passed"),
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                raw = json.dumps(config).encode()
+                (directory / "registry-approved.secret.json").write_text(
+                    json.dumps(
+                        {
+                            "apiVersion": "v1",
+                            "kind": "Secret",
+                            "immutable": True,
+                            "type": "kubernetes.io/dockerconfigjson",
+                            "metadata": {},
+                            "data": {".dockerconfigjson": base64.b64encode(raw).decode()},
+                        }
+                    )
+                )
+                (directory / "expected-auth.json").write_bytes(raw)
+                pod = {
+                    "status": {
+                        "containerStatuses": [{"name": "pull", "imageID": "sha256:observed"}]
+                    }
+                }
+                if case == "kubelet-denied":
+                    pod = {
+                        "status": {
+                            "containerStatuses": [
+                                {
+                                    "name": "pull",
+                                    "state": {
+                                        "waiting": {
+                                            "reason": "ErrImagePull",
+                                            "message": "unauthorized private-sentinel",
+                                        }
+                                    },
+                                }
+                            ]
+                        }
+                    }
+                (directory / "pod-result.json").write_text(json.dumps(pod))
+                script = (
+                    """set -euo pipefail
+fixture=$1
+results=$fixture
+mode=preflight-parent
+KUBECONFIG=$fixture/kubeconfig
+uv() { shift 4; "$PYTHON_BIN" "$@"; }
+timeout() {
+  echo "$*" >> "$fixture/commands"
+  [[ $1 != --kill-after=* ]] || shift
+  shift
+  "$@"
+}
+docker() {
+  [[ $1 == --config && $2 == "$fixture/registry-client" ]] || return 89
+  cmp "$2/config.json" "$fixture/expected-auth.json" || return 89
+  if [[ $3 == pull ]]; then
+    case "$TEST_CASE" in
+      authorization) echo 'unauthorized private-sentinel'; return 1 ;;
+      missing) echo 'manifest unknown private-sentinel'; return 1 ;;
+      tls) echo 'x509 private-sentinel'; return 1 ;;
+      network) echo 'no such host private-sentinel'; return 1 ;;
+      timeout) echo 'private-sentinel'; return 124 ;;
+    esac
+  else
+    [[ $TEST_CASE != inspection ]] || return 7
+    if [[ $TEST_CASE == platform ]]; then echo linux/arm64; else echo linux/amd64; fi
+  fi
+}
+k() {
+  if [[ $1 == create ]]; then
+    "$PYTHON_BIN" - "$3" "$fixture/expected-auth.json" <<'PY'
+import base64,json,sys
+from pathlib import Path
+obj=json.loads(Path(sys.argv[1]).read_text())
+if obj['kind']=='Secret':
+    assert base64.b64decode(obj['data']['.dockerconfigjson']) == Path(sys.argv[2]).read_bytes()
+else:
+    spec=obj['spec']
+    assert spec['automountServiceAccountToken'] is False
+    assert spec['containers'][0]['env']==[{'name':'PERFENG_DATABASE_URL','value':''}]
+    assert spec['imagePullSecrets']==[{'name':'selected-image-prerequisite'}]
+PY
+  else cat "$fixture/pod-result.json"; fi
+}
+kubectl() { [[ $TEST_CASE != kubelet-denied ]]; }
+"""
+                    + definitions
+                    + """
+registry_selected_image_prerequisite
+[[ $TEST_CASE != kubelet-* ]] || registry_selected_image_kubelet
+"""
+                )
+                process = subprocess.run(
+                    [BASH, "-s", "--", directory.as_posix()],
+                    input=script,
+                    env={
+                        **os.environ,
+                        "PYTHON_BIN": Path(sys.executable).as_posix(),
+                        "TEST_CASE": case,
+                    },
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                self.assertEqual(process.returncode, expected_code, process.stderr)
+                self.assertIn(remedy, process.stdout + process.stderr)
+                self.assertNotIn("private-sentinel", process.stdout + process.stderr)
+                self.assertFalse((directory / "registry-client").exists())
+                report_name = (
+                    "selected-image-kubelet-prerequisite.json"
+                    if case.startswith("kubelet-")
+                    else "selected-image-prerequisite.json"
+                )
+                report = json.loads((directory / report_name).read_text())
+                self.assertEqual(report["status"], "passed" if expected_code == 0 else "failed")
+                if signal:
+                    self.assertIn(signal, report["signals"])
+                self.assertNotIn("private-sentinel", json.dumps(report))
+                if not case.startswith("kubelet-"):
+                    self.assertEqual(report["image"], image)
+                commands = (directory / "commands").read_text()
+                self.assertIn("--kill-after=5s 120s docker --config", commands)
+                self.assertNotIn("private-sentinel", commands)
+
+    def test_selected_image_checks_precede_cluster_and_controller_bootstrap(self):
+        source = SCRIPT.read_text()
+        self.assertLess(
+            source.index("registry_selected_image_prerequisite;"),
+            source.index("kind create cluster"),
+        )
+        self.assertLess(
+            source.index("registry_selected_image_kubelet\n"),
+            source.index('source "$source_dir/adoption-authority.sh"'),
+        )
+        self.assertIn('command -v "$tool"', source)
+        self.assertIn("[[ -f $fixture/owned && -f $fixture/cluster-started ]]", source)
+        self.assertLess(
+            source.index('touch "$fixture/cluster-started"'), source.index("kind create cluster")
+        )
+        registry = (FIXTURE / "registry.sh").read_text()
+        self.assertNotIn("kind load", registry)
+        self.assertIn("--request-timeout=100s", registry)
+
+    def test_selected_image_lock_mismatch_refuses_before_credentials_are_materialized(self):
+        code = re.findall(r"<<'PY'\n(.*?)\nPY", (FIXTURE / "registry.sh").read_text(), re.S)[2]
+        contract = json.loads((FIXTURE / "migration-image.json").read_text())
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "tests/integration/release-workflows").mkdir(parents=True)
+            (directory / "deployments").mkdir()
+            (directory / "tests/integration/release-workflows/migration-image.json").write_text(
+                json.dumps(contract)
+            )
+            (directory / "deployments/local-control-plane.json").write_text(
+                json.dumps(
+                    {
+                        "controlPlane": {
+                            "image": contract["image"],
+                            "sourceRevision": "f" * 40,
+                        }
+                    }
+                )
+            )
+            process = subprocess.run(
+                [sys.executable, "-", str(directory)],
+                input=code,
+                cwd=directory,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertIn("PREREQUISITE:selection", process.stderr)
+            self.assertIn("immutable selection", process.stderr)
+            self.assertFalse((directory / "registry-client").exists())
+
     def test_ci_authority_and_artifact_scope_are_bounded(self):
         workflow = yaml.safe_load(
             (ROOT / ".github/workflows/release-workflows-kind.yml").read_text()

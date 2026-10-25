@@ -18,6 +18,9 @@ if [[ $mode == preflight-parent ]]; then
   [[ ${GITHUB_REF:-} == refs/heads/main && ${GITHUB_REPOSITORY:-} == stanimirivanov/perfeng-environment ]] || refuse 'parent acceptance requires trusted main.'
   [[ ${GITHUB_EVENT_NAME:-} == push || ${GITHUB_EVENT_NAME:-} == workflow_dispatch ]] || refuse 'parent acceptance event is not trusted.'
 fi
+for tool in docker curl jq uv sha256sum gzip tar timeout mktemp; do
+  command -v "$tool" > /dev/null || refuse "missing runner tool: $tool; use the supported GitHub-hosted Ubuntu runner or restore that tool before rerunning."
+done
 [[ -z ${DOCKER_HOST:-}${DOCKER_CONTEXT:-} ]] || refuse 'Docker endpoint/context override is not allowed.'
 [[ $(docker context show) == default ]] || refuse 'requires the default local Docker context.'
 [[ $(docker context inspect default --format '{{.Endpoints.docker.Host}}') == unix:///var/run/docker.sock ]] || refuse 'requires the local Unix Docker socket.'
@@ -54,7 +57,7 @@ finish() {
     fi
     if [[ $ref_rc != 0 ]]; then rc=$ref_rc; fi
   fi
-  if [[ -f $fixture/owned ]]; then
+  if [[ -f $fixture/owned && -f $fixture/cluster-started ]]; then
     if [[ -f $fixture/controller-ready ]]; then
       k -n argo-workflows get workflows -o json > "$results/workflows.json"
     fi
@@ -77,6 +80,8 @@ PY
   outcome_rc=$?
   if [[ $rc == 0 && $outcome_rc != 0 ]]; then rc=$outcome_rc; fi
   rm -f "$fixture/token" "$fixture/username" "$fixture/registry-approved.secret.json" "$fixture/registry-denied.secret.json"
+  rm -f "$fixture/registry-client/config.json" "$fixture/selected-image.secret.json"
+  rmdir "$fixture/registry-client" 2> /dev/null || true
   if [[ $mode == preflight-parent ]]; then
     rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json" "$fixture/argocd-environment-repository-secret.json"
   fi
@@ -116,11 +121,26 @@ argo lint --offline --kinds=workflows,workflowtemplates gitops/release-workflows
 clusters=$(kind get clusters)
 [[ -z $clusters ]] || refuse 'pre-existing kind clusters are not owned by this test.'
 touch "$fixture/owned"
+complete_stage
+start_stage registry-prerequisite
+printf '%s' x-access-token > "$fixture/username"
+printf '%s' "$GITHUB_TOKEN" > "$fixture/token"
+source "$source_dir/registry.sh"
+registry_credentials
+if [[ $mode == preflight-parent ]]; then registry_selected_image_prerequisite; fi
+complete_stage
+start_stage cluster-bootstrap
+touch "$fixture/cluster-started"
 timeout 360s kind create cluster --name perfeng-local --kubeconfig "$KUBECONFIG" \
   --image "$(jq -r .compatibility.nodeImage deployments/local-infrastructure.json)" --wait 120s
 for namespace in argo-workflows argocd perf-platform; do k create namespace "$namespace"; done
 cluster_uid=$(k get namespace kube-system -o jsonpath='{.metadata.uid}')
 k version -o json > "$results/kubernetes-version.json"
+if [[ $mode == preflight-parent ]]; then
+  complete_stage
+  run_stage kubelet-image-prerequisite registry_selected_image_kubelet
+  start_stage controller-bootstrap
+fi
 # No ledger records or controllers are needed to prove these real API denials.
 k apply -f gitops/release-workflows-bootstrap/ledger-namespace.yaml
 k apply -f gitops/release-workflows/rbac/adoption
@@ -149,22 +169,14 @@ print(json.dumps({"apiVersion": "v1", "kind": "List", "items": items}))
 ' | k apply -f -
 k apply -f gitops/release-workflows/rbac/maintenance
 k apply -f gitops/release-workflows-bootstrap/maintenance-application-access.yaml
-printf '%s' x-access-token > "$fixture/username"
-printf '%s' "$GITHUB_TOKEN" > "$fixture/token"
 k -n argo-workflows create secret generic release-git-read \
   --from-file="username=$fixture/username" --from-file="password=$fixture/token"
-source "$source_dir/registry.sh"
 complete_stage
-start_stage registry-prerequisite
 if [[ $mode == preflight-parent ]]; then
-  registry_credentials
-  complete_stage
   rm -f "$fixture/token" "$fixture/username"
   run_stage preflight-parent source "$source_dir/preflight-parent.sh"
   exit 0
 fi
-registry_credentials
-complete_stage
 start_stage maintenance
 rm -f "$fixture/token" "$fixture/username"
 unset GITHUB_TOKEN

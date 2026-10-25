@@ -19,6 +19,17 @@ runtime_probe_outcome() {
     grep -Ex 'psql:/sql/probe.sql:[0-9]+: ERROR:  runtime privilege matrix mismatch' "$log" > /dev/null
   fi
 }
+runtime_probe_refuse() {
+  local prefix=$1 code
+  code=$(jq -r '[.[].containers[]? | select(.name=="probe") | .exitCode][0] // "unknown"' "$prefix.worker.json")
+  if [[ $code == 2 ]]; then
+    printf '%s\n' '[PREREQUISITE:database-connection] psql connection failed or was lost (exit 2); this is not the expected SQL-policy refusal (exit 3). Inspect runtime-url Secret delivery, libpq connection configuration, PostgreSQL endpoint/authentication/TLS and connection availability. Image migration already passed; do not change registry roles for this failure. Raw database output was withheld.' > "$prefix.failure.txt"
+  else
+    printf '%s\n' '[RUNTIME-POLICY] Unexpected worker or SQL-policy outcome. Inspect the case workflow/job/worker artifacts and the expected SQL refusal boundary; timeout, image-pull and connection failures cannot qualify as policy refusal. Raw database output was withheld.' > "$prefix.failure.txt"
+  fi
+  cat "$prefix.failure.txt" >&2
+  return 1
+}
 runtime_acl_snapshot() {
   sql > "$1" <<'SQL'
 SELECT json_build_object(
@@ -54,7 +65,10 @@ runtime_probe() {
   k -n perf-platform get pods -l "batch.kubernetes.io/job-name=$job" -o json \
     | jq '[.items[] | {uid:.metadata.uid,containers:[.status.containerStatuses[]? | {name,exitCode:.state.terminated.exitCode,waitingReason:.state.waiting.reason}]}]' > "$prefix.worker.json"
   k -n perf-platform logs "job/$job" -c probe --tail=30 --limit-bytes=8192 > "$fixture/runtime-probe.log"
-  runtime_probe_outcome "$expected" "$prefix" "$fixture/runtime-probe.log"
+  if ! runtime_probe_outcome "$expected" "$prefix" "$fixture/runtime-probe.log"; then
+    runtime_probe_refuse "$prefix"
+    return 1
+  fi
   # Publish a constant only after exact phase/exit/SQL checks; raw logs stay private.
   printf '%s\n' "$label: $expected at runtime privilege policy" > "$prefix.outcome.txt"
 }
