@@ -24,6 +24,8 @@ runtime_probe_refuse() {
   code=$(jq -r '[.[].containers[]? | select(.name=="probe") | .exitCode][0] // "unknown"' "$prefix.worker.json")
   if [[ $code == 2 ]]; then
     printf '%s\n' '[PREREQUISITE:database-connection] psql connection failed or was lost (exit 2); this is not the expected SQL-policy refusal (exit 3). Inspect runtime-url Secret delivery, libpq connection configuration, PostgreSQL endpoint/authentication/TLS and connection availability. Image migration already passed; do not change registry roles for this failure. Raw database output was withheld.' > "$prefix.failure.txt"
+  elif [[ $code == 64 ]]; then
+    printf '%s\n' '[PREREQUISITE:database-input] Runtime URL was rejected before psql execution. Verify the runtime-url Secret uses the reviewed local role/host/port/database/sslmode and 43-character URL-safe password. Do not rotate credentials or expose the URL as an implicit repair.' > "$prefix.failure.txt"
   else
     printf '%s\n' '[RUNTIME-POLICY] Unexpected worker or SQL-policy outcome. Inspect the case workflow/job/worker artifacts and the expected SQL refusal boundary; timeout, image-pull and connection failures cannot qualify as policy refusal. Raw database output was withheld.' > "$prefix.failure.txt"
   fi
