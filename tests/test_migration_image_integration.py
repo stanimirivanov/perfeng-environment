@@ -386,7 +386,15 @@ printf '%s %s' "$migration_rc" "$migration_watch_rc"
                     EVIDENCE.validate_schema(snapshot, self.contract)
 
     def test_rejects_schema_changes_wrong_image_credentials_or_api_authority(self):
-        for change in ("oid", "timestamp", "image", "credential", "api-token", "worker"):
+        for change in (
+            "oid",
+            "timestamp",
+            "image",
+            "pull-policy",
+            "credential",
+            "api-token",
+            "worker",
+        ):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
                 self.populate(directory)
@@ -403,6 +411,10 @@ printf '%s %s' "$migration_rc" "$migration_watch_rc"
                 elif change == "image":
                     value["spec"]["template"]["spec"]["containers"][0]["image"] = (
                         "unreviewed:latest"
+                    )
+                elif change == "pull-policy":
+                    value["spec"]["template"]["spec"]["containers"][0]["imagePullPolicy"] = (
+                        "IfNotPresent"
                     )
                 elif change == "credential":
                     value["spec"]["template"]["spec"]["containers"][0]["env"][0]["valueFrom"][

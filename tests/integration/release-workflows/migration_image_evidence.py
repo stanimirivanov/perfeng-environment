@@ -214,6 +214,7 @@ def check(directory: Path, contract: dict) -> None:
         assert pod["imagePullSecrets"] == [{"name": "migration-ci-registry"}]
         assert len(pod["containers"]) == 1
         container = pod["containers"][0]
+        assert container["imagePullPolicy"] == "Always"
         assert container["image"] == contract["image"] and container["command"] == [
             "/usr/local/bin/migrate"
         ]

@@ -179,6 +179,56 @@ S3/emptyDir, pending a successful post-merge main run. It does not establish
 production storage/proxy health, real readiness or adoption, schema migration,
 manifest-byte/layer verification, recovery/export, promotion or host retirement.
 
+### Early selected-image prerequisites
+
+Trusted-main checks required runner tools and validates the selected image/source
+against the migration contract before creating kind. The `registry-prerequisite`
+stage uses a temporary Docker config containing the exact generated pull Secret's
+authentication JSON, runs a native pull of the immutable control-plane image and
+verifies `linux/amd64`. Pull and inspection are bounded to 120 and 20 seconds
+with five-second kill grace. It never uses a stored login or loads the pulled
+image into kind to bypass node authentication.
+
+`selected-image-prerequisite.json` records only the immutable image, result,
+exit code and constant signals. Authorization, missing manifest, TLS/network,
+timeout and platform failures print explicit resolution guidance. Read or Admin
+package Actions access is sufficient; increasing Admin is not a remedy. A grant
+that already exists requires checking job-token/config delivery. Raw registry
+errors and the ephemeral config are removed, never uploaded. If this stage
+fails, no cluster is created and cleanup does not target an unstarted cluster.
+
+Immediately after kind and namespaces exist, `kubelet-image-prerequisite` uses
+an isolated pull Secret with identical data and one Pod with `imagePullPolicy:
+Always`. It waits up to 95 seconds for the kubelet's nonempty image ID, with a
+100-second command/request bound and five-second kill grace. The Pod's own
+150-second deadline leaves time to inspect failed-pull status before that
+status is replaced by deadline termination. This precedes controllers,
+PostgreSQL and every release parent. A passed runner pull followed by a failed
+node pull points to Secret data/type/namespace/reference or node registry
+access, rather than another request for a broader package role.
+
+The probe gets no Kubernetes API token or database credentials. The pinned
+`/usr/local/bin/migrate` receives an explicitly empty `PERFENG_DATABASE_URL`;
+its reviewed `postgres.Open` rejects that value before any connection. A
+nonzero probe exit is expected and irrelevant to image-pull success. The
+`selected-image-kubelet-prerequisite.json` result establishes image pull only,
+never migration, readiness or adoption. Later CI migration Jobs also set
+`imagePullPolicy: Always`; the early probe must not let a cached image bypass
+the migrator's own registry authentication. Keep the empty-URL behavior under
+review when changing the selected executable. The fixture Pod/Secret remain
+only in the owned disposable cluster until normal teardown; no production
+manifest, credential rights, CI scenario or registry setting changes.
+
+The latest rerun (40107957676, attempt 2, initial leg) progressed past registry
+access and passed migration parity after the owner added Admin Actions access.
+Its later ungranted runtime SQL probe exited 2 instead of the expected SQL
+policy refusal at exit 3. The harness now emits
+`[PREREQUISITE:database-connection]` and a constant
+`runtime-grants-<case>.failure.txt` for that connection failure/loss, with Secret,
+libpq and endpoint/auth/TLS guidance. Other unexpected outcomes retain a distinct
+runtime-policy error. No connection failure is accepted as policy evidence and
+no speculative database repair is included.
+
 ### Selected migration-image parity
 
 After external-state preparation, the main-only job runs the exact control-plane

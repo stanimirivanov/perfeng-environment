@@ -44,6 +44,7 @@ spec:
                 containers:
                   - name: migrate
                     image: '{{workflow.parameters.image}}'
+                    imagePullPolicy: Always
                     command: [/usr/local/bin/migrate]
                     env:
                       - name: PERFENG_DATABASE_URL

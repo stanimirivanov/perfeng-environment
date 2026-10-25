@@ -1104,3 +1104,48 @@ not an implicit repair. Inspect the classified boundary, establish the cause,
 then make a scoped correction. Main run 40095134325 proves the previous
 post-wait evidence-loss defect; it does not establish the migrator timeout cause.
 See [selected migration-image parity](release-workflows-integration.md#selected-migration-image-parity).
+
+
+## Early release-image prerequisite failures
+
+Inspect the `registry-prerequisite` and `kubelet-image-prerequisite` stages
+before diagnosing a later migration timeout. The first uses the same Docker
+auth JSON that feeds the Kubernetes pull Secret and runs before kind creation.
+The second proves that kind can pull with that data before controllers or the
+database are installed. Safe artifacts are `selected-image-prerequisite.json`
+and `selected-image-kubelet-prerequisite.json`; raw vendor errors and credentials
+are withheld.
+
+- `authorization`: verify effective `Packages: read` and the exact package's
+  **Manage Actions access** entry for `perfeng-environment`. Read or Admin is
+  sufficient. If Admin is already present, investigate the job token/config;
+  do not increase privileges or substitute a personal token.
+- `manifest-missing`: restore the locked immutable artifact or review a new
+  selection; do not change to a mutable tag.
+- `tls`, `network`, `timeout`: inspect certificate trust, runner DNS/connectivity
+  and GHCR availability. Keep TLS verification enabled and native migration
+  deadlines unchanged.
+- `platform`: publish/select the reviewed `linux/amd64` variant.
+- Runner pull passes, kubelet pull fails: inspect the pull Secret's data, type,
+  namespace and Pod reference, plus node registry connectivity. This identifies
+  a Kubernetes delivery boundary; another package Admin grant is not the next
+  action. The failure occurs before expensive parent setup.
+
+The probe has an empty database URL and no credentials/API token. Its process
+may exit unsuccessfully; only the kubelet image ID is the prerequisite signal.
+A passing pull never qualifies migration or adoption. Rerun the full workflow
+after correcting the classified prerequisite. Attempt 1 of run 40107957676 showed
+scheduled Pods followed by authorization-classified ErrImagePull/ImagePullBackOff
+in all five legs. After the owner added Admin Actions access, attempt 2's initial
+leg passed all three migration parity cases; it failed later at the runtime SQL
+probe with exit 2. The rerun did not repeat that original image-pull failure.
+
+`[PREREQUISITE:database-connection]` identifies psql exit 2 (connection failure
+or loss), distinct from the expected SQL policy refusal at exit 3. Inspect the
+runtime-url Secret delivery and libpq connection configuration, PostgreSQL
+endpoint, authentication/TLS and availability. A passed migration is not proof
+that this separate psql worker received usable connection settings. Do not
+change registry roles or accept the connection failure as policy refusal.
+`runtime-grants-<case>.failure.txt` retains only fixed safe guidance. The precise
+connection cause remains unproven without its private diagnostic; this change
+does not patch or relax that boundary.
