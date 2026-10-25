@@ -6,6 +6,19 @@ set -euo pipefail
 declare -F k a migration_snapshot external_secrets role_snapshot > /dev/null || exit 2
 
 echo 'Argo CD: install selected bootstrap and reconcile the selected private sources'
+argocd_crd_ready() {
+  # The CRD naming controller writes acceptedNames and initializes conditions
+  # in one status update. Guard the null-sensitive condition wait with that fact.
+  # One outer bound covers both native waits; neither alone establishes readiness.
+  timeout --kill-after=5s 90s env -u GITHUB_TOKEN -u GH_TOKEN bash -eu -c '
+    config=$1; shift
+    while (( $# )); do
+      kubectl --kubeconfig "$config" --context kind-perfeng-local --request-timeout=90s wait "$1" "--for=jsonpath={.status.acceptedNames.kind}=$2" --timeout=90s
+      kubectl --kubeconfig "$config" --context kind-perfeng-local --request-timeout=90s wait "$1" --for=condition=Established --timeout=90s
+      shift 2
+    done
+  ' crd-ready "$KUBECONFIG" "$@"
+}
 argocd_rollout() {
   local rc=0 container containers
   if k -n argocd rollout status "$1" --timeout=240s; then return 0; else rc=$?; fi
@@ -20,12 +33,16 @@ argocd_rollout() {
     k -n argocd logs "$1" -c "$container" --tail=40 --limit-bytes=8192 --pod-running-timeout=1s --request-timeout=5s \
       >> "$fixture/argocd-startup-private.log" 2>> "$fixture/argocd-startup-private.error" || true
   done
+  if ! k -n argocd get events --field-selector=involvedObject.kind=Pod --chunk-size=0 -o json --request-timeout=5s \
+    > "$fixture/argocd-startup-private.events.json" 2> "$fixture/argocd-startup-private.error"; then
+    printf '%s\n' null > "$fixture/argocd-startup-private.events.json"
+  fi
   if k -n argocd get pods -o json > "$fixture/argocd-startup-private.json" 2> "$fixture/argocd-startup-private.error" \
     && timeout --kill-after=5s 20s env PYTHONPATH=. uv run --locked --offline python "$source_dir/argocd_inputs.py" bootstrap-diagnostics \
-      "$fixture/argocd-startup-private.json" "$fixture/argocd-startup-private.log" > "$results/argocd-startup.failure.json" 2> "$fixture/argocd-startup-private.error"; then :; else
+      "$fixture/argocd-startup-private.json" "$fixture/argocd-startup-private.log" "$fixture/argocd-startup-private.events.json" > "$results/argocd-startup.failure.json" 2> "$fixture/argocd-startup-private.error"; then :; else
     printf '%s\n' '{"schemaVersion":1,"diagnostics":"unavailable"}' > "$results/argocd-startup.failure.json"
   fi
-  rm -f "$fixture/argocd-startup-private.json" "$fixture/argocd-startup-private.error" "$fixture/argocd-startup-private.log" || true
+  rm -f "$fixture/argocd-startup-private.json" "$fixture/argocd-startup-private.error" "$fixture/argocd-startup-private.log" "$fixture/argocd-startup-private.events.json" || true
   echo '[PREREQUISITE:argocd-bootstrap] Controller rollout failed; inspect argocd-startup.failure.json for sanitized status and fixed signal categories. No raw controller logs were published; do not change credentials or extend readiness deadlines without evidence.' >&2
   return "$rc"
 }
@@ -59,7 +76,7 @@ k create -f "$fixture/argocd-environment-repository-secret.json"
 rm -f "$RUNNER_TEMP/perfeng-argocd-token" "$fixture/argocd-repository-secret.json" "$fixture/argocd-environment-repository-secret.json"
 k -n argocd get secret ci-perfeng-k8s-repository -o json | jq -S . > "$fixture/argocd-repository-before.json"
 k apply --server-side -k "$bootstrap"
-k wait --for=condition=Established crd/applications.argoproj.io crd/appprojects.argoproj.io --timeout=90s
+argocd_crd_ready crd/applications.argoproj.io Application crd/appprojects.argoproj.io AppProject
 argocd_rollout deployment/argocd-redis
 argocd_rollout deployment/argocd-repo-server
 argocd_rollout statefulset/argocd-application-controller

@@ -628,6 +628,15 @@ logs; three Redis rollout timeouts remain unproven. Readiness deadlines, grants,
 jobs/scenarios/refs and production templates are unchanged. Full post-merge
 adoption acceptance, promotion and measured retirement remain open.
 
+Run 40202197628 separated an initial-null CRD accessor failure from four Redis
+rollout timeouts; its initial-leg report shows `ErrImagePull` after successful
+init. The corrective harness slice waits
+for exact accepted kind before requiring establishment within the existing
+90-second bound, and retains UID-correlated sanitized Pod event categories.
+The Redis pull cause is still unknown; public tag discovery is not CI pull
+qualification. No registry, pin, permission, job, scenario or deadline change
+is included, and this supplies no additional adoption/retirement acceptance.
+
 ADR 0035 adds the owner-approved sixth `pointer-create-conflict` leg. Preserve
 real receipt creation/readback and pointer planning, suspend only before native
 pointer creation, then let the fixture writer create exactly the planned pointer.

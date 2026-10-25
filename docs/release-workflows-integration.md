@@ -1005,15 +1005,31 @@ and sleep, and remains subject to owned cluster cleanup. Run 40191776524 reached
 later S3 retention checks after its former 900-second lifetime, causing exec into
 a completed Pod. No release-operation or controller readiness deadline changes.
 
+CRD readiness first waits for the exact `status.acceptedNames.kind`, then
+requires `Established=True`, within one outer 90-second bound for both CRDs.
+The [upstream naming controller](https://github.com/kubernetes/apiextensions-apiserver/blob/v0.35.0/pkg/controller/status/naming_controller.go)
+writes accepted names and initialized conditions in the same status update.
+This avoids kubectl's initial-null condition accessor failure without accepting
+`Established=False`. A real pinned-client loopback API regression exercises
+null, initialized/unready and established updates; it does not access a cluster.
+
 Failed Redis, repository-server or application-controller rollout retains
 `argocd-startup.failure.json`: allowlisted component/phase/container state/reason
-and fixed signal categories only. Pod JSON and bounded relevant container logs
+and fixed signal categories only. Pod events are fetched with a five-second
+request, matched to selected Pod UIDs in `argocd`, and projected to allowlisted
+reasons and fixed categories, including HTTP authorization, throttling and
+registry unavailability. `events: unavailable` distinguishes failed event
+capture while retaining available status/log categories. Raw events, Pod JSON
+and bounded relevant container logs
 (40 lines/8192 bytes per container, five-second requests and one-second running
 wait) stay private and are removed after classification. Names, specs, arguments,
 environment, arbitrary messages and raw logs are excluded. Failed collection or
 formatting emits only `diagnostics: unavailable`; the original rollout failure
-still determines the outcome. Redis startup failures in three legs of that run
-remain unexplained until live evidence is retained. No speculative image,
+still determines the outcome. Run 40202197628 has four Redis rollout timeouts;
+its retained initial-leg report shows `ErrImagePull` after successful init. The
+fifth leg has an independent initial-null CRD failure. The exact public Redis
+tag is discoverable, but the CI pull cause
+remains unknown until event evidence is retained. No speculative image,
 credential, permission or rollout-timeout change is included.
 
 After foundation chart and selected-server acceptance, trusted-main installs the

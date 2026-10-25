@@ -19,7 +19,9 @@ FOUNDATION_APPLICATIONS = {
 ENVIRONMENT_REPOSITORY = "https://github.com/stanimirivanov/perfeng-environment.git"
 
 
-def bootstrap_diagnostics(value: dict[str, Any], log_text: str = "") -> dict[str, Any]:
+def bootstrap_diagnostics(
+    value: dict[str, Any], log_text: str = "", events: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Publish fixed status vocabulary only; never vendor messages or Pod specs."""
     components = {"argocd-redis", "argocd-repo-server", "argocd-application-controller"}
     reasons = {
@@ -36,6 +38,9 @@ def bootstrap_diagnostics(value: dict[str, Any], log_text: str = "") -> dict[str
         "DeadlineExceeded",
     }
     signals = {
+        "rate-limit": r"too many requests|toomanyrequests|rate.?limit|\b429\b",
+        "http-authorization": r"\b(?:401 unauthorized|403 forbidden)\b",
+        "registry-unavailable": r"\b50[0234]\b|service unavailable|bad gateway",
         "authorization": r"unauthorized|forbidden|denied|authentication required",
         "manifest-missing": r"manifest unknown|not found|no matching manifest",
         "network": r"timeout|timed out|connection refused|no such host|network is unreachable",
@@ -91,10 +96,35 @@ def bootstrap_diagnostics(value: dict[str, Any], log_text: str = "") -> dict[str
                     for name, pattern in signals.items()
                     if re.search(pattern, private, re.IGNORECASE)
                 ],
+                "events": [
+                    {
+                        "reason": event.get("reason")
+                        if event.get("reason")
+                        in {
+                            "Failed",
+                            "BackOff",
+                            "FailedScheduling",
+                            "FailedMount",
+                            "FailedCreatePodSandBox",
+                        }
+                        else "unknown",
+                        "signals": [
+                            name
+                            for name, pattern in signals.items()
+                            if re.search(pattern, str(event.get("message", "")), re.IGNORECASE)
+                        ],
+                    }
+                    for event in (events or {}).get("items", [])
+                    if pod.get("metadata", {}).get("uid")
+                    and event.get("involvedObject", {}).get("uid") == pod["metadata"]["uid"]
+                    and event.get("involvedObject", {}).get("kind") == "Pod"
+                    and event.get("involvedObject", {}).get("namespace") == "argocd"
+                ],
             }
         )
     return {
         "schemaVersion": 1,
+        "events": "collected" if events is not None else "unavailable",
         "pods": pods,
         "logSignals": [
             name for name, pattern in signals.items() if re.search(pattern, log_text, re.IGNORECASE)
@@ -238,6 +268,7 @@ if __name__ == "__main__":
                 bootstrap_diagnostics(
                     json.loads(Path(first).read_text(encoding="utf-8")),
                     Path(rest[0]).read_text(encoding="utf-8", errors="replace"),
+                    json.loads(Path(rest[1]).read_text(encoding="utf-8")),
                 )
             )
         )
