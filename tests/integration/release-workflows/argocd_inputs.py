@@ -19,6 +19,89 @@ FOUNDATION_APPLICATIONS = {
 ENVIRONMENT_REPOSITORY = "https://github.com/stanimirivanov/perfeng-environment.git"
 
 
+def bootstrap_diagnostics(value: dict[str, Any], log_text: str = "") -> dict[str, Any]:
+    """Publish fixed status vocabulary only; never vendor messages or Pod specs."""
+    components = {"argocd-redis", "argocd-repo-server", "argocd-application-controller"}
+    reasons = {
+        "ErrImagePull",
+        "ImagePullBackOff",
+        "CreateContainerConfigError",
+        "CreateContainerError",
+        "CrashLoopBackOff",
+        "ContainerCreating",
+        "PodInitializing",
+        "OOMKilled",
+        "Error",
+        "Completed",
+        "DeadlineExceeded",
+    }
+    signals = {
+        "authorization": r"unauthorized|forbidden|denied|authentication required",
+        "manifest-missing": r"manifest unknown|not found|no matching manifest",
+        "network": r"timeout|timed out|connection refused|no such host|network is unreachable",
+        "tls": r"x509|certificate|tls handshake",
+        "capacity": r"insufficient (cpu|memory)|unschedulable|out of memory",
+        "missing-secret": r"secret .*not found|couldn't find key",
+        "permission": r"permission denied|operation not permitted",
+        "configuration": r"fatal config file error|bad directive|invalid argument",
+    }
+    pods = []
+    for pod in value["items"]:
+        component = pod.get("metadata", {}).get("labels", {}).get("app.kubernetes.io/name")
+        if component not in components:
+            continue
+        status = pod.get("status", {})
+        phase = status.get("phase")
+        containers = []
+        for field, kind in (("initContainerStatuses", "init"), ("containerStatuses", "container")):
+            for container in status.get(field, []):
+                state = container.get("state", {})
+                active = next(
+                    (key for key in ("waiting", "terminated", "running") if key in state), "unknown"
+                )
+                reason = state.get(active, {}).get("reason")
+                name = container.get("name")
+                containers.append(
+                    {
+                        "kind": kind,
+                        "name": name
+                        if name
+                        in {
+                            "redis",
+                            "secret-init",
+                            "argocd-repo-server",
+                            "argocd-application-controller",
+                        }
+                        else "other",
+                        "state": active,
+                        "reason": reason if reason in reasons else "unknown",
+                    }
+                )
+        # Classify private status text, but emit only constant category names.
+        private = json.dumps(status)
+        pods.append(
+            {
+                "component": component,
+                "phase": phase
+                if phase in {"Pending", "Running", "Succeeded", "Failed", "Unknown"}
+                else "unknown",
+                "containers": containers,
+                "signals": [
+                    name
+                    for name, pattern in signals.items()
+                    if re.search(pattern, private, re.IGNORECASE)
+                ],
+            }
+        )
+    return {
+        "schemaVersion": 1,
+        "pods": pods,
+        "logSignals": [
+            name for name, pattern in signals.items() if re.search(pattern, log_text, re.IGNORECASE)
+        ],
+    }
+
+
 def bootstrap(source: Path) -> Path:
     """Reuse the infrastructure validator and require its exact clean checkout."""
     lock = infrastructure.validate(infrastructure_root=source)
@@ -149,6 +232,15 @@ if __name__ == "__main__":
     mode, first, *rest = sys.argv[1:]
     if mode == "bootstrap":
         print(bootstrap(Path(first)).as_posix())
+    elif mode == "bootstrap-diagnostics":
+        print(
+            json.dumps(
+                bootstrap_diagnostics(
+                    json.loads(Path(first).read_text(encoding="utf-8")),
+                    Path(rest[0]).read_text(encoding="utf-8", errors="replace"),
+                )
+            )
+        )
     elif mode == "secret":
         Path(rest[0]).write_text(
             json.dumps(repository_secret(Path(first).read_text(encoding="utf-8"), *rest[1:])),

@@ -619,6 +619,15 @@ independent fresh-read refusal and adds real-client watch regression coverage.
 No grant, deadline, scenario or production-template changes are included.
 Live main-only SQL/adoption acceptance and measured retirement remain open.
 
+Run 40191776524 subsequently passed image pulls, migration, SQL grants and server
+parity, then exposed the shared S3 observer's 900-second expiry during later
+retention checks. The owner approved a 60-minute budget for the existing five
+jobs and the same bounded observer lifetime. This corrective slice also retains
+allowlisted Argo CD bootstrap status and fixed categories from bounded private
+logs; three Redis rollout timeouts remain unproven. Readiness deadlines, grants,
+jobs/scenarios/refs and production templates are unchanged. Full post-merge
+adoption acceptance, promotion and measured retirement remain open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

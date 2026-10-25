@@ -998,6 +998,24 @@ remain open. Production verifier code remains two files/708 physical lines.
 
 ## Actual Argo CD convergence
 
+Trusted-main's existing five jobs have an owner-approved 60-minute budget
+([ADR 0034](decisions/0034-bound-disposable-acceptance-fixture-lifetimes.md)). The
+shared credential-bearing S3 observer has the same bounded 3600-second deadline
+and sleep, and remains subject to owned cluster cleanup. Run 40191776524 reached
+later S3 retention checks after its former 900-second lifetime, causing exec into
+a completed Pod. No release-operation or controller readiness deadline changes.
+
+Failed Redis, repository-server or application-controller rollout retains
+`argocd-startup.failure.json`: allowlisted component/phase/container state/reason
+and fixed signal categories only. Pod JSON and bounded relevant container logs
+(40 lines/8192 bytes per container, five-second requests and one-second running
+wait) stay private and are removed after classification. Names, specs, arguments,
+environment, arbitrary messages and raw logs are excluded. Failed collection or
+formatting emits only `diagnostics: unavailable`; the original rollout failure
+still determines the outcome. Redis startup failures in three legs of that run
+remain unexplained until live evidence is retained. No speculative image,
+credential, permission or rollout-timeout change is included.
+
 After foundation chart and selected-server acceptance, trusted-main installs the
 infrastructure lock's Argo CD bootstrap from its validated clean pinned checkout.
 Earlier phases retain the minimal CRD; this phase installs the actual
@@ -1274,7 +1292,8 @@ multi-controller/database locking or exclusion of host operators and Argo CD.
 
 Owner-approved `initial` and `receipt-only` matrix legs run the existing job on
 independent runners/owned clusters. Fail-fast is disabled; permissions, credential
-rights, pinned sources and each 30-minute deadline remain unchanged. Initial keeps
+rights and pinned sources remain unchanged. Each job now has the approved
+60-minute budget described above. Initial keeps
 its existing request ref. Recovery appends `-receipt-only` to its run/attempt ref;
 artifact names identify both scenarios. Publisher/cleanup reject unknown scenarios
 and cross-scenario ownership. PR fixtures cannot select receipt-only mode.

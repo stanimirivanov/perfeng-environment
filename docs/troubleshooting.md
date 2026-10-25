@@ -2,6 +2,16 @@
 
 ## TL;DR
 
+- Trusted-main `[PREREQUISITE:argocd-bootstrap]`: inspect
+  `argocd-startup.failure.json` for fixed startup categories and allowlisted Pod
+  status. Raw messages/logs are withheld. `diagnostics: unavailable` means capture
+  failed, not that Redis is healthy. Preserve the original rollout failure;
+  choose a remedy from evidence before changing pins, credentials or deadlines.
+- A completed `bucket-ci-observer` during later retention checks previously came
+  from its 900-second lifetime. Its bound now matches the approved 60-minute
+  trusted-main job budget. Rerun through the owned disposable workflow; do not
+  replace an observer in a retained environment as an implicit repair.
+
 - For adoption ledger conflicts or interrupted creation, use
   [release adoption recovery](release-adoption.md#partial-failure-and-recovery).
   Preserve receipts and pointer; do not apply, patch, delete or infer empty state.
