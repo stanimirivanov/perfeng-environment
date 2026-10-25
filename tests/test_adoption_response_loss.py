@@ -164,6 +164,119 @@ def conflict_keywords(args, kind="receipt"):
 
 
 class AdoptionResponseLossTests(unittest.TestCase):
+    def test_barrier_diagnostics_are_allowlisted_and_fail_closed(self):
+        workflow = {
+            "status": {
+                "phase": "Failed",
+                "message": "credential-sentinel Forbidden",
+                "nodes": {
+                    "private-node": {
+                        "displayName": "plan",
+                        "type": "Pod",
+                        "phase": "Failed",
+                        "message": "credential-sentinel Forbidden",
+                        "outputs": {"secret": "credential-sentinel"},
+                    }
+                },
+            }
+        }
+        pods = {
+            "items": [
+                {
+                    "metadata": {"annotations": {"workflows.argoproj.io/node-id": "private-node"}},
+                    "status": {
+                        "containerStatuses": [
+                            {
+                                "name": "main",
+                                "state": {
+                                    "terminated": {"exitCode": 64, "message": "credential-sentinel"}
+                                },
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+        report = MODULE.barrier_diagnostics(workflow, pods, MODULE.BARRIER, "terminal")
+        self.assertEqual(report["decision"], "terminal-parent")
+        self.assertEqual(report["nodes"][0]["step"], "plan")
+        self.assertEqual(report["nodes"][0]["signals"], ["forbidden"])
+        self.assertEqual(report["nodes"][0]["containers"][0]["exitCode"], 64)
+        self.assertNotIn("credential-sentinel", json.dumps(report))
+        self.assertNotIn("private-node", json.dumps(report))
+        self.assertEqual(report["workflowSignals"], ["forbidden"])
+        self.assertEqual(
+            MODULE.barrier_diagnostics(None, None, MODULE.BARRIER, "api-error")["decision"],
+            "api-read-failed",
+        )
+        self.assertEqual(
+            MODULE.barrier_diagnostics({}, None, MODULE.BARRIER, "timeout")["decision"],
+            "barrier-timeout",
+        )
+        workflow["status"]["phase"] = "Running"
+        workflow["status"]["nodes"]["barrier"] = {
+            "displayName": MODULE.BARRIER,
+            "type": "Suspend",
+            "phase": "Running",
+        }
+        self.assertEqual(
+            MODULE.barrier_diagnostics(workflow, pods, MODULE.BARRIER, "ready")["decision"],
+            "barrier-ready",
+        )
+        workflow["status"]["phase"] = "Failed"
+        self.assertNotEqual(
+            MODULE.barrier_diagnostics(workflow, pods, MODULE.BARRIER, "ready")["decision"],
+            "barrier-ready",
+        )
+
+    def test_barrier_diagnostics_bound_unknown_and_malformed_api_fields(self):
+        for workflow, pods in (
+            (None, None),
+            ({"status": None}, {"items": None}),
+            ({"status": {"nodes": []}}, {"items": [None]}),
+        ):
+            with self.subTest(workflow=workflow):
+                self.assertNotEqual(
+                    MODULE.barrier_diagnostics(workflow, pods, MODULE.BARRIER, "ready")["decision"],
+                    "barrier-ready",
+                )
+        node = {
+            "displayName": "credential-sentinel",
+            "phase": "credential-sentinel",
+            "type": "credential-sentinel",
+            "message": "credential-sentinel",
+        }
+        workflow = {
+            "status": {
+                "phase": "credential-sentinel",
+                "nodes": {str(index): node for index in range(300)},
+            }
+        }
+        pods = {
+            "items": [
+                {
+                    "metadata": {"annotations": {"workflows.argoproj.io/node-id": "0"}},
+                    "status": {
+                        "containerStatuses": [
+                            {
+                                "name": "credential-sentinel",
+                                "state": {
+                                    "waiting": {"reason": "credential-sentinel", "exitCode": True}
+                                },
+                            }
+                        ]
+                        * 30
+                    },
+                }
+            ]
+        }
+        report = MODULE.barrier_diagnostics(workflow, pods, MODULE.BARRIER, "timeout")
+        self.assertTrue(report["nodesTruncated"])
+        self.assertEqual(len(report["nodes"]), 256)
+        self.assertEqual(len(report["nodes"][0]["containers"]), 16)
+        self.assertIsNone(report["nodes"][0]["containers"][0]["exitCode"])
+        self.assertNotIn("credential-sentinel", json.dumps(report))
+
     @unittest.skipUnless(
         BASH and shutil.which("jq"), "Bash and jq required for fresh conflict observation"
     )
@@ -771,7 +884,8 @@ echo returned > "$fixture/returned"
             shell.index('adoption_case "$scenario" "$scenario"'),
             shell.index('adoption_case "$response_recovery" success'),
         )
-        self.assertNotIn("--request-timeout", shell)
+        # Read-only observations are bounded; fault/create transport is unchanged.
+        self.assertNotIn("--request-timeout", shell.split('" expected ', 1)[1])
         parent = (FIXTURE / "adoption-parent.sh").read_text()
         self.assertIn('source "$source_dir/adoption-response.sh"', parent)
         self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v2", parent)
@@ -782,7 +896,10 @@ echo returned > "$fixture/returned"
         shell = (FIXTURE / "adoption-response.sh").read_text()
         polling = (
             "response_deadline="
-            + shell.split("response_deadline=", 1)[1].split("\nPYTHONPATH=", 1)[0]
+            + shell.split("response_deadline=", 1)[1].split(
+                '\nPYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_response.py" expected',
+                1,
+            )[0]
         )
         for phase, succeeds in (
             (None, True),
@@ -792,10 +909,16 @@ echo returned > "$fixture/returned"
             ("Failed", False),
             ("Error", False),
             ("Succeeded", False),
+            ("api-error", False),
+            ("timeout", False),
         ):
             with self.subTest(phase=phase), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
-                first = {"status": {"phase": phase}} if phase is not None else {}
+                first = (
+                    {"status": {"phase": "Running" if phase == "timeout" else phase}}
+                    if phase is not None
+                    else {}
+                )
                 second = {
                     "status": {
                         "phase": "Running",
@@ -814,22 +937,46 @@ echo returned > "$fixture/returned"
                 script = (
                     """set -euo pipefail
 fixture=$1
+source_dir=unused
+results=$fixture
+response_kind=receipt
 response_workflow=fixture
 response_barrier=receipt-response-barrier
-k() { local index; index=$(cat "$fixture/count"); echo $((index+1)) > "$fixture/count"; cat "$fixture/state-$index.json"; }
-sleep() { :; }
+k() {
+  if [[ $* == *'get pods'* ]]; then echo null; return; fi
+  local index; index=$(cat "$fixture/count"); echo $((index+1)) > "$fixture/count"
+  [[ $test_phase != api-error ]] || return 1
+  cat "$fixture/state-$index.json"
+}
+sleep() { if [[ $test_phase == timeout ]]; then SECONDS=1000; fi; }
+uv() {
+  echo recorded > "$fixture/report"
+  [[ $(cat "$fixture/adoption-response-barrier.state.txt") == ready ]]
+}
 """
                     + polling
+                    + '\necho continued > "$fixture/continued"\n'
                 )
                 result = subprocess.run(
                     [BASH, "-c", script, "barrier-test", directory.as_posix()],
                     capture_output=True,
                     text=True,
+                    env={**os.environ, "test_phase": str(phase)},
                     timeout=30,
                 )
                 self.assertEqual(result.returncode == 0, succeeds, result.stderr)
                 self.assertEqual(
                     (directory / "count").read_text().strip(), "2" if succeeds else "1"
+                )
+                self.assertTrue((directory / "report").exists())
+                self.assertEqual((directory / "continued").exists(), succeeds)
+                self.assertEqual(
+                    (directory / "adoption-response-barrier.state.txt").read_text().strip(),
+                    "ready"
+                    if succeeds
+                    else phase
+                    if phase in {"api-error", "timeout"}
+                    else "terminal",
                 )
 
     def test_cli_binds_barrier_plan_and_failed_parent_to_safe_report(self):
@@ -911,6 +1058,10 @@ sleep() { :; }
 
             generated = json.loads(run("template").stdout)
             self.assertEqual(generated, MODULE.template(*sources(), operation))
+            (directory / "adoption-response-barrier.state.txt").write_text("ready")
+            run("barrier")
+            report_path = directory / f"adoption-{label}.barrier.json"
+            self.assertEqual(json.loads(report_path.read_text())["decision"], "barrier-ready")
             self.assertEqual(json.loads(run("expected").stdout), expected)
             run("verify")
             self.assertEqual(
@@ -927,6 +1078,9 @@ sleep() { :; }
             )
             with self.assertRaises(subprocess.CalledProcessError):
                 run("expected")
+            with self.assertRaises(subprocess.CalledProcessError):
+                run("barrier")
+            self.assertEqual(json.loads(report_path.read_text())["decision"], "invalid-observation")
 
 
 if __name__ == "__main__":
