@@ -1146,6 +1146,17 @@ runtime-url Secret delivery and libpq connection configuration, PostgreSQL
 endpoint, authentication/TLS and availability. A passed migration is not proof
 that this separate psql worker received usable connection settings. Do not
 change registry roles or accept the connection failure as policy refusal.
-`runtime-grants-<case>.failure.txt` retains only fixed safe guidance. The precise
-connection cause remains unproven without its private diagnostic; this change
-does not patch or relax that boundary.
+`runtime-grants-<case>.failure.txt` retains only fixed safe guidance.
+
+The original worker supplied a complete URI as `PGDATABASE`. A native-client
+reproduction with the exact pinned image established that libpq treated it as a
+literal database name and selected a local socket. The corrected worker
+validates the existing canonical URI and exports separate `PGHOST`, `PGPORT`,
+`PGDATABASE`, `PGUSER`, `PGPASSWORD` and `PGSSLMODE` values before executing psql.
+Its password stays in the environment, never command arguments or diagnostics.
+`[PREREQUISITE:database-input]` (worker exit 64) means that validation failed
+before any SQL execution: inspect the Secret mapping against the reviewed local
+URI contract and 43-character URL-safe password. Do not print the URI or rotate
+credentials as an implicit repair. The Secret schema and SQL refusal criteria
+are unchanged. A later exit 2 still requires connection diagnosis; neither this
+mapping fix nor isolated endpoint-selection evidence proves live grants.

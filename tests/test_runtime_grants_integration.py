@@ -1,9 +1,12 @@
 """Offline policy parity, worker authority and refusal classification checks."""
 
 import json
+import os
 import re
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +22,97 @@ FIXTURE = ROOT / "tests/integration/release-workflows"
 
 
 class RuntimeGrantsIntegrationTests(unittest.TestCase):
+    @unittest.skipUnless(BASH, "Bash required for actual worker command regression")
+    def test_worker_maps_runtime_url_to_libpq_environment_without_argv_credentials(self):
+        assert BASH is not None
+        workflow = yaml.safe_load((FIXTURE / "runtime-grants-workflow.yaml").read_text())
+        job = yaml.safe_load(workflow["spec"]["templates"][0]["resource"]["manifest"])
+        worker = job["spec"]["template"]["spec"]["containers"][0]
+        secret_input = next(e["name"] for e in worker["env"] if "valueFrom" in e)
+        prefix = "postgresql://perfeng_runtime:"
+        suffix = "@postgres.perf-platform.svc.cluster.local:5432/perfeng?sslmode=disable"
+        passwords = ["a" * 43, "A_-" * 14 + "9"]
+        good = prefix + passwords[0] + suffix
+        cases: list[tuple[str, str | None]] = [
+            (prefix + password + suffix, password) for password in passwords
+        ]
+        cases += [
+            (value, None)
+            for value in (
+                good.replace("perfeng_runtime", "perfeng_migration"),
+                good.replace("postgres.perf-platform", "foreign.perf-platform"),
+                good.replace(":5432/", ":9999/"),
+                good.replace("/perfeng?", "/other?"),
+                good.replace("disable", "require"),
+                good + "&extra=value",
+                prefix + "a" * 42 + suffix,
+                prefix + "a" * 44 + suffix,
+                prefix + "a" * 42 + "%" + suffix,
+                prefix + "a" * 42 + "\n" + suffix,
+            )
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            recorder = directory / "record.py"
+            recorder.write_text(
+                "import json,os,sys\nfrom pathlib import Path\nPath(os.environ['CAPTURE']).write_text(json.dumps({'argv':sys.argv[1:],'env':{k:v for k,v in os.environ.items() if k.startswith('PG') or k=='RUNTIME_URL'}}))\n"
+            )
+            client = directory / "psql"
+            client.write_text('#!/bin/sh\nexec "$PYTHON_BIN" "$RECORDER" "$@"\n', newline="\n")
+            client.chmod(0o700)
+            capture = directory / "capture.json"
+            for url, password in cases:
+                with self.subTest(valid=password is not None):
+                    capture.unlink(missing_ok=True)
+                    process = subprocess.run(
+                        [
+                            BASH,
+                            "-c",
+                            'PATH="$(cd "$1" && pwd):$PATH"; export PATH; '
+                            + shlex.join(worker["command"] + worker["args"]),
+                            "worker-test",
+                            directory.as_posix(),
+                        ],
+                        env={
+                            **os.environ,
+                            secret_input: url,
+                            "PGHOST": "foreign-default",
+                            "PGCONNECT_TIMEOUT": "10",
+                            "PGAPPNAME": "runtime-grants-ci",
+                            "PYTHON_BIN": Path(sys.executable).as_posix(),
+                            "RECORDER": recorder.as_posix(),
+                            "CAPTURE": capture.as_posix(),
+                            # Keep POSIX psql arguments intact in the Windows recorder.
+                            "MSYS2_ARG_CONV_EXCL": "*",
+                        },
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                    )
+                    self.assertNotIn(url, process.stdout + process.stderr)
+                    if password is None:
+                        self.assertEqual(process.returncode, 64)
+                        self.assertIn("DATABASE_INPUT", process.stderr)
+                        self.assertFalse(capture.exists())
+                        continue
+                    self.assertEqual(process.returncode, 0, process.stderr)
+                    observed = json.loads(capture.read_text())
+                    self.assertEqual(
+                        observed["argv"],
+                        ["-X", "-w", "-qAt", "-v", "ON_ERROR_STOP=1", "-f", "/sql/probe.sql"],
+                    )
+                    env = observed["env"]
+                    self.assertEqual(env["PGHOST"], "postgres.perf-platform.svc.cluster.local")
+                    self.assertEqual(env["PGPORT"], "5432")
+                    self.assertEqual(env["PGDATABASE"], "perfeng")
+                    self.assertEqual(env["PGUSER"], "perfeng_runtime")
+                    self.assertEqual(env["PGPASSWORD"], password)
+                    self.assertEqual(env["PGSSLMODE"], "disable")
+                    self.assertEqual(env["PGCONNECT_TIMEOUT"], "10")
+                    self.assertEqual(env["PGAPPNAME"], "runtime-grants-ci")
+                    self.assertNotIn("RUNTIME_URL", env)
+                    self.assertNotIn(password, json.dumps(observed["argv"]))
+
     @unittest.skipUnless(BASH and shutil.which("jq"), "Bash and jq required")
     def test_connection_failure_is_explained_without_accepting_a_policy_refusal(self):
         assert BASH is not None
@@ -27,7 +121,7 @@ class RuntimeGrantsIntegrationTests(unittest.TestCase):
         assert function is not None
         with tempfile.TemporaryDirectory() as temporary:
             prefix = Path(temporary) / "probe"
-            for code in (2, 3, 137, None):
+            for code in (2, 3, 64, 137, None):
                 with self.subTest(code=code):
                     prefix.with_suffix(".worker.json").write_text(
                         json.dumps(
@@ -49,7 +143,12 @@ class RuntimeGrantsIntegrationTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 1)
                     self.assertNotIn("credential-sentinel", result.stderr)
                     self.assertIn(
-                        "database-connection" if code == 2 else "RUNTIME-POLICY", result.stderr
+                        "database-connection"
+                        if code == 2
+                        else "database-input"
+                        if code == 64
+                        else "RUNTIME-POLICY",
+                        result.stderr,
                     )
                     self.assertEqual(prefix.with_suffix(".failure.txt").read_text(), result.stderr)
 
@@ -73,9 +172,10 @@ class RuntimeGrantsIntegrationTests(unittest.TestCase):
         worker = pod["containers"][0]
         server = yaml.safe_load((FIXTURE / "postgres-pod.yaml").read_text())
         self.assertEqual(worker["image"], server["spec"]["containers"][0]["image"])
-        self.assertEqual(worker["command"], ["psql"])
-        self.assertIn("ON_ERROR_STOP=1", worker["args"])
-        self.assertIn("-qAt", worker["args"])
+        self.assertEqual(worker["command"], ["/bin/sh", "-eu", "-c"])
+        self.assertEqual(len(worker["args"]), 1)
+        self.assertIn("ON_ERROR_STOP=1", worker["args"][0])
+        self.assertIn("-qAt", worker["args"][0])
         self.assertEqual(
             [e["valueFrom"]["secretKeyRef"] for e in worker["env"] if "valueFrom" in e],
             [{"name": "perfeng-control-plane-database", "key": "runtime-url"}],

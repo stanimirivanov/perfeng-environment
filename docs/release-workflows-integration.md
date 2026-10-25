@@ -226,8 +226,22 @@ policy refusal at exit 3. The harness now emits
 `[PREREQUISITE:database-connection]` and a constant
 `runtime-grants-<case>.failure.txt` for that connection failure/loss, with Secret,
 libpq and endpoint/auth/TLS guidance. Other unexpected outcomes retain a distinct
-runtime-policy error. No connection failure is accepted as policy evidence and
-no speculative database repair is included.
+runtime-policy error. No connection failure is accepted as policy evidence.
+
+The runtime worker's connection defect was subsequently reproduced with the
+fixture's pinned PostgreSQL client in a network-isolated container. `PGDATABASE`
+is a literal database-name default; putting the complete URI there does not
+expand its host, user or password, so the original worker selected a local
+socket. The worker now validates the existing canonical `runtime-url` Secret
+against the local role, host, port, database, sslmode and 43-character URL-safe
+password contract, then exports separate libpq connection variables. The URI is
+unset before `exec psql`; credentials stay out of command arguments and logs.
+No Secret format, SQL policy, grants or image pin changes. Invalid input exits
+64 with `[PREREQUISITE:database-input]`; connection failure remains exit 2 and
+the expected SQL policy refusal remains exit 3. The isolated native-client
+before/after check proves endpoint selection only; full SQL/grant acceptance
+still runs through the unchanged trusted-main disposable-cluster workflow.
+See PostgreSQL's [environment-variable documentation](https://www.postgresql.org/docs/17/libpq-envars.html).
 
 ### Selected migration-image parity
 
