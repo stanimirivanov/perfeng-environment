@@ -206,8 +206,14 @@ Project or change cluster state.
 For the staged external-state Workflow on a **disposable kind cluster**, inspect
 the Workflow UID, failing step and the Job name in its output or node status.
 `task-selection` failure means the reviewed control-plane lock differs from the
-v1 task selection; submit a reviewed new selection instead of bypassing the
-gate. A bucket Job failure may mean a denied lookup rather than an absent
+v1 task selection. Compare its literal `expected-lock-digest` with the raw lock
+bytes at the reviewed selection commit. A lock promotion must include review of
+the preparation children and a matching stable-parent pin; `make verify` checks
+that relationship against the checked-in lock. Preserve exact-byte refusal and
+submit a fresh Workflow after the reviewed correction. Never copy an unreviewed
+lock digest from a request into the approval pin. A `task-selection` refusal creates no
+preparation Job and is not a bucket, SQL or registry failure.
+A bucket Job failure may mean a denied lookup rather than an absent
 bucket; do not treat all `head-bucket` errors as permission to create. A role
 Job failure can indicate an unsafe existing role, a missing credential Secret
 or a password mismatch; restore the matching Secret and inspect role state

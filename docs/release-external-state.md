@@ -14,7 +14,20 @@
 
 ## Inputs and ownership
 
-The workflow accepts the same four exact Git inputs as [release preflight](release-preflight-workflow.md): reviewed request commit, request path, raw request digest and selected environment commit. It calls the preflight template before any Job. The parent passes `perfeng-local` and the reviewed `deployments/local-control-plane.json` SHA-256 `866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f` to a reusable selection assertion. That lock pins the runtime package whose three execution image digests are embedded in the versioned registry template. A changed control-plane lock needs a reviewed new task selection; it cannot silently reuse v1 image checks.
+The workflow accepts the same four exact Git inputs as [release preflight](release-preflight-workflow.md): reviewed request commit, request path, raw request digest and selected environment commit. It calls the preflight template before any Job. The parent passes `perfeng-local` and the reviewed `deployments/local-control-plane.json` SHA-256 `a0d206a41e14c06d2d019dbb0dda7c50e07f93a72d52e0cd6a0b76e7ec9601ec` to a reusable selection assertion. That lock pins the runtime package whose three execution image digests are embedded in the versioned registry template. A changed control-plane lock needs a reviewed new task selection; it cannot silently reuse v1 image checks.
+
+Promote the stable parent's literal digest together with an approved lock change,
+after reviewing compatibility with all three preparation children. The rebuilt-cluster
+bundle/package 1.0.1 changes cluster-bound inputs while retaining the control-plane
+implementation and execution image/task identities. It therefore keeps the existing
+versioned children and immutable verifier package. A changed child implementation
+still requires a new published version and explicit parent reference update.
+
+The repository-local contract test hashes the actual checked-in lock bytes and
+compares them with this parent pin before exercising the published selector.
+This catches selection-promotion drift before disposable CI runs. Wrong environment,
+wrong digest and byte-different equivalent JSON remain refused. The runtime approval
+pin stays a reviewed literal; it is never copied from a submitted preflight result.
 
 The parent keeps the mutex, deadline, sequential steps and v1 outputs (`preflight-result`, `bucket-job`, `database-job`, `registry-job`). Its preparation children keep their `-v1` names; preflight and task selection now use `-v3` names and the shared [verifier package](release-verifier-package.md). Argo CD applies the immutable `perfeng-external-state-scripts-v1` ConfigMap in `perf-platform` at sync wave `-2`, the child templates at `-1`, then the parent at `1`. The bucket and database Jobs mount scripts from that ConfigMap; they do not carry shell payloads in WorkflowTemplate YAML. A script or child-template change requires a new versioned name and a parent reference update. The preflight v3 identity verifier preserves v1 data contracts. The registry remains one Job with three pinned `crane` containers so `registry-job` stays a single Job name; a `withItems` conversion would change that output contract. [ADR 0016](decisions/0016-compose-versioned-release-templates.md) records this review boundary.
 
