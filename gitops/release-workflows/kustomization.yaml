@@ -35,6 +35,12 @@ resources:
   - plan-release-adoption-v3.yaml
   - adoption-records.yaml
   - release-adopt-existing-v3.yaml
+  - rbac/maintenance-pause/serviceaccount.yaml
+  - rbac/maintenance-pause/workflow-access.yaml
+  - rbac/maintenance-pause/cluster-identity.yaml
+  - rbac/maintenance-pause/platform-access.yaml
+  - maintenance-resources-v1.yaml
+  - release-maintenance-pause-v1.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform

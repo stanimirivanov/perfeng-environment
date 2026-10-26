@@ -8,3 +8,5 @@ resources:
   - adoption-application-access.yaml
   - ledger-namespace.yaml
   - ledger-access.yaml
+  - maintenance-pause-application-access.yaml
+  - maintenance-pause-ledger-access.yaml
