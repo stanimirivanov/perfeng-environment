@@ -59,7 +59,6 @@ def rendered(values: dict) -> list[dict]:
     }
     objects[3]["spec"] = {
         "caBundle": values["tls"]["caBundle"],
-        "insecureSkipTLSVerify": False,
         "service": {"name": "metrics-server", "namespace": "monitoring", "port": 443},
     }
     return objects
@@ -177,6 +176,7 @@ class ResourceMetricsSelectionTests(unittest.TestCase):
             "namespace",
             "ca",
             "aggregation-bypass",
+            "noncanonical-default",
             "scraper-bypass",
             "image",
             "node",
@@ -191,6 +191,8 @@ class ResourceMetricsSelectionTests(unittest.TestCase):
                 objects[3]["spec"]["caBundle"] = "foreign"
             elif failure == "aggregation-bypass":
                 objects[3]["spec"]["insecureSkipTLSVerify"] = True
+            elif failure == "noncanonical-default":
+                objects[3]["spec"]["insecureSkipTLSVerify"] = False
             elif failure == "scraper-bypass":
                 pod["containers"][0]["args"].append("--kubelet-insecure-tls")
             elif failure == "image":
@@ -211,7 +213,7 @@ class ResourceMetricsSelectionTests(unittest.TestCase):
                     {"image": release.IMAGE, "version": "0.9.0", "chart": release.CHART}
                 ).encode()
             if path.endswith("Chart.yaml"):
-                return b'version: "1.0.0"\nappVersion: "0.9.0"\n'
+                return b'version: "1.0.1"\nappVersion: "0.9.0"\n'
             return b"# selected Git bytes only\n"
 
         with (

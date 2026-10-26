@@ -12,16 +12,16 @@
     "sources": [
       {
         "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
-        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
+        "revision": "4c762262422420a1a223e1d56c2c469ab1c38c89",
         "path": "charts/control-plane",
         "image": "ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3",
         "runtimeConfigMap": "perfeng-control-plane-runtime-315a2eede8ff",
-        "registryConfigMap": "perfeng-runtime-registry-7be1d749994e"
+        "registryConfigMap": "perfeng-runtime-registry-37bfeb2a30f6"
       },
       {
         "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
-        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
-        "path": "packages/runtime-inputs/local-kind-integration-1.0.0",
+        "revision": "4c762262422420a1a223e1d56c2c469ab1c38c89",
+        "path": "packages/runtime-inputs/local-kind-integration-1.0.1",
         "image": null,
         "runtimeConfigMap": null,
         "registryConfigMap": null
@@ -30,24 +30,24 @@
     "comparedSources": [
       {
         "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
-        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
+        "revision": "4c762262422420a1a223e1d56c2c469ab1c38c89",
         "path": "charts/control-plane",
         "image": "ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3",
         "runtimeConfigMap": "perfeng-control-plane-runtime-315a2eede8ff",
-        "registryConfigMap": "perfeng-runtime-registry-7be1d749994e"
+        "registryConfigMap": "perfeng-runtime-registry-37bfeb2a30f6"
       },
       {
         "repository": "https://github.com/stanimirivanov/perfeng-k8s.git",
-        "revision": "b4499997cc4653f7a28bac7b242f8db421877f9a",
-        "path": "packages/runtime-inputs/local-kind-integration-1.0.0",
+        "revision": "4c762262422420a1a223e1d56c2c469ab1c38c89",
+        "path": "packages/runtime-inputs/local-kind-integration-1.0.1",
         "image": null,
         "runtimeConfigMap": null,
         "registryConfigMap": null
       }
     ],
     "revisions": [
-      "b4499997cc4653f7a28bac7b242f8db421877f9a",
-      "b4499997cc4653f7a28bac7b242f8db421877f9a"
+      "4c762262422420a1a223e1d56c2c469ab1c38c89",
+      "4c762262422420a1a223e1d56c2c469ab1c38c89"
     ],
     "sync": "Synced",
     "health": "Healthy",
@@ -99,7 +99,7 @@
       "perfeng-control-plane-runtime-315a2eede8ff"
     ],
     "registryConfigMaps": [
-      "perfeng-runtime-registry-7be1d749994e"
+      "perfeng-runtime-registry-37bfeb2a30f6"
     ],
     "runtimeSecrets": [
       "perfeng-control-plane-runtime"

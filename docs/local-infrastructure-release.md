@@ -46,15 +46,16 @@ isolated runtime wrapper; certificate mutation commands are not exposed there.
 utilities, while `gitops.py` manages consumer credentials, Applications and
 workload health. Neither contains a cluster or Argo CD controller lifecycle.
 
-## Selected Redis bootstrap correction
+## Selected metrics normalization and retained Redis correction
 
 The selected provider revision is
-`4017bdda1e6d1f14592e2112ab78c1e67f710981`, merged in infrastructure PR #49.
-Its [Redis decision](https://github.com/stanimirivanov/k8s-infrastructure/blob/4017bdda1e6d1f14592e2112ab78c1e67f710981/docs/decisions/0011-pin-local-argocd-redis-image.md)
+`59b175492aad9d4b0900d03fe04dd0b2ff60c8eb`, merged in infrastructure PR #52.
+It selects metrics chart 1.0.1, omitting the default-false APIService TLS flag to
+match Kubernetes readback. Its [Redis decision](https://github.com/stanimirivanov/k8s-infrastructure/blob/59b175492aad9d4b0900d03fe04dd0b2ff60c8eb/docs/decisions/0011-pin-local-argocd-redis-image.md)
 keeps Argo CD v3.5.2 and selects canonical Docker Hub Redis at the same
 multi-platform content digest as the prior ECR Public image, with `IfNotPresent`.
 Both pinned CI checkouts and the metrics Application select that provider
-revision together. The metrics chart, implementation and Application values
+revision together. Metrics image 0.9.0, live TLS health rules and Application values
 are unchanged. Cluster/context/node image, topology, namespaces and credentials
 retain their existing contracts.
 
@@ -69,8 +70,9 @@ each new current-selection request.
 This selection does not execute substrate bootstrap. Apply later through the
 supported explicit owner path and require bounded controller readiness. Redis's
 Pod may be replaced; no namespace, Secret or ledger deletion is part of the
-change. The metrics Application retains its existing sync policy and unchanged
-chart content. Docker Hub still has pull limits, and actual cold-pull and complete
+change. The metrics Application retains its existing sync policy and public CA.
+No bootstrap or Redis files changed between the prior selection and this promotion.
+Docker Hub still has pull limits, and actual cold-pull and complete
 release acceptance remain live gates.
 
 ## Immutable execution
@@ -146,6 +148,11 @@ Record the non-secret PostgreSQL and SeaweedFS StatefulSet, PVC and PV
 identities before and after acceptance when reusing a stateful cluster. Run the
 existing persistence probes from the stateful runbooks. A passing smoke Run is
 not permission to ignore changed persistent identities.
+
+For the current rebuilt cluster, use the staged root and metrics acceptance in
+[metrics recovery](local-resource-metrics.md#after-merge-acceptance) first. Full
+health and smoke remain pending guarded first-install runtime preparation and
+manual activation; this selection alone does not complete those gates.
 
 The initial ownership cutover completed this sequence on 2026-09-17. The
 existing PostgreSQL and SeaweedFS StatefulSets and PVCs retained their older
