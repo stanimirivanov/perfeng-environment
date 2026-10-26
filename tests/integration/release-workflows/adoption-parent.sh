@@ -28,7 +28,7 @@ adoption_records() {
 adoption_retained() {
   local label=$1 root_mode=${2:-converged}
   root_state "$fixture/adoption-$label"
-  root_retained "$fixture/adoption-before" "$fixture/adoption-$label"
+  root_retained "${adoption_retention_baseline:-$fixture/adoption-before}" "$fixture/adoption-$label"
   root_child_snapshot "$fixture/adoption-children.json"
   uv run --locked --offline python "$source_dir/root_inputs.py" children \
     "$fixture/adoption-children.json" "$fixture/root-tree.yaml" "$fixture/root-children-before.json"
@@ -244,6 +244,7 @@ adoption_retained retained
 printf '%s\n' 'Original receipt/pointer bytes, UIDs and provenance survived original Workflow deletion' > "$results/adoption-parent-retention.outcome.txt"
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 # Owner-approved destructive faults start only after the completed retention proof.
+if [[ $scenario == initial ]]; then source "$source_dir/maintenance-pause.sh"; fi
 cp "$fixture/adoption-retained.records.json" "$fixture/adoption-identity-baseline.json"
 adoption_records "$fixture/adoption-identity-current.json"
 PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_identity_evidence.py" prepare "$fixture" "$results" "$adoption_baseline"

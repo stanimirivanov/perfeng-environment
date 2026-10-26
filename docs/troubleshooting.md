@@ -1281,3 +1281,18 @@ URI contract and 43-character URL-safe password. Do not print the URI or rotate
 credentials as an implicit repair. The Secret schema and SQL refusal criteria
 are unchanged. A later exit 2 still requires connection diagnosis; neither this
 mapping fix nor isolated endpoint-selection evidence proves live grants.
+
+### Trusted-main maintenance pause or recovery failure
+
+In the `initial` leg, inspect `stages.tsv` for `maintenance-pause` or
+`maintenance-recovery`, then the saved pause Workflow, worker identity/status
+projection and checkpoint. A pause failure can leave completed writes in place;
+the fixture does not silently resume. Recovery starts only after successful
+pause, quiescence and retention checks, using explicit child Argo CD sync.
+Unexpected changes to ledger, Secrets, configuration, foundation Pods, storage,
+data, workload specs or Application identities refuse the recovery baseline.
+Only a different control-plane Pod under the same ReplicaSet is allowed, with
+its generated ServiceAccount volume name normalized for spec comparison.
+Original evidence is retained; never repair acceptance by rewriting it or
+ignoring all Pod differences. These checks are disposable CI only; use the
+[maintenance guide](release-maintenance-pause.md) for operational inspection.

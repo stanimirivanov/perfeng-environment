@@ -29,19 +29,20 @@ jq -e 'all(.items[]; .operation==null and (.status.operationState.phase!="Runnin
    else .metadata.annotations["argocd.argoproj.io/skip-reconcile"]=="true" end))' "$fixture/root-children-before.json" > /dev/null
 
 root_state() {
-  local prefix=$1
+  local prefix=$1 server_pods=${2:-${root_server_pods_file:-$results/server-corrected.pods.json}} name
+  local pods=("pod/$database_pod" "pod/$bucket_server_pod")
+  while IFS= read -r name; do pods+=("pod/$name"); done < <(jq -er '.[].name' "$server_pods")
   postgres_application_state "$prefix.postgres"
   seaweedfs_application_state "$prefix.seaweedfs"
   k -n perf-platform get deployment/control-plane service/control-plane -o json \
     | jq -S '[.items[]|{kind,uid:.metadata.uid,spec}]|sort_by(.kind)' > "$prefix.server.json"
-  k -n perf-platform get "pod/$database_pod" "pod/$bucket_server_pod" \
-    "pod/$(jq -er '.[0].name' "$results/server-corrected.pods.json")" -o json \
+  k -n perf-platform get "${pods[@]}" -o json \
     | jq -S '[.items[]|{uid:.metadata.uid,spec}]|sort_by(.uid)' > "$prefix.pods.json"
   # Detect activation in any namespace, including the newly root-created ones.
   k get deployments,statefulsets,daemonsets,cronjobs -A -o json \
     | jq -S '[.items[]|{kind,namespace:.metadata.namespace,name:.metadata.name,uid:.metadata.uid,spec}]|sort_by(.kind,.namespace,.name)' > "$prefix.workloads.json"
 }
-root_retained() {
+root_persistent_retained() {
   local before=$1 after=$2 field
   for field in storage pv service statefulset external server repository roles acl schema; do
     cmp "$before.postgres.$field.json" "$after.postgres.$field.json"
@@ -53,6 +54,10 @@ root_retained() {
     cmp "$before.seaweedfs.$field.json" "$after.seaweedfs.$field.json"
   done
   cmp "$before.seaweedfs.bytes" "$after.seaweedfs.bytes"
+}
+root_retained() {
+  local before=$1 after=$2 field
+  root_persistent_retained "$before" "$after"
   for field in server pods workloads; do
     cmp "$before.$field.json" "$after.$field.json"
   done
