@@ -77,16 +77,30 @@ printf '%s\n' 'Complete pause and manual recovery accepted; only the control-pla
 complete_stage
 current_stage=$maintenance_stage
 
-maintenance_receipt_refusal() {
-  local label=$1 previous=$current_stage workflow rc node_id pod field
+maintenance_baseline_refusal() {
+  local label=$1 previous=$current_stage workflow rc node_id pod field candidate digest hex
+  local parameters="$fixture/parent-parameters.json"
   [[ $mode == preflight-parent && $scenario == initial && -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" ]] || return 2
-  [[ $label == missing-receipt || $label == replaced-receipt ]] || return 2
+  case "$label" in
+    missing-receipt|replaced-receipt) ;;
+    changed-request|upgrade-request) parameters="$fixture/$label-parameters.json" ;;
+    *) return 2 ;;
+  esac
   [[ ${adoption_retention_baseline:-} == "$fixture/maintenance-recovered" && -f $results/maintenance-recovery.outcome.txt ]] || return 2
   start_stage "maintenance-$label"
   maintenance_snapshot "$fixture/maintenance-$label-before"
   root_state "$fixture/maintenance-$label-before"
+  if [[ $label == *-request ]]; then
+    digest=$(jq -er '."request-sha256"' "$parameters")
+    [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]] || return 2
+    hex=${digest#sha256:}
+    candidate="receipt.${hex:0:32}.${hex:32}"
+    k -n "$adoption_namespace" get configmap "$candidate" --ignore-not-found -o json \
+      | jq -s '.[0] // null' > "$fixture/maintenance-$label.candidate-before.json"
+    jq -e '.==null' "$fixture/maintenance-$label.candidate-before.json" > /dev/null
+  fi
   workflow=$(a submit --from workflowtemplate/perfeng-release-maintenance-pause-v1 \
-    --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
+    --parameter-file "$parameters" -o json | jq -er .metadata.name)
   if timeout 1830s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
     --namespace argo-workflows wait "$workflow"; then rc=0; else rc=$?; fi
   a get "$workflow" -o json > "$results/maintenance-$label.workflow.json"
@@ -100,6 +114,10 @@ maintenance_receipt_refusal() {
   k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 > "$fixture/maintenance-$label.worker.log"
   maintenance_snapshot "$fixture/maintenance-$label-after"
   root_state "$fixture/maintenance-$label-after"
+  if [[ $label == *-request ]]; then
+    k -n "$adoption_namespace" get configmap "$candidate" --ignore-not-found -o json \
+      | jq -s '.[0] // null' > "$fixture/maintenance-$label.candidate-after.json"
+  fi
   root_retained "$fixture/maintenance-$label-before" "$fixture/maintenance-$label-after"
   for field in records secrets config git; do
     cmp "$fixture/maintenance-$label-before.$field.json" "$fixture/maintenance-$label-after.$field.json"

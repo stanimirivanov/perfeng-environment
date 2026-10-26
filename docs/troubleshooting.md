@@ -1314,3 +1314,13 @@ mismatch. The corrected matcher requires the exact published fixed line only
 after exact-cause policy replay, retaining the sole planner exit 2 and all
 no-write/no-result checks. Do not expose policy details in production logs or
 accept arbitrary exit-2 failures as a workaround.
+
+`maintenance-changed-request` and `maintenance-upgrade-request` must refuse at
+the baseline planner after fresh candidate preflight/readiness, while the
+accepted baseline remains healthy and intact. Compare the reviewed candidate
+parameters/bytes and validated fixed outcome; raw request/API/log snapshots stay
+private. A changed selection/cluster, other envelope edits, unexpected candidate
+receipt, unrelated worker error, pause write or checkpoint is a failed gate.
+These cases reuse the existing Git fixtures before receipt deletion and perform
+no repair or recovery. Never publish another request, rewrite the pointer or
+accept a timeout as the expected refusal.
