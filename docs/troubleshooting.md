@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- The selected infrastructure release `4017bdda1e6d...` uses digest-pinned
+- The selected infrastructure release `59b175492aad...` uses digest-pinned
   Docker Hub Redis with `IfNotPresent` after two prior CI jobs reported
   ECR Public pull throttling. Existing clusters receive this bootstrap change
   only through explicit application by the supported owner. Inspect the running
@@ -396,6 +396,16 @@ resume the failed supported stage after the prerequisite becomes ready. A recrea
 cluster also needs fresh qualification and reviewed benchmark-bundle UID promotion before
 runtime activation; old receipts must not be edited to fit it. Recreating infrastructure
 does not restore deleted PostgreSQL or object-store data.
+
+The reviewed recovery selection now uses bundle/package 1.0.1 for kube-system UID
+`257a288d-9e0f-4956-a0e3-9c4104de6476` and metrics chart 1.0.1 with the retained
+public CA/Secret. The chart omits the APIService default-false TLS flag, resolving
+readback-only drift without ignore rules or TLS bypasses. After merge reconcile
+the staged root and verify metrics Synced/Healthy before qualification. A Missing
+control-plane Deployment is expected until guarded first-install preparation:
+`kubernetes:prepare` is the existing-runtime maintenance path and refuses that
+absence. Do not fabricate its prerequisite or manually activate the child yet.
+See [fresh-cluster recovery](kubernetes-runtime-deployment.md#fresh-cluster-recovery).
 
 Do not use the provider `cluster down` action or `task destroy` as a repair.
 Either is **destructive** and permanently removes all PostgreSQL, SeaweedFS and

@@ -9,19 +9,21 @@
 - The separate `perfeng-local-resource-metrics` Project permits only the reviewed source, namespaces and resource kinds.
 - The Application uses the operator-provisioned immutable TLS Secret and its real public CA; no private key is committed.
 - Kubelet certificate bootstrap/approval remains explicit provider work, not a GitOps hook or benchmark preflight repair.
-- After merge run GitOps health, `task kubernetes:metrics-health`, then `task kubernetes:qualify`.
+- After merge reconcile the staged root, run `task kubernetes:metrics-health`, then `task kubernetes:qualify`; full GitOps health also requires the runtime.
 - Fresh metrics unblock an observation prerequisite, not runtime promotion or M04 completion.
 
 ## Selected ownership and trust
 
 `deployments/local-infrastructure.json` and CI select infrastructure revision
-`4017bdda1e6d1f14592e2112ab78c1e67f710981`, retaining the serving-CSR usage fix
-and selecting the approved Argo CD Redis source/pull-policy correction.
+`59b175492aad9d4b0900d03fe04dd0b2ff60c8eb`, retaining the serving-CSR usage fix
+and approved Argo CD Redis source/pull-policy correction.
 Cluster identity, node image, placement topology and Argo CD 3.5.2 remain unchanged.
-The metrics Application selects that same commit's `charts/resource-metrics` 1.0.0,
+The metrics Application selects that same commit's `charts/resource-metrics` 1.0.1,
 which pins the official Metrics Server 0.9.0 image by digest.
-The metrics chart and implementation are byte-for-byte unchanged from the prior
-provider selection. Secret references, placement and sync policy are unchanged.
+Chart 1.0.1 omits the default-false `APIService.spec.insecureSkipTLSVerify` field,
+matching Kubernetes readback and preventing repeated Argo CD drift. The render
+gate requires that canonical omission; live health still accepts omission or
+explicit false and rejects a bypass. Secret references, placement and sync policy are unchanged.
 The public serving CA is selected separately for the recreated local cluster.
 
 The consumer owns the Project/Application and existing `monitoring` namespace.
@@ -50,7 +52,7 @@ never use Helm install/upgrade for this package.
 Keep Docker Desktop running and use the dedicated environment kubeconfig/context.
 Certificate operations are separate, mutating provider actions requiring maintenance
 coordination, identity checks and explicit confirmation. Follow the selected provider's
-[resource-metrics guide](https://github.com/stanimirivanov/k8s-infrastructure/blob/4017bdda1e6d1f14592e2112ab78c1e67f710981/docs/resource-metrics.md).
+[resource-metrics guide](https://github.com/stanimirivanov/k8s-infrastructure/blob/59b175492aad9d4b0900d03fe04dd0b2ff60c8eb/docs/resource-metrics.md).
 Run those commands from `k8s-infrastructure` with `--state-root ../perfeng-environment`.
 
 For an existing cluster with completed serving bootstrap/approvals and the matching
@@ -74,16 +76,17 @@ then resume the failed supported stage once its prerequisite is ready. Do not we
 The rebuilt cluster has kube-system UID `257a288d-9e0f-4956-a0e3-9c4104de6476`.
 Its newly issued public serving CA has SHA-256 fingerprint
 `e8f3d17003d9bbaa4aa7b62a0a6ee19b525e40505d6cd15cd5eb3961deedfc53`.
-This selection changes only the public CA; it does not restore deleted data or activate
-runtime workloads. Review and merge it before Argo CD reconciles the APIService trust.
+The public CA selected during trust recovery is retained unchanged by this chart
+promotion. It does not restore deleted data or activate runtime workloads.
 Reverting to the old CA cannot recover the lost Secret and would break this new binding;
 recover through a reviewed selection matching the retained immutable Secret instead.
 
-The selected benchmark bundle still names the previous cluster UID. Keep all historical
-receipts intact. After verified metrics health and fresh qualification, promote a new
-cluster-bound bundle through the upstream review process described in
-[runtime deployment](kubernetes-runtime-deployment.md). Runtime activation remains gated
-by that reviewed promotion; infrastructure bootstrap alone is not runtime acceptance.
+The selected benchmark bundle/package 1.0.1 now binds this rebuilt cluster UID,
+following fresh accepted qualification and merged upstream PR #61. Keep all historical
+receipts intact. Qualification records an observation, not permanent admission;
+repeat qualification when exercising the benchmark loop. As described in
+[runtime deployment](kubernetes-runtime-deployment.md#fresh-cluster-recovery), first-install
+runtime preparation and manual activation remain separate gates.
 
 The existing Argo CD owner-prefix Git credential can be reused only if its fine-grained
 Contents token permits read access to `k8s-infrastructure` as well as the existing workload
@@ -111,16 +114,20 @@ Run in PowerShell from `perfeng-environment`, after the GitOps files reach remot
 ```powershell
 Set-Location C:\Source\perf-eng\perfeng-environment
 uv sync --locked
-uv run --locked python scripts/gitops.py health --execute
+uv run --locked python scripts/gitops.py bootstrap --execute
 task kubernetes:metrics-health
 task kubernetes:qualify
 ```
 
 The root reads `main`, creates the separate Project in wave -1 and reconciles the metrics
 Application. No extra deploy or Helm command is needed for an already bootstrapped root.
-GitOps health now waits for the root plus six workload Applications and includes metrics
-acceptance. Its existing timeout path may request one normal Application refresh; the
-focused metrics task itself performs no mutations or refreshes.
+Require the metrics Application to be Synced/Healthy at the selected source after
+root reconciliation. On the rebuilt cluster the manual control-plane child may
+remain Missing until guarded first-install preparation and activation are complete.
+Only then run `uv run --locked python scripts/gitops.py health --execute` for full
+GitOps acceptance; that command also waits for all workload Applications. Its existing
+timeout path may request one normal Application refresh. The focused metrics task
+performs no mutations or refreshes.
 
 `kubernetes:metrics-health` checks the live Application/Project against reviewed desired
 state and the APIService's exact public CA/service binding. It then executes only the

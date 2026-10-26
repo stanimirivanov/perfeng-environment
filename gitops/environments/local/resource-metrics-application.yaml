@@ -11,7 +11,7 @@ spec:
   project: perfeng-local-resource-metrics
   source:
     repoURL: https://github.com/stanimirivanov/k8s-infrastructure.git
-    targetRevision: 4017bdda1e6d1f14592e2112ab78c1e67f710981
+    targetRevision: 59b175492aad9d4b0900d03fe04dd0b2ff60c8eb
     path: charts/resource-metrics
     helm:
       releaseName: resource-metrics

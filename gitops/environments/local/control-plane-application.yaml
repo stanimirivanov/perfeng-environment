@@ -11,7 +11,7 @@ spec:
   project: perfeng-local
   sources:
     - repoURL: https://github.com/stanimirivanov/perfeng-k8s.git
-      targetRevision: b4499997cc4653f7a28bac7b242f8db421877f9a
+      targetRevision: 4c762262422420a1a223e1d56c2c469ab1c38c89
       path: charts/control-plane
       helm:
         releaseName: control-plane
@@ -23,7 +23,7 @@ spec:
           runtimeConfigMap: perfeng-control-plane-runtime-315a2eede8ff
           runtimeSecret: perfeng-control-plane-runtime
           authenticationSecret: perfeng-control-plane-authentication
-          registryConfigMap: perfeng-runtime-registry-7be1d749994e
+          registryConfigMap: perfeng-runtime-registry-37bfeb2a30f6
           registryItems:
             - key: identities--environment.json
               path: identities/environment.json
@@ -42,8 +42,8 @@ spec:
             - key: registry.json
               path: registry.json
     - repoURL: https://github.com/stanimirivanov/perfeng-k8s.git
-      targetRevision: b4499997cc4653f7a28bac7b242f8db421877f9a
-      path: packages/runtime-inputs/local-kind-integration-1.0.0
+      targetRevision: 4c762262422420a1a223e1d56c2c469ab1c38c89
+      path: packages/runtime-inputs/local-kind-integration-1.0.1
   destination:
     server: https://kubernetes.default.svc
     namespace: perf-platform

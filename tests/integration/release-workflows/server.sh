@@ -15,7 +15,8 @@ source_checkout=.ci/perfeng-k8s
 PYTHONPATH=. uv run --locked --offline python "$source_dir/server_inputs.py" prepare "$source_checkout" "$fixture"
 helm template control-plane "$source_checkout/charts/control-plane" --namespace perf-platform \
   --values "$fixture/server-values.yaml" > "$fixture/server-chart.yaml"
-k kustomize "$source_checkout/packages/runtime-inputs/local-kind-integration-1.0.0" > "$fixture/server-package.yaml"
+package_path=$(jq -er '.deployment.runtimePackage.path' deployments/local-control-plane.json)
+k kustomize "$source_checkout/$package_path" > "$fixture/server-package.yaml"
 PYTHONPATH=. uv run --locked --offline python "$source_dir/server_inputs.py" rendered "$source_checkout" "$fixture"
 k create -f "$fixture/server-secrets.json"
 rm -f "$fixture/server-secrets.json" "$fixture/server-input-secrets.json"

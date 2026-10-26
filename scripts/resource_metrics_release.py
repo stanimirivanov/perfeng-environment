@@ -201,7 +201,7 @@ def validate_rendered(objects: list[dict[str, Any]], values: dict[str, Any]) -> 
     pod = next(o for o in objects if o["kind"] == "Deployment")["spec"]["template"]["spec"]
     container = pod["containers"][0]
     if (
-        api.get("insecureSkipTLSVerify", False) is not False
+        "insecureSkipTLSVerify" in api
         or api.get("caBundle") != values["tls"]["caBundle"]
         or api.get("service") != {"name": "metrics-server", "namespace": NAMESPACE, "port": 443}
         or pod["nodeSelector"] != values["nodeSelector"]
@@ -247,7 +247,7 @@ def validate(root: Path = ROOT, infrastructure_root: Path | None = None) -> None
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(read(f"{CHART}/{name}"))
         identity = read_yaml(chart / "Chart.yaml")
-        if identity.get("version") != "1.0.0" or identity.get("appVersion") != "0.9.0":
+        if identity.get("version") != "1.0.1" or identity.get("appVersion") != "0.9.0":
             raise ValueError("Pinned resource metrics chart version differs")
         for arguments in (
             ["lint", str(chart), "--strict", "-f", "-"],
