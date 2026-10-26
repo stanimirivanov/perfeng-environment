@@ -248,6 +248,7 @@ if [[ $scenario == initial ]]; then
   source "$source_dir/maintenance-pause.sh"
   maintenance_baseline_refusal changed-request
   maintenance_baseline_refusal upgrade-request
+  source "$source_dir/maintenance-guard-conflict.sh"
 fi
 cp "$fixture/adoption-retained.records.json" "$fixture/adoption-identity-baseline.json"
 adoption_records "$fixture/adoption-identity-current.json"

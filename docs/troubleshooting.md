@@ -1324,3 +1324,20 @@ receipt, unrelated worker error, pause write or checkpoint is a failed gate.
 These cases reuse the existing Git fixtures before receipt deletion and perform
 no repair or recovery. Never publish another request, rewrite the pointer or
 accept a timeout as the expected refusal.
+
+### Disposable maintenance stale-guard refusal
+
+For `maintenance-stale-root`, `maintenance-stale-child` or
+`maintenance-stale-deployment`, inspect the safe barrier report first. An API
+read failure, terminal parent or timeout before suspension is a failed setup,
+not stale-patch acceptance. Do not resume a parent whose marker restoration,
+UID/spec/generation or retained-state checks failed. Native JSON Patch rejection
+uses the API's generic Invalid message and pinned executor exit 64; proof of
+cause also requires the unchanged patch and captured equal UID/spec but stale
+resourceVersion. Arbitrary exit failures or permission errors do not qualify.
+Raw marker/API/log evidence stays private. Deployment uses only a top-level
+fixture label: an annotation would increment generation and may propagate to
+the ReplicaSet. Never change selectors, Pod templates, ledger records or
+production recovery to make this fixture pass. Failed setup may leave its
+marker in the owned disposable cluster until the existing cluster cleanup;
+there is no automatic repair or recovery.
