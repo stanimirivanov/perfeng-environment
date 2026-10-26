@@ -254,6 +254,7 @@ k -n "$adoption_namespace" wait --for=delete "configmap/$adoption_receipt" --tim
 adoption_records "$fixture/adoption-missing-before.records.json"
 adoption_case missing-receipt missing-receipt
 cmp "$fixture/adoption-missing-before.records.json" "$fixture/adoption-missing-receipt.records.json"
+if [[ $scenario == initial ]]; then maintenance_receipt_refusal missing-receipt; fi
 if [[ $scenario == receipt-only ]]; then
   k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
     --for=jsonpath='{.status.used.count/configmaps}'=2 --timeout=60s
@@ -262,6 +263,7 @@ k create -f "$fixture/adoption-receipt-recreate.json" -o json > "$fixture/adopti
 adoption_records "$fixture/adoption-replaced-before.records.json"
 adoption_case replaced-receipt replaced-receipt
 cmp "$fixture/adoption-replaced-before.records.json" "$fixture/adoption-replaced-receipt.records.json"
+if [[ $scenario == initial ]]; then maintenance_receipt_refusal replaced-receipt; fi
 jq -s --argjson expected "${#adoption_labels[@]}" -e 'length==$expected and (map(.metadata.uid)|unique|length)==$expected' "$results"/adoption-parent-*.workflow.json > /dev/null
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 

@@ -94,7 +94,7 @@ def refusal(
         assert str(error) == reason
     else:
         raise AssertionError("Injected ledger state was accepted")
-    plan_refused(workflow, workers, log, reason)
+    plan_refused(workflow, workers, log)
     return {
         "decision": case + "-refused",
         "workflowUID": workflow["metadata"]["uid"],
@@ -104,15 +104,18 @@ def refusal(
     }
 
 
-def plan_refused(
-    workflow: dict[str, Any], workers: list[dict[str, Any]], log: str, reason: str
-) -> None:
+def plan_refused(workflow: dict[str, Any], workers: list[dict[str, Any]], log: str) -> None:
     """Require the sole owning planner failure, without later workers or success output."""
     failed = readiness.named(workflow, "plan")
     assert failed["phase"] in {"Failed", "Error"}
     nonzero = [w for w in workers if w["exitCode"] not in (None, 0)]
     assert len(nonzero) == 1 and nonzero[0]["nodeID"] == failed["id"]
-    assert nonzero[0]["exitCode"] == 2 and reason in log
+    assert nonzero[0]["exitCode"] == 2
+    # Callers replay the exact policy cause first. The published runtime redacts
+    # that cause, so a synthetic detailed error is not valid native evidence.
+    assert log.splitlines() == [
+        "Adoption refused: inspect reviewed inputs, ownership and observations; no success evidence"
+    ]
     assert "result" not in readiness.outputs(failed)
     assert "result" not in readiness.outputs(
         workflow["status"]["nodes"][workflow["metadata"]["name"]]
@@ -194,7 +197,7 @@ def request_refusal(
         assert str(error) == reason
     else:
         raise AssertionError("Request crossed the adoption boundary")
-    plan_refused(workflow, workers, log, reason)
+    plan_refused(workflow, workers, log)
     return {
         "decision": case + "-refused",
         "workflowUID": workflow["metadata"]["uid"],

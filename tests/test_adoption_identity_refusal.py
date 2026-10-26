@@ -24,7 +24,9 @@ with patch.dict(
 ):
     SPEC.loader.exec_module(MODULE)
 
-REASON = "current pointer conflicts or references a missing/replaced receipt"
+REFUSAL = (
+    "Adoption refused: inspect reviewed inputs, ownership and observations; no success evidence"
+)
 
 
 def fault(case):
@@ -54,7 +56,7 @@ def fault(case):
     else:
         api["receipt"]["metadata"].update(uid="replacement-uid", resourceVersion="50")
     nodes["existing-receipt"]["outputs"]["parameters"][0]["value"] = json.dumps(api["receipt"])
-    return [case, *args, [{"nodeID": "plan", "exitCode": 2}], REASON, baseline]
+    return [case, *args, [{"nodeID": "plan", "exitCode": 2}], REFUSAL, baseline]
 
 
 class AdoptionIdentityRefusalTests(unittest.TestCase):
