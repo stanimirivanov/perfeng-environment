@@ -200,7 +200,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             verifier.NoRedirect().redirect_request(None, None, 302, "", {}, "http://foreign")
 
     def test_workflow_uses_native_waits_and_named_read_only_authority(self) -> None:
-        workflow = yaml.safe_load((DIRECTORY / "release-readiness-v2.yaml").read_text())
+        workflow = yaml.safe_load((DIRECTORY / "release-readiness-v3.yaml").read_text())
         observer = yaml.safe_load((DIRECTORY / "observe-release-readiness.yaml").read_text())
         bootstrap = yaml.safe_load(
             (ROOT / "gitops/release-workflows-bootstrap/project.yaml").read_text()
@@ -209,7 +209,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             "argocd", [item["namespace"] for item in bootstrap["spec"]["destinations"]]
         )
         verifier_template = yaml.safe_load(
-            (DIRECTORY / "verify-release-readiness-v2.yaml").read_text()
+            (DIRECTORY / "verify-release-readiness-v3.yaml").read_text()
         )["spec"]["templates"][0]
         self.assertEqual(
             json.loads(verifier_template["podSpecPatch"])["securityContext"]["fsGroup"], 10001
@@ -223,7 +223,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertEqual(workflow["spec"]["activeDeadlineSeconds"], 1200)
         self.assertEqual(
             workflow["spec"]["templates"][0]["steps"][0][0]["templateRef"]["name"],
-            "perfeng-release-preflight-v2",
+            "perfeng-release-preflight-v3",
         )
         for template in observer["spec"]["templates"]:
             self.assertEqual(template["resource"]["action"], "get")
@@ -244,7 +244,7 @@ class ReleaseReadinessTests(unittest.TestCase):
                         self.assertEqual(rule["verbs"], ["get"])
                         self.assertTrue(rule["resourceNames"])
         root = yaml.safe_load((ROOT / "gitops/environments/local/kustomization.yaml").read_text())
-        self.assertNotIn("release-readiness-v2.yaml", str(root))
+        self.assertNotIn("release-readiness-v3.yaml", str(root))
 
 
 if __name__ == "__main__":

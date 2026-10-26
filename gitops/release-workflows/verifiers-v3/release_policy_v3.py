@@ -1,4 +1,4 @@
-"""Pure release predicates shared by the v2 preflight, health and ledger boundaries."""
+"""Pure release predicates shared by the v3 preflight, health and ledger boundaries."""
 
 import base64
 import hashlib
@@ -338,12 +338,11 @@ def plan_adoption(
     request = json.loads(raw, object_pairs_hook=unique)
     digest = "sha256:" + hashlib.sha256(raw).hexdigest()
     require(
-        request["schemaVersion"] == 1
+        request["schemaVersion"] == readiness["schemaVersion"] == 1
         and request["kind"] == "PerfengReleaseRequest"
         and request["environment"]["name"] == "perfeng-local"
         and request["promotion"]["activation"] == "manual"
         and request["promotion"]["expectedCurrent"] is None
-        and readiness["schemaVersion"] == 1
         and readiness["kind"] == "PerfengReleaseReadiness"
         and readiness["scope"] == "control-plane-foundation"
         and readiness["status"] == "readiness-verified"
@@ -352,19 +351,25 @@ def plan_adoption(
         and readiness["selectionRevision"] == request["selection"]["revision"],
         "request/readiness identity differs or adoption is not initial",
     )
-    application_identity(root, NAMES[0])
-    metadata, status = root["metadata"], root["status"]
-    require(
-        status.get("operationState", {}).get("phase") in (None, "Succeeded")
-        and status["sync"]["status"] == "Synced"
-        and status["health"]["status"] == "Healthy"
-        and not status.get("conditions")
-        and status["sync"]["revision"] == readiness["selectionRevision"]
-        and status["sync"]["comparedTo"]["source"] == ROOT_SOURCE,
-        "root is stale, syncing or not at the reviewed selection",
-    )
-    if root_after is not None:
-        require(root_after == root, "root changed during adoption; inspect and resubmit")
+    samples = []
+    # Argo CD's Application has no status subresource; refresh advances generation too.
+    ignored = {"metadata": {"generation", "resourceVersion"}, "status": {"reconciledAt"}}
+    for sample in (root,) if root_after is None else (root, root_after):
+        application_identity(sample, NAMES[0])
+        status = sample["status"]
+        require(
+            status.get("operationState", {}).get("phase") in (None, "Succeeded")
+            and (status["sync"]["status"], status["health"]["status"]) == ("Synced", "Healthy")
+            and not status.get("conditions")
+            and status["sync"]["revision"] == readiness["selectionRevision"]
+            and status["sync"]["comparedTo"]["source"] == ROOT_SOURCE,
+            "root is stale, syncing or not at the reviewed selection",
+        )
+        snapshot = dict(sample)
+        for key in ignored:
+            snapshot[key] = {k: v for k, v in sample[key].items() if k not in ignored[key]}
+        samples.append(snapshot)
+    require(samples[0] == samples[-1], "root changed during adoption; inspect and resubmit")
     name = "receipt." + digest[7:39] + "." + digest[39:]
     record = {
         "schemaVersion": 1,
@@ -373,7 +378,7 @@ def plan_adoption(
         "environment": request["environment"],
         "requestDigest": digest,
         "selectionRevision": readiness["selectionRevision"],
-        "rootUID": metadata["uid"],
+        "rootUID": root["metadata"]["uid"],
         "controlPlaneApplicationUID": readiness["applicationUID"],
         "deploymentRevision": readiness["deploymentRevision"],
         "image": readiness["image"],
@@ -425,14 +430,9 @@ def plan_adoption(
         "cluster-uid": data["clusterUID"],
         "request-digest": digest,
         "result": {
-            "schemaVersion": 1,
+            **{k: record[k] for k in ("schemaVersion", "status", "selectionRevision")},
             "kind": "PerfengReleaseAdoptionResult",
-            "status": "adopted-baseline",
-            "requestDigest": digest,
-            "selectionRevision": readiness["selectionRevision"],
-            "clusterUID": data["clusterUID"],
-            "receiptName": name,
-            "receiptUID": data["receiptUID"],
+            **data,
             "pointerUID": pointer["metadata"]["uid"] if pointer is not None else "",
         },
     }

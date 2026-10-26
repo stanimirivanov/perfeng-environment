@@ -4,13 +4,13 @@ resources:
   - rbac/preflight/serviceaccount.yaml
   - rbac/preflight/workflow-access.yaml
   - rbac/preflight/cluster-identity.yaml
-  - release-preflight-v2.yaml
+  - release-preflight-v3.yaml
   - rbac/external-state/serviceaccount.yaml
   - rbac/external-state/workflow-access.yaml
   - rbac/external-state/cluster-identity.yaml
   - rbac/external-state/platform-jobs.yaml
   - rbac/external-state/generator-jobs.yaml
-  - release-task-selection-v2.yaml
+  - release-task-selection-v3.yaml
   - prepare-bucket.yaml
   - prepare-database-roles.yaml
   - prepare-execution-registry.yaml
@@ -20,21 +20,21 @@ resources:
   - rbac/readiness/cluster-identity.yaml
   - rbac/readiness/platform-observation.yaml
   - observe-release-readiness.yaml
-  - verify-release-readiness-v2.yaml
-  - release-readiness-v2.yaml
+  - verify-release-readiness-v3.yaml
+  - release-readiness-v3.yaml
   - rbac/maintenance/serviceaccount.yaml
   - rbac/maintenance/workflow-access.yaml
   - rbac/maintenance/cluster-identity.yaml
   - rbac/maintenance/platform-observation.yaml
-  - verify-release-quiescence-v2.yaml
-  - release-maintenance-checkpoint-v2.yaml
+  - verify-release-quiescence-v3.yaml
+  - release-maintenance-checkpoint-v3.yaml
   - rbac/adoption/serviceaccount.yaml
   - rbac/adoption/workflow-access.yaml
   - rbac/adoption/cluster-identity.yaml
   - rbac/adoption/platform-observation.yaml
-  - plan-release-adoption-v2.yaml
+  - plan-release-adoption-v3.yaml
   - adoption-records.yaml
-  - release-adopt-existing-v2.yaml
+  - release-adopt-existing-v3.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform
@@ -45,11 +45,11 @@ configMapGenerator:
       disableNameSuffixHash: true
       annotations:
         argocd.argoproj.io/sync-wave: '-2'
-  - name: perfeng-release-verifiers-v2
+  - name: perfeng-release-verifiers-v3
     namespace: argo-workflows
     files:
-      - verifiers-v2/release_policy_v2.py
-      - verifiers-v2/release_runtime_v2.py
+      - verifiers-v3/release_policy_v3.py
+      - verifiers-v3/release_runtime_v3.py
     options:
       disableNameSuffixHash: true
       annotations:
@@ -64,7 +64,7 @@ patches:
         value: true
   - target:
       kind: ConfigMap
-      name: perfeng-release-verifiers-v2
+      name: perfeng-release-verifiers-v3
     patch: |-
       - op: add
         path: /immutable

@@ -23,7 +23,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         cls.children = {
             name: yaml.safe_load((DIRECTORY / filename).read_text())
             for name, filename in (
-                ("task-selection", "release-task-selection-v2.yaml"),
+                ("task-selection", "release-task-selection-v3.yaml"),
                 ("bucket", "prepare-bucket.yaml"),
                 ("database-roles", "prepare-database-roles.yaml"),
                 ("execution-registry", "prepare-execution-registry.yaml"),
@@ -56,7 +56,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         )
         self.assertEqual(
             steps[0]["templateRef"],
-            {"name": "perfeng-release-preflight-v2", "template": "preflight"},
+            {"name": "perfeng-release-preflight-v3", "template": "preflight"},
         )
         self.assertEqual(set(self.templates), {"prepare"})
         self.assertEqual(
@@ -73,7 +73,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
         self.assertEqual(
             self.workflow["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"], "1"
         )
-        script = str(DIRECTORY / "verifiers-v2/release_runtime_v2.py")
+        script = str(DIRECTORY / "verifiers-v3/release_runtime_v3.py")
         lock_digest = "sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f"
         selection_args = {
             item["name"]: item["value"] for item in steps[1]["arguments"]["parameters"]
@@ -146,7 +146,7 @@ class ReleaseExternalStateTests(unittest.TestCase):
             [item["name"] for item in kustomization["configMapGenerator"]],
             [
                 "perfeng-external-state-scripts-v1",
-                "perfeng-release-verifiers-v2",
+                "perfeng-release-verifiers-v3",
             ],
         )
         generator = kustomization["configMapGenerator"][0]

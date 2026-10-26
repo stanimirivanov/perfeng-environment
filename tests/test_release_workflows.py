@@ -24,7 +24,7 @@ CLUSTER_UID = "11111111-2222-3333-4444-555555555555"
 class ReleaseWorkflowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.workflow = yaml.safe_load((DIRECTORY / "release-preflight-v2.yaml").read_text())
+        cls.workflow = yaml.safe_load((DIRECTORY / "release-preflight-v3.yaml").read_text())
         cls.templates = {item["name"]: item for item in cls.workflow["spec"]["templates"]}
         cls.rbac = [
             obj
@@ -168,7 +168,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         if mutation is not None:
             mutation(environment, request, request_path, lock)
         result = subprocess.run(
-            [sys.executable, str(DIRECTORY / "verifiers-v2/release_runtime_v2.py"), "preflight"],
+            [sys.executable, str(DIRECTORY / "verifiers-v3/release_runtime_v3.py"), "preflight"],
             capture_output=True,
             text=True,
             check=False,

@@ -269,14 +269,14 @@ class MaintenanceCheckpointTests(unittest.TestCase):
                     self.assertNotIn("private-token", stderr.getvalue())
 
     def test_staged_workflow_and_rbac_preserve_read_only_boundary(self) -> None:
-        parent = yaml.safe_load((DIRECTORY / "release-maintenance-checkpoint-v2.yaml").read_text())
-        child = yaml.safe_load((DIRECTORY / "verify-release-quiescence-v2.yaml").read_text())
+        parent = yaml.safe_load((DIRECTORY / "release-maintenance-checkpoint-v3.yaml").read_text())
+        child = yaml.safe_load((DIRECTORY / "verify-release-quiescence-v3.yaml").read_text())
         self.assertEqual(parent["spec"]["serviceAccountName"], "release-maintenance-checkpoint")
         self.assertEqual(
             parent["spec"]["synchronization"]["mutexes"], [{"name": "perfeng-local-external-state"}]
         )
         steps = parent["spec"]["templates"][0]["steps"]
-        self.assertEqual(steps[0][0]["templateRef"]["name"], "perfeng-release-preflight-v2")
+        self.assertEqual(steps[0][0]["templateRef"]["name"], "perfeng-release-preflight-v3")
         self.assertEqual(child["spec"]["templates"][0]["activeDeadlineSeconds"], 180)
         for path in [
             *(DIRECTORY / "rbac/maintenance").glob("*.yaml"),

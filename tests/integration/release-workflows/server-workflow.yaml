@@ -35,7 +35,7 @@ spec:
       volumes:
         - name: verifier
           configMap:
-            name: perfeng-release-verifiers-v2
+            name: perfeng-release-verifiers-v3
         # The executor needs its ordinary task-result identity. Mask its default
         # API credential path in main only; Kubernetes skips automatic mounting
         # into a container that already mounts this path.
@@ -50,7 +50,7 @@ spec:
             from pathlib import Path
             assert not Path('/var/run/secrets/kubernetes.io/serviceaccount/token').exists()
             sys.path.insert(0, '/opt/release')
-            import release_runtime_v2 as runtime
+            import release_runtime_v3 as runtime
             try:
                 runtime.probe_endpoints()
             except runtime.policy.ReadinessRefused as error:

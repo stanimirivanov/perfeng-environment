@@ -29,7 +29,7 @@ readiness = dict(schemaVersion=1, kind="PerfengReleaseReadiness", scope="control
     status="readiness-verified", requestDigest=payload["requestDigest"],
     clusterUID=payload["environment"]["clusterUID"], selectionRevision=payload["selectionRevision"],
     applicationUID=payload["controlPlaneApplicationUID"], deploymentRevision=payload["deploymentRevision"], image=payload["image"])
-refusals = {"changed-root": "root changed during adoption", "dangling": "current pointer conflicts",
+refusals = {"changed-root": "root is stale, syncing or not at the reviewed selection", "dangling": "current pointer conflicts",
     "replaced": "current pointer conflicts"}
 try:
     plan = policy.plan_adoption(raw, readiness, records["root"], records["receipt"], records["pointer"], root_after)

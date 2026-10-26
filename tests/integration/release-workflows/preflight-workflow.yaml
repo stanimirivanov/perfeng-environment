@@ -20,15 +20,15 @@ spec:
       steps:
         - - name: validate-schema
             templateRef:
-              name: perfeng-release-preflight-v2
+              name: perfeng-release-preflight-v3
               template: validate-schema
         - - name: cluster-uid
             templateRef:
-              name: perfeng-release-preflight-v2
+              name: perfeng-release-preflight-v3
               template: cluster-uid
         - - name: verify-identities
             templateRef:
-              name: perfeng-release-preflight-v2
+              name: perfeng-release-preflight-v3
               template: verify-identities
             arguments:
               parameters:

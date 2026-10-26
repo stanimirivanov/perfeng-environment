@@ -134,7 +134,7 @@ def evidence() -> tuple[dict[str, Any], dict[str, Any], dict[str, str], dict[str
     workflow = {
         "metadata": {"name": "parent", "uid": "workflow-uid"},
         "spec": {
-            "workflowTemplateRef": {"name": "perfeng-release-readiness-v2"},
+            "workflowTemplateRef": {"name": "perfeng-release-readiness-v3"},
             "arguments": {"parameters": [{"name": k, "value": v} for k, v in parameters.items()]},
         },
         "status": {"phase": "Succeeded", "nodes": nodes},
@@ -307,7 +307,7 @@ class ReadinessParentIntegrationTests(unittest.TestCase):
 
     def test_phase_uses_complete_parent_after_real_argocd_without_synthetic_parameters(self):
         source = (FIXTURE / "readiness-parent.sh").read_text()
-        self.assertIn("--from workflowtemplate/perfeng-release-readiness-v2", source)
+        self.assertIn("--from workflowtemplate/perfeng-release-readiness-v3", source)
         self.assertNotIn("-p preflight-result", source)
         self.assertNotIn("argo retry", source)
         self.assertEqual(
@@ -326,7 +326,7 @@ class ReadinessParentIntegrationTests(unittest.TestCase):
             chain.index('source "$source_dir/readiness-parent.sh"'),
         )
         self.assertIn(
-            'names.add(("WorkflowTemplate", "perfeng-release-readiness-v2"))',
+            'names.add(("WorkflowTemplate", "perfeng-release-readiness-v3"))',
             (FIXTURE / "run.sh").read_text(),
         )
 

@@ -25,11 +25,11 @@ spec:
       steps:
         - - name: preflight
             templateRef:
-              name: perfeng-release-preflight-v2
+              name: perfeng-release-preflight-v3
               template: preflight
         - - name: task-selection
             templateRef:
-              name: perfeng-release-task-selection-v2
+              name: perfeng-release-task-selection-v3
               template: run
             arguments:
               parameters:

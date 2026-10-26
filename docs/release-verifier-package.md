@@ -3,21 +3,21 @@
 ## TL;DR
 
 - Five Python verification modes share two stdlib modules and one immutable
-  `perfeng-release-verifiers-v2` ConfigMap in `argo-workflows`.
+  `perfeng-release-verifiers-v3` ConfigMap in `argo-workflows`.
 - Argo retains sequencing, native resource waits, deadlines and persistence;
   the package owns input predicates and bounded reads/probes.
-- Use v2 preflight, readiness, maintenance-checkpoint and adoption entrypoints.
+- Use v3 preflight, readiness, maintenance-checkpoint and adoption entrypoints.
   The external-state parent and all request/result data schemas remain v1.
-- Retired source is identified by Git revision and SHA-256; installed v1
+- Retired source is identified by Git revision and SHA-256; installed v1/v2
   objects remain retained. Source retirement does not authorize cluster pruning.
 - This corrects the staged helper budget. Host cutover, original script
   retirement, live parity and production readiness remain outstanding.
 
 ## Package boundary and accounting
 
-`gitops/release-workflows/verifiers-v2/release_policy_v2.py` contains pure
+`gitops/release-workflows/verifiers-v3/release_policy_v3.py` contains pure
 identity, readiness, quiescence and adoption predicates. Its companion
-`release_runtime_v2.py` handles checked Git artifacts, environment inputs,
+`release_runtime_v3.py` handles checked Git artifacts, environment inputs,
 bounded authenticated Kubernetes reads, fixed HTTP probes and result output.
 Each container invokes one mode: `preflight`, `selection`, `readiness`,
 `quiescence` or `adoption`. There is no general command runner, subprocess
@@ -42,9 +42,17 @@ and 3,545 lines. None is deleted or counted as retired by this package change.
 
 ## Version and compatibility boundary
 
+[ADR 0036](decisions/0036-tolerate-root-reconciliation-bookkeeping.md) introduces
+v3 after exact captured-input replay identified routine root status refresh as
+the cause of v2 adoption refusals. Only generation, resourceVersion and
+reconciledAt are excluded from root equality; both samples are validated and
+all remaining fields and ledger checks are preserved. The 708-line ceiling is
+unchanged; result construction reuses existing identity fields without changing
+output values. v2 source is retired with exact provenance, not edited in place.
+
 Preflight, task selection, verification children, readiness, maintenance and
-adoption parents receive new `-v2` Kubernetes names and source paths. The stable
-`perfeng-release-external-state-v1` parent points to v2 preflight/selection while
+adoption parents receive new `-v3` Kubernetes names and source paths. The stable
+`perfeng-release-external-state-v1` parent points to v3 preflight/selection while
 retaining its four inputs and outputs. Its native preparation children, native
 readiness observer and adoption record operations keep their existing v1 names.
 Request, preflight, readiness, checkpoint and adoption data schemas stay v1;
@@ -70,14 +78,14 @@ Historical blobs remain in Git and can be read with
 2. Confirm pruning remains disabled. Sync the package ConfigMap at wave `-2`,
    children at `-1`, then parents. Both module keys must exist in the same
    namespace as their Pods. No additional RBAC is required.
-3. Submit a **fresh** Workflow using the guide's v2 entrypoint and four pinned
-   Git inputs. Retain old objects and in-flight v1 Workflows; do not resume or
-   memoize successful v1 nodes as a v2 verification attempt.
+3. Submit a **fresh** Workflow using the guide's v3 entrypoint and four pinned
+   Git inputs. Retain old objects and in-flight v1/v2 Workflows; do not resume or
+   memoize successful older-version nodes as a v3 verification attempt.
 4. If the upgrade fails, preserve failed Workflow evidence and stop new
    submissions. Review/sync the previous staged Git revision with pruning off;
-   it restores source selection and parent references. Existing immutable v1
-   ConfigMaps/templates remain usable. Do not overwrite a v2 ConfigMap or delete
-   installed versions as an implicit repair.
+   it restores source selection and parent references. Existing immutable v1/v2
+   ConfigMaps/templates remain usable. Do not overwrite a published ConfigMap or
+   delete installed versions as an implicit repair.
 
 Removal from desired source does not remove retained cluster resources when
 pruning is off. A future live resource-retirement task must inspect in-flight

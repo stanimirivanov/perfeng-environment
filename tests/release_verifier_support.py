@@ -4,7 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-PACKAGE = Path(__file__).resolve().parents[1] / "gitops/release-workflows/verifiers-v2"
+PACKAGE = Path(__file__).resolve().parents[1] / "gitops/release-workflows/verifiers-v3"
 
 
 def load(name):
@@ -17,5 +17,5 @@ def load(name):
     return sys.modules[name]
 
 
-policy = load("release_policy_v2")
-runtime = load("release_runtime_v2")
+policy = load("release_policy_v3")
+runtime = load("release_runtime_v3")

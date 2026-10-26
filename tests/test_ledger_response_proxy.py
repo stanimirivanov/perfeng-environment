@@ -369,7 +369,7 @@ class LedgerResponseProxyTests(unittest.TestCase):
         self.assertFalse(pod["spec"]["enableServiceLinks"])
         self.assertNotIn("env", pod["spec"]["containers"][0])
         planner = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/plan-release-adoption-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/plan-release-adoption-v3.yaml").read_text()
         )
         self.assertEqual(
             pod["spec"]["containers"][0]["image"],

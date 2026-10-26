@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 
-import release_policy_v2 as policy
+import release_policy_v3 as policy
 
 API, NAMES = policy.API, policy.NAMES
 PLATFORM = "/apis/apps/v1/namespaces/perf-platform/deployments/control-plane"

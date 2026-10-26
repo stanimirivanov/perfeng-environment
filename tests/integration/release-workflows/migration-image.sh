@@ -54,7 +54,7 @@ migration_case() {
   migration_label=$1 migration_key=$2
   [[ $migration_key == runtime-url || $migration_key == migration-url ]] || exit 2
   echo "Selected migration image: $migration_label"
-  checkpoint=$(a submit --from workflowtemplate/perfeng-release-maintenance-checkpoint-v2 \
+  checkpoint=$(a submit --from workflowtemplate/perfeng-release-maintenance-checkpoint-v3 \
     --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
   timeout 930s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$checkpoint"
   a get "$checkpoint" -o json > "$results/migration-image-$migration_label.checkpoint.workflow.json"

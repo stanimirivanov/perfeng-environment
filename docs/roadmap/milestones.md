@@ -675,6 +675,15 @@ rights or scenarios. The underlying parent failure is unproven until fresh
 trusted-main observations are retained. This change supplies no live adoption,
 promotion or script-retirement credit.
 
+ADR 0036 implements the owner-approved root refresh boundary after exact-input
+replay of run 40227060836 isolated initial `finish` and receipt-only
+`pointer-plan` refusals to generation/resourceVersion/reconciledAt changes.
+The v3 package validates both samples and compares every other field, preserving
+ledger bytes/provenance and existing native operations. Audited v2 source
+retirement retains installed objects with pruning disabled. The active package
+remains two modules/708 lines under the unchanged 708-line ceiling. Full-parent
+live acceptance remains post-merge; promotion, cutover and retirement stay open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

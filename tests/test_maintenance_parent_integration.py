@@ -63,7 +63,7 @@ def refused_workflow(step):
 class MaintenanceParentIntegrationTests(unittest.TestCase):
     def test_actual_parent_and_ci_phase_preserve_production_composition(self):
         parent = yaml.safe_load(
-            (ROOT / "gitops/release-workflows/release-maintenance-checkpoint-v2.yaml").read_text()
+            (ROOT / "gitops/release-workflows/release-maintenance-checkpoint-v3.yaml").read_text()
         )
         steps = parent["spec"]["templates"][0]["steps"]
         self.assertEqual([step[0]["name"] for step in steps], ["preflight", "observe"])

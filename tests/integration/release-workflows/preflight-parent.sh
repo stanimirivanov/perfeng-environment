@@ -15,7 +15,7 @@ cp "$fixture/parent-parameters.json" "$results/parent-parameters.json"
 
 for label in first repeat; do
   echo "Complete production preflight: $label"
-  name=$(a submit --from workflowtemplate/perfeng-release-preflight-v2 \
+  name=$(a submit --from workflowtemplate/perfeng-release-preflight-v3 \
     --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
   if timeout 630s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
     --namespace argo-workflows wait "$name"; then parent_rc=0; else parent_rc=$?; fi

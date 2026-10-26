@@ -15,7 +15,7 @@ k -n argocd get secret ci-perfeng-k8s-repository -o json | jq -S . > "$fixture/r
 readiness_parent_case() {
   local label=$1 input=$2 expected=$3 workflow rc node_id pod
   echo "Complete release readiness: $label"
-  workflow=$(a submit --from workflowtemplate/perfeng-release-readiness-v2 \
+  workflow=$(a submit --from workflowtemplate/perfeng-release-readiness-v3 \
     --parameter-file "$input" -o json | jq -er .metadata.name)
   if timeout 1260s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
     --namespace argo-workflows wait "$workflow"; then rc=0; else rc=$?; fi

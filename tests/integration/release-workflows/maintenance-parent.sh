@@ -29,7 +29,7 @@ maintenance_parent_case() {
   maintenance_label=$1 maintenance_input=$2 maintenance_step=$3 maintenance_refusal=$4
   echo "Complete maintenance checkpoint: $maintenance_label"
   maintenance_parent_snapshot "$results/maintenance-parent-$maintenance_label.before.json"
-  maintenance_name=$(a submit --from workflowtemplate/perfeng-release-maintenance-checkpoint-v2 \
+  maintenance_name=$(a submit --from workflowtemplate/perfeng-release-maintenance-checkpoint-v3 \
     --parameter-file "$maintenance_input" -o json | jq -er .metadata.name)
   if timeout 930s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
     --namespace argo-workflows wait "$maintenance_name"; then maintenance_rc=0; else maintenance_rc=$?; fi

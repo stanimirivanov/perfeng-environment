@@ -50,7 +50,7 @@ def evidence(first: bool = True) -> tuple:
     nodes["readiness"] = nodes.pop("parent")
     nodes["readiness"].update(id="readiness", displayName="readiness")
     workflow["metadata"].update(name="adoption", uid="00000000-0000-0000-0000-000000000001")
-    workflow["spec"]["workflowTemplateRef"]["name"] = "perfeng-release-adopt-existing-v2"
+    workflow["spec"]["workflowTemplateRef"]["name"] = "perfeng-release-adopt-existing-v3"
     workflow["spec"]["arguments"]["parameters"] = [
         {"name": k, "value": v} for k, v in parameters.items()
     ]
@@ -199,7 +199,7 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
 
     def test_stale_partial_or_conflicting_success_is_refused(self):
         for change in (
-            "root-version",
+            "root-annotation",
             "root-revision",
             "root-auto",
             "request-bytes",
@@ -217,8 +217,10 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
                 nodes = args[0]["status"]["nodes"]
                 if change.startswith("root-"):
                     value = READINESS.outputs(nodes["final-root"])["observation"]
-                    if change == "root-version":
-                        value["metadata"]["resourceVersion"] = "11"
+                    if change == "root-annotation":
+                        value["metadata"].setdefault("annotations", {})["ci.example/change"] = (
+                            "changed"
+                        )
                     elif change == "root-revision":
                         value["status"]["sync"]["revision"] = "c" * 40
                     else:
@@ -320,7 +322,7 @@ class AdoptionParentIntegrationTests(unittest.TestCase):
                 ("replaced-receipt", "replaced-receipt"),
             ],
         )
-        self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v2", source)
+        self.assertIn("--from workflowtemplate/perfeng-release-adopt-existing-v3", source)
         self.assertNotIn("argo retry", source)
         self.assertNotIn("--subresource=status", source)
         self.assertNotIn("delete configmap ", source)

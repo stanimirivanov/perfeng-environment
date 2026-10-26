@@ -107,7 +107,7 @@ def refusal(
     """Require the owning refusal boundary; reads may succeed but no later write may run."""
     assert step in {"root", "plan"}
     assert workflow["status"]["phase"] in {"Failed", "Error"}
-    assert workflow["spec"]["workflowTemplateRef"]["name"] == "perfeng-release-adopt-existing-v2"
+    assert workflow["spec"]["workflowTemplateRef"]["name"] == "perfeng-release-adopt-existing-v3"
     assert readiness.named(workflow, "readiness", "Steps")["phase"] == "Succeeded"
     failed = readiness.named(workflow, step)
     assert failed["phase"] in {"Failed", "Error"}
@@ -260,7 +260,7 @@ def waiting(
 ) -> None:
     """Prove both actual production parents queue behind this native suspended holder."""
     spec = yaml.safe_load(
-        Path("gitops/release-workflows/release-adopt-existing-v2.yaml").read_text(encoding="utf-8")
+        Path("gitops/release-workflows/release-adopt-existing-v3.yaml").read_text(encoding="utf-8")
     )["spec"]
     synchronization = spec["synchronization"]
     assert holder["metadata"]["namespace"] == "argo-workflows"
@@ -280,7 +280,7 @@ def waiting(
     for workflow in workflows:
         assert workflow["metadata"]["namespace"] == "argo-workflows"
         assert workflow["spec"]["workflowTemplateRef"] == {
-            "name": "perfeng-release-adopt-existing-v2"
+            "name": "perfeng-release-adopt-existing-v3"
         }
         assert {
             p["name"]: p["value"] for p in workflow["spec"]["arguments"]["parameters"]

@@ -23,7 +23,7 @@ spec:
       steps:
         - - name: readiness
             templateRef:
-              name: perfeng-verify-release-readiness-v2
+              name: perfeng-verify-release-readiness-v3
               template: run
             arguments:
               parameters:
