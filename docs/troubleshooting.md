@@ -402,9 +402,12 @@ The reviewed recovery selection now uses bundle/package 1.0.1 for kube-system UI
 public CA/Secret. The chart omits the APIService default-false TLS flag, resolving
 readback-only drift without ignore rules or TLS bypasses. After merge reconcile
 the staged root and verify metrics Synced/Healthy before qualification. A Missing
-control-plane Deployment is expected until guarded first-install preparation:
-`kubernetes:prepare` is the existing-runtime maintenance path and refuses that
-absence. Do not fabricate its prerequisite or manually activate the child yet.
+control-plane Deployment is supported by the existing `kubernetes:prepare` path:
+it pauses existing owned root/child Applications and refuses any remaining
+control-plane Pods, even when the Deployment is absent. There is no placeholder
+or separate first-install command. Require API/foundation/metrics health and the
+selected cluster UID before preparation; an API timeout blocks execution.
+Complete preparation and policy publication before manually activating the child.
 See [fresh-cluster recovery](kubernetes-runtime-deployment.md#fresh-cluster-recovery).
 
 Do not use the provider `cluster down` action or `task destroy` as a repair.

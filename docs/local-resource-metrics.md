@@ -85,8 +85,8 @@ The selected benchmark bundle/package 1.0.1 now binds this rebuilt cluster UID,
 following fresh accepted qualification and merged upstream PR #61. Keep all historical
 receipts intact. Qualification records an observation, not permanent admission;
 repeat qualification when exercising the benchmark loop. As described in
-[runtime deployment](kubernetes-runtime-deployment.md#fresh-cluster-recovery), first-install
-runtime preparation and manual activation remain separate gates.
+[runtime deployment](kubernetes-runtime-deployment.md#fresh-cluster-recovery), the existing
+preparation Task supports first installation; preparation and manual activation remain separate gates.
 
 The existing Argo CD owner-prefix Git credential can be reused only if its fine-grained
 Contents token permits read access to `k8s-infrastructure` as well as the existing workload
@@ -123,7 +123,8 @@ The root reads `main`, creates the separate Project in wave -1 and reconciles th
 Application. No extra deploy or Helm command is needed for an already bootstrapped root.
 Require the metrics Application to be Synced/Healthy at the selected source after
 root reconciliation. On the rebuilt cluster the manual control-plane child may
-remain Missing until guarded first-install preparation and activation are complete.
+remain Missing until the existing `task kubernetes:prepare`, policy publication
+and manual activation are complete.
 Only then run `uv run --locked python scripts/gitops.py health --execute` for full
 GitOps acceptance; that command also waits for all workload Applications. Its existing
 timeout path may request one normal Application refresh. The focused metrics task

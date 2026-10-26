@@ -133,13 +133,58 @@ class MaintenanceTests(unittest.TestCase):
     def test_replicas_or_remaining_pods_block_migration(self) -> None:
         running = deployment()
         running["status"]["replicas"] = 1
-        for dep, pods in [(running, []), (deployment(), [{"metadata": {"name": "old-pod"}}])]:
+        for dep, pods in [
+            (running, []),
+            (deployment(), [{"metadata": {"name": "old-pod"}}]),
+            (None, [{"metadata": {"name": "orphaned-pod"}}]),
+        ]:
             with (
                 patch.object(maintenance, "read", side_effect=[None, None, dep]),
                 patch.object(maintenance.cluster, "run", return_value=json.dumps({"items": pods})),
                 self.assertRaises(ValueError),
             ):
                 maintenance.verify_quiescent(cluster.ROOT)
+
+    def test_first_install_pauses_selected_applications_without_a_deployment(self) -> None:
+        root, child = [application(name) for name in maintenance.APPLICATIONS]
+        root["spec"]["syncPolicy"]["automated"]["enabled"] = True
+        release = maintenance.load_lock()
+        child["spec"].pop("source")
+        child["spec"]["sources"] = [
+            {
+                "repoURL": maintenance.REPOSITORIES[maintenance.APPLICATIONS[1]][0],
+                "path": path,
+                "targetRevision": release.deployment_revision,
+            }
+            for path in (release.chart_path, release.package_path)
+        ]
+        paused_root = deepcopy(root)
+        paused_root["spec"]["syncPolicy"]["automated"]["enabled"] = False
+        with (
+            patch.object(maintenance, "validate_release", return_value=release),
+            patch.object(maintenance.cluster, "verify_local_docker"),
+            patch.object(maintenance.cluster, "verify_context"),
+            patch.object(maintenance.benchmark_authority, "verify_target") as target,
+            patch.object(
+                maintenance,
+                "read",
+                side_effect=[root, child, None, paused_root, child, None],
+            ),
+            patch.object(
+                maintenance.cluster,
+                "run",
+                side_effect=["", "", '{"items": []}', '{"items": []}'],
+            ) as run,
+        ):
+            maintenance.pause()
+        target.assert_called_once_with(cluster.ROOT, release)
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(len(commands), 4)
+        for command, name in zip(commands[:2], maintenance.APPLICATIONS, strict=True):
+            index = command.index("patch")
+            self.assertEqual(command[index + 1 : index + 3], ["application", name])
+            self.assertIs(json.loads(command[-1])[-1]["value"]["automated"]["enabled"], False)
+        self.assertTrue(all("get" in command and "pods" in command for command in commands[2:]))
 
     def test_pause_orders_reconcilers_before_scale_with_concurrency_tests(self) -> None:
         with (

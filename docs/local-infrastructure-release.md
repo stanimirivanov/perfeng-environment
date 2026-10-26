@@ -151,8 +151,9 @@ not permission to ignore changed persistent identities.
 
 For the current rebuilt cluster, use the staged root and metrics acceptance in
 [metrics recovery](local-resource-metrics.md#after-merge-acceptance) first. Full
-health and smoke remain pending guarded first-install runtime preparation and
-manual activation; this selection alone does not complete those gates.
+health and smoke require first-install runtime preparation through the existing
+`task kubernetes:prepare`, policy publication and manual activation; this selection
+alone does not complete those gates.
 
 The initial ownership cutover completed this sequence on 2026-09-17. The
 existing PostgreSQL and SeaweedFS StatefulSets and PVCs retained their older
