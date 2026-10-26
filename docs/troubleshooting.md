@@ -385,6 +385,18 @@ foundation. If a cluster exists without its dedicated kubeconfig, or the
 kubeconfig exists without the named cluster, ensure stops for operator diagnosis
 instead of adopting or deleting either side.
 
+After intentional removal of all Docker containers and volumes, the old cluster's
+persistent data and external metrics TLS Secret are gone. Preserve host credentials and
+receipts; verify the cluster is absent before archiving an orphaned dedicated kubeconfig.
+Rebuild through staged bootstrap, then follow
+[metrics trust recovery](local-resource-metrics.md#recovery-after-docker-storage-removal).
+The new CA needs a reviewed Application selection; do not bypass TLS or compete with
+Argo CD using Helm. Cold image pulls may exceed a readiness deadline: inspect events and
+resume the failed supported stage after the prerequisite becomes ready. A recreated
+cluster also needs fresh qualification and reviewed benchmark-bundle UID promotion before
+runtime activation; old receipts must not be edited to fit it. Recreating infrastructure
+does not restore deleted PostgreSQL or object-store data.
+
 Do not use the provider `cluster down` action or `task destroy` as a repair.
 Either is **destructive** and permanently removes all PostgreSQL, SeaweedFS and
 Run state stored in the cluster.
