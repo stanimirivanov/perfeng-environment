@@ -1,0 +1,197 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-maintenance-pause-v1
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+spec:
+  serviceAccountName: release-maintenance-pause
+  entrypoint: pause
+  activeDeadlineSeconds: 1800
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: pause
+      steps:
+        - - name: preflight
+            templateRef:
+              name: perfeng-release-preflight-v3
+              template: preflight
+        - - name: postgres
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: postgres
+        - - name: seaweedfs
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: statefulset
+            arguments:
+              parameters:
+                - name: name
+                  value: seaweedfs
+        - - name: application
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: application
+        - - name: deployment
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: deployment
+        - - name: service
+            templateRef:
+              name: perfeng-observe-release-readiness-v1
+              template: service
+        - - name: readiness
+            templateRef:
+              name: perfeng-verify-release-readiness-v3
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: '{{steps.preflight.outputs.parameters.result}}'
+                - name: application
+                  value: '{{steps.application.outputs.parameters.observation}}'
+                - name: deployment
+                  value: '{{steps.deployment.outputs.parameters.observation}}'
+                - name: postgres
+                  value: '{{steps.postgres.outputs.parameters.observation}}'
+                - name: seaweedfs
+                  value: '{{steps.seaweedfs.outputs.parameters.observation}}'
+                - name: service
+                  value: '{{steps.service.outputs.parameters.observation}}'
+        - - name: root
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: root
+        - - name: pointer
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: pointer
+        - - name: receipt
+            templateRef:
+              name: perfeng-adoption-records-v1
+              template: receipt
+            arguments:
+              parameters:
+                - name: name
+                  value: '{{=''receipt.'' + workflow.parameters[''request-sha256''][7:39] + ''.'' + workflow.parameters[''request-sha256''][39:]}}'
+        - - name: root-after
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: root
+        - - name: baseline
+            templateRef:
+              name: perfeng-plan-release-adoption-v3
+              template: run
+            arguments:
+              parameters:
+                - name: phase
+                  value: finish
+                - name: readiness
+                  value: '{{steps.readiness.outputs.parameters.result}}'
+                - name: root
+                  value: '{{steps.root.outputs.parameters.observation}}'
+                - name: root-after
+                  value: '{{steps.root-after.outputs.parameters.observation}}'
+                - name: receipt
+                  value: '{{steps.receipt.outputs.parameters.observation}}'
+                - name: pointer
+                  value: '{{steps.pointer.outputs.parameters.observation}}'
+        - - name: guard-root
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: guard-root
+            arguments:
+              parameters:
+                - name: snapshot
+                  value: '{{steps.root-after.outputs.parameters.observation}}'
+        - - name: pause-root
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: patch-root
+            arguments:
+              parameters:
+                - name: observation
+                  value: '{{steps.guard-root.outputs.parameters.observation}}'
+        - - name: guard-child
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: guard-child
+            arguments:
+              parameters:
+                - name: snapshot
+                  value: '{{=toJson(jsonpath(steps[''application''].outputs.parameters.observation, ''$.snapshot''))}}'
+        - - name: pause-child
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: patch-child
+            arguments:
+              parameters:
+                - name: observation
+                  value: '{{steps.guard-child.outputs.parameters.observation}}'
+        - - name: guard-deployment
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: guard-deployment
+            arguments:
+              parameters:
+                - name: snapshot
+                  value: '{{=toJson(jsonpath(steps[''deployment''].outputs.parameters.observation, ''$.snapshot''))}}'
+        - - name: pause-deployment
+            templateRef:
+              name: perfeng-maintenance-resources-v1
+              template: patch-deployment
+            arguments:
+              parameters:
+                - name: observation
+                  value: '{{steps.guard-deployment.outputs.parameters.observation}}'
+        - - name: checkpoint
+            template: checkpoint
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: '{{steps.preflight.outputs.parameters.result}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.checkpoint.outputs.parameters.result}}'
+    - name: checkpoint
+      inputs:
+        parameters:
+          - name: preflight-result
+      retryStrategy:
+        limit: '4'
+        retryPolicy: OnFailure
+        backoff:
+          duration: 5s
+          factor: '2'
+          maxDuration: 600s
+      steps:
+        - - name: observe
+            templateRef:
+              name: perfeng-verify-release-quiescence-v3
+              template: run
+            arguments:
+              parameters:
+                - name: preflight-result
+                  value: '{{inputs.parameters.preflight-result}}'
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              parameter: '{{steps.observe.outputs.parameters.result}}'

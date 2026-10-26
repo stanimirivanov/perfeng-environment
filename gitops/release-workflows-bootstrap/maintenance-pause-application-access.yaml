@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-maintenance-pause
+  namespace: argocd
+rules:
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+    verbs:
+      - get
+      - patch
+    resourceNames:
+      - perfeng-local-root
+      - perfeng-local-control-plane
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-maintenance-pause
+  namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-maintenance-pause
+subjects:
+  - kind: ServiceAccount
+    name: release-maintenance-pause
+    namespace: argo-workflows

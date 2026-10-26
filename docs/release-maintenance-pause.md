@@ -1,0 +1,64 @@
+# Staged guarded maintenance pause
+
+## TL;DR
+
+- `perfeng-release-maintenance-pause-v1` pauses an already adopted, healthy initial control-plane baseline; it is outside the active local root.
+- It verifies the exact reviewed request, selected readiness and both existing ledger records before any Application or Deployment write.
+- Native Argo resource operations disable root then child automatic sync and scale the owned Deployment to zero, using atomic UID/resourceVersion/spec tests.
+- Only the read-only quiescence observation is retried. Success returns the existing `PerfengMaintenanceCheckpoint` v1 and leaves maintenance in place.
+- This is staged code with offline acceptance. Disposable controller/API acceptance and local acceptance remain pending; do not replace the supported host maintenance commands yet.
+
+## Preconditions and inputs
+
+This pilot accepts the same four pinned Git inputs as [preflight](release-preflight-workflow.md): `request-revision`, `request-path`, `request-sha256` and `selection-revision`. The request must be the exact bytes of the **already adopted initial baseline**, with `expectedCurrent: null` and manual activation. Both its immutable receipt and current pointer must already exist and agree with the selected cluster incarnation, root/child identities and running release. This does not adopt a missing record, advance the pointer, or support an upgrade request.
+
+The operator must schedule downtime, stop submissions, inspect/drain active Runs, retain the required backup and exclude other operators, manual Argo syncs and release operations through the existing [M04 maintenance procedure](kubernetes-runtime-deployment.md). Readiness is not a drain or backup check. The shared Argo mutex serializes only cooperating Workflows, not host commands or controllers.
+
+Root must be owned, healthy, synced to the selected environment commit and free of active sync; child and foundations must satisfy the existing selected readiness contract. Root tracks `main`: do not merge or reconcile a different selection during the operation. A missing or already stopped Deployment does not satisfy the running-baseline precondition. A partially completed pause requires inspection and explicit recovery, rather than replaying cached readiness or bypassing the baseline gate.
+
+## Sequence and write guards
+
+```text
+pinned Git request + selected cluster identity
+  -> selected foundations, child and Deployment readiness
+  -> existing immutable receipt + current pointer verification (finish phase)
+  -> fresh root guard -> JSON Patch: automatic sync disabled
+  -> fresh child guard -> JSON Patch: automatic sync disabled
+  -> fresh Deployment guard -> JSON Patch: replicas = 0
+  -> bounded fresh read-only quiescence observations
+  -> PerfengMaintenanceCheckpoint v1; leave paused
+```
+
+Child and Deployment observations carry their full snapshot alongside the existing readiness projection in **one** native output, so the snapshot subjected to write guards is the one verified for readiness. Ownership, deletion and pending sync checks happen in these initial observations before the first write. Root uses the existing adoption verifier on two complete observations. The `finish` phase requires both existing ledger records; this workflow references no ledger create template.
+
+Before each write, another named native GET requires the previously verified UID and full spec, unchanged labels/annotations/finalizers, no owner references or deletion, and valid ownership. Applications must remain free of pending/running/terminating sync, retain the verified sync/health observations and have no conditions. Deployment must retain its exact selector and ServiceAccount. A normal resourceVersion refresh can be accepted by this fresh semantic guard; the patch then tests **that fresh read's** UID, resourceVersion and spec atomically. Any change between guard and patch refuses the write. No write node has a workflow retry policy. Native executor transport retry cannot convert a stale guard into a new authorization: it retains the same tests.
+
+Patch resource identities, operation paths and terminal values are fixed in `maintenance-resources-v1.yaml`; the workflow accepts no arbitrary resource name or patch document. Application changes preserve the observed sync-policy options while forcing `automated.enabled: false`. Deployment changes only `spec.replicas` to zero. Automatic sync being disabled does not stop Argo CD comparisons or prevent an independently authorized manual sync.
+
+The parent deadline is 1,800 seconds. Native guards/patches have 60-second node deadlines and ten-second API request timeouts. Existing readiness leaves retain their bounds. The final read-only checkpoint has at most five attempts (four retries), exponential backoff starting at five seconds and a 600-second retry duration bound, within the overall parent deadline. Its unchanged verifier makes fresh bounded reads on each attempt, including an independent matching-Pod list and cluster UID check. Retry is confined to observation while Deployment status and Pod termination settle; it never reapplies a mutation. Final success requires current observed generation, zero replicas, no matching Pods and stable sampled identities, as described in the [checkpoint contract](release-maintenance-checkpoint.md).
+
+## Authority, staging and rollout
+
+[ADR 0037](decisions/0037-stage-guarded-maintenance-pause.md) records the owner-approved authority. Separate `release-maintenance-pause` permissions allow:
+
+| Boundary | Authority |
+|:--|:--|
+| `argocd` | Get/patch only `perfeng-local-root` and `perfeng-local-control-plane` Applications |
+| `perf-platform` | Get/patch only Deployment `control-plane`; get named `postgres`/`seaweedfs` StatefulSets and `control-plane` Service; list Pods |
+| Ledger namespace | Get ConfigMaps only; no create, patch or delete |
+| Cluster identity | Get only Namespace `kube-system` |
+| Workflow namespace | Existing named `release-git-read` Secret read and Argo task-result create/patch |
+
+Kubernetes RBAC cannot restrict patch fields on those named resources. A principal able to submit arbitrary Workflows using this ServiceAccount can exercise its entire patch authority. Template structure is not an admission or multi-user authorization boundary. Pod listing exposes namespace Pod data; selectors do not narrow RBAC. These limits make this a trusted-operator local pilot, not the completed M06 security architecture.
+
+The two bootstrap Role/Binding files for Application and ledger access are explicit prerequisites before the staged release Application can use this identity. `argocd` remains outside the staged Project destinations. New namespace-local/cluster identity grants and both WorkflowTemplates are included in the existing staged Kustomization. Neither the active local root nor host Task commands select the new parent. Existing read-only ServiceAccounts, immutable v3 modules, installed versions, Secrets, workloads and ledger objects are unchanged by installation.
+
+After disposable acceptance and a separately selected operational rollout, use the [existing submission procedure](release-preflight-workflow.md#disposable-kind-verification) with `--from workflowtemplate/perfeng-release-maintenance-pause-v1` and the adopted baseline's four exact inputs. This document is not authorization to run it against the deferred local cluster. Reverting Git selection does not withdraw already installed permissions or undo maintenance writes, because pruning remains disabled. Stopping further writes requires an explicitly authorized withdrawal of this identity's new RoleBindings; retain installed immutable templates and all ledger/data/Secrets. Never change credentials as rollback.
+
+## Failure, recovery and remaining acceptance
+
+A refused baseline produces no workload write. A subsequent failure may leave only root paused, both Applications paused, or the Deployment stopped. Kubernetes does not provide a cross-resource transaction here. A failed request response also does not prove a write was absent. Retain the Workflow/node identities and inspect the three resources, ledger identities and independent live health with the existing owner diagnostics. No successful checkpoint result is emitted unless the final observation passes.
+
+Do not use `argo retry`, reuse successful nodes, auto-resume, force-delete Pods, rewrite records or relax the guards. After inspection, follow the existing explicit M04 recovery/manual sync procedure. A fresh submission requires a healthy adopted running baseline again; completed partial pauses are not silently repaired. If maintenance is already established, submit the existing read-only checkpoint instead. Every subsequent migration must independently recheck current quiescence; this result is not a lease or migration authorization.
+
+Offline acceptance exercises the actual jq predicates, the unchanged readiness/adoption/quiescence policy, kubectl's local JSON Patch engine, exact named write authority, immutable inventory, Kustomize rendering and pinned Argo lint. It does not prove API admission, ServiceAccount delivery, controller timing or Pod termination. Before host-script retirement, disposable kind acceptance must cover successful root/child pause and scale, data/Secret/ledger retention, missing/conflicting records, wrong ownership/source/cluster, pending sync, guard conflict after observation, partial failure after each write, missing write rights, lingering Pods, and fresh independent quiescence. No new live CI scenario, ref, credential right or local operation is introduced here. Existing host entrypoints remain supported until that evidence and operational cutover are separately reviewed.

@@ -49,6 +49,16 @@
   [quiescence recovery boundary](release-maintenance-checkpoint.md#evidence-failure-and-recovery).
   It repairs nothing; keep manual pause/migration/sync and retained evidence.
 
+- For the staged `perfeng-release-maintenance-pause-v1`, a baseline refusal
+  means no workload write was authorized; inspect the exact adopted request,
+  selected readiness, receipt and pointer. A later failure can leave root/child
+  paused or the Deployment stopped. A guard conflict requires inspection, not
+  relaxed tests or cached-node retry. Preserve ledger/data/Secrets and use the
+  [pause recovery boundary](release-maintenance-pause.md#failure-recovery-and-remaining-acceptance).
+  Check the separately installed bootstrap grants for named Application patch
+  and ledger get access on `release-maintenance-pause`. It has no ledger write
+  authority. Local execution and host-command replacement remain deferred.
+
 - Run every command from the `perfeng-environment` repository and use
   `.local/perfeng-local.kubeconfig`; the similarly named context in the global
   kubeconfig may point to an earlier kind API-server port.

@@ -1,0 +1,280 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-maintenance-resources-v1
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+spec:
+  templates:
+    - name: root
+      activeDeadlineSeconds: 60
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: perfeng-local-root
+            namespace: argocd
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: .
+    - name: application
+      activeDeadlineSeconds: 300
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: perfeng-local-control-plane
+            namespace: argocd
+        successCondition: status.sync.status = Synced, status.health.status = Healthy
+        failureCondition: status.health.status in (Degraded,Missing)
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                if (.metadata.deletionTimestamp // null) == null
+                and (.metadata.ownerReferences // [] | length) == 0
+                and (.metadata.uid | type == "string" and length > 0)
+                and (.metadata.resourceVersion | type == "string" and length > 0)
+                and .metadata.labels["app.kubernetes.io/managed-by"] == "perfeng-environment"
+                and (.operation // null) == null
+                and (.status.operationState.phase // "Succeeded") == "Succeeded"
+                then . as $snapshot | ({
+                  name:.metadata.name,
+                  namespace:.metadata.namespace,
+                  uid:.metadata.uid,
+                  generation:.metadata.generation,
+                  project:.spec.project,
+                  destination:.spec.destination,
+                  sources:[(.spec.sources // [.spec.source])[] | {repository:.repoURL,revision:.targetRevision,path:.path,image:(.helm.valuesObject.image // null),runtimeConfigMap:(.helm.valuesObject.runtimeConfigMap // null),registryConfigMap:(.helm.valuesObject.registryConfigMap // null)}],
+                  comparedSources:[(.status.sync.comparedTo.sources // [.status.sync.comparedTo.source])[] | {repository:.repoURL,revision:.targetRevision,path:.path,image:(.helm.valuesObject.image // null),runtimeConfigMap:(.helm.valuesObject.runtimeConfigMap // null),registryConfigMap:(.helm.valuesObject.registryConfigMap // null)}],
+                  revisions:(.status.sync.revisions // [.status.sync.revision]),
+                  sync:.status.sync.status,
+                  health:.status.health.status,
+                  conditions:[.status.conditions[]? | .type],
+                  operation:(.status.operationState.phase // null)
+                }) + {snapshot:$snapshot}
+                else error("maintenance baseline refused: foreign, deleting or syncing resource") end
+    - name: deployment
+      activeDeadlineSeconds: 300
+      resource:
+        action: get
+        manifest: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: control-plane
+            namespace: perf-platform
+        successCondition: spec.replicas = 1, status.replicas = 1, status.availableReplicas = 1, status.readyReplicas
+          = 1, status.updatedReplicas = 1
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                if (.metadata.deletionTimestamp // null) == null
+                and (.metadata.ownerReferences // [] | length) == 0
+                and (.metadata.uid | type == "string" and length > 0)
+                and (.metadata.resourceVersion | type == "string" and length > 0)
+                and .metadata.labels["app.kubernetes.io/name"] == "perfeng-control-plane"
+                and .metadata.labels["app.kubernetes.io/instance"] == "control-plane"
+                and .spec.selector == {matchLabels:{"app.kubernetes.io/name":"perfeng-control-plane","app.kubernetes.io/instance":"control-plane"}}
+                and .spec.template.spec.serviceAccountName == "control-plane"
+                then . as $snapshot | ({
+                  name:.metadata.name,
+                  namespace:.metadata.namespace,
+                  uid:.metadata.uid,
+                  generation:.metadata.generation,
+                  observedGeneration:.status.observedGeneration,
+                  desired:.spec.replicas,
+                  replicas:.status.replicas,
+                  ready:.status.readyReplicas,
+                  updated:.status.updatedReplicas,
+                  available:.status.availableReplicas,
+                  unavailable:(.status.unavailableReplicas // 0),
+                  images:[.spec.template.spec.containers[].image],
+                  runtimeConfigMaps:[.spec.template.spec.containers[].envFrom[]? | .configMapRef.name // empty],
+                  runtimeSecrets:[.spec.template.spec.containers[].envFrom[]? | .secretRef.name // empty],
+                  registryConfigMaps:[.spec.template.spec.volumes[]? | select(.name == "registry") | .configMap.name],
+                  authenticationSecrets:[.spec.template.spec.volumes[]? | select(.name == "authentication") | .secret.secretName],
+                  imagePullSecrets:[.spec.template.spec.imagePullSecrets[]?.name]
+                }) + {snapshot:$snapshot}
+                else error("maintenance baseline refused: foreign, deleting or syncing resource") end
+    - name: guard-root
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: snapshot
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: perfeng-local-root
+            namespace: argocd
+        flags:
+          - --request-timeout=10s
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {{inputs.parameters.snapshot}} as $expected |
+                if .apiVersion == $expected.apiVersion and .kind == $expected.kind
+                and .metadata.name == $expected.metadata.name and .metadata.namespace == $expected.metadata.namespace
+                and .metadata.uid == $expected.metadata.uid and (.metadata.uid | type == "string" and length > 0)
+                and (.metadata.resourceVersion | type == "string" and length > 0)
+                and (.metadata.deletionTimestamp // null) == null
+                and (.metadata.ownerReferences // [] | length) == 0
+                and .metadata.labels == $expected.metadata.labels
+                and .metadata.annotations == $expected.metadata.annotations
+                and .metadata.finalizers == $expected.metadata.finalizers
+                and .spec == $expected.spec
+                and .metadata.labels["app.kubernetes.io/managed-by"] == "perfeng-environment"
+                and (.operation // null) == null
+                and (.status.operationState.phase // "Succeeded") == "Succeeded"
+                and .status.sync == $expected.status.sync and .status.health == $expected.status.health
+                and (.status.conditions // [] | length) == 0
+                then {uid:.metadata.uid,resourceVersion:.metadata.resourceVersion,spec:.spec,syncPolicy:((.spec.syncPolicy // {}) + {automated:((.spec.syncPolicy.automated // {}) + {enabled:false})})}
+                else error("maintenance write refused: resource changed, foreign or syncing; inspect before retry") end
+    - name: patch-root
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: observation
+      resource:
+        action: patch
+        mergeStrategy: json
+        flags:
+          - applications.argoproj.io
+          - perfeng-local-root
+          - --namespace=argocd
+          - --request-timeout=10s
+        manifest: |
+          [{"op":"test","path":"/metadata/uid","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.uid"))}}},
+          {"op":"test","path":"/metadata/resourceVersion","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.resourceVersion"))}}},
+          {"op":"test","path":"/spec","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.spec"))}}},
+          {"op":"add","path":"/spec/syncPolicy","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.syncPolicy"))}}},
+          {"op":"add","path":"/spec/syncPolicy/automated/enabled","value":false}]
+    - name: guard-child
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: snapshot
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: perfeng-local-control-plane
+            namespace: argocd
+        flags:
+          - --request-timeout=10s
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {{inputs.parameters.snapshot}} as $expected |
+                if .apiVersion == $expected.apiVersion and .kind == $expected.kind
+                and .metadata.name == $expected.metadata.name and .metadata.namespace == $expected.metadata.namespace
+                and .metadata.uid == $expected.metadata.uid and (.metadata.uid | type == "string" and length > 0)
+                and (.metadata.resourceVersion | type == "string" and length > 0)
+                and (.metadata.deletionTimestamp // null) == null
+                and (.metadata.ownerReferences // [] | length) == 0
+                and .metadata.labels == $expected.metadata.labels
+                and .metadata.annotations == $expected.metadata.annotations
+                and .metadata.finalizers == $expected.metadata.finalizers
+                and .spec == $expected.spec
+                and .metadata.labels["app.kubernetes.io/managed-by"] == "perfeng-environment"
+                and (.operation // null) == null
+                and (.status.operationState.phase // "Succeeded") == "Succeeded"
+                and .status.sync == $expected.status.sync and .status.health == $expected.status.health
+                and (.status.conditions // [] | length) == 0
+                then {uid:.metadata.uid,resourceVersion:.metadata.resourceVersion,spec:.spec,syncPolicy:((.spec.syncPolicy // {}) + {automated:((.spec.syncPolicy.automated // {}) + {enabled:false})})}
+                else error("maintenance write refused: resource changed, foreign or syncing; inspect before retry") end
+    - name: patch-child
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: observation
+      resource:
+        action: patch
+        mergeStrategy: json
+        flags:
+          - applications.argoproj.io
+          - perfeng-local-control-plane
+          - --namespace=argocd
+          - --request-timeout=10s
+        manifest: |
+          [{"op":"test","path":"/metadata/uid","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.uid"))}}},
+          {"op":"test","path":"/metadata/resourceVersion","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.resourceVersion"))}}},
+          {"op":"test","path":"/spec","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.spec"))}}},
+          {"op":"add","path":"/spec/syncPolicy","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.syncPolicy"))}}},
+          {"op":"add","path":"/spec/syncPolicy/automated/enabled","value":false}]
+    - name: guard-deployment
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: snapshot
+      resource:
+        action: get
+        manifest: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: control-plane
+            namespace: perf-platform
+        flags:
+          - --request-timeout=10s
+      outputs:
+        parameters:
+          - name: observation
+            valueFrom:
+              jqFilter: |
+                {{inputs.parameters.snapshot}} as $expected |
+                if .apiVersion == $expected.apiVersion and .kind == $expected.kind
+                and .metadata.name == $expected.metadata.name and .metadata.namespace == $expected.metadata.namespace
+                and .metadata.uid == $expected.metadata.uid and (.metadata.uid | type == "string" and length > 0)
+                and (.metadata.resourceVersion | type == "string" and length > 0)
+                and (.metadata.deletionTimestamp // null) == null
+                and (.metadata.ownerReferences // [] | length) == 0
+                and .metadata.labels == $expected.metadata.labels
+                and .metadata.annotations == $expected.metadata.annotations
+                and .metadata.finalizers == $expected.metadata.finalizers
+                and .spec == $expected.spec
+                and .metadata.labels["app.kubernetes.io/name"] == "perfeng-control-plane"
+                and .metadata.labels["app.kubernetes.io/instance"] == "control-plane"
+                and .spec.selector == {matchLabels:{"app.kubernetes.io/name":"perfeng-control-plane","app.kubernetes.io/instance":"control-plane"}}
+                and .spec.template.spec.serviceAccountName == "control-plane"
+                then {uid:.metadata.uid,resourceVersion:.metadata.resourceVersion,spec:.spec,syncPolicy:null}
+                else error("maintenance write refused: resource changed, foreign or syncing; inspect before retry") end
+    - name: patch-deployment
+      activeDeadlineSeconds: 60
+      inputs:
+        parameters:
+          - name: observation
+      resource:
+        action: patch
+        mergeStrategy: json
+        flags:
+          - deployments.apps
+          - control-plane
+          - --namespace=perf-platform
+          - --request-timeout=10s
+        manifest: |
+          [{"op":"test","path":"/metadata/uid","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.uid"))}}},
+          {"op":"test","path":"/metadata/resourceVersion","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.resourceVersion"))}}},
+          {"op":"test","path":"/spec","value":{{=toJson(jsonpath(inputs.parameters.observation, "$.spec"))}}},
+          {"op":"replace","path":"/spec/replicas","value":0}]

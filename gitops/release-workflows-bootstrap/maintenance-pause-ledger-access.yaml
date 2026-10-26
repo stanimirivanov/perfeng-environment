@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-maintenance-pause
+  namespace: perfeng-release-ledger
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - configmaps
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-maintenance-pause
+  namespace: perfeng-release-ledger
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-maintenance-pause
+subjects:
+  - kind: ServiceAccount
+    name: release-maintenance-pause
+    namespace: argo-workflows

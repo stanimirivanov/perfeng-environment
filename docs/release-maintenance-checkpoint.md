@@ -6,6 +6,7 @@
 - It requires owned, paused root/child Applications, no active sync, a current zero-replica Deployment and no matching Pods, including terminating Pods.
 - Its versioned result is observation evidence, not a promotion receipt, backup proof, migration authorization or an ongoing lock.
 - Keep the [manual M04 maintenance and recovery path](kubernetes-runtime-deployment.md). This staged checkpoint does not pause, migrate, resume, sync or repair anything.
+- A separate [staged maintenance-pause parent](release-maintenance-pause.md) can sequence guarded writes before this unchanged observation; its live acceptance and host cutover remain pending.
 - A [trusted-main CI phase](release-workflows-integration.md#complete-maintenance-parent-composition)
   exercises this unchanged complete parent using the real disposable UID and
   exact Git request after full preflight. Fixture Applications remain synthetic;
