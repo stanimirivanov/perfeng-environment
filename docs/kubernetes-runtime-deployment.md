@@ -3,10 +3,9 @@
 ## TL;DR
 
 - This selects `local-kind-integration/1.0.1`, not a production-performance cohort.
-- On the rebuilt cluster, stop at [fresh-cluster recovery](#fresh-cluster-recovery):
-  guarded first-install preparation is still required before runtime activation.
-- For an already installed runtime, prepare the reviewed branch with `task kubernetes:prepare`.
-  This is **mutating**: it pauses reconciliation and stops the API/worker before migrations.
+- For first installation or an installed runtime, use `task kubernetes:prepare`
+  after the prerequisites in [fresh-cluster recovery](#fresh-cluster-recovery).
+  This is **mutating**: it pauses reconciliation and stops any existing owned API/worker before migrations.
 - Publish the new pod-startup policy once, then merge the reviewed selection.
 - Resume the root with `gitops.py bootstrap --execute`, wait for benchmark authority,
   then manually Sync the control-plane child in Argo CD, with pruning disabled.
@@ -51,22 +50,35 @@ edited evidence file. Do not recreate the cluster to repair deployment.
 
 ## Fresh-cluster recovery
 
-The rebuilt cluster has no installed control-plane Deployment. Selecting these
-inputs does not create the database schema, runtime credentials, migrations or
-published policies. The maintenance path below requires an existing owned
-Deployment and deliberately refuses a missing one. Do not fabricate a zero-replica
-Deployment, adoption receipt or current-release pointer to bypass that check.
+Selecting these inputs does not create the database schema, runtime credentials,
+migrations or published policies. First installation uses the existing
+`task kubernetes:prepare`, with the same pause and migration guards as maintenance.
+An absent control-plane Deployment is supported: there is nothing to scale.
+The command still checks cluster identity, pauses existing owned root/child
+Applications and requires zero matching control-plane Pods. A missing Deployment
+does not establish an empty database or erase previous history. Do not fabricate
+a Deployment, adoption receipt or current-release pointer.
 
 After this selection merges, reconcile the staged root and accept metrics as
 described in [metrics acceptance](local-resource-metrics.md#after-merge-acceptance).
-A separate guarded first-install preparation task is required before runtime
-activation; keep control-plane auto-sync disabled and do not manually Sync it yet.
+Before preparation, require a responsive API, healthy PostgreSQL/SeaweedFS and
+their external credentials, verified resource metrics and the selected cluster
+UID. A timeout or failed identity check is a prerequisite failure, not permission
+to skip a guard, extend a deadline or recreate the cluster.
+
+Follow the preparation commands below from the reviewed selection. Provision
+missing pull credentials explicitly; existing owned credentials are verified and
+retained. The Task creates/verifies database identities, runs the pinned migration,
+assembles immutable runtime ConfigMaps and prepares execution credentials. It does
+not publish policies or install/activate the control-plane Deployment.
+Keep control-plane auto-sync disabled until preparation and policy publication
+succeed, then use the manual activation procedure below.
 The accepted upstream qualification supports this descriptor's provenance, not
 permanent admission or a baseline approval. Preserve historical receipts and
 obtain fresh qualification for subsequent benchmark acceptance. Deleted database
 and object-store data are not recovered by selecting a new bundle.
 
-## Prepare the maintenance window before merging
+## Prepare before activation
 
 The [staged Argo maintenance checkpoint](release-maintenance-checkpoint.md) can
 observe an already paused current selection on a disposable fixture. It does
@@ -90,13 +102,15 @@ task kubernetes:prepare
 
 The two previews are offline. The Task then validates the pin, ownership-checks
 and pauses the root Application first and control-plane child second, scales only
-the existing `control-plane` Deployment to zero and waits at most 180 seconds for
-its Pods to stop. Optimistic UID/resourceVersion tests reject racing changes.
+an existing `control-plane` Deployment to zero and waits at most 180 seconds for
+its Pods to stop. First installation skips scaling an absent Deployment and still
+performs fresh quiescence reads. Optimistic UID/resourceVersion tests reject racing changes.
 Active syncs, ApplicationSet ownership and unexpected sources are refused.
-Missing objects on a fresh cluster are not adopted or fabricated.
+Missing objects on a fresh cluster are not adopted or fabricated. Remaining Pods
+refuse migration even when the Deployment is absent.
 
 The migration command independently refuses writes unless both Applications are
-paused, the owned Deployment has zero replicas and no matching Pods remain.
+paused when present, any owned Deployment has zero replicas and no matching Pods remain.
 Its pinned Job runs migrations through 0018. Runtime grants include only
 SELECT/INSERT/UPDATE on `benchmark_target_reservations`, explicitly **no DELETE**.
 No native-worker grants or operator permissions are enabled.

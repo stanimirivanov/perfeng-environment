@@ -69,8 +69,10 @@ tasks:
   kubernetes:prepare:
     desc: Pause the control plane and explicitly prepare the selected M04 migration and external inputs
     summary: |
-      Requires the existing stateful foundation. This intentionally stops the API
-      and worker, pauses root/child sync and leaves them paused. It does not
+      Requires a healthy stateful foundation and selected cluster identity.
+      Pauses root/child sync and stops an existing owned API/worker Deployment.
+      First installation needs no placeholder Deployment; remaining Pods refuse migration.
+      Leaves reconcilers paused. It does not
       publish policies or activate the new Deployment. Follow docs/kubernetes-runtime-deployment.md.
     cmds:
       - uv run --locked python scripts/control_plane_release.py validate
