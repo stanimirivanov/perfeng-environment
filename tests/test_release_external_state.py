@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -74,7 +75,8 @@ class ReleaseExternalStateTests(unittest.TestCase):
             self.workflow["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"], "1"
         )
         script = str(DIRECTORY / "verifiers-v3/release_runtime_v3.py")
-        lock_digest = "sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f"
+        lock_bytes = (ROOT / "deployments/local-control-plane.json").read_bytes()
+        lock_digest = "sha256:" + hashlib.sha256(lock_bytes).hexdigest()
         selection_args = {
             item["name"]: item["value"] for item in steps[1]["arguments"]["parameters"]
         }
@@ -82,11 +84,18 @@ class ReleaseExternalStateTests(unittest.TestCase):
         self.assertEqual(
             selection_args["expected-lock-path"], "deployments/local-control-plane.json"
         )
-        self.assertEqual(selection_args["expected-lock-digest"], lock_digest)
+        self.assertEqual(
+            selection_args["expected-lock-digest"],
+            lock_digest,
+            "Promote the reviewed external-state task selection with the control-plane lock",
+        )
+        different_bytes = lock_bytes + b"\n"
+        self.assertEqual(json.loads(lock_bytes), json.loads(different_bytes))
         for environment, digest, expected in (
             ("perfeng-local", lock_digest, 0),
             ("other", lock_digest, 1),
             ("perfeng-local", "sha256:" + "0" * 64, 1),
+            ("perfeng-local", "sha256:" + hashlib.sha256(different_bytes).hexdigest(), 1),
         ):
             with self.subTest(environment=environment, digest=digest):
                 result = subprocess.run(

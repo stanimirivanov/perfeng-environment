@@ -40,7 +40,7 @@ spec:
                 - name: expected-lock-path
                   value: deployments/local-control-plane.json
                 - name: expected-lock-digest
-                  value: sha256:866280f8538e86c4f02cc437ff9ef293cf9e14d8b1c9930129bc7f57bfef0f5f
+                  value: sha256:a0d206a41e14c06d2d019dbb0dda7c50e07f93a72d52e0cd6a0b76e7ec9601ec
         - - name: bucket
             templateRef:
               name: perfeng-prepare-bucket-v1
