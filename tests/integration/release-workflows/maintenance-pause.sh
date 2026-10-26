@@ -76,3 +76,36 @@ cmp "$results/adoption-parent-$adoption_baseline.result.json" "$results/adoption
 printf '%s\n' 'Complete pause and manual recovery accepted; only the control-plane Pod was replaced' > "$results/maintenance-recovery.outcome.txt"
 complete_stage
 current_stage=$maintenance_stage
+
+maintenance_receipt_refusal() {
+  local label=$1 previous=$current_stage workflow rc node_id pod field
+  [[ $mode == preflight-parent && $scenario == initial && -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" ]] || return 2
+  [[ $label == missing-receipt || $label == replaced-receipt ]] || return 2
+  [[ ${adoption_retention_baseline:-} == "$fixture/maintenance-recovered" && -f $results/maintenance-recovery.outcome.txt ]] || return 2
+  start_stage "maintenance-$label"
+  maintenance_snapshot "$fixture/maintenance-$label-before"
+  root_state "$fixture/maintenance-$label-before"
+  workflow=$(a submit --from workflowtemplate/perfeng-release-maintenance-pause-v1 \
+    --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
+  if timeout 1830s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local \
+    --namespace argo-workflows wait "$workflow"; then rc=0; else rc=$?; fi
+  a get "$workflow" -o json > "$results/maintenance-$label.workflow.json"
+  [[ $rc != 0 && $rc != 124 && $rc != 137 ]]
+  k -n argo-workflows get pods -l "workflows.argoproj.io/workflow=$workflow" -o json \
+    | jq '[.items[]|{name:.metadata.name,uid:.metadata.uid,nodeID:.metadata.annotations["workflows.argoproj.io/node-id"],
+      account:.spec.serviceAccountName,exitCode:([.status.containerStatuses[]?|select(.name=="main")|.state.terminated.exitCode][0])}]' \
+    > "$results/maintenance-$label.workers.json"
+  node_id=$(jq -er '.status.nodes[]|select(.displayName=="baseline" and .type=="Pod" and (.phase=="Failed" or .phase=="Error"))|.id' "$results/maintenance-$label.workflow.json")
+  pod=$(jq -er --arg id "$node_id" '.[]|select(.nodeID==$id)|.name' "$results/maintenance-$label.workers.json")
+  k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 > "$fixture/maintenance-$label.worker.log"
+  maintenance_snapshot "$fixture/maintenance-$label-after"
+  root_state "$fixture/maintenance-$label-after"
+  root_retained "$fixture/maintenance-$label-before" "$fixture/maintenance-$label-after"
+  for field in records secrets config git; do
+    cmp "$fixture/maintenance-$label-before.$field.json" "$fixture/maintenance-$label-after.$field.json"
+  done
+  adoption_retained "maintenance-$label"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_pause_evidence.py" "$label" "$fixture" "$results"
+  complete_stage
+  current_stage=$previous
+}

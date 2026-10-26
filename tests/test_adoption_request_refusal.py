@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_adoption_identity_refusal import MODULE
+from test_adoption_identity_refusal import MODULE, REFUSAL
 from test_adoption_parent_integration import FIXTURE, READINESS, evidence
 
 
@@ -22,11 +22,9 @@ def request_fault(case):
     request = json.loads(original)
     if case == "changed-request":
         raw = original + b"\n"
-        reason = "current pointer conflicts or references a missing/replaced receipt"
     else:
         request["promotion"]["expectedCurrent"] = "sha256:" + hashlib.sha256(original).hexdigest()
         raw = (json.dumps(request, indent=2) + "\n").encode()
-        reason = "request/readiness identity differs or adoption is not initial"
     digest = "sha256:" + hashlib.sha256(raw).hexdigest()
     parameters["request-sha256"] = preflight["requestDigest"] = digest
     parameters["request-path"] = preflight["requestPath"] = (
@@ -68,7 +66,7 @@ def request_fault(case):
         raw_lock,
         api,
         [{"nodeID": "plan", "exitCode": 2}],
-        reason,
+        REFUSAL,
         baseline,
     ]
 

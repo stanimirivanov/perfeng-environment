@@ -1296,3 +1296,21 @@ its generated ServiceAccount volume name normalized for spec comparison.
 Original evidence is retained; never repair acceptance by rewriting it or
 ignoring all Pod differences. These checks are disposable CI only; use the
 [maintenance guide](release-maintenance-pause.md) for operational inspection.
+
+`maintenance-missing-receipt` and `maintenance-replaced-receipt` are expected
+baseline refusals in the initial job's existing receipt fault windows. Success
+requires fresh preflight/readiness, exactly the baseline worker exiting 2, no
+pause/checkpoint execution, unchanged retained state and a validated refusal
+outcome. The production worker intentionally redacts policy details; CI binds
+that fixed message to the exact native ledger observations through the unchanged
+policy. A timeout, native Forbidden, malformed input, unrelated worker failure
+or missing result file is not acceptance. Never rewrite the pointer, delete
+another receipt, weaken retention or run recovery to make these cases pass.
+
+The same redacted-message contract applies to adoption receipt/request refusal
+gates. The old harness incorrectly required detailed policy reasons in worker
+logs, which the runtime deliberately suppresses; synthetic logs concealed the
+mismatch. The corrected matcher requires the exact published fixed line only
+after exact-cause policy replay, retaining the sole planner exit 2 and all
+no-write/no-result checks. Do not expose policy details in production logs or
+accept arbitrary exit-2 failures as a workaround.
