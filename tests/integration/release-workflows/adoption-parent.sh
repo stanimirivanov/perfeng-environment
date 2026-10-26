@@ -244,7 +244,11 @@ adoption_retained retained
 printf '%s\n' 'Original receipt/pointer bytes, UIDs and provenance survived original Workflow deletion' > "$results/adoption-parent-retention.outcome.txt"
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 # Owner-approved destructive faults start only after the completed retention proof.
-if [[ $scenario == initial ]]; then source "$source_dir/maintenance-pause.sh"; fi
+if [[ $scenario == initial ]]; then
+  source "$source_dir/maintenance-pause.sh"
+  maintenance_baseline_refusal changed-request
+  maintenance_baseline_refusal upgrade-request
+fi
 cp "$fixture/adoption-retained.records.json" "$fixture/adoption-identity-baseline.json"
 adoption_records "$fixture/adoption-identity-current.json"
 PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_identity_evidence.py" prepare "$fixture" "$results" "$adoption_baseline"
@@ -254,7 +258,7 @@ k -n "$adoption_namespace" wait --for=delete "configmap/$adoption_receipt" --tim
 adoption_records "$fixture/adoption-missing-before.records.json"
 adoption_case missing-receipt missing-receipt
 cmp "$fixture/adoption-missing-before.records.json" "$fixture/adoption-missing-receipt.records.json"
-if [[ $scenario == initial ]]; then maintenance_receipt_refusal missing-receipt; fi
+if [[ $scenario == initial ]]; then maintenance_baseline_refusal missing-receipt; fi
 if [[ $scenario == receipt-only ]]; then
   k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
     --for=jsonpath='{.status.used.count/configmaps}'=2 --timeout=60s
@@ -263,7 +267,7 @@ k create -f "$fixture/adoption-receipt-recreate.json" -o json > "$fixture/adopti
 adoption_records "$fixture/adoption-replaced-before.records.json"
 adoption_case replaced-receipt replaced-receipt
 cmp "$fixture/adoption-replaced-before.records.json" "$fixture/adoption-replaced-receipt.records.json"
-if [[ $scenario == initial ]]; then maintenance_receipt_refusal replaced-receipt; fi
+if [[ $scenario == initial ]]; then maintenance_baseline_refusal replaced-receipt; fi
 jq -s --argjson expected "${#adoption_labels[@]}" -e 'length==$expected and (map(.metadata.uid)|unique|length)==$expected' "$results"/adoption-parent-*.workflow.json > /dev/null
 [[ $(k get namespace kube-system -o jsonpath='{.metadata.uid}') == "$cluster_uid" ]]
 

@@ -290,7 +290,7 @@ class MaintenanceReceiptRefusalTests(unittest.TestCase):
     def test_shell_keeps_existing_fault_windows_initial_only_and_rejects_wait_failures(self):
         assert BASH
         source = (FIXTURE / "maintenance-pause.sh").read_text()
-        function = re.search(r"^maintenance_receipt_refusal\(\) \{.*?^\}", source, re.M | re.S)
+        function = re.search(r"^maintenance_baseline_refusal\(\) \{.*?^\}", source, re.M | re.S)
         assert function
         shell = r"""
 set -euo pipefail
@@ -316,7 +316,7 @@ uv() { echo verified-refusal; }
             directory = Path(temporary)
             script = directory / "refusal.sh"
             script.write_text(
-                shell + function.group() + "\nmaintenance_receipt_refusal missing-receipt\n",
+                shell + function.group() + "\nmaintenance_baseline_refusal missing-receipt\n",
                 encoding="utf-8",
                 newline="\n",
             )
@@ -343,13 +343,13 @@ uv() { echo verified-refusal; }
         adoption = (FIXTURE / "adoption-parent.sh").read_text()
         self.assertLess(
             adoption.index("adoption_case missing-receipt missing-receipt"),
-            adoption.index("maintenance_receipt_refusal missing-receipt"),
+            adoption.index("maintenance_baseline_refusal missing-receipt"),
         )
         self.assertLess(
-            adoption.index("maintenance_receipt_refusal missing-receipt"),
+            adoption.index("maintenance_baseline_refusal missing-receipt"),
             adoption.index('k create -f "$fixture/adoption-receipt-recreate.json"'),
         )
         self.assertLess(
             adoption.index("adoption_case replaced-receipt replaced-receipt"),
-            adoption.index("maintenance_receipt_refusal replaced-receipt"),
+            adoption.index("maintenance_baseline_refusal replaced-receipt"),
         )

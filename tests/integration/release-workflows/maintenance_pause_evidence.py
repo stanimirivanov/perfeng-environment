@@ -1,5 +1,6 @@
 """Offline evidence checks for the owned CI pause and explicit manual recovery."""
 
+import hashlib
 import json
 import re
 import sys
@@ -331,6 +332,19 @@ def refusal(
         assert str(error) == "current pointer conflicts or references a missing/replaced receipt"
     else:
         raise AssertionError("Maintenance accepted the injected ledger fault")
+    baseline_refused(workflow, workers, log)
+    return {
+        "decision": "maintenance-" + case + "-refused",
+        "workflowUID": workflow["metadata"]["uid"],
+        "pointerUID": pointer["metadata"]["uid"],
+        "originalReceiptUID": original["metadata"]["uid"],
+        "observedReceiptUID": receipt["metadata"]["uid"] if receipt else None,
+    }
+
+
+def baseline_refused(workflow: dict[str, Any], workers: list[dict[str, Any]], log: str) -> None:
+    """Require the sole native baseline failure and forbid any later pause/checkpoint."""
+    assert workflow["status"]["phase"] in {"Failed", "Error"}
     failed = readiness.named(workflow, "baseline")
     assert failed["phase"] in {"Failed", "Error"} and failed["templateRef"] == {
         "name": "perfeng-plan-release-adoption-v3",
@@ -383,19 +397,89 @@ def refusal(
     assert "result" not in readiness.outputs(
         workflow["status"]["nodes"][workflow["metadata"]["name"]]
     )
+
+
+def request_refusal(
+    case: str,
+    workflow: dict[str, Any],
+    workers: list[dict[str, Any]],
+    parameters: dict[str, str],
+    raw: bytes,
+    original_raw: bytes,
+    original_parameters: dict[str, str],
+    raw_lock: bytes,
+    before: dict[str, Any],
+    baseline: list[dict[str, Any]],
+    log: str,
+) -> dict[str, Any]:
+    """Prove candidate identity/intent refusal while retaining a valid accepted baseline."""
+    assert case in {"changed-request", "upgrade-request"}
+    digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+    original_digest = "sha256:" + hashlib.sha256(original_raw).hexdigest()
+    assert digest != original_digest and parameters["request-sha256"] == digest
+    assert original_parameters["request-sha256"] == original_digest
+    assert parameters == {
+        **original_parameters,
+        "request-sha256": digest,
+        "request-path": f"deployments/release-requests/ci-{case}-v1.json",
+    }
+    candidate, accepted = json.loads(raw), json.loads(original_raw)
+    reason = "current pointer conflicts or references a missing/replaced receipt"
+    if case == "changed-request":
+        assert candidate == accepted
+    else:
+        assert candidate == {
+            **accepted,
+            "promotion": {**accepted["promotion"], "expectedCurrent": original_digest},
+        }
+        reason = "request/readiness identity differs or adoption is not initial"
+    preflight = readiness.outputs(readiness.named(workflow, "preflight", "Steps"))["result"]
+    Draft202012Validator(
+        json.loads(Path("deployments/release-preflight-result-v1.schema.json").read_text())
+    ).validate(preflight)
+    assert preflight["requestPath"] == parameters["request-path"]
+    assert preflight["lockDigests"] == accepted["selection"]["lockDigests"]
+    health, _ = running(workflow, parameters, preflight, raw_lock, before)
+    assert len(baseline) == 2 and before["records"] == baseline
+    pointer, receipt = sorted(baseline, key=lambda o: o["metadata"]["name"])
+    assert before["requestedReceipt"] is None
+    assert readiness.outputs(readiness.named(workflow, "receipt"))["observation"] is None
+    assert readiness.outputs(readiness.named(workflow, "pointer"))["observation"] == pointer
+    root = readiness.outputs(readiness.named(workflow, "root"))["observation"]
+    root_after = readiness.outputs(readiness.named(workflow, "root-after"))["observation"]
+    # Only the request digest differs in the selected readiness of these fixtures.
+    # This replay validates the stored baseline; it authorizes no write or recovery.
+    original_health = {**health, "requestDigest": original_digest}
+    valid = policy.plan_adoption(original_raw, original_health, root, receipt, pointer, root_after)
+    assert valid["create-receipt"] == valid["create-pointer"] == "false"
+    try:
+        policy.plan_adoption(raw, health, root, None, pointer, root_after)
+    except policy.ReadinessRefused as error:
+        assert str(error) == reason
+    else:
+        raise AssertionError("Maintenance accepted changed identity or upgrade intent")
+    baseline_refused(workflow, workers, log)
     return {
         "decision": "maintenance-" + case + "-refused",
         "workflowUID": workflow["metadata"]["uid"],
+        "requestDigest": digest,
+        "acceptedDigest": original_digest,
         "pointerUID": pointer["metadata"]["uid"],
-        "originalReceiptUID": original["metadata"]["uid"],
-        "observedReceiptUID": receipt["metadata"]["uid"] if receipt else None,
+        "originalReceiptUID": receipt["metadata"]["uid"],
     }
 
 
 def main() -> None:
     """Read private snapshots; publish only the validated checkpoint/decision."""
     mode, directory, evidence_directory = sys.argv[1:]
-    assert mode in {"paused", "recovered", "missing-receipt", "replaced-receipt"}
+    assert mode in {
+        "paused",
+        "recovered",
+        "missing-receipt",
+        "replaced-receipt",
+        "changed-request",
+        "upgrade-request",
+    }
     fixture, results = Path(directory), Path(evidence_directory)
 
     def load(path: Path) -> Any:
@@ -420,22 +504,41 @@ def main() -> None:
             )
         }
 
-    if mode in {"missing-receipt", "replaced-receipt"}:
+    if mode not in {"paused", "recovered"}:
         before, after = state(mode + "-before"), state(mode + "-after")
         for key in ("server", "workloads", "pods", "records", "secrets", "config", "git"):
             assert before[key] == after[key]
-        report = refusal(
-            mode,
-            load(results / f"maintenance-{mode}.workflow.json"),
-            load(results / f"maintenance-{mode}.workers.json"),
-            load(fixture / "parent-parameters.json"),
-            load(results / "parent-first.result.json"),
-            (fixture / "parent-request.json").read_bytes(),
-            Path("deployments/local-control-plane.json").read_bytes(),
-            before,
-            load(fixture / "adoption-identity-baseline.json"),
-            (fixture / f"maintenance-{mode}.worker.log").read_text(encoding="utf-8"),
-        )
+        if mode.endswith("-request"):
+            before["requestedReceipt"] = load(fixture / f"maintenance-{mode}.candidate-before.json")
+            assert before["requestedReceipt"] == load(
+                fixture / f"maintenance-{mode}.candidate-after.json"
+            )
+            report = request_refusal(
+                mode,
+                load(results / f"maintenance-{mode}.workflow.json"),
+                load(results / f"maintenance-{mode}.workers.json"),
+                load(fixture / f"{mode}-parameters.json"),
+                (fixture / f"{mode}-request.json").read_bytes(),
+                (fixture / "parent-request.json").read_bytes(),
+                load(fixture / "parent-parameters.json"),
+                Path("deployments/local-control-plane.json").read_bytes(),
+                before,
+                load(fixture / "adoption-identity-baseline.json"),
+                (fixture / f"maintenance-{mode}.worker.log").read_text(encoding="utf-8"),
+            )
+        else:
+            report = refusal(
+                mode,
+                load(results / f"maintenance-{mode}.workflow.json"),
+                load(results / f"maintenance-{mode}.workers.json"),
+                load(fixture / "parent-parameters.json"),
+                load(results / "parent-first.result.json"),
+                (fixture / "parent-request.json").read_bytes(),
+                Path("deployments/local-control-plane.json").read_bytes(),
+                before,
+                load(fixture / "adoption-identity-baseline.json"),
+                (fixture / f"maintenance-{mode}.worker.log").read_text(encoding="utf-8"),
+            )
         (results / f"maintenance-{mode}.outcome.json").write_text(
             json.dumps(report, sort_keys=True) + "\n", encoding="utf-8"
         )
