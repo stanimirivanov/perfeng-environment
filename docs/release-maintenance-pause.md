@@ -6,7 +6,7 @@
 - It verifies the exact reviewed request, selected readiness and both existing ledger records before any Application or Deployment write.
 - Native Argo resource operations disable root then child automatic sync and scale the owned Deployment to zero, using atomic UID/resourceVersion/spec tests.
 - Only the read-only quiescence observation is retried. Success returns the existing `PerfengMaintenanceCheckpoint` v1 and leaves maintenance in place.
-- This is staged code with offline acceptance. Disposable controller/API acceptance and local acceptance remain pending; do not replace the supported host maintenance commands yet.
+- This is staged code with offline acceptance and a main-only disposable acceptance gate; live proof is pending until that job succeeds. Local acceptance remains deferred; do not replace the supported host maintenance commands yet.
 
 ## Preconditions and inputs
 
@@ -56,6 +56,8 @@ The two bootstrap Role/Binding files for Application and ledger access are expli
 After disposable acceptance and a separately selected operational rollout, use the [existing submission procedure](release-preflight-workflow.md#disposable-kind-verification) with `--from workflowtemplate/perfeng-release-maintenance-pause-v1` and the adopted baseline's four exact inputs. This document is not authorization to run it against the deferred local cluster. Reverting Git selection does not withdraw already installed permissions or undo maintenance writes, because pruning remains disabled. Stopping further writes requires an explicitly authorized withdrawal of this identity's new RoleBindings; retain installed immutable templates and all ledger/data/Secrets. Never change credentials as rollback.
 
 ## Failure, recovery and remaining acceptance
+
+The existing trusted-main `initial` job now exercises the complete unchanged parent after adoption retention, before receipt identity faults. It checks native worker identity/order, verified readiness and both original records before writes, successful checkpoint output, zero Deployment status/desired replicas and absence of server Pods. It preserves original evidence, ledger bytes/UIDs/provenance, foundation Pods, storage, database/S3 data, configuration and Secrets. Only after a successful pause and retention proof does the fixture explicitly sync the selected control-plane child, verify native/HTTP health and require exactly one replacement Pod under the same ReplicaSet. Its spec must match except the generated ServiceAccount projected-volume name and corresponding mount references. The fixture then establishes a checked recovery snapshot for the remaining tests; it never overwrites the original Pod evidence. Root auto-sync stays disabled and the other six children stay skipped. [ADR 0038](decisions/0038-exercise-maintenance-pause-and-checked-recovery.md) records this approved CI retention boundary; it does not introduce production resume behavior. The other five scenarios retain their original Pod baseline.
 
 A refused baseline produces no workload write. A subsequent failure may leave only root paused, both Applications paused, or the Deployment stopped. Kubernetes does not provide a cross-resource transaction here. A failed request response also does not prove a write was absent. Retain the Workflow/node identities and inspect the three resources, ledger identities and independent live health with the existing owner diagnostics. No successful checkpoint result is emitted unless the final observation passes.
 
