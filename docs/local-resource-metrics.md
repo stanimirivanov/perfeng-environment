@@ -21,7 +21,8 @@ Cluster identity, node image, placement topology and Argo CD 3.5.2 remain unchan
 The metrics Application selects that same commit's `charts/resource-metrics` 1.0.0,
 which pins the official Metrics Server 0.9.0 image by digest.
 The metrics chart and implementation are byte-for-byte unchanged from the prior
-provider selection. CA, Secret references, placement and sync policy are unchanged.
+provider selection. Secret references, placement and sync policy are unchanged.
+The public serving CA is selected separately for the recreated local cluster.
 
 The consumer owns the Project/Application and existing `monitoring` namespace.
 The chart owns its eight reviewed workload/RBAC/API resources. It creates no namespace,
@@ -59,6 +60,30 @@ Argo CD, then complete the explicit certificate procedure before final health. S
 bootstrap deliberately does not wait for metrics, whose external prerequisites may not
 exist yet. A newly generated serving CA requires a reviewed change to the Application;
 never substitute the provider's synthetic rendering fixture or edit a qualification receipt.
+
+### Recovery after Docker storage removal
+
+Deleting all Docker containers and volumes removes the cluster, PostgreSQL/object-store
+data and the external metrics TLS Secret. An old public CA cannot recreate its discarded
+signing key. Archive an orphaned dedicated kubeconfig only after verifying that the named
+cluster is absent; keep host credentials, publication receipts and qualification evidence.
+Use staged bootstrap and the exact selected provider's certificate procedure above.
+Cold image pulls can exceed a readiness deadline: inspect Pod events and controller state,
+then resume the failed supported stage once its prerequisite is ready. Do not weaken deadlines.
+
+The rebuilt cluster has kube-system UID `257a288d-9e0f-4956-a0e3-9c4104de6476`.
+Its newly issued public serving CA has SHA-256 fingerprint
+`e8f3d17003d9bbaa4aa7b62a0a6ee19b525e40505d6cd15cd5eb3961deedfc53`.
+This selection changes only the public CA; it does not restore deleted data or activate
+runtime workloads. Review and merge it before Argo CD reconciles the APIService trust.
+Reverting to the old CA cannot recover the lost Secret and would break this new binding;
+recover through a reviewed selection matching the retained immutable Secret instead.
+
+The selected benchmark bundle still names the previous cluster UID. Keep all historical
+receipts intact. After verified metrics health and fresh qualification, promote a new
+cluster-bound bundle through the upstream review process described in
+[runtime deployment](kubernetes-runtime-deployment.md). Runtime activation remains gated
+by that reviewed promotion; infrastructure bootstrap alone is not runtime acceptance.
 
 The existing Argo CD owner-prefix Git credential can be reused only if its fine-grained
 Contents token permits read access to `k8s-infrastructure` as well as the existing workload
