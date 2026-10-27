@@ -252,6 +252,7 @@ if [[ $scenario == initial ]]; then
   source "$source_dir/maintenance-guard-conflict.sh"
   source "$source_dir/maintenance-partial-pause.sh"
   source "$source_dir/maintenance-deployment-pause.sh"
+  source "$source_dir/maintenance-patch-response.sh"
 fi
 cp "$fixture/adoption-retained.records.json" "$fixture/adoption-identity-baseline.json"
 adoption_records "$fixture/adoption-identity-current.json"

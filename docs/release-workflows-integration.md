@@ -1750,3 +1750,30 @@ stays private; validated `maintenance-write-denied-<target>.refusal.json` and
 `.outcome.json` describe native refusal and successful Role restoration. Existing
 jobs, scenarios, refs, credentials, production resources and budget are unchanged.
 Heavy offline suites run on PR CI; full live proof remains post-merge trusted-main.
+
+### Deployment PATCH response loss
+
+`maintenance-patch-response.sh` runs only in the existing trusted-main initial
+job after the Deployment interruption/lingering-Pod checked recovery. The
+`maintenance_patch_response.py` parent and native template reverse exactly to
+their published sources after removing one pre-PATCH barrier and its transport
+adapter. PR CI lints this generated copy using the existing pinned Argo CLI.
+The separate `maintenance_patch_proxy.py` preserves ledger proxy behavior and
+forwards only the expected named GET and single exact guarded JSON PATCH under
+the maintenance ServiceAccount token, with verified TLS on both hops.
+
+The proxy validates the committed HTTP 200 Deployment before dropping its
+response. Native failure alone cannot qualify: require a matching commit event,
+sole failed worker exit 64, no later checkpoint/result, direct settled zero
+replicas/Pod absence and unchanged paused-state/data/ledger evidence. A fresh
+unchanged checkpoint must precede explicit recovery and one same-ReplicaSet Pod
+replacement. Verify adoption records/result against a candidate snapshot before
+advancing the checked baseline. See
+[ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md).
+
+Safe reports are `maintenance-response.barrier.json`, `.outcome.json`,
+`.checkpoint.json` and `.recovered.json`. Raw API/Workflow/worker/proxy evidence
+stays private. Runner GitHub credentials remain available for existing temporary
+ref cleanup and are never injected into the proxy Pod. No jobs, scenarios, refs,
+credential rights, budgets or production resources change. Heavy TLS/real-client
+checks run on PR CI; live proof remains the post-merge trusted-main initial job.

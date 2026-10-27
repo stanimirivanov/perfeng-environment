@@ -126,3 +126,18 @@ data. Only verified refusal/retention permits UID/resourceVersion/rules-guarded
 restoration of the captured Role; require exact restored rules and effective
 grants before continuing. There is no EXIT repair or workload recovery. Heavy
 checks run on PR CI; live proof remains post-merge, without local execution.
+
+### Committed Deployment PATCH with a lost response
+
+The existing trusted-main initial job adds a reversible parent/native transport
+copy and a separate scoped TLS PATCH proxy after checked interruption recovery
+([ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md)). The exact
+guarded scale-to-zero PATCH must commit once before its response is dropped.
+Require native worker failure, no later checkpoint/result, fresh direct paused
+state/data/ledger retention and an independent unchanged checkpoint before any
+manual sync. Checked recovery permits exactly one additional same-ReplicaSet Pod
+replacement; unchanged adoption records/result must pass before the new fixed
+baseline advances. No blind retry, automatic recovery or local operation is added.
+The proxy handles only the approved maintenance identity and exact request; both
+TLS hops verify certificates and no GitHub credential reaches its Pod. Heavy
+transport/client checks run on PR CI; full live proof remains post-merge.

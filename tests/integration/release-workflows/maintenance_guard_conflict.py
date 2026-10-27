@@ -55,9 +55,18 @@ def ready(
     raw: bytes,
     lock: bytes,
     before: dict[str, Any],
+    *,
+    parent_name: str | None = None,
+    barrier_name: str = BARRIER,
 ) -> dict[str, Any]:
     """Require actual selected readiness, existing baseline and the completed guard."""
-    workflow = normalized(workflow, resource)
+    if parent_name is None:
+        workflow = normalized(workflow, resource)
+    else:
+        assert workflow["spec"]["workflowTemplateRef"] == {"name": parent_name}
+        assert not workflow["spec"].get("shutdown")
+        workflow = deepcopy(workflow)
+        workflow["spec"]["workflowTemplateRef"] = {"name": "perfeng-release-maintenance-pause-v1"}
     preflight = maintenance.readiness.outputs(
         maintenance.readiness.named(workflow, "preflight", "Steps")
     )["result"]
@@ -113,7 +122,7 @@ def ready(
     assert datetime.fromisoformat(
         maintenance.readiness.named(workflow, "guard-" + resource)["finishedAt"]
     ) <= datetime.fromisoformat(
-        maintenance.readiness.named(workflow, BARRIER, "Suspend")["startedAt"]
+        maintenance.readiness.named(workflow, barrier_name, "Suspend")["startedAt"]
     )
     target = (
         before["deployment"]

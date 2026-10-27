@@ -89,7 +89,8 @@ maintenance_baseline_refusal() {
   esac
   [[ -f $results/maintenance-recovery.outcome.txt ]] || return 2
   [[ ${adoption_retention_baseline:-} == "$fixture/maintenance-recovered" ||
-    ( ${adoption_retention_baseline:-} == "$fixture/maintenance-partial-deployment-recovered" && -f $results/maintenance-partial-deployment.recovered.json ) ]] || return 2
+    ( ${adoption_retention_baseline:-} == "$fixture/maintenance-partial-deployment-recovered" && -f $results/maintenance-partial-deployment.recovered.json ) ||
+    ( ${adoption_retention_baseline:-} == "$fixture/maintenance-response-recovered" && -f $results/maintenance-response.recovered.json ) ]] || return 2
   start_stage "maintenance-$label"
   maintenance_snapshot "$fixture/maintenance-$label-before"
   root_state "$fixture/maintenance-$label-before"
