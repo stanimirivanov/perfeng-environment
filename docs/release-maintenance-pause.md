@@ -57,6 +57,20 @@ After disposable acceptance and a separately selected operational rollout, use t
 
 ## Failure, recovery and remaining acceptance
 
+After stale-guard acceptance and before receipt faults, the trusted-main initial
+job also checks interruption immediately after the root and child pause patches.
+Each reversible CI-only parent adds one post-patch suspension. Actual readiness,
+ledger planning and successful native workers must precede `argo stop`. Require
+the same Workflow UID, `shutdown: Stop`, the specific controller stop message,
+no later guard/write/checkpoint and no successful result. Independent retention
+must preserve the recovered server Pod, ledger, workloads, storage, Secrets,
+configuration and data. No recovery or baseline advancement occurs. Applications
+are already disabled: this proves interruption ordering, not an enabled-to-disabled
+transition. Inspect `maintenance-partial-root` and `maintenance-partial-child`
+stages, sanitized barrier reports and validated outcomes; raw evidence stays
+private. [ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md) records
+the approved fault scope. Live proof remains post-merge main-only.
+
 The existing trusted-main `initial` job now exercises the complete unchanged parent after adoption retention, before receipt identity faults. It checks native worker identity/order, verified readiness and both original records before writes, successful checkpoint output, zero Deployment status/desired replicas and absence of server Pods. It preserves original evidence, ledger bytes/UIDs/provenance, foundation Pods, storage, database/S3 data, configuration and Secrets. Only after a successful pause and retention proof does the fixture explicitly sync the selected control-plane child, verify native/HTTP health and require exactly one replacement Pod under the same ReplicaSet. Its spec must match except the generated ServiceAccount projected-volume name and corresponding mount references. The fixture then establishes a checked recovery snapshot for the remaining tests; it never overwrites the original Pod evidence. Root auto-sync stays disabled and the other six children stay skipped. [ADR 0038](decisions/0038-exercise-maintenance-pause-and-checked-recovery.md) records this approved CI retention boundary; it does not introduce production resume behavior. The other five scenarios retain their original Pod baseline.
 
 A refused baseline produces no workload write. A subsequent failure may leave only root paused, both Applications paused, or the Deployment stopped. Kubernetes does not provide a cross-resource transaction here. A failed request response also does not prove a write was absent. Retain the Workflow/node identities and inspect the three resources, ledger identities and independent live health with the existing owner diagnostics. No successful checkpoint result is emitted unless the final observation passes.
