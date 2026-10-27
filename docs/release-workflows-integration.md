@@ -1650,6 +1650,27 @@ promotion, retained recovery or measured retirement.
 
 ## Verification and remaining gates
 
+The initial leg now follows root/child interruption with
+`maintenance-deployment-pause.sh`. It reuses the reversible partial-pause copy
+after the Deployment patch, proves exact Stop with no parent checkpoint, then
+requires settled generation/zero status and raw matching-Pod absence within a
+120-second read-only bound. Keep the raw PodList resourceVersion/pagination
+evidence separate from ordinary kubectl workload snapshots. Paused-state/data
+retention must pass before an independent unchanged checkpoint parent is submitted.
+Bind its successful read-only workers and result to the same request, cluster and
+resource identities; native and fixture resourceVersions are separate samples.
+Only a validated checkpoint permits manual child sync and same-ReplicaSet Pod
+replacement, fresh root/native/HTTP health and checked recovery retention.
+
+Inspect `maintenance-partial-deployment`, `maintenance-partial-deployment-checkpoint`
+and `maintenance-partial-deployment-recovery` stages and their validated outcomes.
+Raw command/Workflow/worker/API/Secret evidence stays private. Original snapshots
+remain immutable; later receipt faults reference only the verified new Pod
+baseline. The existing happy and root/child cases remain intact. See
+[ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md) for the approved
+Deployment-only recovery exception. Heavy validation is delegated to existing PR
+CI at the owner's request; full parent proof remains post-merge trusted-main.
+
 After the initial leg's stale-guard cases, `maintenance-partial-pause.sh` checks
 two reversible parent copies with one suspension immediately after the real
 root or child pause patch. Before stopping that exact Workflow, require actual

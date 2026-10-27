@@ -1389,3 +1389,30 @@ workload Pod. Existing owned disposable-cluster cleanup remains the only cleanup
 See [maintenance pause](release-maintenance-pause.md) and
 [ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md). No local operation
 or operational recovery is authorized by this fixture.
+
+## Disposable Deployment interruption and recovery
+
+For `maintenance-partial-deployment`, require the exact suspended-parent Stop
+before investigating the 120-second read-only settlement phase. A changed UID,
+deleting Deployment, changed desired replicas, API failure, stale generation or
+remaining matching Pod must prevent checkpoint/recovery. Do not force-delete a
+Pod or scale again. Raw PodList evidence must retain its resourceVersion and no
+pagination; a generic kubectl List without that evidence cannot prove absence.
+
+For `maintenance-partial-deployment-checkpoint`, require a distinct unchanged
+read-only parent using the same pinned inputs and successful read-only workers.
+A checkpoint from the interrupted parent, an old Workflow, wrong identity, worker
+failure or mismatched cluster/resources cannot authorize the fixture sync. Keep
+native and independent fixture resourceVersions separate; their sampling times
+differ. Do not change native verifier guards to compare those separate reads.
+
+`maintenance-partial-deployment-recovery` may sync only after verified Stop,
+paused retention and independent checkpoint. A failed sync, HTTP/native check,
+root convergence, same-ReplicaSet replacement or retained-state check must stop
+before baseline advancement. Original evidence and both ledger records remain
+unchanged. Later receipt faults may use only the fixed checked recovery snapshot;
+never accept an arbitrary baseline path. Existing owned-cluster cleanup is the
+only automatic cleanup. Raw logs/API/Secret snapshots stay private; public
+artifacts contain verified outcomes and the validated independent checkpoint.
+See [ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md). This is
+CI acceptance and adds no local or production recovery command.

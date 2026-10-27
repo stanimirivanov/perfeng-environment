@@ -1,4 +1,4 @@
-"""Validate approved CI interruption after the two native Application pause writes."""
+"""Validate approved CI maintenance interruption and explicit Deployment recovery."""
 
 import json
 import sys
@@ -9,16 +9,18 @@ from typing import Any
 
 import maintenance_pause_evidence as maintenance
 import yaml
+from jsonschema import Draft202012Validator
 
 DIRECTORY = Path("gitops/release-workflows")
 RESOURCES = ("root", "child")
+TARGETS = (*RESOURCES, "deployment")
 BARRIER = "partial-pause-barrier"
 STOPPED = "Stopped with strategy 'Stop'"
 
 
 def template(resource: str) -> dict[str, Any]:
     """Keep the published parent intact except for one post-patch suspension."""
-    assert resource in RESOURCES
+    assert resource in TARGETS
     original = yaml.safe_load((DIRECTORY / "release-maintenance-pause-v1.yaml").read_text())
     result = deepcopy(original)
     result["metadata"] = {
@@ -50,7 +52,7 @@ def validate(
     stopped: bool,
 ) -> None:
     """Bind the specific stop to real readiness, ledger planning and completed patches."""
-    assert resource in RESOURCES
+    assert resource in TARGETS
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     assert workflow["spec"]["workflowTemplateRef"] == {
         "name": template(resource)["metadata"]["name"]
@@ -87,7 +89,7 @@ def validate(
         if "value" in p
     } == planned
     sequence = [named(workflow, "root-after"), baseline]
-    for target in RESOURCES[: RESOURCES.index(resource) + 1]:
+    for target in TARGETS[: TARGETS.index(resource) + 1]:
         for operation in ("guard", "pause"):
             node = named(workflow, operation + "-" + target)
             assert node["templateRef"] == {
@@ -95,13 +97,20 @@ def validate(
                 "template": ("patch" if operation == "pause" else operation) + "-" + target,
             }
             sequence.append(node)
-        actual = next(
-            o
-            for o in before["applications"]["items"]
-            if o["metadata"]["name"]
-            == "perfeng-local-" + ("root" if target == "root" else "control-plane")
+        actual = (
+            before["deployment"]
+            if target == "deployment"
+            else next(
+                o
+                for o in before["applications"]["items"]
+                if o["metadata"]["name"]
+                == "perfeng-local-" + ("root" if target == "root" else "control-plane")
+            )
         )
-        assert actual["spec"]["syncPolicy"]["automated"]["enabled"] is False
+        if target == "deployment":
+            assert actual["spec"]["replicas"] == 1
+        else:
+            assert actual["spec"]["syncPolicy"]["automated"]["enabled"] is False
         guard = observe("guard-" + target)
         assert guard["uid"] == actual["metadata"]["uid"] and guard["spec"] == actual["spec"]
     barrier = named(workflow, BARRIER, "Suspend")
@@ -125,9 +134,10 @@ def validate(
     for worker in workers:
         assert worker["account"] == "release-maintenance-pause" and worker["uid"]
         assert worker["exitCode"] == 0 and pods[worker["nodeID"]]["phase"] == "Succeeded"
-    forbidden = {"guard-deployment", "pause-deployment", "checkpoint", "observe"}
-    if resource == "root":
-        forbidden.update({"guard-child", "pause-child"})
+    later = TARGETS[TARGETS.index(resource) + 1 :]
+    forbidden = {"checkpoint", "observe"} | {
+        op + "-" + target for target in later for op in ("guard", "pause")
+    }
     allowed_writes = {n["displayName"] for n in sequence[2:]}
     for node in workflow["status"]["nodes"].values():
         ref = node.get("templateRef", {})
@@ -146,9 +156,102 @@ def validate(
             assert "result" not in outputs(node)
 
 
+def stopped_identity(
+    workflow: dict[str, Any], suspended: dict[str, Any], workers: Any, previous_workers: Any
+) -> None:
+    """Require exactly the previously inspected Workflow and worker set."""
+    assert all(
+        workflow["metadata"][k] == suspended["metadata"][k] for k in ("uid", "name", "namespace")
+    )
+    assert workflow["spec"] == {**suspended["spec"], "shutdown": "Stop"}
+    assert workers == previous_workers
+
+
+def checkpoint(
+    workflow: dict[str, Any],
+    workers: list[dict[str, Any]],
+    interrupted: dict[str, Any],
+    parameters: dict[str, str],
+    lock: bytes,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """Require a fresh, independent unchanged read-only parent and real quiescence."""
+    named, outputs = maintenance.readiness.named, maintenance.readiness.outputs
+    assert (
+        workflow["metadata"]["uid"]
+        and workflow["metadata"]["uid"] != interrupted["metadata"]["uid"]
+    )
+    assert workflow["metadata"]["namespace"] == "argo-workflows"
+    assert workflow["spec"]["workflowTemplateRef"] == {
+        "name": "perfeng-release-maintenance-checkpoint-v3"
+    }
+    assert not workflow["spec"].get("shutdown") and workflow["status"]["phase"] == "Succeeded"
+    assert {
+        p["name"]: p["value"] for p in workflow["spec"]["arguments"]["parameters"]
+    } == parameters
+    preflight = named(workflow, "preflight", "Steps")
+    preflight_result = outputs(preflight)["result"]
+    assert preflight_result == outputs(named(interrupted, "preflight", "Steps"))["result"]
+    observe = named(workflow, "observe")
+    assert preflight["phase"] == observe["phase"] == "Succeeded"
+    assert observe["templateRef"] == {
+        "name": "perfeng-verify-release-quiescence-v3",
+        "template": "run",
+    }
+    assert datetime.fromisoformat(interrupted["status"]["finishedAt"]) <= datetime.fromisoformat(
+        preflight["startedAt"]
+    )
+    assert (
+        datetime.fromisoformat(preflight["finishedAt"])
+        <= datetime.fromisoformat(observe["startedAt"])
+        <= datetime.fromisoformat(observe["finishedAt"])
+    )
+    pods = {n["id"]: n for n in workflow["status"]["nodes"].values() if n["type"] == "Pod"}
+    assert len(workers) == len(pods) and {w["nodeID"] for w in workers} == pods.keys()
+    for worker in workers:
+        assert (
+            worker["account"] == "release-maintenance-checkpoint"
+            and worker["uid"]
+            and worker["exitCode"] == 0
+        )
+        assert pods[worker["nodeID"]]["phase"] == "Succeeded"
+    result = outputs(workflow["status"]["nodes"][workflow["metadata"]["name"]])["result"]
+    assert result == outputs(observe)["result"]
+    Draft202012Validator(
+        json.loads(Path("deployments/maintenance-checkpoint-v1.schema.json").read_text())
+    ).validate(result)
+    resources = [
+        next(o for o in state["applications"]["items"] if o["metadata"]["name"] == name)
+        for name in ("perfeng-local-root", "perfeng-local-control-plane")
+    ] + [state["deployment"]]
+    expected = maintenance.policy.verify_quiescence(
+        preflight_result,
+        lock,
+        parameters["selection-revision"],
+        resources,
+        state["podList"],
+        resources,
+        state["namespace"],
+    )
+
+    # Native verification and the independent API snapshot sample at different
+    # times. Compare their full contract except fresh API resourceVersions.
+    def identity(value: dict[str, Any]) -> dict[str, Any]:
+        return {
+            **value,
+            "podListResourceVersion": "sampled",
+            "resources": [
+                {k: v for k, v in r.items() if k != "resourceVersion"} for r in value["resources"]
+            ],
+        }
+
+    assert identity(result) == identity(expected)
+    return result
+
+
 def main() -> None:
     mode, resource, directory, output = sys.argv[1:]
-    assert resource in RESOURCES
+    assert resource in TARGETS
     fixture, results = Path(directory), Path(output)
     prefix = "maintenance-partial-" + resource
 
@@ -163,7 +266,8 @@ def main() -> None:
         assert installed["spec"] == expected["spec"]
         assert all(installed["metadata"][k] == v for k, v in expected["metadata"].items())
         return
-    assert mode in {"barrier", "verify"}
+    assert mode in {"barrier", "stopped", "verify", "checkpoint", "recovered"}
+    assert resource == "deployment" or mode in {"barrier", "verify"}
     if mode == "barrier":
         from adoption_response import barrier_diagnostics
 
@@ -182,7 +286,7 @@ def main() -> None:
             )
 
     def state(label: str) -> dict[str, Any]:
-        return {
+        value = {
             key: json.loads((fixture / f"{prefix}-{label}.{key}.json").read_text())
             for key in (
                 "applications",
@@ -197,9 +301,18 @@ def main() -> None:
                 "git",
             )
         }
+        if resource == "deployment":
+            value["serverPod"] = json.loads(
+                (fixture / f"{prefix}-{label}.server-pods.json").read_text()
+            )
+            if label == "after":
+                value["podList"] = json.loads(
+                    (fixture / f"{prefix}-{label}.pod-list.json").read_text()
+                )
+        return value
 
     before = state("before")
-    workflow = load("workflow" if mode == "verify" else "barrier")
+    workflow = load("barrier" if mode == "barrier" else "workflow")
     validate(
         workflow,
         load("workers"),
@@ -208,27 +321,60 @@ def main() -> None:
         (fixture / "parent-request.json").read_bytes(),
         Path("deployments/local-control-plane.json").read_bytes(),
         before,
-        stopped=mode == "verify",
+        stopped=mode != "barrier",
     )
-    if mode == "verify":
+    if mode != "barrier":
         suspended = load("barrier")
-        assert all(
-            workflow["metadata"][k] == suspended["metadata"][k]
-            for k in ("uid", "name", "namespace")
-        )
-        expected_spec = {**suspended["spec"], "shutdown": "Stop"}
-        assert workflow["spec"] == expected_spec
-        assert load("workers") == load("workers-before")
+        stopped_identity(workflow, suspended, load("workers"), load("workers-before"))
+        if mode == "stopped":
+            return
         after = state("after")
-        for key in before:
-            if key != "applications":
-                # Deployment status is controller bookkeeping; workload/Pod specs
-                # and identities are independently retained by root_retained.
-                if key == "deployment":
-                    assert before[key]["spec"] == after[key]["spec"]
-                    assert before[key]["metadata"]["uid"] == after[key]["metadata"]["uid"]
-                else:
-                    assert before[key] == after[key]
+        if resource == "deployment":
+            maintenance.retained(before, after, paused=True)
+            deployment = after["deployment"]
+            assert deployment["metadata"]["uid"] == before["deployment"]["metadata"]["uid"]
+            assert deployment["spec"] == {**before["deployment"]["spec"], "replicas": 0}
+            assert (
+                deployment["status"]["observedGeneration"] == deployment["metadata"]["generation"]
+            )
+            assert all(
+                deployment["status"].get(field, 0) == 0
+                for field in ("replicas", "readyReplicas", "updatedReplicas", "availableReplicas")
+            )
+            report = None
+            if mode in {"checkpoint", "recovered"}:
+                report = checkpoint(
+                    load("checkpoint-workflow"),
+                    load("checkpoint-workers"),
+                    workflow,
+                    json.loads((fixture / "parent-parameters.json").read_text()),
+                    Path("deployments/local-control-plane.json").read_bytes(),
+                    after,
+                )
+            if mode == "checkpoint":
+                (results / f"{prefix}.checkpoint.json").write_text(json.dumps(report))
+                return
+            if mode == "recovered":
+                maintenance.retained(before, state("recovered"), paused=False)
+                (results / f"{prefix}.recovered.json").write_text(
+                    json.dumps(
+                        {
+                            "decision": "maintenance-deployment-recovery-verified",
+                            "workflowUID": workflow["metadata"]["uid"],
+                        }
+                    )
+                )
+                return
+        if resource != "deployment":
+            for key in before:
+                if key != "applications":
+                    # Deployment status is controller bookkeeping; workload/Pod
+                    # specs and identities are also retained by root_retained.
+                    if key == "deployment":
+                        assert before[key]["spec"] == after[key]["spec"]
+                        assert before[key]["metadata"]["uid"] == after[key]["metadata"]["uid"]
+                    else:
+                        assert before[key] == after[key]
         for old, new in zip(
             sorted(before["applications"]["items"], key=lambda o: o["metadata"]["name"]),
             sorted(after["applications"]["items"], key=lambda o: o["metadata"]["name"]),
