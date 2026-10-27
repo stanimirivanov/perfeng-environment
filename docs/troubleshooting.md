@@ -1416,3 +1416,22 @@ only automatic cleanup. Raw logs/API/Secret snapshots stay private; public
 artifacts contain verified outcomes and the validated independent checkpoint.
 See [ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md). This is
 CI acceptance and adds no local or production recovery command.
+
+### Maintenance lingering-Pod acceptance fails
+
+Inspect the `maintenance-lingering-pod` stage and validated
+`maintenance-lingering.refusal.json` report. Raw Workflow, Pod, log and API/Secret
+snapshots remain private. A valid refusal requires the real preflight, only the
+quiescence worker exiting 2, its generic policy-refusal line, no checkpoint
+result, and independent policy replay proving that the sole gated fixture Pod
+blocks otherwise valid paused snapshots. A timeout, missing worker, operational
+error, changed Pod UID/spec/gate or retention mismatch is a failure, not proof.
+
+Do not remove scheduling gates, force-delete Pods, retry successful nodes or run
+manual recovery to make this test pass. Conditional cleanup is generated only
+after valid refusal and uses the captured Pod UID/resourceVersion. A stale DELETE
+stops; owned disposable-cluster teardown is the failure cleanup boundary. After
+successful deletion, absence and zero replicas must precede a fresh unchanged
+checkpoint; only its verified success permits the existing checked recovery.
+This fixture does not authorize any local cluster action. See
+[ADR 0042](decisions/0042-exercise-lingering-pod-checkpoint-refusal.md).
