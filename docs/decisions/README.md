@@ -136,3 +136,4 @@ How will the assumptions and consequences be verified?
 | [0038](0038-exercise-maintenance-pause-and-checked-recovery.md) | Proposed | Exercise the complete pause in the existing initial leg, then verify manual recovery and exactly one Pod replacement before advancing the CI retention baseline. |
 | [0039](0039-exercise-maintenance-stale-guard-conflicts.md) | Proposed | Prove stale root/child/Deployment native patches refuse after guarded fixture metadata changes, preserving the checked recovered baseline. |
 | [0040](0040-exercise-maintenance-partial-pause.md) | Proposed | Stop CI-only parents after the native root/child patches and prove no later write/checkpoint or retained-state change. |
+| [0041](0041-exercise-deployment-pause-interruption.md) | Proposed | Stop after the Deployment pause, prove independent quiescence, and verify one additional server Pod replacement before advancing the checked CI baseline. |

@@ -126,6 +126,16 @@ jobs:
         if: runner.os == 'Linux'
         run: make workflow-lint
         working-directory: perfeng-environment
+      - name: Lint maintenance interruption copies offline
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: perfeng-environment
+        run: |
+          set -euo pipefail
+          for resource in root child deployment; do
+            PYTHONPATH=. uv run --locked --offline python tests/integration/release-workflows/maintenance_partial_pause.py template "$resource" "$RUNNER_TEMP" "$RUNNER_TEMP" > "$RUNNER_TEMP/maintenance-partial-$resource.json"
+          done
+          argo lint --offline --kinds=workflowtemplates gitops/release-workflows "$RUNNER_TEMP/maintenance-partial-root.json" "$RUNNER_TEMP/maintenance-partial-child.json" "$RUNNER_TEMP/maintenance-partial-deployment.json"
       - name: Validate exact adjacent release selections
         if: runner.os == 'Linux'
         run: make release-selection-check

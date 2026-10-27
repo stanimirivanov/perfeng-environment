@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop only an approved suspended CI copy; never repair or advance the baseline.
+# Stop only an approved suspended CI copy; recovery is a separate guarded phase.
 set -euo pipefail
 [[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent && ${scenario:-} == initial ]] || exit 2
 [[ ${GITHUB_ACTIONS:-} == true && ${RUNNER_ENVIRONMENT:-} == github-hosted && ${RUNNER_OS:-} == Linux ]] || exit 2
@@ -22,7 +22,8 @@ maintenance_partial_workers() {
 maintenance_partial_case() {
   local resource=$1 previous=$current_stage prefix workflow deadline state rc field
   prefix="maintenance-partial-$resource"
-  [[ $resource == root || $resource == child ]] || return 2
+  [[ $resource == root || $resource == child || $resource == deployment ]] || return 2
+  if [[ $resource == deployment ]]; then declare -F maintenance_deployment_settled maintenance_deployment_pods root_persistent_retained > /dev/null || return 2; fi
   start_stage "$prefix"
   maintenance_snapshot "$fixture/$prefix-before"
   maintenance_partial_root "$fixture/$prefix-before"
@@ -55,12 +56,23 @@ maintenance_partial_case() {
   [[ $rc != 0 && $rc != 124 && $rc != 137 ]]
   a get "$workflow" -o json > "$fixture/$prefix.workflow.json"
   maintenance_partial_workers "$workflow" > "$fixture/$prefix.workers.json"
+  if [[ $resource == deployment ]]; then
+    PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_partial_pause.py" stopped "$resource" "$fixture" "$results"
+    maintenance_deployment_settled "$prefix"
+  fi
   maintenance_snapshot "$fixture/$prefix-after"
-  maintenance_partial_root "$fixture/$prefix-after"
-  root_state "$fixture/$prefix-after"
-  root_retained "$fixture/$prefix-before" "$fixture/$prefix-after"
+  if [[ $resource == deployment ]]; then
+    maintenance_deployment_pods > "$fixture/$prefix-after.pod-list.json"
+    printf '%s\n' '[]' > "$fixture/$prefix.no-server.json"
+    root_state "$fixture/$prefix-after" "$fixture/$prefix.no-server.json"
+    root_persistent_retained "$fixture/$prefix-before" "$fixture/$prefix-after"
+  else
+    maintenance_partial_root "$fixture/$prefix-after"
+    root_state "$fixture/$prefix-after"
+    root_retained "$fixture/$prefix-before" "$fixture/$prefix-after"
+  fi
   for field in records secrets config git; do cmp "$fixture/$prefix-before.$field.json" "$fixture/$prefix-after.$field.json"; done
-  adoption_retained "$prefix-after"
+  if [[ $resource != deployment ]]; then adoption_retained "$prefix-after"; fi
   k -n argo-workflows get "workflowtemplate/perfeng-maintenance-partial-$resource-ci" -o json > "$fixture/$prefix.installed.json"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_partial_pause.py" installed "$resource" "$fixture" "$results"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_partial_pause.py" verify "$resource" "$fixture" "$results"

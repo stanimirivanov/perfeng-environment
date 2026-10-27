@@ -57,6 +57,20 @@ After disposable acceptance and a separately selected operational rollout, use t
 
 ## Failure, recovery and remaining acceptance
 
+Deployment interruption extends the same initial-job acceptance after the
+root/child cases ([ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md)).
+A reversible copy stops after the real scale-to-zero patch and before its own
+checkpoint. Exact Stop evidence must precede bounded read-only settlement and
+paused retention. A separate unchanged read-only checkpoint must then succeed
+for the same pinned request, cluster and resource identities. Only that proof
+allows explicit test-only child sync and checked native/HTTP recovery, including
+one additional same-ReplicaSet Pod replacement. Preserve all original evidence;
+later receipt tests use the newly verified recovery snapshot. Root remains
+auto-sync-disabled, the other six children remain skipped, and ledger, foundation,
+storage, Secret/config and data retention remain strict. No failure may trigger
+repair or recovery automatically. The existing job/scenarios/refs/credentials/
+rights/budget and production templates remain unchanged; live proof is post-merge.
+
 After stale-guard acceptance and before receipt faults, the trusted-main initial
 job also checks interruption immediately after the root and child pause patches.
 Each reversible CI-only parent adds one post-patch suspension. Actual readiness,
