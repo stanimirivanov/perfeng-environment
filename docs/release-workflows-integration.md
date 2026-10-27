@@ -1732,3 +1732,21 @@ passes. A fresh successful checkpoint must follow cleanup before recovery. See
 [ADR 0042](decisions/0042-exercise-lingering-pod-checkpoint-refusal.md). Existing
 job/scenario/ref counts, credentials, budget and production templates are unchanged.
 Heavy cross-platform tests run in PR CI; live acceptance remains post-merge.
+
+### Complete-parent missing PATCH grants
+
+`maintenance-write-denial.sh` runs three cases in the existing trusted-main
+initial job after checked happy recovery/request refusals and before stale-guard
+faults. `maintenance_write_denial.py` validates the staged Role rules, prepares
+conditional narrowing/restoration and binds actual native Forbidden to the real
+readiness/adopted baseline and successful guard prefix. Effective GET/PATCH
+checks must show precisely the intended boundary before submission and after
+failure; restored grants and exact Role identity/rules must pass before the next
+case. Both roots use the existing captured-root convergence validation. Workload,
+Pod, ledger, Secret and data retention permits no replacement or recovery.
+
+See [ADR 0043](decisions/0043-exercise-maintenance-write-denial.md). Raw evidence
+stays private; validated `maintenance-write-denied-<target>.refusal.json` and
+`.outcome.json` describe native refusal and successful Role restoration. Existing
+jobs, scenarios, refs, credentials, production resources and budget are unchanged.
+Heavy offline suites run on PR CI; full live proof remains post-merge trusted-main.
