@@ -1454,3 +1454,27 @@ A stale restoration or failed effective-grant check stops before the next case.
 There is no EXIT repair; owned disposable-cluster teardown is the failure cleanup
 boundary. This fault authorizes no local cluster or production permission change.
 See [ADR 0043](decisions/0043-exercise-maintenance-write-denial.md).
+
+### Maintenance PATCH response-loss acceptance fails
+
+Inspect stages `maintenance-response-prepare`, `maintenance-response-checkpoint`
+and `maintenance-response-recovery` and their validated fixed reports. Raw
+Workflow, API, worker and proxy diagnostics remain private. Barrier setup must
+prove real readiness/adoption planning and a fresh Deployment matching the real
+guard. A stale version or setup failure stops before resume; do not refresh the
+payload or retry the write to make acceptance pass.
+
+After resume, require exactly one proxy event proving the expected PATCH committed
+with HTTP 200 and no successful response forwarded, plus the native failed worker
+and unchanged downstream/checkpoint boundary. TLS errors, forbidden/invalid API
+responses, timeouts, wrong committed spec/UID/generation, repeat forwarding or a
+failed Workflow without that event are failures, not evidence of ambiguity.
+
+Do not retry the parent, resume successful nodes, repair records or sync workloads
+to bypass missing proof. Fresh direct settled observations and retained data must
+pass, then a new unchanged read-only checkpoint must succeed before the explicit
+checked recovery. Later baseline advancement also requires unchanged adoption
+records/result and exactly one approved same-ReplicaSet replacement. No EXIT
+recovery is installed; owned disposable-cluster teardown is the failure cleanup
+boundary. No local or production action is authorized. See
+[ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md).
