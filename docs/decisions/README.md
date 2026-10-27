@@ -138,3 +138,4 @@ How will the assumptions and consequences be verified?
 | [0040](0040-exercise-maintenance-partial-pause.md) | Proposed | Stop CI-only parents after the native root/child patches and prove no later write/checkpoint or retained-state change. |
 | [0041](0041-exercise-deployment-pause-interruption.md) | Proposed | Stop after the Deployment pause, prove independent quiescence, and verify one additional server Pod replacement before advancing the checked CI baseline. |
 | [0042](0042-exercise-lingering-pod-checkpoint-refusal.md) | Proposed | Prove gated matching-Pod refusal, conditional fixture cleanup and a fresh independent checkpoint before existing checked recovery. |
+| [0043](0043-exercise-maintenance-write-denial.md) | Proposed | Narrow each existing named PATCH grant, prove complete-parent Forbidden refusal and retained state, then conditionally restore exact original Role rules. |

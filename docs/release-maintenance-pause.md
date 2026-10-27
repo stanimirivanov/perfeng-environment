@@ -113,3 +113,16 @@ pass before UID/resourceVersion-conditional deletion of that Pod. Confirm absenc
 and zero replicas, then require a new unchanged successful checkpoint before the
 existing manual recovery and baseline advancement. Raw evidence stays private.
 This is bounded disposable CI acceptance, not a local cleanup or recovery command.
+
+### Missing maintenance write permission
+
+The trusted-main initial job exercises root, child and Deployment PATCH denial
+([ADR 0043](decisions/0043-exercise-maintenance-write-denial.md)). Each case
+narrows only the existing disposable Role, preserving reads and other approved
+writes. The unchanged complete parent must pass real readiness and the selected
+guard, then fail only that native PATCH with exact Forbidden. Require no later
+write/checkpoint and unchanged workloads, Pod identities, ledger, Secrets and
+data. Only verified refusal/retention permits UID/resourceVersion/rules-guarded
+restoration of the captured Role; require exact restored rules and effective
+grants before continuing. There is no EXIT repair or workload recovery. Heavy
+checks run on PR CI; live proof remains post-merge, without local execution.

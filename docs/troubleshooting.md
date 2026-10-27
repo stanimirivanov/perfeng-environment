@@ -1435,3 +1435,22 @@ successful deletion, absence and zero replicas must precede a fresh unchanged
 checkpoint; only its verified success permits the existing checked recovery.
 This fixture does not authorize any local cluster action. See
 [ADR 0042](decisions/0042-exercise-lingering-pod-checkpoint-refusal.md).
+
+### Maintenance write-denial acceptance fails
+
+Inspect `maintenance-write-denied-root`, `maintenance-write-denied-child` or
+`maintenance-write-denied-deployment` stages and validated refusal/outcome reports.
+Raw Role/API/log/Workflow/worker and Secret snapshots remain private. A valid case
+requires original staged rules, exactly the intended effective PATCH denial with
+all GET/other PATCH grants intact, real complete-parent readiness/guard success,
+and sole selected native PATCH exit 64 with exact Forbidden subject/verb/group/
+resource/namespace/name. GET denial, API timeout, stale patch, unrelated worker
+failure, unexpected success or retention mismatch is a failing test.
+
+Do not restore Roles manually, broaden grants, retry native writes, replace Pods
+or sync workloads to make the case pass. Only verified refusal/retention emits a
+restoration patch testing captured UID, fresh resourceVersion and narrowed rules.
+A stale restoration or failed effective-grant check stops before the next case.
+There is no EXIT repair; owned disposable-cluster teardown is the failure cleanup
+boundary. This fault authorizes no local cluster or production permission change.
+See [ADR 0043](decisions/0043-exercise-maintenance-write-denial.md).
