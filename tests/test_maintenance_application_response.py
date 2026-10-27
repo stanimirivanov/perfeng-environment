@@ -211,13 +211,19 @@ mode=preflight-parent scenario=initial GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=gi
 current_stage=parent adoption_baseline=first adoption_retention_baseline=$fixture/maintenance-recovered
 mkdir -p "$results"; touch "$fixture/owned" "$results/maintenance-recovery.outcome.txt"
 fail=$3
-start_stage() { :; }; complete_stage() { echo complete >> "$fixture/trace"; }
+start_stage() { echo "stage $*" >> "$fixture/trace"; }; complete_stage() { echo complete >> "$fixture/trace"; }
 maintenance_write_snapshot() { :; }; maintenance_partial_workers() { echo '[]'; }
-root_retained() { [[ $fail != retention ]]; }
+root_retained() {
+  case "$2" in
+    *-before) echo retain-before >> "$fixture/trace"; [[ $fail != baseline-retention ]] ;;
+    *-after) echo retain-after >> "$fixture/trace"; [[ $fail != retention ]] ;;
+    *) return 2 ;;
+  esac
+}
 adoption_case() { echo adoption >> "$fixture/trace"; [[ $fail != adoption ]]; }
-cmp() { [[ $fail != records ]]; }
+cmp() { echo compare >> "$fixture/trace"; [[ $fail != records ]]; }
 k() { echo '{}'; }; a() { echo '{}'; }; argo() { :; }; jq() { cat >/dev/null; echo worker; }
-timeout() { [[ $fail == unexpected ]] && return 0; [[ $fail == timeout ]] && return 124; return 1; }
+timeout() { echo wait >> "$fixture/trace"; [[ $fail == unexpected ]] && return 0; [[ $fail == timeout ]] && return 124; return 1; }
 uv() { echo "uv $*" >> "$fixture/trace"; [[ $* != *" $fail root "* ]]; }
 source "$2"
 maintenance_application_response_case root
@@ -230,6 +236,7 @@ maintenance_application_response_case root
             script.write_text(setup, newline="\n")
             for mode in (
                 "pass",
+                "baseline-retention",
                 "prepare",
                 "retention",
                 "unexpected",
@@ -249,9 +256,35 @@ maintenance_application_response_case root
                     text=True,
                     timeout=60,
                 )
-                trace = (fixture / "trace").read_text()
                 with self.subTest(mode=mode):
-                    self.assertEqual(process.returncode == 0, mode == "pass", process.stderr)
+                    diagnostic = (
+                        f"scenario={mode}, exit={process.returncode}, stderr={process.stderr}"
+                    )
+                    trace_path = fixture / "trace"
+                    self.assertTrue(trace_path.is_file(), diagnostic)
+                    trace = trace_path.read_text()
+                    lines = trace.splitlines()
+                    self.assertEqual(lines[0], "stage maintenance-root-response", diagnostic)
+                    self.assertEqual(process.returncode, 0 if mode == "pass" else 1, diagnostic)
+                    boundary = {
+                        "pass": "complete",
+                        "baseline-retention": "retain-before",
+                        "retention": "retain-after",
+                        "unexpected": "wait",
+                        "timeout": "wait",
+                        "adoption": "adoption",
+                        "records": "compare",
+                    }
+                    if mode in boundary:
+                        self.assertEqual(lines[-1], boundary[mode], diagnostic)
+                    else:
+                        self.assertIn(f" {mode} root ", lines[-1], diagnostic)
+                    if mode == "retention":
+                        self.assertTrue(any(" prepare root " in line for line in lines))
+                        self.assertIn("wait", lines)
+                        self.assertFalse(any(" verify root " in line for line in lines))
+                    if mode == "baseline-retention":
+                        self.assertFalse(any(line.startswith("uv ") for line in lines))
                     if mode not in {"pass", "adoption", "records"}:
                         self.assertNotIn("adoption\n", trace)
                     if mode != "pass":
