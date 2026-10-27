@@ -141,3 +141,17 @@ baseline advances. No blind retry, automatic recovery or local operation is adde
 The proxy handles only the approved maintenance identity and exact request; both
 TLS hops verify certificates and no GitHub credential reaches its Pod. Heavy
 transport/client checks run on PR CI; full live proof remains post-merge.
+
+### Root/child no-op PATCH response loss
+
+The existing initial job also exercises each named Application before the
+Deployment interruption ([ADR 0045](decisions/0045-exercise-application-patch-response-loss.md)).
+Both Applications are already auto-sync-disabled, so an accepted no-op PATCH may
+retain its resourceVersion. Each proxy instance forwards only its exact planned
+Application request and validates HTTP 200/unchanged state before dropping the
+response. Require native failure, no later write/checkpoint and strict running
+workload/Pod/ledger/data retention before a fresh unchanged adoption parent
+rechecks readiness and reuses both records. No Pod replacement, sync, recovery
+or baseline advancement occurs. These cases do not prove enabled-to-disabled
+transitions. Deployment response-loss checks remain strict and unchanged in scope.
+Heavy TLS/client checks run on PR CI; full live proof remains post-merge.

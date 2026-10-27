@@ -1491,3 +1491,24 @@ records/result and exactly one approved same-ReplicaSet replacement. No EXIT
 recovery is installed; owned disposable-cluster teardown is the failure cleanup
 boundary. No local or production action is authorized. See
 [ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md).
+
+### Root/child Application response-loss acceptance fails
+
+Inspect `maintenance-root-response` or `maintenance-child-response` and their
+validated barrier/outcome reports. A valid case requires real readiness/adoption
+planning and a fresh selected guard before proxy setup, exactly one matching
+HTTP 200 commit event, sole selected native PATCH failure, no later writes or
+checkpoint, and unchanged running workloads/Pods/ledger/data. The Applications
+are already disabled, so an unchanged resourceVersion can be correct. Wrong
+UID/spec/ownership, an enabled baseline, changed child generation, wrong route,
+API/TLS refusal or an arbitrary failed Workflow cannot qualify.
+
+Each proxy instance accepts only its configured named Application. Do not widen
+routes, alter native guards, retry a stale payload, resume successful nodes or
+sync workloads to make acceptance pass. Setup collisions fail without replacement.
+Fresh unchanged adoption is allowed only after verified fault/retention and must
+reuse both records and the original adoption result. There is no automatic repair,
+Pod replacement or baseline advancement. Keep raw diagnostics private; failure
+cleanup remains owned disposable-cluster teardown. This authorizes no local or
+production action. See
+[ADR 0045](decisions/0045-exercise-application-patch-response-loss.md).
