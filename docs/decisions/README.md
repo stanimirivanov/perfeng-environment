@@ -135,3 +135,4 @@ How will the assumptions and consequences be verified?
 | [0037](0037-stage-guarded-maintenance-pause.md) | Proposed | Stage three guarded native maintenance writes for an already adopted baseline, preserving read-only checkpoint authority and requiring separate live cutover acceptance. |
 | [0038](0038-exercise-maintenance-pause-and-checked-recovery.md) | Proposed | Exercise the complete pause in the existing initial leg, then verify manual recovery and exactly one Pod replacement before advancing the CI retention baseline. |
 | [0039](0039-exercise-maintenance-stale-guard-conflicts.md) | Proposed | Prove stale root/child/Deployment native patches refuse after guarded fixture metadata changes, preserving the checked recovered baseline. |
+| [0040](0040-exercise-maintenance-partial-pause.md) | Proposed | Stop CI-only parents after the native root/child patches and prove no later write/checkpoint or retained-state change. |

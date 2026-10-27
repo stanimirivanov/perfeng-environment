@@ -1650,6 +1650,21 @@ promotion, retained recovery or measured retirement.
 
 ## Verification and remaining gates
 
+After the initial leg's stale-guard cases, `maintenance-partial-pause.sh` checks
+two reversible parent copies with one suspension immediately after the real
+root or child pause patch. Before stopping that exact Workflow, require actual
+selected readiness, original adoption records, baseline planning and successful
+native worker identities/exits. Require `shutdown: Stop`, the same Workflow UID,
+specific controller stop evidence, unchanged workers and no later write or
+checkpoint output. Fresh retention keeps the recovered Pod baseline, workload,
+storage, ledger, Secret/config and database/S3 identities/data intact. Publish
+only `maintenance-partial-<resource>.barrier.json` and validated outcome JSON;
+raw evidence stays private. Setup, stop, timeout or retention failure stops the
+job without recovery or baseline advancement. This reuses the existing job,
+scenarios, refs, credentials and budget; production manifests are unchanged.
+See [ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md). Main-only
+post-merge execution supplies live proof; offline tests do not.
+
 The trusted-main `initial` leg additionally runs the unchanged maintenance-pause parent after adoption retention and before receipt identity faults. `maintenance-pause.sh` installs only the staged pause templates/approved authority, checks native sequence and quiescence, then explicitly syncs the selected control-plane child for test-only recovery. Original snapshots remain immutable; only a verified same-ReplicaSet server Pod replacement can advance the later retention baseline. Ledger, storage, foundation Pods, Secrets, config, database and S3 data must remain intact. Root auto-sync stays disabled and six other children stay skipped. No other matrix leg changes. See [ADR 0038](decisions/0038-exercise-maintenance-pause-and-checked-recovery.md). Full live proof remains post-merge main-only; this fixture is not a local operator command.
 
 Inspect `maintenance-pause` and `maintenance-recovery` in `stages.tsv`, `maintenance-pause.workflow.json`, the sanitized worker projection, validated checkpoint and fixed recovery outcome. Raw API/Secret/retention snapshots stay private. A failed pause or retention check must not trigger recovery; a failed recovery must not advance Pod/baseline references. The existing six scenarios, ref/artifact ownership, credentials, rights and 60-minute budget are unchanged.

@@ -1364,3 +1364,28 @@ so a permission regression still must not persist a change. Do not remove that
 flag, rotate credentials, connect with pod exec, repair records or advance
 maintenance after an audit/retention failure. Pod exec evidence is a review only;
 RBAC still permits arbitrary patch fields on the three allowed resources.
+
+## Disposable maintenance partial-pause acceptance
+
+For `maintenance-partial-root` or `maintenance-partial-child`, inspect the safe
+barrier report and `stages.tsv` first. An outcome exists only after the real
+native patch completed, its CI-only post-patch barrier was explicitly stopped,
+and fresh retention passed. Raw Workflow, worker, stop/wait logs and API/Secret
+snapshots remain private and must not be uploaded unredacted.
+
+The expected terminal state is the same Workflow UID with `spec.shutdown: Stop`,
+phase `Failed` and `Stopped with strategy 'Stop'` on the Workflow and suspension.
+Preceding native workers must have succeeded as `release-maintenance-pause`;
+later guard/write/checkpoint execution or a successful result is a failure.
+Timeouts, `Terminate`, image pull errors and permission errors are not substitutes
+for this evidence. Use safe barrier diagnostics for startup/dependency failures;
+private stop/wait logs are for privileged diagnosis only.
+
+A missing outcome or failed retention check must stop the job. Do not resume,
+retry successful nodes, sync the child, repair workloads, change permissions,
+rewrite ledger records or advance the recovered baseline to make acceptance pass.
+Both Applications were already disabled, so these cases should replace no
+workload Pod. Existing owned disposable-cluster cleanup remains the only cleanup.
+See [maintenance pause](release-maintenance-pause.md) and
+[ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md). No local operation
+or operational recovery is authorized by this fixture.
