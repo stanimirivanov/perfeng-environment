@@ -262,6 +262,8 @@ class MaintenancePartialPauseTests(unittest.TestCase):
 set -euo pipefail
 fixture=$1 results=$1/results source_dir=unused KUBECONFIG=$1/kubeconfig
 mode=preflight-parent scenario=initial current_stage=preflight-parent FAIL_MODE=$3
+source_dir=$1/source; mkdir -p "$source_dir"
+printf 'echo lingering >> "$fixture/trace"; [[ $FAIL_MODE != lingering ]]\n' > "$source_dir/maintenance-lingering-pod.sh"
 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted RUNNER_OS=Linux
 adoption_retention_baseline=$1/maintenance-recovered
 root_server_pods_file=original adoption_baseline=first
@@ -277,7 +279,7 @@ server_case() { echo http >> "$fixture/trace"; [[ $FAIL_MODE != http ]]; }
 adoption_case() { echo adoption >> "$fixture/trace"; }
 jq() { while IFS= read -r line; do :; done; echo checkpoint; }
 timeout() { [[ $FAIL_MODE != wait ]]; }
-uv() { echo "uv $*" >> "$fixture/trace"; if [[ $* == *" $FAIL_MODE deployment "* ]]; then return 1; fi; }
+uv() { echo "uv $*" >> "$fixture/trace"; if [[ $* == *" $FAIL_MODE "* ]]; then return 1; fi; }
 source "$2"
 """
         with tempfile.TemporaryDirectory() as temporary:
@@ -287,7 +289,9 @@ source "$2"
             for mode in (
                 "success",
                 "pause",
+                "lingering",
                 "wait",
+                "fresh",
                 "checkpoint",
                 "sync",
                 "http",
@@ -314,7 +318,7 @@ source "$2"
                 trace = (fixture / "trace").read_text()
                 with self.subTest(mode=mode):
                     self.assertEqual(process.returncode == 0, mode == "success", process.stderr)
-                    if mode in {"pause", "wait", "checkpoint"}:
+                    if mode in {"pause", "lingering", "wait", "fresh", "checkpoint"}:
                         self.assertNotIn("sync\n", trace)
                     if mode != "success":
                         self.assertIn(

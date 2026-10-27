@@ -29,12 +29,14 @@ maintenance_deployment_settled() {
 
 deployment_previous_stage=$current_stage
 maintenance_partial_case deployment
+source "$source_dir/maintenance-lingering-pod.sh"
 start_stage maintenance-partial-deployment-checkpoint
 deployment_checkpoint=$(a submit --from workflowtemplate/perfeng-release-maintenance-checkpoint-v3 --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
 if timeout 930s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$deployment_checkpoint" > "$fixture/maintenance-partial-deployment.checkpoint-wait.log" 2>&1; then deployment_checkpoint_rc=0; else deployment_checkpoint_rc=$?; fi
 [[ $deployment_checkpoint_rc == 0 ]]
 a get "$deployment_checkpoint" -o json > "$fixture/maintenance-partial-deployment.checkpoint-workflow.json"
 maintenance_partial_workers "$deployment_checkpoint" > "$fixture/maintenance-partial-deployment.checkpoint-workers.json"
+PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_lingering_pod.py" fresh "$fixture" "$results"
 PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_partial_pause.py" checkpoint deployment "$fixture" "$results"
 complete_stage
 
