@@ -98,6 +98,30 @@ def evidence():
 
 
 class MaintenancePatchEvidenceTests(unittest.TestCase):
+    def test_named_route_accepts_only_native_timeout_and_patch_query_options(self):
+        for patch_request in (False, True):
+            self.assertTrue(PROXY.named_request(PROXY.ROUTE, patch=patch_request))
+            self.assertTrue(PROXY.named_request(PROXY.ROUTE + "?timeout=10s", patch=patch_request))
+            for query in (
+                "timeout=0s",
+                "timeout=11s",
+                "timeout=",
+                "timeout=10s&timeout=10s",
+                "dryRun=All",
+                "watch=true",
+                "timeout",
+                "timeout=10s&other=value",
+            ):
+                with self.subTest(patch=patch_request, query=query):
+                    self.assertFalse(
+                        PROXY.named_request(PROXY.ROUTE + "?" + query, patch=patch_request)
+                    )
+        options = "?fieldManager=kubectl-patch&fieldValidation=Strict&timeout=10s"
+        self.assertTrue(PROXY.named_request(PROXY.ROUTE + options, patch=True))
+        self.assertFalse(PROXY.named_request(PROXY.ROUTE + options, patch=False))
+        self.assertFalse(PROXY.named_request(PROXY.ROUTE + "-other?timeout=10s", patch=True))
+        self.assertFalse(PROXY.named_request("https://other" + PROXY.ROUTE, patch=True))
+
     def test_prepare_binds_fresh_guard_and_projects_no_runner_credential_to_proxy(self):
         workflow, _, parameters, raw, _, before, _, expected, _ = evidence()
         workflow["status"]["phase"] = "Running"
@@ -364,6 +388,7 @@ class API(HTTPServer):
         super().__init__(("127.0.0.1", 0), APIHandler)
         self.expected = expected
         self.writes = []
+        self.reads = []
         self.status = 200
         self.mismatch = False
 
@@ -383,6 +408,7 @@ class APIHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        self.server.reads.append(self.path)
         self.respond(self.server.expected["before"])
 
     def do_PATCH(self):
@@ -461,9 +487,10 @@ class MaintenancePatchTransportTests(unittest.TestCase):
         ):
             self.assertEqual(self.call(method, path, body, token), (403, b""))
         self.assertFalse(self.api.writes)
-        self.assertEqual(self.call("GET")[0], 200)
+        self.assertEqual(self.call("GET", PROXY.ROUTE + "?timeout=10s")[0], 200)
+        self.assertEqual(self.api.reads, [PROXY.ROUTE + "?timeout=10s"])
         with self.assertRaises(http.client.RemoteDisconnected):
-            self.call()
+            self.call(path=PROXY.ROUTE + "?fieldManager=kubectl-patch&timeout=10s")
         self.assertEqual(len(self.api.writes), 1)
         self.assertEqual(self.proxy.events[0]["event"], "deployment-committed-response-dropped")
         self.assertEqual(self.call(), (410, b""))
@@ -540,6 +567,8 @@ class MaintenancePatchTransportTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(len(self.api.writes), 1, result.stderr)
+            self.assertTrue(self.api.reads)
+            self.assertTrue(all(path == PROXY.ROUTE + "?timeout=10s" for path in self.api.reads))
             self.assertEqual(len(self.proxy.events), 1)
             self.assertEqual(self.proxy.events[0]["event"], "deployment-committed-response-dropped")
 

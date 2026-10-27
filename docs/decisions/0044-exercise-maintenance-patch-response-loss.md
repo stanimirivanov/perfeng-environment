@@ -55,6 +55,15 @@ unsupported query parameters and repeat mutations. The real API authenticates
 JWT signature, expiry and audience. A subject claim check alone grants nothing.
 The proxy never logs authorization headers, request payloads or raw API bodies.
 
+The preserved native `--request-timeout=10s` flag also produces the HTTP query
+`timeout=10s` on the preliminary GET and PATCH. Accept only that timeout value
+(or its absence), with no duplicate timeout parameter. GET accepts no other
+query keys; PATCH additionally accepts only the existing kubectl field manager
+and validation options. Forward the validated query to the API. The real-client
+regression must demonstrate the named GET with that timeout reaches the API
+before exactly one PATCH commits; a proxy-generated Forbidden during GET is not
+evidence of API permission denial or response loss.
+
 Mark the mutation attempted before forwarding, with a bounded upstream call and
 no retry. Require HTTP 200, same Deployment UID, changed resourceVersion,
 generation incremented exactly once, unchanged metadata except managedFields/

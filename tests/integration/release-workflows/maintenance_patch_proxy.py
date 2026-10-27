@@ -18,6 +18,29 @@ ACCOUNT = "system:serviceaccount:argo-workflows:release-maintenance-pause"
 ADDRESS = "https://maintenance-response-proxy.argo-workflows.svc:8443"
 
 
+def named_request(path: str, *, patch: bool) -> bool:
+    """Accept only the named route and the copied client's fixed query semantics."""
+    parsed = urlsplit(path)
+    try:
+        query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True)
+    except ValueError:
+        return False
+    allowed = {"timeout", "fieldManager", "fieldValidation"} if patch else {"timeout"}
+    return (
+        not (parsed.scheme or parsed.netloc or parsed.fragment)
+        and parsed.path == ROUTE
+        and not query.keys() - allowed
+        # --request-timeout=10s is preserved in the native copy. client-go puts
+        # it on both the preliminary GET and the PATCH, not just the socket.
+        and ("timeout" not in query or query["timeout"] == ["10s"])
+        and ("fieldManager" not in query or query["fieldManager"] == ["kubectl-patch"])
+        and (
+            "fieldValidation" not in query
+            or query["fieldValidation"] in (["Ignore"], ["Warn"], ["Strict"])
+        )
+    )
+
+
 def committed(expected: dict[str, Any], obj: dict[str, Any]) -> bool:
     if not isinstance(obj, dict) or not isinstance(obj.get("metadata"), dict):
         return False
@@ -118,13 +141,13 @@ class Handler(ledger.Handler):
         parsed = urlsplit(self.path)
         if parsed.path in documents:
             body = json.dumps(documents[parsed.path]).encode()
-        elif self.path == ROUTE and not self.server.attempted:
+        elif named_request(self.path, patch=False) and not self.server.attempted:
             connection = http.client.HTTPSConnection(
                 self.server.upstream, context=self.server.context, timeout=10
             )
             try:
                 authorization = self.authorization()
-                connection.request("GET", ROUTE, headers={"Authorization": authorization})
+                connection.request("GET", self.path, headers={"Authorization": authorization})
                 response = connection.getresponse()
                 body = response.read(ledger.LIMIT + 1)
                 if response.status != 200 or len(body) > ledger.LIMIT:
@@ -156,23 +179,7 @@ class Handler(ledger.Handler):
 
     def do_PATCH(self) -> None:
         try:
-            parsed = urlsplit(self.path)
-            query = parse_qs(parsed.query, keep_blank_values=True)
-            if (
-                parsed.scheme
-                or parsed.netloc
-                or parsed.fragment
-                or parsed.path != ROUTE
-                or any(k not in {"fieldManager", "fieldValidation"} for k in query)
-            ):
-                raise ValueError
-            if "fieldManager" in query and query["fieldManager"] != ["kubectl-patch"]:
-                raise ValueError
-            if "fieldValidation" in query and query["fieldValidation"] not in (
-                ["Ignore"],
-                ["Warn"],
-                ["Strict"],
-            ):
+            if not named_request(self.path, patch=True):
                 raise ValueError
             lengths = self.headers.get_all("Content-Length", [])
             if (
