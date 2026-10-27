@@ -134,3 +134,4 @@ How will the assumptions and consequences be verified?
 | [0036](0036-tolerate-root-reconciliation-bookkeeping.md) | Proposed | Validate both root samples and tolerate only generation/resourceVersion/reconciledAt bookkeeping, with immutable v3 sources and audited v2 retirement. |
 | [0037](0037-stage-guarded-maintenance-pause.md) | Proposed | Stage three guarded native maintenance writes for an already adopted baseline, preserving read-only checkpoint authority and requiring separate live cutover acceptance. |
 | [0038](0038-exercise-maintenance-pause-and-checked-recovery.md) | Proposed | Exercise the complete pause in the existing initial leg, then verify manual recovery and exactly one Pod replacement before advancing the CI retention baseline. |
+| [0039](0039-exercise-maintenance-stale-guard-conflicts.md) | Proposed | Prove stale root/child/Deployment native patches refuse after guarded fixture metadata changes, preserving the checked recovered baseline. |
