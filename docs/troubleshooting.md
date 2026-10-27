@@ -1341,3 +1341,26 @@ the ReplicaSet. Never change selectors, Pod templates, ledger records or
 production recovery to make this fixture pass. Failed setup may leave its
 marker in the owned disposable cluster until the existing cluster cleanup;
 there is no automatic repair or recovery.
+
+### Maintenance API authority audit
+
+`maintenance-authority` must finish before real maintenance submission. Inspect
+`maintenance-authority.tsv`: only a final `suite verified` passes. Allowed named
+native patches must succeed with server dry-run; inspect the unchanged staged
+maintenance RoleBindings and pinned resource ownership if one fails. An Invalid
+stale-version response can cause at most three fresh read-only attempts only
+when UID/spec/ownership remain equal and resourceVersion changed. Standalone
+kubectl renders this as `The request is invalid: ...`; it does not use the
+usual `Error from server (Invalid)` wrapper. Transport,
+permission, unrelated Invalid or malformed positive responses cannot qualify.
+
+A negative probe must prove Forbidden for the exact subject and API operation.
+Unexpected allow requires reviewing the ServiceAccount's effective bindings;
+never grant broader rights to make a probe pass. A GET/NotFound/client-validation
+failure does not prove PATCH/DELETE denial. Manifest handles and the supported
+`delete -o name` command keep probes at the intended API boundary. Raw
+API/diagnostic files stay private. Every mutation probe includes server dry-run,
+so a permission regression still must not persist a change. Do not remove that
+flag, rotate credentials, connect with pod exec, repair records or advance
+maintenance after an audit/retention failure. Pod exec evidence is a review only;
+RBAC still permits arbitrary patch fields on the three allowed resources.

@@ -329,7 +329,7 @@ touch "$fixture/owned" "$fixture/adoption-retained.records.json"
 root_uid=root cluster_uid=cluster adoption_baseline=first
 trap 'printf "baseline=%s\npods=%s\n" "${adoption_retention_baseline:-original}" "${root_server_pods_file:-original}"' EXIT
 k() { printf '{}\n'; }
-a() { printf '{"metadata":{"name":"pause-ci"}}\n'; }
+a() { touch "$fixture/submitted"; printf '{"metadata":{"name":"pause-ci"}}\n'; }
 jq() { cat > /dev/null; if [[ $* == *'.metadata.name'* ]]; then echo pause-ci; else echo '{}'; fi; }
 timeout() { return 0; }
 cmp() { return 0; }
@@ -352,13 +352,19 @@ uv() {
 argocd_case() { echo recovery-sync; }
 server_case() { echo recovered-http; }
 adoption_case() { echo fresh-adoption; }
+source() {
+  if [[ $1 == */maintenance-authority.sh ]]; then
+    echo authority-audit
+    [[ $failure != authority ]] || return 17
+  else builtin source "$@"; fi
+}
 source "$source_dir/maintenance-pause.sh"
 """
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             script = directory / "rehearsal.sh"
             script.write_text(shell, encoding="utf-8", newline="\n")
-            for failure in ("paused", "recovered", "none"):
+            for failure in ("authority", "paused", "recovered", "none"):
                 with self.subTest(failure=failure):
                     fixture = directory / failure
                     results = fixture / "results"
@@ -381,7 +387,7 @@ source "$source_dir/maintenance-pause.sh"
                     self.assertEqual(
                         result.returncode, 0 if failure == "none" else 17, result.stderr
                     )
-                    if failure == "paused":
+                    if failure in {"authority", "paused"}:
                         self.assertNotIn("recovery-sync", result.stdout)
                     else:
                         self.assertIn("recovery-sync", result.stdout)
@@ -389,6 +395,8 @@ source "$source_dir/maintenance-pause.sh"
                         self.assertIn("baseline=original", result.stdout)
                         self.assertIn("pods=original", result.stdout)
                         self.assertNotIn("fresh-adoption", result.stdout)
+                        if failure == "authority":
+                            self.assertFalse((fixture / "submitted").exists())
                     else:
                         self.assertIn(
                             "baseline=" + fixture.as_posix() + "/maintenance-recovered",

@@ -32,6 +32,7 @@ maintenance_snapshot "$fixture/maintenance-before"
 root_state "$fixture/maintenance-before"
 root_retained "$fixture/adoption-before" "$fixture/maintenance-before"
 cmp "$fixture/adoption-retained.records.json" "$fixture/maintenance-before.records.json"
+source "$source_dir/maintenance-authority.sh"
 
 maintenance_name=$(a submit --from workflowtemplate/perfeng-release-maintenance-pause-v1 \
   --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name)
