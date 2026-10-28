@@ -139,7 +139,8 @@ jobs:
           for resource in root child; do
             PYTHONPATH=. uv run --locked --offline python tests/integration/release-workflows/maintenance_application_response.py template "$resource" "$RUNNER_TEMP" "$RUNNER_TEMP" > "$RUNNER_TEMP/maintenance-$resource-response.json"
           done
-          argo lint --offline --kinds=workflowtemplates gitops/release-workflows "$RUNNER_TEMP/maintenance-partial-root.json" "$RUNNER_TEMP/maintenance-partial-child.json" "$RUNNER_TEMP/maintenance-partial-deployment.json" "$RUNNER_TEMP/maintenance-response.json" "$RUNNER_TEMP/maintenance-root-response.json" "$RUNNER_TEMP/maintenance-child-response.json"
+          PYTHONPATH=. uv run --locked --offline python tests/integration/release-workflows/maintenance_child_transition.py template "$RUNNER_TEMP" "$RUNNER_TEMP" > "$RUNNER_TEMP/maintenance-child-transition.json"
+          argo lint --offline --kinds=workflowtemplates gitops/release-workflows "$RUNNER_TEMP/maintenance-partial-root.json" "$RUNNER_TEMP/maintenance-partial-child.json" "$RUNNER_TEMP/maintenance-partial-deployment.json" "$RUNNER_TEMP/maintenance-response.json" "$RUNNER_TEMP/maintenance-root-response.json" "$RUNNER_TEMP/maintenance-child-response.json" "$RUNNER_TEMP/maintenance-child-transition.json"
       - name: Validate exact adjacent release selections
         if: runner.os == 'Linux'
         run: make release-selection-check
