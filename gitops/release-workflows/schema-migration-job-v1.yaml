@@ -1,0 +1,87 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-schema-migration-job-v1
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  templates:
+  - name: run
+    resource:
+      action: create
+      successCondition: status.succeeded > 0
+      failureCondition: status.failed > 0
+      manifest: |
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: perfeng-schema-{{workflow.uid}}
+          namespace: perf-platform
+          labels:
+            app.kubernetes.io/managed-by: perfeng-environment
+            app.kubernetes.io/name: perfeng-control-plane-migration
+            perfeng.io/workflow-uid: '{{workflow.uid}}'
+          annotations:
+            perfeng.io/request-revision: '{{workflow.parameters.request-revision}}'
+            perfeng.io/request-sha256: '{{workflow.parameters.request-sha256}}'
+            perfeng.io/selection-revision: '{{workflow.parameters.selection-revision}}'
+        spec:
+          backoffLimit: 0
+          activeDeadlineSeconds: 180
+          template:
+            spec:
+              restartPolicy: Never
+              automountServiceAccountToken: false
+              imagePullSecrets:
+              - name: perfeng-control-plane-registry
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 65532
+                seccompProfile:
+                  type: RuntimeDefault
+                runAsGroup: 65532
+              containers:
+              - name: migrate
+                image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3
+                imagePullPolicy: Always
+                command:
+                - /usr/local/bin/migrate
+                env:
+                - name: PERFENG_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: perfeng-control-plane-database
+                      key: migration-url
+                - name: PGAPPNAME
+                  value: perfeng-schema-migration-v1
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 64Mi
+                  limits:
+                    cpu: 250m
+                    memory: 256Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                    - ALL
+              serviceAccountName: default
+              nodeSelector:
+                workload: control-plane
+              tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+      flags:
+      - --request-timeout=10s
+    outputs:
+      parameters:
+      - name: job-name
+        valueFrom:
+          jsonPath: '{.metadata.name}'
+    activeDeadlineSeconds: 240

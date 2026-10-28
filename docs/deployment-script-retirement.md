@@ -192,3 +192,11 @@ The ownership rule is [ADR 0014](decisions/0014-separate-release-and-run-orchest
 Argo CD reconciles workloads; Argo Workflows owns finite release steps; the
 Perfeng control plane owns Runs. Tekton or Dagger may produce immutable inputs
 upstream but do not participate in the local release path by default.
+
+The staged [schema-migration parent](release-schema-migration.md) now declares
+pinned preflight/lock/intent/quiescence gates and a native selected migrator Job.
+It adds no production Python and retires none of the 13 host entrypoints:
+`control_plane_migration.py` still supplies the supported migration/grant/recovery
+path until complete-parent live acceptance and operational cutover are reviewed.
+The two-module/708-line verifier budget remains unchanged. CI-only image parity
+does not establish this new parent or authorize retained-environment upgrades.

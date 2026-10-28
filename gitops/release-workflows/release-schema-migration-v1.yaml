@@ -1,0 +1,125 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-schema-migration-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-schema-migration
+  entrypoint: migrate
+  activeDeadlineSeconds: 1200
+  synchronization:
+    mutexes:
+    - name: perfeng-local-external-state
+  arguments:
+    parameters:
+    - name: request-revision
+    - name: request-path
+    - name: request-sha256
+    - name: selection-revision
+  templates:
+  - name: migrate
+    steps:
+    - - name: preflight
+        templateRef:
+          name: perfeng-release-preflight-v3
+          template: preflight
+    - - name: task-selection
+        templateRef:
+          name: perfeng-release-task-selection-v3
+          template: run
+        arguments:
+          parameters:
+          - name: preflight-result
+            value: '{{steps.preflight.outputs.parameters.result}}'
+          - name: expected-environment
+            value: perfeng-local
+          - name: expected-lock-path
+            value: deployments/local-control-plane.json
+          - name: expected-lock-digest
+            value: sha256:a0d206a41e14c06d2d019dbb0dda7c50e07f93a72d52e0cd6a0b76e7ec9601ec
+    - - name: migration-intent
+        template: migration-intent
+    - - name: quiescence
+        templateRef:
+          name: perfeng-verify-release-quiescence-v3
+          template: run
+        arguments:
+          parameters:
+          - name: preflight-result
+            value: '{{steps.preflight.outputs.parameters.result}}'
+    - - name: migrate
+        templateRef:
+          name: perfeng-schema-migration-job-v1
+          template: run
+    outputs:
+      parameters:
+      - name: checkpoint
+        valueFrom:
+          parameter: '{{steps.quiescence.outputs.parameters.result}}'
+      - name: job-name
+        valueFrom:
+          parameter: '{{steps.migrate.outputs.parameters.job-name}}'
+  - name: migration-intent
+    activeDeadlineSeconds: 60
+    inputs:
+      artifacts:
+      - name: request-source
+        path: /inputs/request
+        git:
+          repo: https://github.com/stanimirivanov/perfeng-environment.git
+          revision: '{{workflow.parameters.request-revision}}'
+          disableSubmodules: true
+          usernameSecret:
+            name: release-git-read
+            key: username
+          passwordSecret:
+            name: release-git-read
+            key: password
+    volumes:
+    - name: intent-policy
+      configMap:
+        name: perfeng-schema-migration-intent-v1
+        items:
+        - key: schema-migration-intent-v1.schema.json
+          path: schema-migration-intent-v1.schema.json
+    container:
+      image: ghcr.io/sourcemeta/jsonschema:v17.2.0@sha256:8466fb557d241ec0a8e5b20056bafc0e6d23affc72bb223402dc9657bfb8f40d
+      command:
+      - /bin/sh
+      - -ec
+      env:
+      - name: REQUEST_PATH
+        value: '{{workflow.parameters.request-path}}'
+      - name: REQUEST_SHA256
+        value: '{{workflow.parameters.request-sha256}}'
+      - name: REQUEST_ROOT
+        value: /inputs/request
+      args:
+      - |
+        printf '%s  %s\n' "${REQUEST_SHA256#sha256:}" "$REQUEST_ROOT/$REQUEST_PATH" | sha256sum -c - >/dev/null
+        /usr/local/bin/jsonschema validate /policy/schema-migration-intent-v1.schema.json "$REQUEST_ROOT/$REQUEST_PATH"
+      volumeMounts:
+      - name: intent-policy
+        mountPath: /policy
+        readOnly: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault

@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: perfeng-schema-migration-intent-v1
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '-2'
+immutable: true
+data:
+  schema-migration-intent-v1.schema.json: |
+    {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "promotion"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "promotion": {
+          "type": "object",
+          "required": [
+            "activation",
+            "migration"
+          ],
+          "properties": {
+            "activation": {
+              "const": "manual"
+            },
+            "migration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "id"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "forward-only"
+                },
+                "id": {
+                  "const": "0018"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
