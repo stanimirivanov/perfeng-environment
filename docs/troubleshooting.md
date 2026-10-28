@@ -1613,3 +1613,23 @@ service to pass acceptance. Only all case/retention gates permit the existing
 explicit recovery; failures remain paused for owned disposable cleanup.
 See [ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md).
 Heavy checks stay on PR CI; live proof remains post-merge, with no local action.
+
+### Schema-parent denied authority does not qualify
+
+[ADR 0051](decisions/0051-exercise-schema-job-create-denial.md) requires
+`schema-parent-denied-authority`, `schema-parent-denied` and
+`schema-parent-denied-restoration` in the initial paused suite. Expected access
+is create=no/get=yes/watch=yes while narrowed, and all yes after restoration.
+An auth-check warning, transport failure or unexpected response is not denial.
+Inspect private Role snapshots and the denied native worker's main log: real
+preflight/selection/intent/quiescence must succeed, then only creation of the
+planned migration Job must return Forbidden for release-schema-migration in
+batch/perf-platform. Failed GET, image startup, timeout, unexpected Job/Pod,
+parent output or any SQL/retention drift fails the case. Safe artifacts contain
+only fixed diagnostics and validated outcomes, never raw logs or SQL/Secrets.
+
+Do not manually restore the Role, retry workers or recover the service to turn
+an unproved case green. Only proved refusal and retention permit the captured
+rules' UID/resourceVersion/rules-guarded restoration. A stale patch or changed
+Role stops acceptance for owned disposable cleanup. Heavy checks stay on CI;
+live proof remains post-merge, with no local action.

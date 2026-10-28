@@ -112,7 +112,8 @@ Kustomize/Project checks verify the staged inventory; PR CI performs heavy full,
 cross-platform and pinned Argo lint/render checks. No Docker/cluster execution
 is introduced into offline validation. Complete-parent repeat/data retention
 acceptance is staged in the existing initial CI leg, with live proof post-merge.
-Full-parent fresh installation, denial and partial/ambiguous failure remain deferred.
+Full-parent fresh installation and partial/ambiguous SQL failure remain deferred.
+Bounded Job-create denial acceptance is staged under [ADR 0051](decisions/0051-exercise-schema-job-create-denial.md).
 All 13 host deployment entrypoints remain supported and no script is retired.
 
 ## Complete-parent repeat acceptance on disposable CI
@@ -137,3 +138,18 @@ artifacts. Heavy verification stays on PR CI and full live proof remains
 post-merge. This is repeat execution, not complete-parent first installation,
 expectedCurrent admission, an upgrade or interrupted SQL recovery. Host tasks
 and retirement status are unchanged.
+
+## Complete-parent Job-create denial
+
+[ADR 0051](decisions/0051-exercise-schema-job-create-denial.md) adds one case
+between none-intent refusal and successful repeats in the same paused window.
+Temporarily remove only Jobs create from the fixture migration Role, preserving
+get/watch and all observation rights. Verify effective access, run the unchanged
+parent, and require the successful real prefix/quiescence followed only by the
+native create worker's exact Forbidden. No Job/Pod, successful parent output or
+SQL/retained-state change may occur. Only proved refusal and retention permit
+UID/resourceVersion/rules-guarded restoration of the captured rules and verified
+restored access. All four Workflows remain retained. Failure stops without Role
+repair or recovery; production authority and local infrastructure are unchanged.
+Heavy checks stay on CI and live proof remains post-merge. This adds no script
+retirement credit or SQL failure/recovery claim.

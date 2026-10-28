@@ -206,3 +206,8 @@ checks while reusing the original paused current schema and existing recovery.
 It changes no production verifier or supported host task and adds no retirement
 credit. Complete-parent first installation, failure/recovery, live cutover and
 measured deletion remain separate gates; two modules/708 lines remain unchanged.
+
+Bounded complete-parent Job-create denial ([ADR 0051](decisions/0051-exercise-schema-job-create-denial.md))
+adds CI-only Role guards and refusal/retention evidence. It changes no production
+Python or supported task, and retires no host entrypoint. Two modules/708 lines
+remain unchanged; operational cutover and measured deletion remain pending.

@@ -1889,7 +1889,7 @@ The existing upgrade-request is the valid forward-only/0018 input. Exactly one
 new migration-none request, identical apart from migration intent, is published
 only in the initial leg's existing commit/ref. The other three fixtures and
 five scenarios are unchanged. No new CI jobs, scenarios, refs, credentials,
-rights or budget are introduced. Both Jobs and all three Workflows remain
+rights or budget are introduced. Both Jobs and all four Workflows remain
 retained; installed source/policy identities must remain unchanged.
 
 While still paused, require original receipt/pointer provenance, Secret/config
@@ -1899,10 +1899,26 @@ remain unchanged. Only validated cases and final retention permit the already
 approved manual recovery and its existing Pod replacement. No new recovery or
 baseline advancement occurs inside this phase.
 
-Inspect `schema-parent-setup`, `schema-parent-none`, `schema-parent-first`,
-`schema-parent-repeat` and `schema-parent-retention`, their bounded outcomes and
+Inspect `schema-parent-setup`, `schema-parent-none`,
+`schema-parent-denied-authority`, `schema-parent-denied`,
+`schema-parent-denied-restoration`, `schema-parent-first`, `schema-parent-repeat` and
+`schema-parent-retention`, their bounded outcomes and
 startup projections. Native failure/timeout first retains safe stage/Pod signals;
 raw Workflow/Job/Pod/watch/SQL/Secret evidence stays private. Heavy checks run
 on PR CI; full live proof remains post-merge. These runs operate on a current
 schema and do not prove fresh-schema installation, upgrade admission,
 partial/ambiguous SQL recovery, local deployment or script retirement.
+
+The [Job-create denial case](decisions/0051-exercise-schema-job-create-denial.md)
+runs after none-intent and before either repeat. Capture the published migration
+Role, atomically remove only Jobs create with UID/resourceVersion/rules tests,
+and check effective create=no/get=yes/watch=yes using the fixture admin's
+ServiceAccount impersonation. No new token is issued. Bound propagation to 30
+seconds and refuse warnings, errors or ambiguous responses. Submit the unchanged
+parent with upgrade-request. Require preflight/selection/intent/quiescence
+success, exact native worker create Forbidden, no native Job/Pod or successful
+parent output, and unchanged private SQL and paused-state evidence. Inspect only
+that failed worker's bounded main log for refusal attribution; generic startup
+projections remain diagnostic-only. Only all proof permits a fresh guarded Role
+restoration; validate restored rules/access before repeats and again at final
+retention. No EXIT repair, new recovery or local operation is authorized.

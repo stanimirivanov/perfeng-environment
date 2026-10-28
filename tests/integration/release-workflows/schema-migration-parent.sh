@@ -29,8 +29,8 @@ SQL
 }
 
 schema_parent_case() {
-  local label=$1 prefix="schema-parent-$1" parameters="$fixture/upgrade-request-parameters.json" workflow uid rc watch_pid= watch_rc=0 failed_pod
-  [[ $label == none || $label == first || $label == repeat ]] || return 2
+  local label=$1 prefix="schema-parent-$1" parameters="$fixture/upgrade-request-parameters.json" workflow uid rc watch_pid= watch_rc=0 failed_pod node pod
+  [[ $label == none || $label == denied || $label == first || $label == repeat ]] || return 2
   if [[ $label == none ]]; then parameters="$fixture/migration-none-parameters.json"; fi
   start_stage "$prefix"
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-control-plane-migration -o json > "$fixture/$prefix.jobs-before.json"
@@ -64,9 +64,52 @@ schema_parent_case() {
   fi
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_parent.py" "diagnose-$label" "$fixture" "$results"
   [[ $rc != 124 && $rc != 137 ]]
-  if [[ $label == none ]]; then [[ $rc != 0 ]]; else [[ $rc == 0 ]]; fi
+  if [[ $label == none || $label == denied ]]; then [[ $rc != 0 ]]; else [[ $rc == 0 ]]; fi
+  if [[ $label == denied ]]; then
+    node=$(jq -er '[.status.nodes[]|select(.displayName=="migrate" and .type=="Pod" and (.phase=="Failed" or .phase=="Error"))]|if length==1 then .[0].id else error("expected one denied create") end' "$fixture/$prefix.workflow.json")
+    pod=$(jq -er --arg id "$node" '[.items[]|select(.metadata.annotations["workflows.argoproj.io/node-id"]==$id)]|if length==1 then .[0].metadata.name else error("expected one denied worker") end' "$fixture/$prefix.workflow-pods.json")
+    k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 --request-timeout=10s > "$fixture/$prefix.denied.log"
+  fi
   schema_parent_snapshot "$fixture/$prefix"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_parent.py" "$label" "$fixture" "$results"
+  complete_stage
+}
+
+schema_parent_access() {
+  local denied=$1 verb expected answer rc ready deadline=$((SECONDS + 30))
+  while ((SECONDS < deadline)); do
+    ready=true
+    for verb in create get watch; do
+      expected=yes
+      if [[ $denied == true && $verb == create ]]; then expected=no; fi
+      if answer=$(k --as system:serviceaccount:argo-workflows:release-schema-migration --as-group system:serviceaccounts --as-group system:serviceaccounts:argo-workflows --as-group system:authenticated auth can-i "$verb" jobs.batch -n perf-platform 2> "$fixture/schema-parent-denied.auth.private"); then rc=0; else rc=$?; fi
+      [[ ! -s $fixture/schema-parent-denied.auth.private && ( ( $rc == 0 && $answer == yes ) || ( $rc == 1 && $answer == no ) ) ]] || return 1
+      if [[ $answer != "$expected" ]]; then ready=false; fi
+    done
+    if [[ $ready == true ]]; then return 0; fi
+    sleep 1
+  done
+  printf '%s\n' 'Schema migration effective Job authority did not reach the expected boundary; no next operation attempted' >&2
+  return 1
+}
+
+schema_parent_denial() {
+  start_stage schema-parent-denied-authority
+  schema_parent_access false
+  k -n perf-platform get role/release-schema-migration -o json > "$fixture/schema-parent-denied.role-original.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_denial.py" prepare "$fixture"
+  k -n perf-platform patch role/release-schema-migration --type=json --patch-file "$fixture/schema-parent-denied.narrow-patch.json" --request-timeout=10s -o json > "$fixture/schema-parent-denied.role-narrowed.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_denial.py" narrowed "$fixture"
+  schema_parent_access true
+  schema_parent_case denied
+  # Refusal and all private retention checks above must pass before any restoration.
+  start_stage schema-parent-denied-restoration
+  schema_parent_access true
+  k -n perf-platform get role/release-schema-migration -o json > "$fixture/schema-parent-denied.role-current.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_denial.py" restore "$fixture"
+  k -n perf-platform patch role/release-schema-migration --type=json --patch-file "$fixture/schema-parent-denied.restore-patch.json" --request-timeout=10s -o json > "$fixture/schema-parent-denied.role-restored.json"
+  schema_parent_access false
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_denial.py" restored "$fixture"
   complete_stage
 }
 
@@ -81,15 +124,20 @@ schema_parent_suite() {
   schema_parent_sources before
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_parent.py" baseline "$fixture" "$results"
   complete_stage
-  for label in none first repeat; do schema_parent_case "$label"; done
+  schema_parent_case none
+  schema_parent_denial
+  for label in first repeat; do schema_parent_case "$label"; done
   start_stage schema-parent-retention
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-control-plane-migration -o json > "$fixture/schema-parent.retained-jobs.json"
-  for label in none first repeat; do
+  for label in none denied first repeat; do
     name=$(jq -er .metadata.name "$fixture/schema-parent-$label.workflow.json")
     schema_parent_workflows+=("$name")
   done
   k -n argo-workflows get workflows "${schema_parent_workflows[@]}" -o json > "$fixture/schema-parent.retained-workflows.json"
   schema_parent_sources after
+  k -n perf-platform get role/release-schema-migration -o json > "$fixture/schema-parent-denied.role-final.json"
+  schema_parent_access false
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_denial.py" final "$fixture"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_parent.py" complete "$fixture" "$results"
   complete_stage
   current_stage=$previous
