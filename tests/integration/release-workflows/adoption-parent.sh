@@ -252,6 +252,7 @@ if [[ $scenario == initial ]]; then
   source "$source_dir/maintenance-guard-conflict.sh"
   source "$source_dir/maintenance-partial-pause.sh"
   source "$source_dir/maintenance-application-response.sh"
+  source "$source_dir/maintenance-child-transition.sh"
   source "$source_dir/maintenance-deployment-pause.sh"
   source "$source_dir/maintenance-patch-response.sh"
 fi

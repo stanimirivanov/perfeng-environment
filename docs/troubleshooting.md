@@ -1512,3 +1512,21 @@ Pod replacement or baseline advancement. Keep raw diagnostics private; failure
 cleanup remains owned disposable-cluster teardown. This authorizes no local or
 production action. See
 [ADR 0045](decisions/0045-exercise-application-patch-response-loss.md).
+
+### Child transition acceptance fails or root becomes OutOfSync
+
+During `maintenance-child-transition`, the disposable fixture deliberately enables
+only the selected healthy control-plane child's auto-sync, with prune/selfHeal
+false. Root remains disabled and may compare the child as OutOfSync while its
+live spec differs from Git. The published child guard/PATCH must restore the
+original disabled spec, with two generation increments across the case. Root
+must then converge and strict running-state/data retention must pass before
+fresh unchanged adoption. Inspect the private enable response, enabled read,
+Workflow/workers and before/after snapshots; only validated `.outcome.json` is
+published. Wrong identity/spec, active sync, native failure, stale guards,
+timeout or changed Pods/ledger/data cannot qualify. Do not retry writes, enable
+root, manually sync, repair, or advance the baseline to pass acceptance. A failed
+case stops for owned disposable-cluster teardown, even if the child remains
+enabled. This is CI leaf proof, not a supported local recovery command or full
+parent transition acceptance. See
+[ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md).

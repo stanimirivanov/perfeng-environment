@@ -155,3 +155,18 @@ rechecks readiness and reuses both records. No Pod replacement, sync, recovery
 or baseline advancement occurs. These cases do not prove enabled-to-disabled
 transitions. Deployment response-loss checks remain strict and unchanged in scope.
 Heavy TLS/client checks run on PR CI; full live proof remains post-merge.
+
+### Real child auto-sync transition
+
+The initial job also exercises the unchanged child guard and native PATCH against
+an actually enabled child ([ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md)).
+Guarded fixture setup enables only the healthy, pinned control-plane child,
+preserving prune/selfHeal false. The CI-only two-step composition must disable
+it, preserving every other spec field and all running Pods, ledger records and
+data. Require exactly two generation increments across enable/disable, verified
+root convergence and strict retention before fresh unchanged adoption. No manual
+sync, recovery or baseline advancement occurs. Failed or ambiguous setup stops
+without repair. Root stays disabled and other children skipped; enabling the
+child can temporarily make root OutOfSync, so this proves the child operation
+rather than complete-parent enabled-baseline acceptance. Heavy checks run on PR
+CI; live proof remains post-merge and local execution stays deferred.

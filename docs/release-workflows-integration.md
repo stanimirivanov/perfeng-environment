@@ -1802,3 +1802,27 @@ Applications are already disabled: unchanged resourceVersion is valid for these
 no-ops. Deployment version/generation/scale checks remain intact. No jobs,
 scenarios, refs, credentials, rights or budget changes; heavy checks remain on
 PR CI and full live proof remains the existing post-merge trusted-main initial job.
+
+### Native child enabled-to-disabled acceptance
+
+`maintenance-child-transition.sh` runs after Application response-loss cases and
+before Deployment interruption in the existing trusted-main initial job.
+A UID/resourceVersion/full-spec guarded setup enables only the healthy pinned
+child, keeping prune/selfHeal false. A create-only two-step CI WorkflowTemplate
+references the unchanged maintenance `guard-child` and `patch-child` leaves,
+with the same maintenance ServiceAccount and mutex. Verify the API response,
+fresh enabled observation, native guard/output/worker order, restored full spec
+and exactly two generation increments. Require unchanged Pods, workloads,
+ledger, Secrets and persistent SQL/S3 data, plus root convergence, before fresh
+unchanged adoption reuses the original records/result. Baselines never advance.
+
+Root remains disabled and six other children skipped. Root may temporarily be
+OutOfSync because the enabled child differs from Git; this deliberately proves
+the native child operation, not complete-parent enabled-baseline coverage.
+Inspect stage `maintenance-child-transition`, its validated `.outcome.json` and
+separate `-checked` adoption evidence. Raw API/Workflow/worker/Secret snapshots
+stay private. Failed/ambiguous enablement or native disablement stops without
+write retries, manual sync or automatic repair. Existing job/scenarios/refs/
+rights/budget stay unchanged; heavy checks run on PR CI, full live proof stays
+post-merge and no local execution is authorized. See
+[ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md).
