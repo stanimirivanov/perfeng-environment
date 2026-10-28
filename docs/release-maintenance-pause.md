@@ -184,3 +184,18 @@ SQL/S3/storage/Secret retention must pass before the existing first adoption.
 Failures stop without repair or recovery. This adds no authority, job, scenario,
 ref or budget and leaves later adopted pause acceptance intact. Heavy checks
 stay on PR CI; full live proof remains post-merge and local execution deferred.
+
+### Receipt-only adoption is not a maintenance baseline
+
+The existing receipt-only CI leg also submits the unchanged maintenance parent
+before its quota increase and adoption retry
+([ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md)).
+The sole valid receipt must match the earlier verified partial-adoption snapshot
+in full and the pointer must remain absent. Require successful real readiness,
+exact finish inputs and refusal specifically for the missing stored pointer,
+with no later pause guard/write/checkpoint/result. Only verified refusal and
+strict receipt/Pod/Secret/data retention permit the existing quota/adoption
+recovery. No deletion, injected fault, new recovery, root enablement or baseline
+advance occurs. The same staged authority is installed in that existing cluster;
+no rights/jobs/scenarios/refs/budget expand. Heavy checks stay on PR CI, full
+live proof stays post-merge and local execution remains deferred.

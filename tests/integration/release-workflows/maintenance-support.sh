@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared fixture-only setup and private snapshots; sourcing performs no API writes.
 set -euo pipefail
-[[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent && ${scenario:-} == initial ]] || exit 2
+[[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent && ( ${scenario:-} == initial || ${scenario:-} == receipt-only ) ]] || exit 2
 [[ -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" ]] || exit 2
 
 maintenance_install() {

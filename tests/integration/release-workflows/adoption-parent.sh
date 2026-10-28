@@ -134,6 +134,7 @@ if [[ $scenario == receipt-only ]]; then
   [[ -z $(k -n "$adoption_namespace" get configmap perfeng-local-current --ignore-not-found -o name) ]]
   k -n "$adoption_namespace" wait resourcequota/ci-adoption-receipt-only \
     --for=jsonpath='{.status.used.count/configmaps}'=2 --timeout=60s
+  source "$source_dir/maintenance-unadopted.sh"
   k -n "$adoption_namespace" get resourcequota ci-adoption-receipt-only -o json > "$fixture/adoption-quota-current.json"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/adoption_parent_evidence.py" quota-patch \
     "$fixture" "$results" receipt-only > "$fixture/adoption-quota-patch.json"
