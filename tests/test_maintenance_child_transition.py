@@ -203,6 +203,7 @@ class ChildTransitionTests(unittest.TestCase):
         setup = r"""#!/usr/bin/env bash
 set -euo pipefail
 fixture=$1; results=$1; source_dir=$1; fail=$3
+KUBECONFIG="$fixture/kubeconfig"
 current_stage=outer; adoption_retention_baseline=baseline; adoption_baseline=initial
 start_stage() { echo stage >> "$fixture/trace"; }
 complete_stage() { echo complete >> "$fixture/trace"; }
@@ -259,6 +260,22 @@ maintenance_child_transition_case
                 with self.subTest(fail=fail):
                     trace = (fixture / "trace").read_text().splitlines()
                     self.assertEqual(process.returncode, 0 if fail == "pass" else 1, process.stderr)
+                    self.assertNotIn("unbound variable", process.stderr)
+                    boundary = {
+                        "pass": "complete",
+                        "baseline-retention": "retain-before",
+                        "retention": "retain-after",
+                        "wait": "wait",
+                        "adoption": "adoption",
+                        "records": "compare",
+                    }
+                    if fail in boundary:
+                        self.assertEqual(trace[-1], boundary[fail], process.stderr)
+                    elif fail == "enable":
+                        self.assertIn(" patch application perfeng-local-control-plane ", trace[-1])
+                    else:
+                        self.assertTrue(trace[-1].startswith("uv "))
+                        self.assertIn(f" {fail} ", trace[-1])
                     if fail not in {"pass", "adoption", "records"}:
                         self.assertNotIn("adoption", trace)
                     if fail != "pass":
