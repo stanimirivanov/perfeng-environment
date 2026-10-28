@@ -25,13 +25,17 @@ with patch.dict(
     spec.loader.exec_module(MODULE)
 
 
-def evidence():
+def evidence(receipt_only=False):
     workflow, workers, parameters, preflight, raw, lock, before, _ = pause.evidence()
     before["server-pods"] = before.pop("serverPod")
-    before["records"] = []
+    receipt = (
+        next(o for o in before["records"] if o.get("immutable") is True) if receipt_only else None
+    )
+    before["records"] = [receipt] if receipt_only else []
     nodes = workflow["status"]["nodes"]
     for name in ("receipt", "pointer"):
         nodes[name]["outputs"] = {"parameters": [{"name": "observation", "value": "null"}]}
+    nodes["receipt"]["outputs"]["parameters"][0]["value"] = json.dumps(receipt)
     for name in (
         "guard-root",
         "pause-root",
@@ -52,7 +56,7 @@ def evidence():
         "phase": "finish",
         "readiness": health,
         "root": pause.READINESS.outputs(nodes["root"])["observation"],
-        "receipt": None,
+        "receipt": receipt,
         "pointer": None,
         "root-after": pause.READINESS.outputs(nodes["root-after"])["observation"],
     }
@@ -73,6 +77,32 @@ def evidence():
 class UnadoptedMaintenanceTests(unittest.TestCase):
     def test_actual_policy_and_finish_runtime_refuse_without_outputs(self):
         self.assertEqual(MODULE.verify(*evidence())["decision"], "maintenance-unadopted-refused")
+
+    def test_receipt_only_requires_valid_unchanged_receipt_and_missing_pointer_finish(self):
+        args = evidence(True)
+        result = MODULE.verify(*args, receipt_only=True)
+        self.assertEqual(result["decision"], "maintenance-receipt-only-refused")
+        self.assertEqual(result["receiptUID"], args[6]["records"][0]["metadata"]["uid"])
+        with self.assertRaises(AssertionError):
+            MODULE.verify(*args)
+        with self.assertRaises(AssertionError):
+            MODULE.verify(*evidence(), receipt_only=True)
+        for mutate in (
+            lambda a: a[7]["records"][0]["metadata"].update(uid="replacement"),
+            lambda a: a[7]["records"][0].update(data={"changed": "bytes"}),
+            lambda a: a[7]["records"][0]["metadata"].update(annotations={"changed": "provenance"}),
+            lambda a: a[0]["status"]["nodes"]["pointer"]["outputs"]["parameters"][0].update(
+                value='{"metadata":{"name":"unexpected-pointer"}}'
+            ),
+            lambda a: a[0]["status"]["nodes"]["baseline"]["inputs"]["parameters"][0].update(
+                value="pointer"
+            ),
+            lambda a: a[7]["server-pods"]["items"][0]["metadata"].update(uid="replacement"),
+        ):
+            bad = list(evidence(True))
+            mutate(bad)
+            with self.assertRaises(AssertionError):
+                MODULE.verify(*bad, receipt_only=True)
 
     def test_unrelated_failure_record_write_or_success_cannot_qualify(self):
         for mutate in (
@@ -104,39 +134,64 @@ class UnadoptedMaintenanceTests(unittest.TestCase):
             MODULE.verify(*args)
 
     def test_cli_keeps_raw_snapshots_private_and_withholds_unproven_outcome(self):
-        workflow, workers, parameters, preflight, raw, _, before, after, log = evidence()
+        self.cli_case(False)
+        self.cli_case(True)
+
+    def cli_case(self, receipt_only):
+        workflow, workers, parameters, preflight, raw, _, before, after, log = evidence(
+            receipt_only
+        )
+        prefix = "maintenance-receipt-only" if receipt_only else MODULE.PREFIX
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             results = directory / "results"
             results.mkdir()
             for label, state in (("before", before), ("after", after)):
                 for key, value in state.items():
-                    (directory / f"{MODULE.PREFIX}-{label}.{key}.json").write_text(
-                        json.dumps(value)
-                    )
+                    (directory / f"{prefix}-{label}.{key}.json").write_text(json.dumps(value))
             for name, value in (
-                (f"{MODULE.PREFIX}.workflow.json", workflow),
-                (f"{MODULE.PREFIX}.workers.json", workers),
+                (f"{prefix}.workflow.json", workflow),
+                (f"{prefix}.workers.json", workers),
                 ("parent-parameters.json", parameters),
             ):
                 (directory / name).write_text(json.dumps(value))
             (directory / "parent-request.json").write_bytes(raw)
-            (directory / f"{MODULE.PREFIX}.worker.log").write_text(log)
+            (directory / f"{prefix}.worker.log").write_text(log)
+            if receipt_only:
+                (directory / "adoption-receipt-only.records.json").write_text(
+                    json.dumps(before["records"])
+                )
             (results / "parent-first.result.json").write_text(json.dumps(preflight))
-            with patch("sys.argv", ["unadopted", str(directory), str(results)]):
+            argv = [
+                "unadopted",
+                str(directory),
+                str(results),
+                "receipt-only" if receipt_only else "initial",
+            ]
+            with patch("sys.argv", argv):
                 MODULE.main()
-            report = results / f"{MODULE.PREFIX}.outcome.json"
+            report = results / f"{prefix}.outcome.json"
             self.assertEqual(
-                set(json.loads(report.read_text())), {"decision", "workflowUID", "clusterUID"}
+                set(json.loads(report.read_text())),
+                {"decision", "workflowUID", "clusterUID"}
+                | ({"receiptUID"} if receipt_only else set()),
             )
             report.unlink()
-            (directory / f"{MODULE.PREFIX}.worker.log").write_text("transport timeout")
+            (directory / f"{prefix}.worker.log").write_text("transport timeout")
             with (
-                patch("sys.argv", ["unadopted", str(directory), str(results)]),
+                patch("sys.argv", argv),
                 self.assertRaises(AssertionError),
             ):
                 MODULE.main()
             self.assertFalse(report.exists())
+            if receipt_only:
+                (directory / f"{prefix}.worker.log").write_text(log)
+                expected = deepcopy(before["records"])
+                expected[0]["metadata"]["uid"] = "foreign-partial-receipt"
+                (directory / "adoption-receipt-only.records.json").write_text(json.dumps(expected))
+                with patch("sys.argv", argv), self.assertRaises(AssertionError):
+                    MODULE.main()
+                self.assertFalse(report.exists())
 
     @unittest.skipUnless(BASH, "Bash required")
     def test_first_adoption_requires_exact_refusal_and_both_retention_checks(self):
@@ -147,7 +202,7 @@ class UnadoptedMaintenanceTests(unittest.TestCase):
         )[0]
         setup = r"""#!/usr/bin/env bash
 set -euo pipefail
-fixture=$1; results=$1; source_dir=$1; fail=$3; KUBECONFIG="$fixture/kubeconfig"
+fixture=$1; results=$1; source_dir=$1; fail=$3; scenario=${4:-initial}; KUBECONFIG="$fixture/kubeconfig"
 current_stage=outer
 start_stage() { echo stage >> "$fixture/trace"; }; complete_stage() { echo complete >> "$fixture/trace"; }
 maintenance_install() { echo install >> "$fixture/trace"; [[ $fail != install ]]; }
@@ -169,17 +224,21 @@ echo adoption >> "$fixture/trace"
             directory = Path(temporary)
             (directory / "case.sh").write_text(library, newline="\n")
             (directory / "run.sh").write_text(setup, newline="\n")
-            for fail in (
-                "pass",
-                "install",
-                "snapshot",
-                "before",
-                "after",
-                "success",
-                "timeout",
-                "verify",
+            for scenario, fail in (
+                (scenario, fail)
+                for scenario in ("initial", "receipt-only")
+                for fail in (
+                    "pass",
+                    "install",
+                    "snapshot",
+                    "before",
+                    "after",
+                    "success",
+                    "timeout",
+                    "verify",
+                )
             ):
-                fixture = directory / fail
+                fixture = directory / f"{scenario}-{fail}"
                 fixture.mkdir()
                 process = subprocess.run(
                     [
@@ -188,6 +247,7 @@ echo adoption >> "$fixture/trace"
                         fixture.as_posix(),
                         (directory / "case.sh").as_posix(),
                         fail,
+                        scenario,
                     ],
                     cwd=pause.ROOT,
                     env={**os.environ, "BASH_ENV": ""},
@@ -195,7 +255,7 @@ echo adoption >> "$fixture/trace"
                     text=True,
                     timeout=60,
                 )
-                with self.subTest(fail=fail):
+                with self.subTest(scenario=scenario, fail=fail):
                     trace = (fixture / "trace").read_text().splitlines()
                     self.assertEqual(process.returncode, 0 if fail == "pass" else 1, process.stderr)
                     self.assertNotIn("unbound variable", process.stderr)

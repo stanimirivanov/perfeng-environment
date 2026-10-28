@@ -1848,3 +1848,23 @@ unrelated failure, timeout, failed setup or retention stops before adoption.
 No jobs, scenarios, refs, credentials, rights or budget are added. Heavy suites
 stay on PR CI; live proof remains post-merge trusted-main. See
 [ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md).
+
+### Maintenance refusal during receipt-only recovery
+
+The shared `maintenance-unadopted.sh` gate also runs in the existing receipt-only
+leg, after its verified pointer-admission refusal and before the approved quota
+increase/adoption recovery. Its separate `maintenance-receipt-only` prefix keeps
+raw evidence and the bounded outcome distinct from the empty initial ledger.
+Both shell snapshots and the CLI compare the sole receipt with the original
+`adoption-receipt-only.records.json`; no normalization of bytes/UID/provenance is
+allowed. Planning must reuse that valid receipt and require only the pointer.
+The unchanged finish runtime must refuse specifically for `stored pointer missing`,
+after real readiness/root/ledger reads, with no downstream pause/checkpoint.
+
+Only exact refusal plus root/child, Pod/workload/Secret/ledger and persistent
+SQL/S3/storage retention permits the existing recovery sequence to continue.
+No deletion, fixture injection, repair, new recovery or baseline advancement
+occurs. Inspect stage `maintenance-receipt-only` and validated `.outcome.json`;
+raw observations/logs remain private. Same job/ref/rights/budget; heavy checks
+remain on PR CI and live proof is post-merge in the existing receipt-only job.
+See [ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md).

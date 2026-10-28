@@ -1545,3 +1545,19 @@ retry maintenance, bypass retention or run recovery to make this gate pass.
 First adoption remains blocked until the gate succeeds; existing disposable
 cleanup owns teardown. This adds no supported local operation. See
 [ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md).
+
+### Receipt-only maintenance refusal blocks adoption recovery
+
+In stage `maintenance-receipt-only`, a valid stored receipt with no current pointer
+must fail only baseline finish, specifically for the missing stored pointer.
+The parent must first pass real readiness and native root/ledger observations.
+The receipt must exactly match the original partial-adoption snapshot, including
+UID, bytes and provenance; the pointer remains absent. Invalid receipt, missing
+root evidence, early worker failure, timeout or an empty ledger cannot substitute
+for the expected refusal. Inspect private Workflow/worker/log and before/after
+snapshots. The bounded outcome is published only after receipt and running/
+persistent-state retention pass. The approved quota increase and fresh adoption
+retry remain blocked until then. Do not rewrite records, bypass the gate, retry
+maintenance or sync/recover workloads to pass acceptance. Existing disposable
+cleanup owns teardown. No local action is authorized. See
+[ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md).
