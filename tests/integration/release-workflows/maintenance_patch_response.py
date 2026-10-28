@@ -21,22 +21,36 @@ PREFIX = "maintenance-response"
 DIRECTORY = Path("gitops/release-workflows")
 
 
-def template() -> dict[str, Any]:
+def parent_name(resource: str) -> str:
+    assert resource in proxy.TARGETS
+    return NAME if resource == "deployment" else "perfeng-maintenance-" + resource + "-response-ci"
+
+
+def fixture_name(resource: str) -> str:
+    assert resource in proxy.TARGETS
+    return (
+        "maintenance-response-proxy"
+        if resource == "deployment"
+        else "maintenance-" + resource + "-response-proxy"
+    )
+
+
+def template(resource: str = "deployment") -> dict[str, Any]:
     original = yaml.safe_load((DIRECTORY / "release-maintenance-pause-v1.yaml").read_text())
     native = yaml.safe_load((DIRECTORY / "maintenance-resources-v1.yaml").read_text())
     result = deepcopy(original)
-    result["metadata"] = {"name": NAME, "namespace": "argo-workflows"}
+    result["metadata"] = {"name": parent_name(resource), "namespace": "argo-workflows"}
     steps = result["spec"]["templates"][0]["steps"]
-    index = next(i for i, group in enumerate(steps) if group[0]["name"] == "pause-deployment")
-    assert steps[index - 1][0]["name"] == "guard-deployment"
+    index = next(i for i, group in enumerate(steps) if group[0]["name"] == "pause-" + resource)
+    assert steps[index - 1][0]["name"] == "guard-" + resource
     assert steps[index][0].pop("templateRef") == {
         "name": native["metadata"]["name"],
-        "template": "patch-deployment",
+        "template": "patch-" + resource,
     }
-    steps[index][0]["template"] = "fault-patch-deployment"
+    steps[index][0]["template"] = "fault-patch-" + resource
     steps.insert(index, [{"name": BARRIER, "template": BARRIER}])
     patch = deepcopy(
-        next(t for t in native["spec"]["templates"] if t["name"] == "patch-deployment")
+        next(t for t in native["spec"]["templates"] if t["name"] == "patch-" + resource)
     )
     assert (
         not patch.get("podSpecPatch")
@@ -44,11 +58,11 @@ def template() -> dict[str, Any]:
         and not original["spec"].get("hooks")
     )
     adapted = deepcopy(patch)
-    adapted["name"] = "fault-patch-deployment"
+    adapted["name"] = "fault-patch-" + resource
     adapted["resource"]["flags"].append("--kubeconfig=/fault/client.json")
     adapted["podSpecPatch"] = json.dumps(
         {
-            "volumes": [{"name": "fault", "configMap": {"name": "maintenance-response-proxy"}}],
+            "volumes": [{"name": "fault", "configMap": {"name": fixture_name(resource)}}],
             "containers": [
                 {
                     "name": "main",
@@ -66,11 +80,11 @@ def template() -> dict[str, Any]:
     del restored_steps[index][0]["template"]
     restored_steps[index][0]["templateRef"] = {
         "name": native["metadata"]["name"],
-        "template": "patch-deployment",
+        "template": "patch-" + resource,
     }
     barrier, transported = restored["spec"]["templates"][-2:]
     assert barrier == {"name": BARRIER, "suspend": {}}
-    transported["name"] = "patch-deployment"
+    transported["name"] = "patch-" + resource
     assert transported["resource"]["flags"].pop() == "--kubeconfig=/fault/client.json"
     del transported["podSpecPatch"]
     assert transported == patch
@@ -85,16 +99,18 @@ def ready(
     raw: bytes,
     lock: bytes,
     before: dict[str, Any],
+    *,
+    resource: str = "deployment",
 ) -> dict[str, Any]:
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     return guards.ready(
         workflow,
-        "deployment",
+        resource,
         parameters,
         raw,
         lock,
         before,
-        parent_name=NAME,
+        parent_name=parent_name(resource),
         barrier_name=BARRIER,
     )
 
@@ -105,15 +121,18 @@ def failed(
     expected: dict[str, Any],
     events: list[dict[str, Any]],
     after: dict[str, Any],
+    *,
+    resource: str = "deployment",
 ) -> dict[str, Any]:
     named, outputs = partial.maintenance.readiness.named, partial.maintenance.readiness.outputs
     assert workflow["status"]["phase"] in {"Failed", "Error"} and not workflow["spec"].get(
         "shutdown"
     )
     assert named(workflow, BARRIER, "Suspend")["phase"] == "Succeeded"
-    node = named(workflow, "pause-deployment")
+    assert proxy.target(expected) == resource
+    node = named(workflow, "pause-" + resource)
     assert node["type"] == "Pod" and node["phase"] in {"Failed", "Error"}
-    assert node.get("templateName") == "fault-patch-deployment" and not node.get("templateRef")
+    assert node.get("templateName") == "fault-patch-" + resource and not node.get("templateRef")
     barrier = named(workflow, BARRIER, "Suspend")
     assert (
         datetime.fromisoformat(barrier["finishedAt"])
@@ -128,6 +147,13 @@ def failed(
         if worker["nodeID"] != node["id"]:
             assert pods[worker["nodeID"]]["phase"] == "Succeeded"
     for other in workflow["status"]["nodes"].values():
+        later = ("root", "child", "deployment")[
+            ("root", "child", "deployment").index(resource) + 1 :
+        ]
+        if other["displayName"] in {
+            operation + "-" + target for target in later for operation in ("guard", "pause")
+        }:
+            assert other["phase"] in {"Skipped", "Omitted"} and other["type"] != "Pod"
         if (
             other["displayName"] in {"checkpoint", "observe"}
             or other.get("templateRef", {}).get("name") == "perfeng-verify-release-quiescence-v3"
@@ -138,20 +164,78 @@ def failed(
     assert len(events) == 1
     event = events[0]
     assert (
-        event["event"] == "deployment-committed-response-dropped" and event["upstreamStatus"] == 200
+        event["event"] == resource + "-committed-response-dropped"
+        and event["upstreamStatus"] == 200
     )
     assert event["successfulResponsesForwarded"] == 0 and event["patchDigest"] == ledger.digest(
         expected["patch"]
     )
     assert event["uid"] == expected["before"]["metadata"]["uid"] and event["resourceVersion"]
-    assert event["resourceVersion"] != expected["before"]["metadata"]["resourceVersion"]
-    assert proxy.committed(expected, after["deployment"])
+    if resource == "deployment":
+        assert event["resourceVersion"] != expected["before"]["metadata"]["resourceVersion"]
+        assert proxy.committed(expected, after["deployment"])
+    else:
+        actual = next(
+            o
+            for o in after["applications"]["items"]
+            if o["metadata"]["name"] == proxy.TARGETS[resource][3]
+        )
+        assert proxy.committed(expected, actual, observed=True)
+        return {
+            "decision": "maintenance-application-patch-response-loss-verified",
+            "resource": resource,
+            "workflowUID": workflow["metadata"]["uid"],
+            "applicationUID": event["uid"],
+            "patchDigest": event["patchDigest"],
+        }
     return {
         "decision": "maintenance-patch-response-loss-verified",
         "workflowUID": workflow["metadata"]["uid"],
         "deploymentUID": event["uid"],
         "patchDigest": event["patchDigest"],
     }
+
+
+def assets(fixture: Path, prefix: str, resource: str = "deployment") -> None:
+    name = fixture_name(resource)
+    directory = fixture if resource == "deployment" else fixture / (prefix + "-tls")
+    if resource != "deployment":
+        directory.mkdir()
+    ledger.certificate(directory, name + ".argo-workflows.svc")
+    client = {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [
+            {
+                "name": "fault",
+                "cluster": {
+                    "server": "https://" + name + ".argo-workflows.svc:8443",
+                    "certificate-authority": "/fault/ca.crt",
+                },
+            }
+        ],
+        "users": [
+            {
+                "name": "caller",
+                "user": {"tokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token"},
+            }
+        ],
+        "contexts": [
+            {
+                "name": "fault",
+                "context": {"cluster": "fault", "user": "caller", "namespace": "argo-workflows"},
+            }
+        ],
+        "current-context": "fault",
+    }
+    (fixture / f"{prefix}.client.json").write_text(json.dumps(client))
+    objects = list(
+        yaml.safe_load_all(
+            Path("tests/integration/release-workflows/ledger-response-proxy.yaml").read_text()
+        )
+    )
+    rendered = json.loads(json.dumps(objects).replace("ledger-response-proxy", name))
+    (fixture / f"{prefix}.proxy.yaml").write_text(yaml.safe_dump_all(rendered))
 
 
 def main() -> None:
@@ -222,45 +306,7 @@ def main() -> None:
         payload, _ = authority.prepare("deployment", target)
         expected = {"before": target, "patch": payload}
         (fixture / f"{PREFIX}.expected.json").write_text(json.dumps(expected))
-        ledger.certificate(fixture, "maintenance-response-proxy.argo-workflows.svc")
-        client = {
-            "apiVersion": "v1",
-            "kind": "Config",
-            "clusters": [
-                {
-                    "name": "fault",
-                    "cluster": {"server": proxy.ADDRESS, "certificate-authority": "/fault/ca.crt"},
-                }
-            ],
-            "users": [
-                {
-                    "name": "caller",
-                    "user": {"tokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token"},
-                }
-            ],
-            "contexts": [
-                {
-                    "name": "fault",
-                    "context": {
-                        "cluster": "fault",
-                        "user": "caller",
-                        "namespace": "argo-workflows",
-                    },
-                }
-            ],
-            "current-context": "fault",
-        }
-        (fixture / f"{PREFIX}.client.json").write_text(json.dumps(client))
-        objects = list(
-            yaml.safe_load_all(
-                Path("tests/integration/release-workflows/ledger-response-proxy.yaml").read_text()
-            )
-        )
-        # Reuse the pinned, unprivileged transport Pod without its ledger route or identity.
-        rendered = json.loads(
-            json.dumps(objects).replace("ledger-response-proxy", "maintenance-response-proxy")
-        )
-        (fixture / f"{PREFIX}.proxy.yaml").write_text(yaml.safe_dump_all(rendered))
+        assets(fixture, PREFIX)
         return
     assert mode in {"verify", "checkpoint", "recovered"}
     before, after, workflow = state("before"), state("after"), load("workflow")

@@ -1777,3 +1777,28 @@ stays private. Runner GitHub credentials remain available for existing temporary
 ref cleanup and are never injected into the proxy Pod. No jobs, scenarios, refs,
 credential rights, budgets or production resources change. Heavy TLS/real-client
 checks run on PR CI; live proof remains the post-merge trusted-main initial job.
+
+### Root/child Application PATCH response loss
+
+`maintenance-application-response.sh` runs two isolated cases after root/child
+interruption and before Deployment interruption in the existing initial job.
+The shared generator reverses each copied parent/native PATCH to its published
+source; the existing CI lint step now checks both new copies. A proxy instance
+selects only its configured root or child Application route from the fixed
+whitelist. `maintenance_application_response.py` binds real readiness/planning/
+guard, exact native no-op payload, committed event, sole failed worker and
+absence of later writes/checkpoint to strict running-state/data retention.
+
+After verified fault/retention only, a fresh unchanged adoption parent must reuse
+both original records and reproduce the original adoption result. There is no
+workload recovery, Pod replacement or retention-baseline advancement. Inspect
+`maintenance-root-response`/`maintenance-child-response` stages and validated
+`.barrier.json`/`.outcome.json` reports, plus their separate `-checked` adoption
+evidence. Raw API/Workflow/worker/proxy/Secret evidence stays private. Distinct
+create-only proxy assets and TLS directories preserve earlier evidence.
+
+See [ADR 0045](decisions/0045-exercise-application-patch-response-loss.md).
+Applications are already disabled: unchanged resourceVersion is valid for these
+no-ops. Deployment version/generation/scale checks remain intact. No jobs,
+scenarios, refs, credentials, rights or budget changes; heavy checks remain on
+PR CI and full live proof remains the existing post-merge trusted-main initial job.

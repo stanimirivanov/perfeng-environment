@@ -140,3 +140,4 @@ How will the assumptions and consequences be verified?
 | [0042](0042-exercise-lingering-pod-checkpoint-refusal.md) | Proposed | Prove gated matching-Pod refusal, conditional fixture cleanup and a fresh independent checkpoint before existing checked recovery. |
 | [0043](0043-exercise-maintenance-write-denial.md) | Proposed | Narrow each existing named PATCH grant, prove complete-parent Forbidden refusal and retained state, then conditionally restore exact original Role rules. |
 | [0044](0044-exercise-maintenance-patch-response-loss.md) | Proposed | Prove one committed guarded Deployment PATCH loses its response, then require direct paused-state evidence, independent checkpoint and one checked recovery replacement. |
+| [0045](0045-exercise-application-patch-response-loss.md) | Proposed | Prove no-op root/child PATCH response loss with one-target TLS forwarding, unchanged running-state retention and fresh unchanged adoption, preserving Deployment behavior. |

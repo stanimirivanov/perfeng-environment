@@ -1,4 +1,4 @@
-"""Disposable TLS fault for one exact guarded maintenance Deployment PATCH."""
+"""Disposable TLS fault for one configured, named maintenance PATCH."""
 
 import base64
 import http.client
@@ -16,9 +16,45 @@ import ledger_response_proxy as ledger
 ROUTE = "/apis/apps/v1/namespaces/perf-platform/deployments/control-plane"
 ACCOUNT = "system:serviceaccount:argo-workflows:release-maintenance-pause"
 ADDRESS = "https://maintenance-response-proxy.argo-workflows.svc:8443"
+TARGETS = {
+    "deployment": ("apps/v1", "Deployment", "perf-platform", "control-plane", ROUTE),
+    "root": (
+        "argoproj.io/v1alpha1",
+        "Application",
+        "argocd",
+        "perfeng-local-root",
+        "/apis/argoproj.io/v1alpha1/namespaces/argocd/applications/perfeng-local-root",
+    ),
+    "child": (
+        "argoproj.io/v1alpha1",
+        "Application",
+        "argocd",
+        "perfeng-local-control-plane",
+        "/apis/argoproj.io/v1alpha1/namespaces/argocd/applications/perfeng-local-control-plane",
+    ),
+}
 
 
-def named_request(path: str, *, patch: bool) -> bool:
+def target(expected: dict[str, Any]) -> str:
+    before = expected["before"]
+    for resource, (api, kind, namespace, name, _) in TARGETS.items():
+        if (
+            before.get("apiVersion"),
+            before.get("kind"),
+            before["metadata"].get("namespace"),
+            before["metadata"].get("name"),
+        ) == (api, kind, namespace, name):
+            if (
+                resource != "deployment"
+                and before["spec"].get("syncPolicy", {}).get("automated", {}).get("enabled")
+                is not False
+            ):
+                raise ValueError("Application fault requires an already disabled baseline")
+            return resource
+    raise ValueError("Fault target is outside the approved named resources")
+
+
+def named_request(path: str, *, patch: bool, resource: str = "deployment") -> bool:
     """Accept only the named route and the copied client's fixed query semantics."""
     parsed = urlsplit(path)
     try:
@@ -28,7 +64,8 @@ def named_request(path: str, *, patch: bool) -> bool:
     allowed = {"timeout", "fieldManager", "fieldValidation"} if patch else {"timeout"}
     return (
         not (parsed.scheme or parsed.netloc or parsed.fragment)
-        and parsed.path == ROUTE
+        and resource in TARGETS
+        and parsed.path == TARGETS[resource][4]
         and not query.keys() - allowed
         # --request-timeout=10s is preserved in the native copy. client-go puts
         # it on both the preliminary GET and the PATCH, not just the socket.
@@ -41,10 +78,35 @@ def named_request(path: str, *, patch: bool) -> bool:
     )
 
 
-def committed(expected: dict[str, Any], obj: dict[str, Any]) -> bool:
+def committed(expected: dict[str, Any], obj: dict[str, Any], *, observed: bool = False) -> bool:
     if not isinstance(obj, dict) or not isinstance(obj.get("metadata"), dict):
         return False
     before = expected["before"]
+    resource = target(expected)
+    if resource != "deployment":
+        generation = obj["metadata"].get("generation")
+        return (
+            obj.get("apiVersion") == before["apiVersion"]
+            and obj.get("kind") == "Application"
+            and bool(obj["metadata"].get("resourceVersion"))
+            and not obj.get("operation")
+            and not obj["metadata"].get("deletionTimestamp")
+            and obj.get("spec") == before["spec"]
+            and {
+                k: v
+                for k, v in obj["metadata"].items()
+                if k not in {"resourceVersion", "managedFields", "generation"}
+            }
+            == {
+                k: v
+                for k, v in before["metadata"].items()
+                if k not in {"resourceVersion", "managedFields", "generation"}
+            }
+            and (
+                generation == before["metadata"].get("generation")
+                or (observed and resource == "root" and type(generation) is int and generation > 0)
+            )
+        )
     return (
         obj.get("apiVersion") == "apps/v1"
         and obj.get("kind") == "Deployment"
@@ -79,6 +141,7 @@ class Proxy(ledger.Proxy):
     ):
         HTTPServer.__init__(self, address, Handler)
         self.expected, self.upstream, self.context = expected, upstream, context
+        self.resource = target(expected)
         self.attempted = False
         self.events = []
         self.tls = None
@@ -103,10 +166,13 @@ class Handler(ledger.Handler):
         return headers[0]
 
     def do_GET(self) -> None:
+        api, kind, _, _, _ = TARGETS[self.server.resource]
+        group_name, version = api.split("/")
+        plural = "deployments" if kind == "Deployment" else "applications"
         group = {
-            "name": "apps",
-            "versions": [{"groupVersion": "apps/v1", "version": "v1"}],
-            "preferredVersion": {"groupVersion": "apps/v1", "version": "v1"},
+            "name": group_name,
+            "versions": [{"groupVersion": api, "version": version}],
+            "preferredVersion": {"groupVersion": api, "version": version},
         }
         documents = {
             "/api": {
@@ -116,23 +182,23 @@ class Handler(ledger.Handler):
                 "serverAddressByClientCIDRs": [],
             },
             "/apis": {"kind": "APIGroupList", "apiVersion": "v1", "groups": [group]},
-            "/apis/apps": {"kind": "APIGroup", "apiVersion": "v1", **group},
+            "/apis/" + group_name: {"kind": "APIGroup", "apiVersion": "v1", **group},
             "/api/v1": {
                 "kind": "APIResourceList",
                 "apiVersion": "v1",
                 "groupVersion": "v1",
                 "resources": [],
             },
-            "/apis/apps/v1": {
+            "/apis/" + api: {
                 "kind": "APIResourceList",
                 "apiVersion": "v1",
-                "groupVersion": "apps/v1",
+                "groupVersion": api,
                 "resources": [
                     {
-                        "name": "deployments",
-                        "singularName": "deployment",
+                        "name": plural,
+                        "singularName": plural[:-1],
                         "namespaced": True,
-                        "kind": "Deployment",
+                        "kind": kind,
                         "verbs": ["get", "patch"],
                     }
                 ],
@@ -141,7 +207,10 @@ class Handler(ledger.Handler):
         parsed = urlsplit(self.path)
         if parsed.path in documents:
             body = json.dumps(documents[parsed.path]).encode()
-        elif named_request(self.path, patch=False) and not self.server.attempted:
+        elif (
+            named_request(self.path, patch=False, resource=self.server.resource)
+            and not self.server.attempted
+        ):
             connection = http.client.HTTPSConnection(
                 self.server.upstream, context=self.server.context, timeout=10
             )
@@ -179,7 +248,7 @@ class Handler(ledger.Handler):
 
     def do_PATCH(self) -> None:
         try:
-            if not named_request(self.path, patch=True):
+            if not named_request(self.path, patch=True, resource=self.server.resource):
                 raise ValueError
             lengths = self.headers.get_all("Content-Length", [])
             if (
@@ -229,7 +298,7 @@ class Handler(ledger.Handler):
             self.connection.shutdown(socket.SHUT_RDWR)
             self.close_connection = True
             self.server.event(
-                "deployment-committed-response-dropped",
+                self.server.resource + "-committed-response-dropped",
                 upstreamStatus=200,
                 uid=obj["metadata"]["uid"],
                 resourceVersion=obj["metadata"]["resourceVersion"],
