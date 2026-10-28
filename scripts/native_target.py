@@ -95,6 +95,56 @@ def identity(image: str, revision: str) -> None:
         raise ValueError("Native target requires an exact source revision")
 
 
+def build_failure_reason(output: str) -> str:
+    """Classify known backend signals without copying paths, credentials or raw logs."""
+    lowered = output.lower()
+    for signals, reason in (
+        (("no space left on device",), "[BUILD_STORAGE] Runner storage is exhausted"),
+        (
+            ("toomanyrequests", "unauthenticated pull rate limit"),
+            "[BUILD_REGISTRY_RATE_LIMIT] Registry pull rate limit reached",
+        ),
+        (
+            ("pull access denied", "failed to authorize", "unauthorized: authentication required"),
+            "[BUILD_REGISTRY_AUTH] Registry authorization failed",
+        ),
+        (
+            ("x509:", "certificate verify failed"),
+            "[BUILD_REGISTRY_TLS] Certificate verification failed",
+        ),
+        (
+            (
+                "tls handshake timeout",
+                "i/o timeout",
+                "connection reset by peer",
+                "no such host",
+                "temporary failure in name resolution",
+            ),
+            "[BUILD_NETWORK] Registry/build transport or name resolution failed",
+        ),
+        (
+            ("cannot connect to the docker daemon", "is the docker daemon running"),
+            "[BUILD_DAEMON] Docker daemon connection failed",
+        ),
+        (
+            ("buildx component is missing or broken", "buildx is not a docker command"),
+            "[BUILD_BUILDER] Buildx is missing or broken",
+        ),
+        (("failed to read dockerfile",), "[BUILD_CONTEXT] Dockerfile could not be read"),
+        (
+            ("manifest unknown", "no matching manifest for linux/amd64"),
+            "[BUILD_MANIFEST] Base manifest lookup or platform selection failed",
+        ),
+        (
+            ("failed to resolve source metadata",),
+            "[BUILD_BASE_RESOLUTION] Base metadata resolution failed; check registry, network and manifest access",
+        ),
+    ):
+        if any(signal in lowered for signal in signals):
+            return reason
+    return "[BUILD_UNKNOWN] Backend cause is unclassified; no raw output was printed"
+
+
 def docker(arguments: list[str], timeout: int = 30) -> str:
     """Run one bounded Docker operation with progress and safe errors, never raw logs."""
     print(f"Native target: docker {arguments[0]}...", file=sys.stderr, flush=True)
@@ -113,7 +163,12 @@ def docker(arguments: list[str], timeout: int = 30) -> str:
             f"Native target Docker {arguments[0]} was unavailable or timed out"
         ) from error
     if result.returncode != 0:
-        raise ValueError(f"Native target Docker {arguments[0]} failed (exit {result.returncode})")
+        reason = ""
+        if arguments[0] == "build":
+            reason = ": " + build_failure_reason(result.stderr + "\n" + result.stdout)
+        raise ValueError(
+            f"Native target Docker {arguments[0]} failed (exit {result.returncode}){reason}"
+        )
     return result.stdout.strip()
 
 

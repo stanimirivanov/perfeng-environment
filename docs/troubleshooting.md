@@ -1580,3 +1580,17 @@ grants, schema parity, admission or activation. See the
 [staged migration guide](release-schema-migration.md) and
 [ADR 0049](decisions/0049-stage-pinned-schema-migration.md); this authorizes no
 local execution or host-script cutover.
+
+### Native target Docker build reports only an exit code
+
+Older native-target build errors discarded captured Docker output and reported
+only the exit code, so a historical failed runner's cause cannot be recovered
+from that log. New build errors add fixed `BUILD_*` categories for recognized
+storage, registry/rate-limit/auth/TLS/network, daemon/builder, context and
+manifest signals. `BUILD_BASE_RESOLUTION` remains a broad metadata-resolution
+failure; `BUILD_UNKNOWN` is explicitly unclassified. No raw backend output or
+credentials are printed. A category is a diagnostic signal, not permission to
+change a reviewed pin, rotate credentials or bypass verification. Check the
+named boundary and the pinned manifest/platform; its availability elsewhere
+does not establish runner connectivity. Keep heavy rebuilds on CI when the host
+is busy. See [candidate build diagnostics](native-browser-candidate.md#build-failure-classification).
