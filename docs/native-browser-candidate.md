@@ -71,3 +71,21 @@ After host approval and a real runner capture, assemble `browser-environment/v1`
 Next, select the published candidate, qualified environment artifact, exact Playwright source, compatible analysis/report images and the newer control-plane image in the complete native bundle. Preserve the existing immutable deployment until that review is complete. Then select the native bundle and content-addressed runtime inputs, provision the distinct worker identity and prove signed upload/internal read-back plus the full decision loop.
 
 Rollback stops candidate use and restores the previous selection; it does not delete evidence, rotate credentials, remove CA trust or rewrite prior bundles. Publication failure leaves no approved promotion input. A failed local check reports only a safe operation boundary rather than raw Docker logs. M03 remains incomplete until qualified live Windows/control-plane acceptance, cancellation and explicit recovery pass.
+
+## Build failure classification
+
+Native target builds report a fixed `BUILD_*` category when captured Docker
+output contains a recognized signal: runner storage, registry rate limit or
+authorization, certificate verification, network/DNS, daemon connection,
+builder availability, Dockerfile context or manifest/platform lookup. Base
+metadata resolution has its own broader category and does not distinguish
+registry/network/manifest causes. `BUILD_UNKNOWN` means the cause remains
+unclassified. Categories copy no backend text, paths, URLs or credential values;
+other Docker operations keep their existing redacted errors.
+
+Use the category to investigate the named boundary before changing the base
+pin, credentials or Dockerfile. Do not add retries to hide an unresolved error.
+A failed historical run that discarded backend output cannot be diagnosed from
+its exit code alone. A verified public manifest does not prove that a particular
+runner could reach it or download its layers. Repeat build verification on CI
+when the host is busy; publishing and local Docker builds remain explicit actions.

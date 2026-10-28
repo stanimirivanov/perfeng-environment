@@ -1561,3 +1561,36 @@ retry remain blocked until then. Do not rewrite records, bypass the gate, retry
 maintenance or sync/recover workloads to pass acceptance. Existing disposable
 cleanup owns teardown. No local action is authorized. See
 [ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md).
+
+### Staged schema migration is refused or incomplete
+
+`perfeng-release-schema-migration-v1` remains staged with live acceptance pending.
+Wrong deployment lock, changed request bytes, migration mode none, automated
+activation or migration ID other than 0018 must stop before the Job, as must
+failed fresh quiescence. Verify the pinned request, immutable intent ConfigMap
+and explicit schema-migration Application-read bootstrap before diagnosing Job
+creation. Missing credentials require explicit provisioning through existing
+procedures, not rotation or replacement. A Job API denial, image-pull failure,
+timeout or SQL error cannot qualify as migration success. A lost create response
+may still leave `perfeng-schema-<Workflow UID>` or committed SQL: preserve private
+Workflow/Job/spec/provenance and schema-ledger evidence, keep the service paused,
+and follow coordinated M04 recovery. Do not retry nodes, delete/recreate Jobs,
+force sync or infer rollback from Git. Job Complete does not establish runtime
+grants, schema parity, admission or activation. See the
+[staged migration guide](release-schema-migration.md) and
+[ADR 0049](decisions/0049-stage-pinned-schema-migration.md); this authorizes no
+local execution or host-script cutover.
+
+### Native target Docker build reports only an exit code
+
+Older native-target build errors discarded captured Docker output and reported
+only the exit code, so a historical failed runner's cause cannot be recovered
+from that log. New build errors add fixed `BUILD_*` categories for recognized
+storage, registry/rate-limit/auth/TLS/network, daemon/builder, context and
+manifest signals. `BUILD_BASE_RESOLUTION` remains a broad metadata-resolution
+failure; `BUILD_UNKNOWN` is explicitly unclassified. No raw backend output or
+credentials are printed. A category is a diagnostic signal, not permission to
+change a reviewed pin, rotate credentials or bypass verification. Check the
+named boundary and the pinned manifest/platform; its availability elsewhere
+does not establish runner connectivity. Keep heavy rebuilds on CI when the host
+is busy. See [candidate build diagnostics](native-browser-candidate.md#build-failure-classification).

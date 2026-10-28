@@ -41,6 +41,13 @@ resources:
   - rbac/maintenance-pause/platform-access.yaml
   - maintenance-resources-v1.yaml
   - release-maintenance-pause-v1.yaml
+  - rbac/schema-migration/serviceaccount.yaml
+  - rbac/schema-migration/workflow-access.yaml
+  - rbac/schema-migration/cluster-identity.yaml
+  - rbac/schema-migration/platform-observation.yaml
+  - schema-migration-intent-v1.yaml
+  - schema-migration-job-v1.yaml
+  - release-schema-migration-v1.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform

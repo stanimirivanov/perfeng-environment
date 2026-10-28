@@ -180,6 +180,48 @@ class NativeTargetTests(unittest.TestCase):
             self.assertNotIn("private", str(failure.exception))
             self.assertEqual(run.call_args.kwargs["timeout"], 30)
 
+    def test_build_failure_reports_only_fixed_backend_category(self):
+        for signal, code in (
+            ("no space left on device", "BUILD_STORAGE"),
+            ("TOOMANYREQUESTS", "BUILD_REGISTRY_RATE_LIMIT"),
+            ("failed to authorize", "BUILD_REGISTRY_AUTH"),
+            ("x509: certificate signed by unknown authority", "BUILD_REGISTRY_TLS"),
+            ("TLS handshake timeout", "BUILD_NETWORK"),
+            ("Cannot connect to the Docker daemon", "BUILD_DAEMON"),
+            ("buildx component is missing or broken", "BUILD_BUILDER"),
+            ("failed to read dockerfile", "BUILD_CONTEXT"),
+            ("manifest unknown", "BUILD_MANIFEST"),
+            ("failed to resolve source metadata", "BUILD_BASE_RESOLUTION"),
+            ("unrecognized backend failure", "BUILD_UNKNOWN"),
+        ):
+            for stream in ("stdout", "stderr"):
+                result = subprocess.CompletedProcess([], 1, stdout="", stderr="")
+                setattr(result, stream, signal + " https://user:private-token@example.invalid/path")
+                with (
+                    self.subTest(code=code, stream=stream),
+                    patch.object(target.subprocess, "run", return_value=result),
+                    redirect_stderr(io.StringIO()),
+                ):
+                    with self.assertRaises(ValueError) as failure:
+                        target.docker(["build", "restricted-context"])
+                    message = str(failure.exception)
+                    self.assertIn(code, message)
+                    self.assertNotIn("private-token", message)
+                    self.assertNotIn("example.invalid", message)
+                    self.assertNotIn("user:", message)
+
+    def test_unrecognized_build_error_stays_unknown_and_other_operations_stay_redacted(self):
+        self.assertIn("BUILD_UNKNOWN", target.build_failure_reason("permission denied private"))
+        result = subprocess.CompletedProcess([], 1, stdout="", stderr="TOOMANYREQUESTS private")
+        with (
+            patch.object(target.subprocess, "run", return_value=result),
+            redirect_stderr(io.StringIO()),
+        ):
+            with self.assertRaises(ValueError) as failure:
+                target.docker(["image", "inspect", "candidate"])
+            self.assertNotIn("BUILD_", str(failure.exception))
+            self.assertNotIn("private", str(failure.exception))
+
     def test_publication_is_main_only_opt_in_and_digest_reverified(self):
         document = yaml.safe_load(
             (target.ROOT / ".github/workflows/publish-native-target.yml").read_text()

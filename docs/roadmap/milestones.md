@@ -684,6 +684,13 @@ retirement retains installed objects with pruning disabled. The active package
 remains two modules/708 lines under the unchanged 708-line ceiling. Full-parent
 live acceptance remains post-merge; promotion, cutover and retirement stay open.
 
+The [staged schema-migration parent](../release-schema-migration.md) adds exact
+lock and reviewed forward-only intent gates, fresh quiescence and a native
+selected migrator Job under separate trusted authority. It adds no production
+Python or active-root selection. Complete-parent live first/repeat/failure
+proof, retained-release admission, runtime grants, operational cutover and
+measured script retirement remain open; existing CI image parity is separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

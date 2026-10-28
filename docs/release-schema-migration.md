@@ -1,0 +1,115 @@
+# Staged pinned schema migration
+
+## TL;DR
+
+- `perfeng-release-schema-migration-v1` stages migration through 0018 using pinned Git inputs and a native Argo Job.
+- Preflight, exact lock and reviewed forward-only/manual intent must pass before fresh quiescence and Job creation.
+- It remains outside the active local root; no live execution or supported host cutover is authorized here.
+- A separate trusted identity can create Jobs and therefore potentially mount namespace Secrets; multi-user admission remains open.
+- Failure retains Jobs/evidence and leaves the service paused; runtime grants, recovery and activation remain explicit separate operations.
+
+## Inputs and prerequisites
+
+Use the existing four [preflight inputs](release-preflight-workflow.md):
+`request-revision`, `request-path`, `request-sha256`, `selection-revision`.
+The exact reviewed request must specify manual activation and forward-only
+migration ID `0018`. The parent pins the current deployment lock's raw digest
+and released image; it accepts no arbitrary image, command, credential key or
+Job manifest. The immutable intent ConfigMap uses the same pinned JSON Schema
+validator as preflight and rechecks request bytes at the pinned Git commit.
+
+The database roles and fixed `perfeng-control-plane-database` migration-url,
+`perfeng-control-plane-registry` pull Secret and `release-git-read` credential
+must already be provisioned and verified through their existing procedures.
+Both Applications must be paused, the selected Deployment stopped/absent as
+permitted by the unchanged checkpoint policy, and matching Pods absent.
+Do not provision or rotate credentials as implicit failure recovery.
+
+Before any future separately authorized execution, schedule downtime, stop
+submissions, drain active Runs, retain a suitable database backup and exclude
+other operators/manual syncs and host preparation. Quiescence is not proof of
+these prerequisites or a lease. This staged parent does not read the current
+ledger or implement expectedCurrent/promotion admission. Retained-environment
+upgrade admission and recovery remain separate review gates.
+
+## Staging and flow
+
+```text
+four pinned Git inputs
+  -> unchanged v3 preflight
+  -> exact environment + deployment-lock digest check
+  -> pinned request bytes + immutable manual/forward-only/0018 intent policy
+  -> fresh unchanged quiescence verifier
+  -> native create/wait: selected immutable /usr/local/bin/migrate Job
+  -> checkpoint + Job name; leave paused
+```
+
+The staged Kustomization includes the new parent, native Job template, immutable
+intent ConfigMap and dedicated identity/RBAC. Its Application-read bootstrap
+Role/Binding is `gitops/release-workflows-bootstrap/schema-migration-application-access.yaml`;
+apply it only as part of a separately authorized staged installation. The
+existing staged Project already permits the required kinds/destinations;
+argocd remains outside those destinations. The active root, Taskfile and
+supported [M04 operator procedure](kubernetes-runtime-deployment.md) are unchanged.
+There is no new supported submission Task. After live acceptance and a reviewed
+rollout, the existing pinned Argo submission procedure can select this parent;
+this document is not permission to submit it now.
+
+The parent holds the existing release mutex throughout. It has a 1,200-second
+deadline; intent validation has 60 seconds, existing quiescence has 180 seconds,
+and the native worker has 240 seconds around a Job with 180 seconds and zero
+backoff. No workflow retry or continue-on-failure is configured. Job name
+`perfeng-schema-<Workflow UID>` and annotations retain request/selection identity.
+A fresh submission creates a different identity and must repeat all gates.
+
+## Security and outputs
+
+The separate `release-schema-migration` identity can read the named root/child,
+Deployment, kube-system Namespace and Git Secret, list platform Pods, publish
+Argo task results and create/get/watch platform Jobs. It cannot pause workloads,
+sync Applications, mutate the ledger, delete Jobs or write Secrets. Job creation
+can mount namespace Secrets and RBAC does not restrict template fields, so
+trusted submitters are required; see [ADR 0049](decisions/0049-stage-pinned-schema-migration.md).
+
+The Job uses fixed migration/pull Secret references, no Pod API token, non-root
+UID/GID, read-only container filesystem, dropped capabilities, RuntimeDefault
+seccomp and bounded CPU/memory. It retains the host migrator's control-plane
+node placement and toleration. There is no shell around the migration binary.
+No TTL, Workflow owner reference or cleanup hook deletes the Job.
+
+Success means the Job completed and returns its name plus the prior checkpoint.
+It does not prove schema identity/checksums, runtime grants, operational health,
+adoption or promotion. The selected binary executes all bundled migrations
+through 0018, not a caller-supplied single SQL file. The existing CI image-parity
+phase remains separate and has not exercised this complete parent.
+
+## Failure, retry and rollback
+
+Any failed preflight, lock, intent or quiescence stops before the Job. Missing
+credentials, image-pull failures, native API denial, timeout or migrator failure
+stop without pause/resume, grants, sync, ledger advancement or automatic repair.
+A failed/ambiguous create may leave a Job or committed SQL; retain private
+Workflow/node/Job identities, full Job spec and migration-ledger observations.
+Do not expose database URLs or raw logs in shared artifacts.
+
+Inspect retained state before a separately authorized fresh submission. Do not
+use argo retry, reuse successful nodes, delete a conflicting Job or bypass fresh
+quiescence. Kubernetes/API behavior is not an exactly-once SQL guarantee; the
+migrator's ledger and reviewed recovery procedure remain necessary. Follow the
+existing coordinated M04 recovery guidance for partial forward-only changes;
+reverting Git cannot undo SQL. No automatic restore is provided.
+
+Removing this staged source/selection prevents future intended use but does not
+remove installed immutable objects or RBAC while pruning is disabled. Explicit
+withdrawal of the new RoleBindings needs owner approval. Retain Jobs, records,
+Secrets and data. See [troubleshooting](troubleshooting.md) for failure classification.
+
+## Verification and cutover gates
+
+Focused offline tests cover supported/refused intent, request-byte refusal,
+exact-lock refusal, sequence, native Job security/retention and RBAC. Offline
+Kustomize/Project checks verify the staged inventory; PR CI performs heavy full,
+cross-platform and pinned Argo lint/render checks. No Docker/cluster execution
+is introduced into offline validation. Full-parent live first/repeat, denial,
+partial/ambiguous failure and SQL/data/Secret retention proof are deferred.
+All 13 host deployment entrypoints remain supported and no script is retired.

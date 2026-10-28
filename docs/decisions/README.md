@@ -144,3 +144,4 @@ How will the assumptions and consequences be verified?
 | [0046](0046-exercise-child-auto-sync-transition.md) | Proposed | Prove the child native enabled-to-disabled transition with guarded fixture enablement, strict retained state and fresh unchanged adoption; keep root disabled. |
 | [0047](0047-refuse-maintenance-before-initial-adoption.md) | Proposed | Prove complete maintenance refuses the naturally unadopted initial baseline before pause writes, preserving running state and gating first adoption. |
 | [0048](0048-refuse-maintenance-during-receipt-only-recovery.md) | Proposed | Prove missing-pointer maintenance refusal with the existing receipt-only adoption snapshot, strict retention and gated quota/adoption recovery. |
+| [0049](0049-stage-pinned-schema-migration.md) | Proposed | Stage pinned schema migration behind preflight, exact lock, immutable intent and fresh quiescence with separate trusted Job authority; live execution and cutover deferred. |
