@@ -170,3 +170,17 @@ without repair. Root stays disabled and other children skipped; enabling the
 child can temporarily make root OutOfSync, so this proves the child operation
 rather than complete-parent enabled-baseline acceptance. Heavy checks run on PR
 CI; live proof remains post-merge and local execution stays deferred.
+
+### Unadopted initial baseline refusal
+
+Before the initial job's first adoption, the unchanged complete maintenance
+parent must refuse its healthy but unadopted baseline
+([ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md)).
+The same staged resources/RBAC are installed earlier; both ledger records are
+naturally absent, without deletion or fault injection. Require real readiness,
+null native record observations and exact `finish`-phase baseline refusal with
+no later guard/PATCH/checkpoint/result. Fresh root/child, running-state and
+SQL/S3/storage/Secret retention must pass before the existing first adoption.
+Failures stop without repair or recovery. This adds no authority, job, scenario,
+ref or budget and leaves later adopted pause acceptance intact. Heavy checks
+stay on PR CI; full live proof remains post-merge and local execution deferred.

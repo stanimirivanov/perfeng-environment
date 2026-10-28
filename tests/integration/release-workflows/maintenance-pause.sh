@@ -8,26 +8,9 @@ declare -F k a root_state root_retained root_persistent_retained adoption_record
 # This is not an EXIT trap: failed/partial pauses never silently resume.
 maintenance_stage=$current_stage
 start_stage maintenance-pause
-k apply -f gitops/release-workflows/maintenance-resources-v1.yaml
-k apply -f gitops/release-workflows/release-maintenance-pause-v1.yaml
-k apply -f gitops/release-workflows/rbac/maintenance-pause
-k apply -f gitops/release-workflows-bootstrap/maintenance-pause-application-access.yaml
-k apply -f gitops/release-workflows-bootstrap/maintenance-pause-ledger-access.yaml
+source "$source_dir/maintenance-support.sh"
+maintenance_install
 
-maintenance_snapshot() {
-  local prefix=$1
-  k -n argocd get application perfeng-local-root perfeng-local-control-plane -o json > "$prefix.applications.json"
-  k -n perf-platform get deployment control-plane -o json > "$prefix.deployment.json"
-  k -n perf-platform get pods -l app.kubernetes.io/instance=control-plane,app.kubernetes.io/name=perfeng-control-plane -o json > "$prefix.server-pods.json"
-  k get namespace kube-system -o json > "$prefix.namespace.json"
-  adoption_records "$prefix.records.json"
-  root_child_snapshot "$prefix.children.json"
-  uv run --locked --offline python "$source_dir/root_inputs.py" children \
-    "$prefix.children.json" "$fixture/root-tree.yaml" "$fixture/root-children-before.json"
-  server_inputs_snapshot "$prefix.secrets.json"
-  server_config_snapshot "$prefix.config.json"
-  k -n argo-workflows get secret release-git-read -o json | jq -S . > "$prefix.git.json"
-}
 maintenance_snapshot "$fixture/maintenance-before"
 root_state "$fixture/maintenance-before"
 root_retained "$fixture/adoption-before" "$fixture/maintenance-before"

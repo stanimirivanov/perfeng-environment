@@ -1530,3 +1530,18 @@ case stops for owned disposable-cluster teardown, even if the child remains
 enabled. This is CI leaf proof, not a supported local recovery command or full
 parent transition acceptance. See
 [ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md).
+
+### Maintenance unadopted-baseline acceptance fails
+
+`maintenance-unadopted` runs before first adoption in the trusted-main initial
+job, while both ledger records are naturally absent. The expected failure is
+only the complete parent's `baseline` finish phase, after successful real
+readiness and native ledger/root reads. An API authorization error, timeout,
+missing readiness, non-finish phase, successful maintenance, later pause worker
+or changed state cannot qualify. Check the private Workflow, worker projection,
+fixed refusal log and before/after snapshots; the bounded outcome is published
+only after exact refusal and retained-state verification. Do not create records,
+retry maintenance, bypass retention or run recovery to make this gate pass.
+First adoption remains blocked until the gate succeeds; existing disposable
+cleanup owns teardown. This adds no supported local operation. See
+[ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md).

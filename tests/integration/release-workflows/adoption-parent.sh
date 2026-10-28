@@ -119,6 +119,7 @@ adoption_response_case() {
   adoption_baseline=$recovered
   adoption_origin=$scenario
 }
+if [[ $scenario == initial ]]; then source "$source_dir/maintenance-unadopted.sh"; fi
 if [[ $scenario == receipt-only ]]; then
   # Count only the namespace's root CA plus one receipt; pointer admission must fail.
   k -n "$adoption_namespace" wait --for=create configmap/kube-root-ca.crt --timeout=60s

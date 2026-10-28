@@ -1826,3 +1826,25 @@ write retries, manual sync or automatic repair. Existing job/scenarios/refs/
 rights/budget stay unchanged; heavy checks run on PR CI, full live proof stays
 post-merge and no local execution is authorized. See
 [ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md).
+
+### Maintenance refusal before first adoption
+
+The initial job sources `maintenance-unadopted.sh` before its existing first
+adoption. The same staged templates/RBAC are installed earlier through shared
+`maintenance-support.sh` functions; later happy-path installation reuses those
+unchanged commands. The ledger begins empty: no record is removed or repaired.
+
+Require actual complete-parent preflight/readiness and native null receipt/pointer
+observations, exact finish inputs and the sole baseline worker exit 2. Private
+runtime replay must classify the missing-receipt finish refusal, while planning
+a first adoption would require both creates. No later pause guard/write,
+checkpoint or result may exist. Before first adoption, independently validate
+both roots, skipped children, unchanged Pods/workloads/ledger/Secrets and
+persistent SQL/S3/storage data. No recovery or retention-baseline advance occurs.
+
+Inspect stage `maintenance-unadopted` and its validated `.outcome.json`. Raw
+Workflow, worker, API and refusal logs remain private. Unexpected success,
+unrelated failure, timeout, failed setup or retention stops before adoption.
+No jobs, scenarios, refs, credentials, rights or budget are added. Heavy suites
+stay on PR CI; live proof remains post-merge trusted-main. See
+[ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md).
