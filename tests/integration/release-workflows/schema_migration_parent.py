@@ -15,7 +15,7 @@ import yaml
 from jsonschema import Draft202012Validator
 
 DIRECTORY = Path("gitops/release-workflows")
-LABELS = ("none", "first", "repeat")
+LABELS = ("none", "denied", "first", "repeat")
 SOURCES = (
     "release-schema-migration-v1.yaml",
     "schema-migration-job-v1.yaml",
@@ -69,6 +69,7 @@ def verify(
     after: dict[str, Any],
     job: Any,
     pods: dict[str, Any],
+    diagnostic: str = "",
 ) -> dict[str, Any]:
     assert label in LABELS
     maintenance.retained(before, after, paused=True)
@@ -108,6 +109,7 @@ def verify(
     assert workflow["spec"]["workflowTemplateRef"] == {
         "name": "perfeng-release-schema-migration-v1"
     }
+    assert not workflow["spec"].get("shutdown")
     arguments = workflow["spec"]["arguments"]["parameters"]
     assert len(arguments) == 4 and {p["name"]: p["value"] for p in arguments} == parameters
     named, outputs = maintenance.readiness.named, maintenance.readiness.outputs
@@ -167,8 +169,11 @@ def verify(
         worker = next(w for w in workers if w["nodeID"] == node["id"])
         assert worker["uid"] and worker["account"] == "release-schema-migration"
         refused = label == "none" and node["displayName"] == "migration-intent"
-        assert worker["exitCode"] == (2 if refused else 0)
-        assert node["phase"] == ("Failed" if refused else "Succeeded")
+        denied = label == "denied" and node["displayName"] == "migrate"
+        assert worker["exitCode"] == (2 if refused else 1 if denied else 0)
+        assert node["phase"] in (
+            {"Failed", "Error"} if denied else {"Failed" if refused else "Succeeded"}
+        )
     sequence = [preflight, selection, intent_node]
     parent = nodes[workflow["metadata"]["name"]]
     values = {
@@ -179,6 +184,8 @@ def verify(
     report = {
         "decision": "schema-parent-intent-refused"
         if label == "none"
+        else "schema-parent-job-create-refused"
+        if label == "denied"
         else "schema-parent-repeat-verified",
         "workflowUID": workflow["metadata"]["uid"],
         "requestDigest": parameters["request-sha256"],
@@ -191,7 +198,9 @@ def verify(
             if node["displayName"] in {"quiescence", "migrate"}:
                 assert node["type"] != "Pod" and node["phase"] in {"Skipped", "Omitted"}
     else:
-        assert workflow["status"]["phase"] == "Succeeded"
+        assert workflow["status"]["phase"] in (
+            {"Failed", "Error"} if label == "denied" else {"Succeeded"}
+        )
         checkpoint_node, migrate = (named(workflow, name) for name in ("quiescence", "migrate"))
         assert checkpoint_node["templateRef"] == {
             "name": "perfeng-verify-release-quiescence-v3",
@@ -214,6 +223,20 @@ def verify(
             for o in [*after["applications"]["items"], after["deployment"]]
         }
         expected_name = "perfeng-schema-" + workflow["metadata"]["uid"]
+        if label == "denied":
+            assert job is None and pods["items"] == []
+            assert not values.get("job-name") and not values.get("checkpoint")
+            # Only the failed native resource worker's main log is supplied here.
+            assert re.search(
+                r'Error from server \(Forbidden\): [^\r\n]*jobs\.batch(?: "'
+                + re.escape(expected_name)
+                + r'")? is forbidden: User "system:serviceaccount:argo-workflows:release-schema-migration" '
+                r'cannot create resource "jobs" in API group "batch" in (?:the )?namespace "perf-platform"',
+                diagnostic,
+            )
+            sequence += [checkpoint_node, migrate]
+            ordered(sequence)
+            return report
         assert (
             values["job-name"] == expected_name and json.loads(values["checkpoint"]) == checkpoint
         )
@@ -324,6 +347,12 @@ def verify(
         assert pod["status"]["containerStatuses"][0]["state"]["terminated"]["exitCode"] == 0
         sequence += [checkpoint_node, migrate]
         report["jobUID"] = job["metadata"]["uid"]
+    ordered(sequence)
+    return report
+
+
+def ordered(sequence: list[dict[str, Any]]) -> None:
+    """Require each completed stage before the next begins."""
     for node in sequence:
         start, finish = (datetime.fromisoformat(node[k]) for k in ("startedAt", "finishedAt"))
         assert start.utcoffset() is not None and start <= finish
@@ -331,7 +360,6 @@ def verify(
         assert datetime.fromisoformat(earlier["finishedAt"]) <= datetime.fromisoformat(
             later["startedAt"]
         )
-    return report
 
 
 def main() -> None:
@@ -471,6 +499,7 @@ def main() -> None:
             state(prefix),
             load(prefix + ".job.json"),
             load(prefix + ".job-pods.json"),
+            (fixture / (prefix + ".denied.log")).read_text() if label == "denied" else "",
         )
         for suffix in ("schema.json", "roles.json"):
             assert load(prefix + "." + suffix) == load("schema-parent-baseline." + suffix)
@@ -486,7 +515,9 @@ def main() -> None:
         previous_jobs = load(prefix + ".jobs-before.json")["items"]
         current_jobs = load(prefix + ".jobs-after.json")["items"]
         assert len(previous_jobs) == (1 if label == "repeat" else 0)
-        assert len(current_jobs) == (0 if label == "none" else 1 if label == "first" else 2)
+        assert len(current_jobs) == (
+            0 if label in {"none", "denied"} else 1 if label == "first" else 2
+        )
         assert {o["metadata"]["uid"] for o in previous_jobs} <= {
             o["metadata"]["uid"] for o in current_jobs
         }
@@ -496,12 +527,12 @@ def main() -> None:
         (results / f"schema-parent-{mode}.outcome.json").write_text(json.dumps(check(mode)) + "\n")
         return
     reports = [check(label) for label in LABELS]
-    assert len({r["workflowUID"] for r in reports}) == 3
+    assert len({r["workflowUID"] for r in reports}) == len(LABELS)
     jobs = load("schema-parent.retained-jobs.json")["items"]
     assert len(jobs) == 2 and {o["metadata"]["uid"] for o in jobs} == {
-        r["jobUID"] for r in reports[1:]
+        r["jobUID"] for r in reports if "jobUID" in r
     }
-    for label in LABELS[1:]:
+    for label in ("first", "repeat"):
         original = load(f"schema-parent-{label}.job.json")
         current = next(o for o in jobs if o["metadata"]["uid"] == original["metadata"]["uid"])
         assert current["spec"] == original["spec"]
@@ -516,7 +547,7 @@ def main() -> None:
         }
         assert current["status"]["succeeded"] == 1
     retained = load("schema-parent.retained-workflows.json")["items"]
-    assert len(retained) == 3 and {o["metadata"]["uid"] for o in retained} == {
+    assert len(retained) == len(LABELS) and {o["metadata"]["uid"] for o in retained} == {
         r["workflowUID"] for r in reports
     }
     for label in LABELS:

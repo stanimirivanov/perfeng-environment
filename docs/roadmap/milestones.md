@@ -689,7 +689,9 @@ lock and reviewed forward-only intent gates, fresh quiescence and a native
 selected migrator Job under separate trusted authority. It adds no production
 Python or active-root selection. Complete-parent repeat acceptance now reuses
 the initial job's verified paused/current schema and gates its existing recovery;
-live proof remains post-merge. Fresh-schema/failure proof, retained-release
+live proof remains post-merge. Bounded complete-parent Job-create denial is
+now staged with guarded Role restoration ([ADR 0051](../decisions/0051-exercise-schema-job-create-denial.md)); no SQL mutation occurs in that refusal case.
+Fresh-schema/SQL-failure proof, retained-release
 admission, runtime grants, operational cutover and measured retirement remain
 open; existing CI image parity is separate.
 
