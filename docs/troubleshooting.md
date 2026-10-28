@@ -1594,3 +1594,22 @@ change a reviewed pin, rotate credentials or bypass verification. Check the
 named boundary and the pinned manifest/platform; its availability elsewhere
 does not establish runner connectivity. Keep heavy rebuilds on CI when the host
 is busy. See [candidate build diagnostics](native-browser-candidate.md#build-failure-classification).
+
+### Schema-parent repeat acceptance stops before recovery
+
+`schema-parent-*` stages run only after verified pause in the initial trusted-main
+job. Setup requires the schema already contains all 18 released migrations.
+None-intent must fail at the actual pinned validator with semantic exit 2 before
+quiescence/Job creation; a generic error or startup failure cannot qualify.
+The valid cases reuse upgrade-request, pass fresh quiescence and must retain
+two distinct native Jobs without any schema/role/ledger/data change.
+
+Inspect bounded stage/Pod startup projections before private Workflow/Job/Pod,
+SQL/schema/role/Secret and source snapshots. A missing Job or failed preflight,
+intent, API wait or migrator is not success. Changed checksums, timestamps,
+rows/sequences, provenance, credentials or paused resources block recovery.
+Do not retry nodes, rewrite records, delete Jobs, relax comparisons or sync the
+service to pass acceptance. Only all case/retention gates permit the existing
+explicit recovery; failures remain paused for owned disposable cleanup.
+See [ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md).
+Heavy checks stay on PR CI; live proof remains post-merge, with no local action.

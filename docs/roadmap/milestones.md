@@ -687,9 +687,11 @@ live acceptance remains post-merge; promotion, cutover and retirement stay open.
 The [staged schema-migration parent](../release-schema-migration.md) adds exact
 lock and reviewed forward-only intent gates, fresh quiescence and a native
 selected migrator Job under separate trusted authority. It adds no production
-Python or active-root selection. Complete-parent live first/repeat/failure
-proof, retained-release admission, runtime grants, operational cutover and
-measured script retirement remain open; existing CI image parity is separate.
+Python or active-root selection. Complete-parent repeat acceptance now reuses
+the initial job's verified paused/current schema and gates its existing recovery;
+live proof remains post-merge. Fresh-schema/failure proof, retained-release
+admission, runtime grants, operational cutover and measured retirement remain
+open; existing CI image parity is separate.
 
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the

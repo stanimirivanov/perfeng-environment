@@ -200,3 +200,9 @@ It adds no production Python and retires none of the 13 host entrypoints:
 path until complete-parent live acceptance and operational cutover are reviewed.
 The two-module/708-line verifier budget remains unchanged. CI-only image parity
 does not establish this new parent or authorize retained-environment upgrades.
+
+The complete schema-parent repeat acceptance adds only CI fixtures and evidence
+checks while reusing the original paused current schema and existing recovery.
+It changes no production verifier or supported host task and adds no retirement
+credit. Complete-parent first installation, failure/recovery, live cutover and
+measured deletion remain separate gates; two modules/708 lines remain unchanged.

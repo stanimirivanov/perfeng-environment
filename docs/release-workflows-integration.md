@@ -1373,6 +1373,10 @@ original digest. All three pass the v1 schema before publication and bind
 distinct exact-byte identities/paths to the same delivery commit and reviewed
 selection. Ref journaling and conditional cleanup are unchanged.
 
+Those three fixtures remain unchanged. [ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md)
+adds one none-intent fixture only to the initial leg's same commit/ref for schema
+parent acceptance; the other five scenarios still publish exactly three files.
+
 After successful baseline/recovery/concurrent cases, before retention and
 destructive receipt tests, submit both inputs as fresh complete adoption parents.
 Verify each nested preflight's schema, path, commit, digest, selection and lock
@@ -1868,3 +1872,37 @@ occurs. Inspect stage `maintenance-receipt-only` and validated `.outcome.json`;
 raw observations/logs remain private. Same job/ref/rights/budget; heavy checks
 remain on PR CI and live proof is post-merge in the existing receipt-only job.
 See [ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md).
+
+### Complete schema-parent repeat acceptance
+
+The existing trusted-main initial job runs `schema-migration-parent.sh` after
+verified happy maintenance pause and before its approved manual recovery
+([ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md)).
+Preflight/request/selection inputs, published definitions and the immutable intent
+policy are checked. The schema must already contain all 18 released migrations
+before any parent executes. None-intent must fail only its actual validator with
+semantic exit 2 before quiescence/Job creation. Two unchanged valid parents must
+then pass fresh quiescence and create distinct fixed native Jobs, with successful
+migration Pods and ordered migration-identity workers.
+
+The existing upgrade-request is the valid forward-only/0018 input. Exactly one
+new migration-none request, identical apart from migration intent, is published
+only in the initial leg's existing commit/ref. The other three fixtures and
+five scenarios are unchanged. No new CI jobs, scenarios, refs, credentials,
+rights or budget are introduced. Both Jobs and all three Workflows remain
+retained; installed source/policy identities must remain unchanged.
+
+While still paused, require original receipt/pointer provenance, Secret/config
+bytes, foundation/workload/storage identities, SQL/S3 data, schema-ledger
+checksums/timestamps/OIDs, roles and complete private row/sequence snapshots to
+remain unchanged. Only validated cases and final retention permit the already
+approved manual recovery and its existing Pod replacement. No new recovery or
+baseline advancement occurs inside this phase.
+
+Inspect `schema-parent-setup`, `schema-parent-none`, `schema-parent-first`,
+`schema-parent-repeat` and `schema-parent-retention`, their bounded outcomes and
+startup projections. Native failure/timeout first retains safe stage/Pod signals;
+raw Workflow/Job/Pod/watch/SQL/Secret evidence stays private. Heavy checks run
+on PR CI; full live proof remains post-merge. These runs operate on a current
+schema and do not prove fresh-schema installation, upgrade admission,
+partial/ambiguous SQL recovery, local deployment or script retirement.

@@ -19,6 +19,7 @@ REQUEST_PATHS = {
     "parent": REQUEST_PATH,
     "changed-request": "deployments/release-requests/ci-changed-request-v1.json",
     "upgrade-request": "deployments/release-requests/ci-upgrade-request-v1.json",
+    "migration-none": "deployments/release-requests/ci-schema-migration-none-v1.json",
 }
 
 
@@ -114,6 +115,15 @@ def publish(directory: Path, cluster_uid: str) -> None:
         "changed-request": raw + b"\n",
         "upgrade-request": (json.dumps(upgrade, indent=2) + "\n").encode(),
     }
+    if os.environ.get("RELEASE_ADOPTION_SCENARIO", "initial") == "initial":
+        migration_none = {
+            **upgrade,
+            "promotion": {
+                **upgrade["promotion"],
+                "migration": {"mode": "none"},
+            },
+        }
+        requests["migration-none"] = (json.dumps(migration_none, indent=2) + "\n").encode()
     for label, content in requests.items():
         validator.validate(json.loads(content))
         (directory / f"{label}-request.json").write_bytes(content)
