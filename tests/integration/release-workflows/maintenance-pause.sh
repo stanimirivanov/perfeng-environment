@@ -38,6 +38,8 @@ done
 PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_pause_evidence.py" paused "$fixture" "$results"
 complete_stage
 
+source "$source_dir/schema-migration-parent.sh"
+
 # Only a proved successful pause may reach this independently authorized CI recovery.
 start_stage maintenance-recovery
 argocd_case maintenance-recovery

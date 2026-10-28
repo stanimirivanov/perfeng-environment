@@ -110,6 +110,30 @@ Focused offline tests cover supported/refused intent, request-byte refusal,
 exact-lock refusal, sequence, native Job security/retention and RBAC. Offline
 Kustomize/Project checks verify the staged inventory; PR CI performs heavy full,
 cross-platform and pinned Argo lint/render checks. No Docker/cluster execution
-is introduced into offline validation. Full-parent live first/repeat, denial,
-partial/ambiguous failure and SQL/data/Secret retention proof are deferred.
+is introduced into offline validation. Complete-parent repeat/data retention
+acceptance is staged in the existing initial CI leg, with live proof post-merge.
+Full-parent fresh installation, denial and partial/ambiguous failure remain deferred.
 All 13 host deployment entrypoints remain supported and no script is retired.
+
+## Complete-parent repeat acceptance on disposable CI
+
+The existing trusted-main initial job now stages unchanged-parent repeat
+acceptance while the service is already paused, before its approved recovery
+([ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md)). It reuses
+the already-current schema from earlier image parity and the existing valid
+upgrade request. One extra none-intent request is published in the same owned
+commit/ref for semantic refusal. The original three files and other five
+scenarios remain unchanged.
+
+Require all 18 selected migrations before execution, real parent stage/worker
+order, semantic none-intent exit 2 with no Job, two fresh checkpoints and distinct
+successful retained Jobs/Pods. Preserve original receipt/pointer and Secret
+identities, roles, schema/ledger checksums/timestamps/OIDs, complete private
+application row/sequence state and SQL/S3/storage data while still paused.
+Only all checks and retained source/Job/Workflow identities permit the existing
+manual recovery; no new replacement or recovery path is added. Raw evidence
+stays private; validated outcomes and redacted startup/stage projections are
+artifacts. Heavy verification stays on PR CI and full live proof remains
+post-merge. This is repeat execution, not complete-parent first installation,
+expectedCurrent admission, an upgrade or interrupted SQL recovery. Host tasks
+and retirement status are unchanged.

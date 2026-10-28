@@ -166,7 +166,7 @@ class PreflightRequestRefTests(unittest.TestCase):
                 for path, payload in calls
                 if path == "git/blobs"
             ]
-            self.assertEqual(len(blobs), 3)
+            self.assertEqual(len(blobs), 4)
             self.assertEqual(blobs[1], raw + b"\n")
             self.assertEqual(json.loads(blobs[1]), json.loads(raw))
             upgrade = json.loads(blobs[2])
@@ -178,6 +178,17 @@ class PreflightRequestRefTests(unittest.TestCase):
                     "promotion": {
                         **original["promotion"],
                         "expectedCurrent": parameters["request-sha256"],
+                    },
+                },
+            )
+            migration = json.loads(blobs[3])
+            self.assertEqual(
+                migration,
+                {
+                    **upgrade,
+                    "promotion": {
+                        **upgrade["promotion"],
+                        "migration": {"mode": "none"},
                     },
                 },
             )
@@ -198,12 +209,50 @@ class PreflightRequestRefTests(unittest.TestCase):
                     },
                 )
                 digests.append(item["request-sha256"])
-            self.assertEqual(len(set(digests)), 3)
+            self.assertEqual(len(set(digests)), 4)
             request = json.loads(raw)
             for path, digest in request["selection"]["lockDigests"].items():
                 self.assertEqual(
                     digest, "sha256:" + hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
                 )
+
+    def test_other_scenarios_publish_only_the_original_three_requests(self):
+        for scenario in (
+            "receipt-only",
+            "response-loss",
+            "pointer-response-loss",
+            "receipt-create-conflict",
+            "pointer-create-conflict",
+        ):
+            calls = []
+
+            def api(path, payload=None, calls=calls):
+                calls.append((path, payload))
+                return (
+                    {"tree": {"sha": COMMIT}}
+                    if path.startswith("git/commits/")
+                    else {"sha": COMMIT}
+                )
+
+            with (
+                tempfile.TemporaryDirectory() as temporary,
+                patch.dict(
+                    os.environ, {**ENVIRONMENT, "RELEASE_ADOPTION_SCENARIO": scenario}, clear=True
+                ),
+                patch.object(MODULE, "api", side_effect=api),
+                patch.object(
+                    MODULE.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0, REVISION, ""),
+                ),
+            ):
+                directory = Path(temporary)
+                MODULE.publish(directory, "00000000-0000-0000-0000-000000000001")
+                self.assertEqual(len([p for p, _ in calls if p == "git/blobs"]), 3)
+                self.assertFalse((directory / "migration-none-parameters.json").exists())
+                self.assertFalse((directory / "migration-none-request.json").exists())
+                tree = next(payload["tree"] for path, payload in calls if path == "git/trees")
+                self.assertNotIn(MODULE.REQUEST_PATHS["migration-none"], [e["path"] for e in tree])
 
     def test_lost_create_response_retains_cleanup_intent(self):
         with (
@@ -212,6 +261,7 @@ class PreflightRequestRefTests(unittest.TestCase):
         ):
             directory = Path(temporary)
             responses = [
+                {"sha": COMMIT},
                 {"sha": COMMIT},
                 {"sha": COMMIT},
                 {"sha": COMMIT},
