@@ -400,6 +400,21 @@ retention rechecks restored Role identity/rules/effective rights and publishes
 its bounded `grant-parent-denied.outcome.json`. No scenario or budget is added;
 SQL failure and ambiguous commits remain outside this fault's proof.
 
+After permission restoration, the initial job additionally runs bounded SQL
+contention ([ADR 0058](decisions/0058-exercise-runtime-grant-sql-contention.md)).
+One owned idle psql session holds the published advisory key. A read-only
+observer attributes the real owner backend and Pod to that holder; timestamped
+PostgreSQL evidence must prove the exact lock-timeout statement/error before
+the failed Pod exits. The unchanged parent must retain its real successful
+prefix and fixed failed native Job, without parent output or ACL/state drift.
+Only complete refusal/retention proof permits normal holder quit. Require both
+sessions/locks absent before fresh first/repeat execution; no backend termination,
+EXIT release, settings change or automatic repair is allowed. Keep raw
+`grant-contention.*` evidence private. Phase/final retention now preserves three
+native Jobs and four parent Workflows and refreshes session/lock absence before
+publishing bounded parent outcomes. Other scenarios and the DELETE fault stay
+unchanged; this proves contention/fresh retry, not partial writes or ambiguous commits.
+
 Run offline checks with `make validate` and lint the CI wrapper alongside the
 staged production templates with Argo. Live acceptance first runs on trusted main
 after merge. This phase does not run the control-plane server, load its chart or

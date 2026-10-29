@@ -1709,6 +1709,20 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+For `grant-contention-holder`, `grant-parent-contention` or
+`grant-contention-proof`, inspect the private catalog stream, exact worker/Job
+evidence and timestamped PostgreSQL log. Expected refusal requires the actual
+owner backend from the grant Pod waiting on the owned exact advisory key, then
+the server's lock-timeout error/statement and native exit 1/Error. A failed Job,
+deadline, wrong blocker, missing pre-exit wait or stale/foreign error cannot
+qualify. ACL/schema/data/credential/storage retention must pass while the lock
+is still held. Only that proof permits normal owned-session disconnect; both
+sessions and key locks must disappear before fresh first/repeat grants. Never
+terminate a database backend or add EXIT repair to get past this gate. Final
+retention rechecks the failed Job/Workflow and fresh session absence. See
+[ADR 0058](decisions/0058-exercise-runtime-grant-sql-contention.md); partial writes,
+ambiguous commits and local execution remain outside scope.
+
 For the initial fixture's `grant-denied-authority` / `grant-parent-denied` stages,
 an expected refusal must come from the grant worker's own native Job CREATE,
 after real input/quiescence success. Preliminary GET Forbidden, image failure,

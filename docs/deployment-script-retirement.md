@@ -248,5 +248,8 @@ with live proof post-merge; this CI evidence adds no retirement credit.
 The [Job-create denial slice](decisions/0057-refuse-runtime-grant-job-create.md)
 adds only disposable authority/refusal evidence and guarded restoration; no
 supported command or production verifier source is removed.
+The [grant SQL contention slice](decisions/0058-exercise-runtime-grant-sql-contention.md)
+adds bounded refusal/owned-session evidence only, with live proof post-merge.
+It changes no host command and adds no retirement credit.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.
