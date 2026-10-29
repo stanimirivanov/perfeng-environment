@@ -1952,11 +1952,11 @@ credential observations stay private. A failed submit stops its bounded observer
 failed execution cannot fall back to the CI migrator or continue into repeats.
 
 The paused suite requires exactly the original successful install Job and
-failed contention Job before its own cases. No-create refusals retain both;
+both failed Jobs before its own cases. No-create refusals retain all three;
 repeats add exactly two fresh Jobs.
 Recheck install Job spec/UID/provenance, original Workflow identity/spec/outputs
 and immutable pull-Secret identity/data before the complete suite outcome and
-existing recovery. All four Jobs and six parent Workflows stay retained.
+existing recovery. All five Jobs and seven parent Workflows stay retained.
 No new CI job/scenario/ref/request, token/right, budget, local action, SQL repair or
 recovery path is added. Heavy checks stay on PR CI; live proof is post-merge.
 
@@ -1991,8 +1991,43 @@ Schema absence must still hold before fresh installation.
 No role/credential/ledger edit, backend termination, EXIT repair, new CI
 job/scenario/ref/right/budget or local execution is added. Retain the failed
 Job/Workflow through the later paused suite, distinguishing its failure from
-successful install/repeat Jobs. Final recovery needs four Jobs and six parent
+successful install/repeat Jobs. Final recovery needs five Jobs and seven parent
 Workflows plus all existing data/identity retention. Linux PR CI exercises the
 real FIFO with an inert transport; Windows covers typed evidence and shell gates.
 Live database proof remains post-merge. Partial writes and ambiguous commit
 outcomes remain separate work.
+
+
+### Complete schema-parent attempted-DDL rollback
+
+[ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md) adds
+`schema-migration-rollback.sh` after proved contention release and before fresh
+installation, only in the existing initial leg. Its fixture matches the selected
+component rollback test: a migration-owned schema, artifacts collision table,
+cluster-bound comments and sole integer sentinel. Capture catalog OIDs, exact
+owners/columns/comments/rows. The unchanged native parent must pass the real
+prefix/quiescence and fail with exit 1/BackoffLimitExceeded, no successful parent
+output, and the exact PostgreSQL artifacts relation collision for the migration
+identity/application in the attempt's bounded timestamped log window. Require
+runs/create_bindings/artifacts statements in that private log. Generic errors,
+wrong identities/time windows, startup failures or Job deadlines cannot qualify.
+
+`schema-rollback-setup`, `schema-rollback-parent`, `schema-rollback-proof` and
+`schema-rollback-cleanup` retain private catalog/row/log/Workflow/Job/Pod evidence.
+After failure, only the original fixture table may remain; migration tables,
+ledger, indexes or sequences must not persist. Require unchanged fixture OIDs,
+owner/markers/columns/sentinel, no migration sessions/locks and existing role,
+credential, source/policy, foundation/storage and paused-object retention.
+
+Only all proof generates SQL cleanup. In one bounded transaction, lock the
+fixture table, re-read the complete catalog and sentinel against the proved
+snapshot, then DROP TABLE and DROP SCHEMA RESTRICT. Unexpected identity, inventory,
+dependency or sentinel aborts; no CASCADE, IF EXISTS or EXIT repair is allowed.
+Independently require an absent schema/empty relations/columns with the same
+database OID and retained state before first installation. The paused baseline
+now contains both failed Jobs plus the successful installation Job; refusals add
+zero and repeats add one each. Retain five schema-parent Jobs and seven parent
+Workflows before existing checked recovery. No new CI job/scenario/ref/right/
+budget, production change, role/credential/release-ledger edit, database reset
+or local action is added. Heavy checks remain on CI; live SQL proof is post-merge.
+Ambiguous-commit recovery remains open.

@@ -1683,3 +1683,25 @@ only bounded diagnostics and validated outcomes. Require retention of the failed
 Job/Workflow alongside successful install/repeat evidence before recovery.
 Heavy checks stay on CI and live proof remains post-merge. This is not proof of
 partial-write rollback or ambiguous-commit recovery.
+
+
+### Schema rollback proof or fixture cleanup stops
+
+[ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md) requires exact
+PostgreSQL collision evidence after the complete parent's real prefix and
+native failure. Check `schema-rollback-setup/parent/proof/cleanup` and private
+catalog/row/log/Job/Pod snapshots. The error must name artifacts for the selected
+migration identity/application within the Job/Workflow time window; an unrelated
+relation, older message, startup failure or deadline cannot qualify. Require
+unchanged fixture OIDs/owners/comments/columns/sentinel and no persisted migration
+tables/ledger or remaining migration sessions/locks. Any retained-state drift
+blocks cleanup and fresh installation.
+
+Do not drop, recreate or repair objects manually to pass acceptance. Only proved
+rollback generates the bounded transaction's table lock, exact catalog/sentinel
+guards and DROP RESTRICT statements. A changed identity, extra dependency or
+unexpected row aborts cleanup. No CASCADE, IF EXISTS, release-ledger edit or EXIT
+repair is authorized. After normal cleanup, require the original empty catalog
+and retained surrounding state before fresh installation. Both failed Jobs and
+Workflows remain retained; live proof is post-merge and heavy checks stay on CI.
+This does not establish ambiguous-commit recovery or authorize local execution.

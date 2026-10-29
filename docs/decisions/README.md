@@ -149,3 +149,4 @@ How will the assumptions and consequences be verified?
 | [0051](0051-exercise-schema-job-create-denial.md) | Proposed | Narrow only migration Jobs create, prove exact complete-parent Forbidden and retained state, then guard restoration before repeats/recovery. |
 | [0052](0052-exercise-complete-schema-first-install.md) | Proposed | Replace the initial CI migrator with the unchanged complete parent on the naturally empty database, reusing the early immutable pull Secret and retaining installation before later recovery. |
 | [0053](0053-exercise-schema-sql-contention.md) | Proposed | Prove exact SQL lock contention, native parent failure and owned-session cleanup before fresh installation, retaining the failed Job/Workflow through recovery gates. |
+| [0054](0054-exercise-schema-ddl-rollback.md) | Proposed | Prove complete-parent rollback after attempted DDL, then identity/ownership-guarded fixture-only cleanup before fresh installation and final retention. |

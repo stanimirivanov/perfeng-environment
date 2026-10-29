@@ -99,8 +99,12 @@ def main() -> None:
 
     if mode == "baseline-retained":
         jobs = load("schema-parent-baseline.jobs.json")["items"]
-        originals = [load("schema-install.job.json"), load("schema-contention.job.json")]
-        assert len(jobs) == 2 and {j["metadata"]["uid"] for j in jobs} == {
+        originals = [
+            load("schema-install.job.json"),
+            load("schema-contention.job.json"),
+            load("schema-rollback.job.json"),
+        ]
+        assert len(jobs) == 3 and {j["metadata"]["uid"] for j in jobs} == {
             j["metadata"]["uid"] for j in originals
         }
         for original in originals:
@@ -108,11 +112,13 @@ def main() -> None:
             parent.retained_job(
                 original,
                 current,
-                failed=original["metadata"]["uid"] == originals[1]["metadata"]["uid"],
+                failed=original["metadata"]["uid"] in {j["metadata"]["uid"] for j in originals[1:]},
             )
         return
-    if mode in {"diagnose", "diagnose-install", "diagnose-contention"}:
-        prefix = "schema-contention" if mode == "diagnose-contention" else "schema-install"
+    if mode in {"diagnose", "diagnose-install", "diagnose-contention", "diagnose-rollback"}:
+        prefix = (
+            "schema-" + mode.removeprefix("diagnose-") if mode != "diagnose" else "schema-install"
+        )
         job = load(f"{prefix}.job.json")
         stream = ""
         if job:
@@ -161,9 +167,16 @@ def main() -> None:
         assert not current["metadata"].get("deletionTimestamp")
         later = load("schema-parent.retained-workflows.json")["items"]
         failed_workflow = load("schema-contention.workflow.json")
+        rollback_workflow = load("schema-rollback.workflow.json")
         assert (
             len(later) == 4
-            and len({o["metadata"]["uid"] for o in [*later, current, failed_workflow]}) == 6
+            and len(
+                {
+                    o["metadata"]["uid"]
+                    for o in [*later, current, failed_workflow, rollback_workflow]
+                }
+            )
+            == 7
         )
         name = original["metadata"]["name"]
         assert (
@@ -235,16 +248,17 @@ def main() -> None:
         json.loads(Path("tests/integration/release-workflows/migration-image.json").read_text()),
     )
     jobs = load("schema-install.jobs-after.json")["items"]
-    failed = load("schema-contention.job.json")
-    assert len(jobs) == 2 and {o["metadata"]["uid"] for o in jobs} == {
+    failures = [load("schema-contention.job.json"), load("schema-rollback.job.json")]
+    assert len(jobs) == 3 and {o["metadata"]["uid"] for o in jobs} == {
         load("schema-install.job.json")["metadata"]["uid"],
-        failed["metadata"]["uid"],
+        *[j["metadata"]["uid"] for j in failures],
     }
-    parent.retained_job(
-        failed,
-        next(j for j in jobs if j["metadata"]["uid"] == failed["metadata"]["uid"]),
-        failed=True,
-    )
+    for failed in failures:
+        parent.retained_job(
+            failed,
+            next(j for j in jobs if j["metadata"]["uid"] == failed["metadata"]["uid"]),
+            failed=True,
+        )
     (results / "schema-install.outcome.json").write_text(json.dumps(report) + "\n")
 
 

@@ -132,7 +132,7 @@ def execution(
     diagnostic: str = "",
 ) -> dict[str, Any]:
     """Validate the unchanged native parent independently of adopted/empty baseline."""
-    assert label in {*LABELS, "install", "contention"}
+    assert label in {*LABELS, "install", "contention", "rollback"}
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     assert workflow["spec"]["workflowTemplateRef"] == {
         "name": "perfeng-release-schema-migration-v1"
@@ -193,7 +193,7 @@ def execution(
         worker = next(w for w in workers if w["nodeID"] == node["id"])
         assert worker["uid"] and worker["account"] == "release-schema-migration"
         refused = label == "none" and node["displayName"] == "migration-intent"
-        denied = label in {"denied", "contention"} and node["displayName"] == "migrate"
+        denied = label in {"denied", "contention", "rollback"} and node["displayName"] == "migrate"
         assert worker["exitCode"] == (2 if refused else 1 if denied else 0)
         assert node["phase"] in (
             {"Failed", "Error"} if denied else {"Failed" if refused else "Succeeded"}
@@ -210,6 +210,8 @@ def execution(
         if label == "none"
         else "schema-parent-job-create-refused"
         if label == "denied"
+        else "schema-parent-rollback-refused"
+        if label == "rollback"
         else "schema-parent-contention-refused"
         if label == "contention"
         else "schema-parent-install-verified"
@@ -227,7 +229,7 @@ def execution(
                 assert node["type"] != "Pod" and node["phase"] in {"Skipped", "Omitted"}
     else:
         assert workflow["status"]["phase"] in (
-            {"Failed", "Error"} if label in {"denied", "contention"} else {"Succeeded"}
+            {"Failed", "Error"} if label in {"denied", "contention", "rollback"} else {"Succeeded"}
         )
         checkpoint_node, migrate = (named(workflow, name) for name in ("quiescence", "migrate"))
         assert checkpoint_node["templateRef"] == {
@@ -264,7 +266,7 @@ def execution(
             sequence += [checkpoint_node, migrate]
             ordered(sequence)
             return report
-        if label == "contention":
+        if label in {"contention", "rollback"}:
             assert not values.get("job-name") and not values.get("checkpoint")
         else:
             assert (
@@ -287,7 +289,7 @@ def execution(
             <= created
             <= datetime.fromisoformat(migrate["finishedAt"])
         )
-        if label == "contention":
+        if label in {"contention", "rollback"}:
             assert job["status"].get("failed") == 1 and not job["status"].get("succeeded")
             assert any(
                 c["type"] == "Failed"
@@ -383,12 +385,12 @@ def execution(
             assert security.get("procMount", "Default") == "Default"
             assert not container["env"][0]["valueFrom"]["secretKeyRef"].get("optional", False)
         assert pod["metadata"]["uid"] and pod["status"]["phase"] == (
-            "Failed" if label == "contention" else "Succeeded"
+            "Failed" if label in {"contention", "rollback"} else "Succeeded"
         )
         assert len(pod["status"]["containerStatuses"]) == 1
         assert pod["status"]["containerStatuses"][0]["name"] == "migrate"
         assert pod["status"]["containerStatuses"][0]["state"]["terminated"]["exitCode"] == (
-            1 if label == "contention" else 0
+            1 if label in {"contention", "rollback"} else 0
         )
         sequence += [checkpoint_node, migrate]
         report["jobUID"] = job["metadata"]["uid"]
@@ -547,13 +549,14 @@ def main() -> None:
         return
 
     def retain_baseline(original: dict[str, Any], current: dict[str, Any]) -> None:
-        path = fixture / "schema-contention.job.json"
-        failed = json.loads(path.read_text()) if path.exists() else None
-        if failed and original["metadata"]["uid"] == failed["metadata"]["uid"]:
-            retained_job(failed, original, failed=True)
-            retained_job(failed, current, failed=True)
-        else:
-            retained_job(original, current)
+        for label in ("contention", "rollback"):
+            path = fixture / f"schema-{label}.job.json"
+            failed = json.loads(path.read_text()) if path.exists() else None
+            if failed and original["metadata"]["uid"] == failed["metadata"]["uid"]:
+                retained_job(failed, original, failed=True)
+                retained_job(failed, current, failed=True)
+                return
+        retained_job(original, current)
 
     def check(label: str) -> dict[str, Any]:
         prefix = "schema-parent-" + label

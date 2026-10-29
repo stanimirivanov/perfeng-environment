@@ -128,9 +128,13 @@ def populate(root, results):
     }
     save("schema-contention.job.json", failed)
     save("schema-contention.workflow.json", {"metadata": {"uid": "failed-workflow"}})
-    save("schema-parent-baseline.jobs.json", {"items": [failed, job]})
+    rollback = deepcopy(failed)
+    rollback["metadata"].update(uid="rollback-job", name="perfeng-schema-rollback")
+    save("schema-rollback.job.json", rollback)
+    save("schema-rollback.workflow.json", {"metadata": {"uid": "rollback-workflow"}})
+    save("schema-parent-baseline.jobs.json", {"items": [failed, rollback, job]})
     save("schema-install.jobs-before.json", {"items": []})
-    save("schema-install.jobs-after.json", {"items": [failed, job]})
+    save("schema-install.jobs-after.json", {"items": [failed, rollback, job]})
     source = repeats.image.MigrationImageIntegrationTests()
     source.setUp()
     (results / "migration-image-first.schema.json").write_text(json.dumps(source.schema()))
@@ -302,6 +306,7 @@ echo legacy-repeat >> "$fixture/trace"
                 "wait",
                 "verify-diagnose-install",
                 "contention",
+                "rollback",
                 "snapshot-after",
                 "sources-after",
                 "schema",
@@ -312,6 +317,7 @@ echo legacy-repeat >> "$fixture/trace"
                 (case / "schema-migration-contention.sh").write_text(
                     "step contention\n", newline="\n"
                 )
+                (case / "schema-migration-rollback.sh").write_text("step rollback\n", newline="\n")
                 process = subprocess.run(
                     [
                         BASH,
