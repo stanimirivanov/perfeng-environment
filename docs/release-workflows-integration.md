@@ -1951,10 +1951,48 @@ fixed server pull Secret and migration application name. Raw parent/Pod/logs and
 credential observations stay private. A failed submit stops its bounded observer;
 failed execution cannot fall back to the CI migrator or continue into repeats.
 
-The paused suite requires exactly the original successful install Job before
-its own cases. No-create refusals retain it; repeats add exactly two fresh Jobs.
+The paused suite requires exactly the original successful install Job and
+failed contention Job before its own cases. No-create refusals retain both;
+repeats add exactly two fresh Jobs.
 Recheck install Job spec/UID/provenance, original Workflow identity/spec/outputs
 and immutable pull-Secret identity/data before the complete suite outcome and
-existing recovery. All three Jobs and five parent Workflows stay retained.
-No new job/scenario/ref/request, token/right, budget, local action, SQL repair or
+existing recovery. All four Jobs and six parent Workflows stay retained.
+No new CI job/scenario/ref/request, token/right, budget, local action, SQL repair or
 recovery path is added. Heavy checks stay on PR CI; live proof is post-merge.
+
+### Complete schema-parent SQL contention acceptance
+
+[ADR 0053](decisions/0053-exercise-schema-sql-contention.md) adds
+`schema-migration-contention.sh` between first-install setup and its successful
+native parent in the existing initial leg. The shared native coordinator submits
+the unchanged template/request for both executions. It keeps native transport
+status separate from diagnostic observer status and preserves shell errexit in
+a subshell when capturing the expected failure. No conditional function call
+may suppress intermediate failure checks.
+
+The bounded holder uses the existing owned database Pod/admin transport, one
+private FIFO and the exact session advisory lock. Catalog acquisition, observation
+and cleanup use read-only `schema-contention.sql`, with a quoted psql holder
+parameter. Observe holder PID/backend start/user/database/application and the
+actual selected migrator's matching Pod IP, role/application, query, wait and
+sole blocker on the exact 64-bit key. Require a pre-exit wait observation; a
+lingering failed backend after exit may remain until holder release.
+
+Inspect `schema-contention-holder`, `schema-contention-parent` and
+`schema-contention-proof`, their fixed startup/outcome projections and private
+catalog/Workflow/Job/Pod/log/resource snapshots. Native failure must be exit 1
+and BackoffLimitExceeded with the expected real prefix, no successful parent
+output, absent schema and unchanged roles/credentials/foundation/storage. Stop
+and join the read-only observer before proof. Only all proof and a fresh exact
+holder observation permit `\q` through its owned input, normal process exit and
+bounded disappearance checks for the same holder/waiter identities and locks.
+Schema absence must still hold before fresh installation.
+
+No role/credential/ledger edit, backend termination, EXIT repair, new CI
+job/scenario/ref/right/budget or local execution is added. Retain the failed
+Job/Workflow through the later paused suite, distinguishing its failure from
+successful install/repeat Jobs. Final recovery needs four Jobs and six parent
+Workflows plus all existing data/identity retention. Linux PR CI exercises the
+real FIFO with an inert transport; Windows covers typed evidence and shell gates.
+Live database proof remains post-merge. Partial writes and ambiguous commit
+outcomes remain separate work.

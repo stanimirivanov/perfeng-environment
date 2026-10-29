@@ -132,7 +132,7 @@ def execution(
     diagnostic: str = "",
 ) -> dict[str, Any]:
     """Validate the unchanged native parent independently of adopted/empty baseline."""
-    assert label in {*LABELS, "install"}
+    assert label in {*LABELS, "install", "contention"}
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     assert workflow["spec"]["workflowTemplateRef"] == {
         "name": "perfeng-release-schema-migration-v1"
@@ -193,7 +193,7 @@ def execution(
         worker = next(w for w in workers if w["nodeID"] == node["id"])
         assert worker["uid"] and worker["account"] == "release-schema-migration"
         refused = label == "none" and node["displayName"] == "migration-intent"
-        denied = label == "denied" and node["displayName"] == "migrate"
+        denied = label in {"denied", "contention"} and node["displayName"] == "migrate"
         assert worker["exitCode"] == (2 if refused else 1 if denied else 0)
         assert node["phase"] in (
             {"Failed", "Error"} if denied else {"Failed" if refused else "Succeeded"}
@@ -210,6 +210,8 @@ def execution(
         if label == "none"
         else "schema-parent-job-create-refused"
         if label == "denied"
+        else "schema-parent-contention-refused"
+        if label == "contention"
         else "schema-parent-install-verified"
         if label == "install"
         else "schema-parent-repeat-verified",
@@ -225,7 +227,7 @@ def execution(
                 assert node["type"] != "Pod" and node["phase"] in {"Skipped", "Omitted"}
     else:
         assert workflow["status"]["phase"] in (
-            {"Failed", "Error"} if label == "denied" else {"Succeeded"}
+            {"Failed", "Error"} if label in {"denied", "contention"} else {"Succeeded"}
         )
         checkpoint_node, migrate = (named(workflow, name) for name in ("quiescence", "migrate"))
         assert checkpoint_node["templateRef"] == {
@@ -262,9 +264,13 @@ def execution(
             sequence += [checkpoint_node, migrate]
             ordered(sequence)
             return report
-        assert (
-            values["job-name"] == expected_name and json.loads(values["checkpoint"]) == checkpoint
-        )
+        if label == "contention":
+            assert not values.get("job-name") and not values.get("checkpoint")
+        else:
+            assert (
+                values["job-name"] == expected_name
+                and json.loads(values["checkpoint"]) == checkpoint
+            )
         manifest = yaml.safe_load((DIRECTORY / "schema-migration-job-v1.yaml").read_text())["spec"][
             "templates"
         ][0]["resource"]["manifest"]
@@ -281,10 +287,20 @@ def execution(
             <= created
             <= datetime.fromisoformat(migrate["finishedAt"])
         )
-        assert job["status"].get("succeeded") == 1 and not job["status"].get("failed")
-        assert any(
-            c["type"] == "Complete" and c["status"] == "True" for c in job["status"]["conditions"]
-        )
+        if label == "contention":
+            assert job["status"].get("failed") == 1 and not job["status"].get("succeeded")
+            assert any(
+                c["type"] == "Failed"
+                and c["status"] == "True"
+                and c["reason"] == "BackoffLimitExceeded"
+                for c in job["status"]["conditions"]
+            )
+        else:
+            assert job["status"].get("succeeded") == 1 and not job["status"].get("failed")
+            assert any(
+                c["type"] == "Complete" and c["status"] == "True"
+                for c in job["status"]["conditions"]
+            )
         pod_spec = job["spec"]["template"]["spec"]
         assert not any(
             pod_spec.get(k)
@@ -366,10 +382,14 @@ def execution(
             assert not security["capabilities"].get("add", [])
             assert security.get("procMount", "Default") == "Default"
             assert not container["env"][0]["valueFrom"]["secretKeyRef"].get("optional", False)
-        assert pod["metadata"]["uid"] and pod["status"]["phase"] == "Succeeded"
+        assert pod["metadata"]["uid"] and pod["status"]["phase"] == (
+            "Failed" if label == "contention" else "Succeeded"
+        )
         assert len(pod["status"]["containerStatuses"]) == 1
         assert pod["status"]["containerStatuses"][0]["name"] == "migrate"
-        assert pod["status"]["containerStatuses"][0]["state"]["terminated"]["exitCode"] == 0
+        assert pod["status"]["containerStatuses"][0]["state"]["terminated"]["exitCode"] == (
+            1 if label == "contention" else 0
+        )
         sequence += [checkpoint_node, migrate]
         report["jobUID"] = job["metadata"]["uid"]
     ordered(sequence)
@@ -387,7 +407,9 @@ def ordered(sequence: list[dict[str, Any]]) -> None:
         )
 
 
-def retained_job(original: dict[str, Any], current: dict[str, Any]) -> None:
+def retained_job(
+    original: dict[str, Any], current: dict[str, Any], *, failed: bool = False
+) -> None:
     """Retain native Job identity, declaration and provenance through controller refreshes."""
     assert current["spec"] == original["spec"]
     assert {
@@ -399,7 +421,16 @@ def retained_job(original: dict[str, Any], current: dict[str, Any]) -> None:
         for k, v in original["metadata"].items()
         if k not in {"resourceVersion", "managedFields"}
     }
-    assert current["status"]["succeeded"] == original["status"]["succeeded"] == 1
+    key, other = ("failed", "succeeded") if failed else ("succeeded", "failed")
+    assert current["status"][key] == original["status"][key] == 1
+    assert not current["status"].get(other) and not original["status"].get(other)
+    if failed:
+        assert any(
+            c["type"] == "Failed"
+            and c["status"] == "True"
+            and c["reason"] == "BackoffLimitExceeded"
+            for c in current["status"]["conditions"]
+        )
 
 
 def main() -> None:
@@ -515,6 +546,15 @@ def main() -> None:
     if mode == "baseline":
         return
 
+    def retain_baseline(original: dict[str, Any], current: dict[str, Any]) -> None:
+        path = fixture / "schema-contention.job.json"
+        failed = json.loads(path.read_text()) if path.exists() else None
+        if failed and original["metadata"]["uid"] == failed["metadata"]["uid"]:
+            retained_job(failed, original, failed=True)
+            retained_job(failed, current, failed=True)
+        else:
+            retained_job(original, current)
+
     def check(label: str) -> dict[str, Any]:
         prefix = "schema-parent-" + label
         key = "migration-none" if label == "none" else "upgrade-request"
@@ -563,7 +603,7 @@ def main() -> None:
             current = next(
                 o for o in current_jobs if o["metadata"]["uid"] == original["metadata"]["uid"]
             )
-            retained_job(original, current)
+            retain_baseline(original, current)
         assert {o["metadata"]["uid"] for o in previous_jobs} <= {
             o["metadata"]["uid"] for o in current_jobs
         }
@@ -580,13 +620,13 @@ def main() -> None:
         r["jobUID"] for r in reports if "jobUID" in r
     } | {o["metadata"]["uid"] for o in baseline_jobs}
     for original in baseline_jobs:
-        retained_job(
+        retain_baseline(
             original, next(o for o in jobs if o["metadata"]["uid"] == original["metadata"]["uid"])
         )
     for label in ("first", "repeat"):
         original = load(f"schema-parent-{label}.job.json")
         current = next(o for o in jobs if o["metadata"]["uid"] == original["metadata"]["uid"])
-        retained_job(original, current)
+        retain_baseline(original, current)
     retained = load("schema-parent.retained-workflows.json")["items"]
     assert len(retained) == len(LABELS) and {o["metadata"]["uid"] for o in retained} == {
         r["workflowUID"] for r in reports

@@ -219,3 +219,11 @@ Its evidence helpers are CI-only; production definitions and supported host task
 remain unchanged. No retirement credit is claimed: 13 entrypoints remain, with
 the same two-module/708-line production verifier budget. SQL failure/recovery,
 operational cutover and measured deletion remain separate gates.
+
+
+SQL contention acceptance ([ADR 0053](decisions/0053-exercise-schema-sql-contention.md))
+adds only bounded CI fault/observation evidence around the unchanged schema parent.
+It retires no host entrypoint and changes no production verifier, command or
+manifest. The 13-entrypoint baseline and two-module/708-line verifier budget
+remain unchanged; partial/ambiguous SQL recovery, cutover and measured deletion
+remain separate gates.

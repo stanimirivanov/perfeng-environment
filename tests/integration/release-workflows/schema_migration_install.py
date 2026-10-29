@@ -67,6 +67,29 @@ def baseline(
     return [*applications["items"], deployment]
 
 
+def request_input(root: Path) -> tuple[dict[str, str], dict[str, Any]]:
+    """Revalidate the existing raw first-install request and its delivery identity."""
+    parameters = json.loads((root / "parent-parameters.json").read_text())
+    assert (
+        parameters["request-revision"]
+        == json.loads((root / "request-ref.json").read_text())["commit"]
+    )
+    raw = (root / "parent-request.json").read_bytes()
+    assert parameters["request-sha256"] == "sha256:" + hashlib.sha256(raw).hexdigest()
+    request = json.loads(raw)
+    Draft202012Validator(
+        json.loads(Path("deployments/release-request-v1.schema.json").read_text())
+    ).validate(request)
+    policy = json.loads(
+        yaml.safe_load((parent.DIRECTORY / "schema-migration-intent-v1.yaml").read_text())["data"][
+            "schema-migration-intent-v1.schema.json"
+        ]
+    )
+    Draft202012Validator(policy).validate(request)
+    assert request["promotion"]["expectedCurrent"] is None
+    return parameters, request
+
+
 def main() -> None:
     mode, directory, output = sys.argv[1:]
     root, results = Path(directory), Path(output)
@@ -76,16 +99,24 @@ def main() -> None:
 
     if mode == "baseline-retained":
         jobs = load("schema-parent-baseline.jobs.json")["items"]
-        assert len(jobs) == 1
-        parent.retained_job(load("schema-install.job.json"), jobs[0])
+        originals = [load("schema-install.job.json"), load("schema-contention.job.json")]
+        assert len(jobs) == 2 and {j["metadata"]["uid"] for j in jobs} == {
+            j["metadata"]["uid"] for j in originals
+        }
+        for original in originals:
+            current = next(j for j in jobs if j["metadata"]["uid"] == original["metadata"]["uid"])
+            parent.retained_job(
+                original,
+                current,
+                failed=original["metadata"]["uid"] == originals[1]["metadata"]["uid"],
+            )
         return
-    if mode == "diagnose":
-        job = load("schema-install.job.json")
+    if mode in {"diagnose", "diagnose-install", "diagnose-contention"}:
+        prefix = "schema-contention" if mode == "diagnose-contention" else "schema-install"
+        job = load(f"{prefix}.job.json")
         stream = ""
         if job:
-            with (root / "schema-install.watch.json").open(
-                errors="replace", encoding="utf-8"
-            ) as source:
+            with (root / f"{prefix}.watch.json").open(errors="replace", encoding="utf-8") as source:
                 stream = source.read(4194305)
         report = (
             parent.migration.startup(
@@ -94,15 +125,15 @@ def main() -> None:
                 json.loads(
                     Path("tests/integration/release-workflows/migration-image.json").read_text()
                 ),
-                int((root / "schema-install.watch-code.txt").read_text()),
-                int((root / "schema-install.wait-code.txt").read_text()),
+                int((root / f"{prefix}.watch-code.txt").read_text()),
+                int((root / f"{prefix}.wait-code.txt").read_text()),
             )
             if job
             else {"purpose": "diagnostic-only", "job": "absent"}
         )
         if len(stream) > 4194304:
             report["limitations"].append("watch-size-limit")
-        workflow = load("schema-install.workflow.json")
+        workflow = load(f"{prefix}.workflow.json")
         report["stages"] = [
             {"name": n["displayName"], "phase": n["phase"]}
             for n in workflow.get("status", {}).get("nodes", {}).values()
@@ -111,7 +142,7 @@ def main() -> None:
             and n.get("phase")
             in {"Pending", "Running", "Succeeded", "Failed", "Error", "Skipped", "Omitted"}
         ]
-        (results / "schema-install.startup.json").write_text(json.dumps(report) + "\n")
+        (results / f"{prefix}.startup.json").write_text(json.dumps(report) + "\n")
         return
     if mode == "pull":
         value = server.pull_secret(load("schema-install.pull-source.json"))
@@ -129,9 +160,11 @@ def main() -> None:
         assert current["spec"] == original["spec"] and current["status"]["phase"] == "Succeeded"
         assert not current["metadata"].get("deletionTimestamp")
         later = load("schema-parent.retained-workflows.json")["items"]
-        assert len(later) == 4 and current["metadata"]["uid"] not in {
-            o["metadata"]["uid"] for o in later
-        }
+        failed_workflow = load("schema-contention.workflow.json")
+        assert (
+            len(later) == 4
+            and len({o["metadata"]["uid"] for o in [*later, current, failed_workflow]}) == 6
+        )
         name = original["metadata"]["name"]
         assert (
             current["status"]["nodes"][name]["outputs"]
@@ -185,21 +218,7 @@ def main() -> None:
         load("schema-install.before.namespace.json")["metadata"]["uid"]
         == load("schema-install.after.namespace.json")["metadata"]["uid"]
     )
-    parameters = load("parent-parameters.json")
-    assert parameters["request-revision"] == load("request-ref.json")["commit"]
-    raw = (root / "parent-request.json").read_bytes()
-    assert parameters["request-sha256"] == "sha256:" + hashlib.sha256(raw).hexdigest()
-    request = json.loads(raw)
-    Draft202012Validator(
-        json.loads(Path("deployments/release-request-v1.schema.json").read_text())
-    ).validate(request)
-    policy = json.loads(
-        yaml.safe_load((parent.DIRECTORY / "schema-migration-intent-v1.yaml").read_text())["data"][
-            "schema-migration-intent-v1.schema.json"
-        ]
-    )
-    Draft202012Validator(policy).validate(request)
-    assert request["promotion"]["expectedCurrent"] is None
+    parameters, request = request_input(root)
     report = parent.execution(
         "install",
         load("schema-install.workflow.json"),
@@ -215,9 +234,17 @@ def main() -> None:
         json.loads((results / "migration-image-first.schema.json").read_text()),
         json.loads(Path("tests/integration/release-workflows/migration-image.json").read_text()),
     )
-    assert [o["metadata"]["uid"] for o in load("schema-install.jobs-after.json")["items"]] == [
-        load("schema-install.job.json")["metadata"]["uid"]
-    ]
+    jobs = load("schema-install.jobs-after.json")["items"]
+    failed = load("schema-contention.job.json")
+    assert len(jobs) == 2 and {o["metadata"]["uid"] for o in jobs} == {
+        load("schema-install.job.json")["metadata"]["uid"],
+        failed["metadata"]["uid"],
+    }
+    parent.retained_job(
+        failed,
+        next(j for j in jobs if j["metadata"]["uid"] == failed["metadata"]["uid"]),
+        failed=True,
+    )
     (results / "schema-install.outcome.json").write_text(json.dumps(report) + "\n")
 
 

@@ -251,7 +251,7 @@ def populate(directory, results):
 
 
 class SchemaMigrationParentTests(unittest.TestCase):
-    def test_refusals_create_nothing_and_repeats_preserve_a_prior_install_job(self):
+    def test_refusals_and_repeats_preserve_install_and_failed_contention_jobs(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             results = root / "results"
@@ -259,8 +259,17 @@ class SchemaMigrationParentTests(unittest.TestCase):
             populate(root, results)
             installed = deepcopy(evidence("first")[8])
             installed["metadata"].update(uid="install-job", name="perfeng-schema-install")
+            failed = deepcopy(installed)
+            failed["metadata"].update(uid="contention-job", name="perfeng-schema-contention")
+            failed["status"] = {
+                "failed": 1,
+                "conditions": [
+                    {"type": "Failed", "status": "True", "reason": "BackoffLimitExceeded"}
+                ],
+            }
+            (root / "schema-contention.job.json").write_text(json.dumps(failed))
             (root / "schema-parent-baseline.jobs.json").write_text(
-                json.dumps({"items": [installed]})
+                json.dumps({"items": [installed, failed]})
             )
             files = ["schema-parent.retained-jobs.json"] + [
                 f"schema-parent-{label}.jobs-{when}.json"
@@ -270,7 +279,7 @@ class SchemaMigrationParentTests(unittest.TestCase):
             for name in files:
                 path = root / name
                 value = json.loads(path.read_text())
-                value["items"].insert(0, deepcopy(installed))
+                value["items"][:0] = [deepcopy(installed), deepcopy(failed)]
                 path.write_text(json.dumps(value))
             with patch("sys.argv", ["evidence", "complete", str(root), str(results)]):
                 MODULE.main()

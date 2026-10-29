@@ -113,7 +113,9 @@ cross-platform and pinned Argo lint/render checks. No Docker/cluster execution
 is introduced into offline validation. Complete-parent repeat/data retention
 acceptance is staged in the existing initial CI leg, with live proof post-merge.
 Bounded complete-parent first installation is staged in the initial CI leg;
-partial/ambiguous SQL failure remains deferred.
+bounded SQL contention failure and fresh execution are staged under
+[ADR 0053](decisions/0053-exercise-schema-sql-contention.md); partial writes and
+ambiguous commits remain deferred.
 Bounded Job-create denial acceptance is staged under [ADR 0051](decisions/0051-exercise-schema-job-create-denial.md).
 All 13 host deployment entrypoints remain supported and no script is retired.
 
@@ -173,11 +175,30 @@ stops execution. Other five scenarios retain their original timing/path.
 Preserve roles, existing platform resources/config/Secrets, running ready
 foundation Pods, PV/claim bindings and cluster identity through installation.
 
-The later paused suite requires exactly the retained install Job at baseline;
-refusal cases add zero, and successful repeats add one each. Require all three
-Jobs, four later Workflows plus the installation Workflow, and the original
-pull Secret before publishing complete acceptance or allowing existing recovery.
+The later paused suite requires the retained install and failed contention Jobs
+at baseline; refusal cases add zero, and successful repeats add one each. Require all four
+Jobs, four later Workflows plus the installation and contention Workflows, and
+the original pull Secret before publishing complete acceptance or allowing existing recovery.
 No production templates, credentials/rights, CI jobs/scenarios/refs/budgets,
 local infrastructure or supported host commands change. Heavy checks run on
-PR CI; live proof remains post-merge. SQL failure/recovery, retained upgrades,
+PR CI; live proof remains post-merge. Partial/ambiguous SQL recovery, retained upgrades,
 production multi-user security, cutover and measured retirement remain open.
+
+## SQL contention before installation
+
+[ADR 0053](decisions/0053-exercise-schema-sql-contention.md) adds one complete
+parent failure before the existing first installation in the initial CI leg.
+An owned bounded psql session holds the selected migrator's exact advisory lock.
+Require the successful real parent prefix/quiescence, then the actual selected
+backend blocked by that holder, bound to native Pod IP, role/application,
+backend PID/start time and exact key/query. Require native exit 1 with a failed
+Job rather than a Job deadline, no parent result, absent schema and retained
+surrounding state. No credential, role, ledger or persisted setting is edited.
+
+Only proved failure and retention permit normal disconnect through the holder's
+private input FIFO. Independently require both sessions/locks gone and schema
+still absent before the fresh unchanged first-install parent. No backend
+termination, node retry, fallback or SQL repair is permitted. Retain the failed
+Job/Workflow through installation, paused refusals/repeats and final recovery
+gates. Heavy checks stay on CI; live proof remains post-merge. This proves
+pre-DDL contention failure/retry, not partial writes or ambiguous commits.
