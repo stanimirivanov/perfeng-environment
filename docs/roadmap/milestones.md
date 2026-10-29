@@ -709,7 +709,10 @@ Jobs, exact runtime privileges and surrounding state. Heavy PR checks stay on CI
 live proof remains post-merge. Bounded grant Job-create denial now gates the
 same initial successes, with exact native Forbidden, unchanged state and guarded
 authority restoration ([ADR 0057](../decisions/0057-refuse-runtime-grant-job-create.md)).
-SQL-failure/ambiguity, admission and operational
+Bounded grant SQL contention now precedes fresh first/repeat runs with exact
+backend/Pod/blocker and server timeout evidence, unchanged ACLs/state, owned
+disconnect and retained failed execution ([ADR 0058](../decisions/0058-exercise-runtime-grant-sql-contention.md)).
+Live proof stays post-merge; partial-write/ambiguity, admission and operational
 cutover/host migration-grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.

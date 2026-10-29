@@ -109,7 +109,13 @@ grant Role before first success ([ADR 0057](decisions/0057-refuse-runtime-grant-
 Require the real successful prefix, exact native Forbidden, absent Job/Pod/output
 and unchanged ACLs/schema/data/credentials/storage before guarded rule restoration.
 Retain that failed Workflow and recheck restored authority at final retention.
-Unverified outcomes stop without repair or continuation. This establishes
-bootstrap success and authorization-refusal acceptance, not production
-cutover, admission or SQL-failure/ambiguous-commit recovery. Supported host
+After restoration, the same job now holds the exact advisory key in an owned,
+bounded session ([ADR 0058](decisions/0058-exercise-runtime-grant-sql-contention.md)).
+Require actual owner backend/Pod/blocker attribution and the server's published
+lock-timeout error, with unchanged ACLs/schema/data/credentials/storage. Only
+proved failure permits normal holder disconnect; both sessions/locks must be
+gone before fresh first/repeat grants. Retain the failed SQL Job and Workflow
+alongside the successes. Unverified outcomes stop without repair or continuation.
+This establishes bootstrap success, authorization and contention refusal, not
+production cutover, admission or partial-write/ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.
