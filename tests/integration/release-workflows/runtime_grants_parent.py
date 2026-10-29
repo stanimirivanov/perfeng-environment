@@ -272,9 +272,29 @@ def execution(
     }
 
 
+def delete_drift(first: dict[str, Any], current: dict[str, Any]) -> None:
+    """Allow exactly one added DELETE bit on the existing owner-granted runs entry."""
+    normalized = deepcopy(current)
+    tables = [table for table in normalized["tables"] if table["name"] == "runs"]
+    assert len(tables) == 1
+    entries = tables[0]["acl"]
+    indices = [i for i, entry in enumerate(entries) if entry.startswith("perfeng_runtime=")]
+    assert len(indices) == 1
+    index = indices[0]
+    prefix, suffix = "perfeng_runtime=", "/perfeng_migration"
+    entry = entries[index]
+    assert entry.endswith(suffix)
+    flags = entry.removeprefix(prefix).removesuffix(suffix)
+    assert flags.count("d") == 1
+    original_flags = flags.replace("d", "")
+    assert len(original_flags) == 3 and set(original_flags) == {"a", "r", "w"}
+    entries[index] = prefix + original_flags + suffix
+    assert normalized == first
+
+
 def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[str, Any] | None:
     """Replay immutable input, native execution and retained-state evidence."""
-    assert label in {"denied", "contention", "rollback", "first", "repeat"}
+    assert label in {"denied", "contention", "rollback", "first", "repeat", "corrected"}
 
     def load(name: str) -> Any:
         return json.loads((root / name).read_text())
@@ -302,6 +322,8 @@ def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[st
         load(f"grant-{label}-before.schema.json"),
         json.loads(Path("tests/integration/release-workflows/migration-image.json").read_text()),
     )
+    if label == "corrected":
+        delete_drift(load("grant-first-after.acl.json"), load("grant-corrected-before.acl.json"))
     if before_only:
         return
     assert identities == installed(label + "-after")
@@ -328,6 +350,10 @@ def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[st
     if label in {"denied", "contention", "rollback"}:
         assert (root / f"grant-{label}-before.acl.json").read_bytes() == (
             root / f"grant-{label}-after.acl.json"
+        ).read_bytes()
+    if label == "corrected":
+        assert (root / "grant-corrected-after.acl.json").read_bytes() == (
+            root / "grant-first-after.acl.json"
         ).read_bytes()
     if label == "denied":
         assert install.inventory(load("grant-denied-before.jobs.json")) == install.inventory(
@@ -376,9 +402,9 @@ def main() -> None:
         jobs = load("grant-retained.jobs.json")["items"]
         originals = [
             load(f"grant-{label}.job.json")
-            for label in ("contention", "rollback", "first", "repeat")
+            for label in ("contention", "rollback", "first", "repeat", "corrected")
         ]
-        assert len(jobs) == 4 and len({j["metadata"]["uid"] for j in originals}) == 4
+        assert len(jobs) == 5 and len({j["metadata"]["uid"] for j in originals}) == 5
         assert {j["metadata"]["uid"] for j in jobs} == {j["metadata"]["uid"] for j in originals}
         for job in originals:
             parent.retained_job(
@@ -386,9 +412,9 @@ def main() -> None:
                 next(j for j in jobs if j["metadata"]["uid"] == job["metadata"]["uid"]),
                 failed=job["metadata"]["uid"] in {j["metadata"]["uid"] for j in originals[:2]},
             )
-        labels = ("denied", "contention", "rollback", "first", "repeat")
+        labels = ("denied", "contention", "rollback", "first", "repeat", "corrected")
         workflows = [load(f"grant-{label}.workflow.json") for label in labels]
-        assert len({w["metadata"]["uid"] for w in workflows}) == 5
+        assert len({w["metadata"]["uid"] for w in workflows}) == 6
         for label, workflow in zip(labels, workflows, strict=True):
             current = load(f"grant-{label}.retained-workflow.json")
             assert install.inventory({"items": [workflow]}) == install.inventory(
@@ -407,7 +433,9 @@ def main() -> None:
             (root / "grant-first-after.acl.json").read_bytes()
             == (root / "grant-repeat-before.acl.json").read_bytes()
             == (root / "grant-repeat-after.acl.json").read_bytes()
+            == (root / "grant-corrected-after.acl.json").read_bytes()
         )
+        assert verify_case(root, "corrected") == load("grant-corrected.verified.json")
         # Only bounded, validated identifiers reach shared artifacts, after all phase gates.
         for label in labels:
             report = load(f"grant-{label}.verified.json")
@@ -420,6 +448,7 @@ def main() -> None:
         "rollback",
         "first",
         "repeat",
+        "corrected",
     }
     report = verify_case(root, label, before_only=action == "before")
     if report is not None:

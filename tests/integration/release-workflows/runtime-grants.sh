@@ -103,10 +103,14 @@ fi
 runtime_probe repeat success
 runtime_acl_snapshot "$results/runtime-grants-repeat.acl.json"
 cmp "$results/runtime-grants-first.acl.json" "$results/runtime-grants-repeat.acl.json"
-# Deliberate fixture-only drift; no rows are removed. Workers cannot repair it.
+# Deliberate fixture-only drift; no rows are removed. Runtime probes cannot repair it.
 sql -c 'GRANT DELETE ON perfeng_control.runs TO perfeng_runtime;'
 runtime_probe excess-delete failure
-sql < "$source_dir/runtime-grants.sql"
+if [[ ${scenario:-} == initial ]]; then
+  runtime_grant_parent corrected
+else
+  sql < "$source_dir/runtime-grants.sql"
+fi
 runtime_probe corrected success
 runtime_acl_snapshot "$results/runtime-grants-corrected.acl.json"
 cmp "$results/runtime-grants-first.acl.json" "$results/runtime-grants-corrected.acl.json"

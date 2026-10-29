@@ -24,7 +24,7 @@ grant_snapshot() {
 
 runtime_grant_parent() {
   local label=$1 previous=$current_stage name uid rc
-  [[ $label == denied || $label == contention || $label == rollback || $label == first || $label == repeat ]] || return 2
+  [[ $label == denied || $label == contention || $label == rollback || $label == first || $label == repeat || $label == corrected ]] || return 2
   start_stage "grant-parent-$label"
   grant_snapshot "$label-before"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_parent.py" "before-$label" "$fixture" "$results"
@@ -67,7 +67,7 @@ runtime_grant_parent() {
 runtime_grant_retention() {
   local label name
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-runtime-grants -o json > "$fixture/grant-retained.jobs.json"
-  for label in denied contention rollback first repeat; do
+  for label in denied contention rollback first repeat corrected; do
     name=$(jq -er .metadata.name "$fixture/grant-$label.workflow.json")
     a get "$name" -o json > "$fixture/grant-$label.retained-workflow.json"
   done

@@ -98,7 +98,7 @@ def populate(root, results):
         + MODULE.STATEMENT
         + "\n"
     )
-    for label in ("denied", "contention", "rollback", "first", "repeat"):
+    for label in ("denied", "contention", "rollback", "first", "repeat", "corrected"):
         grants.run("verify-" + label, root, results)
 
 
@@ -138,7 +138,7 @@ class RuntimeGrantsRollbackTests(unittest.TestCase):
             self.assertNotIn("IF EXISTS", cleanup)
             self.assertFalse(list(results.glob("grant-parent-*")))
             grants.run("retained", root, results)
-            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 5)
+            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 6)
             self.assertEqual(
                 json.loads((results / "grant-parent-rollback.outcome.json").read_text())[
                     "decision"

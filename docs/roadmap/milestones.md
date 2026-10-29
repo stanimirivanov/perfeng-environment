@@ -715,6 +715,10 @@ disconnect and retained failed execution ([ADR 0058](../decisions/0058-exercise-
 Attempted-GRANT rollback now uses a scoped fixture event trigger with unique
 error/ACL restoration proof and guarded fixture-only cleanup before fresh
 execution ([ADR 0059](../decisions/0059-exercise-runtime-grant-rollback.md)).
+The initial fixture's existing excess-DELETE correction now uses the unchanged
+owner parent, with strict drift admission, runtime TCP/ACL proof and retained
+execution ([ADR 0060](../decisions/0060-exercise-owner-grant-correction.md));
+other scenarios keep administrator correction.
 Live proof stays post-merge; ambiguous commits, admission and operational
 cutover/host migration-grant retirement remain open.
 

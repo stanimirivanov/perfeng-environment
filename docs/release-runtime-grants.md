@@ -101,7 +101,8 @@ runtime TCP probes verify exact privileges; both distinct owner Jobs, their
 provenance and SQL/template identities remain retained through the scenario.
 Schema/ledger/OIDs/data, roles/passwords, Secrets and foundation/storage identities
 must remain unchanged. The other five scenarios retain administrator grant parity;
-the excess-DELETE fault and administrator correction are unchanged everywhere.
+the excess-DELETE fault is unchanged everywhere. Initial-only owner correction
+is defined by ADR 0060 below; the other five scenarios keep administrator correction.
 
 Heavy checks run on PR CI; complete-parent live proof first runs after merge on
 trusted main. The initial fixture now also removes only Jobs create from the
@@ -123,6 +124,13 @@ error, unchanged committed ACLs and retained state before generating transaction
 OID/owner/definition-guarded DROP RESTRICT of only the trigger/function. Verify
 the original baseline before fresh first/repeat execution; retain both SQL-failed
 Jobs and all parent evidence through final gates. No automatic cleanup or repair.
-This establishes bootstrap success, authorization, contention and attempted-GRANT
-rollback acceptance, not production cutover, admission or ambiguous-commit recovery. Supported host
+The initial job now also uses the unchanged owner parent to correct the existing
+excess-DELETE fault ([ADR 0060](decisions/0060-exercise-owner-grant-correction.md)).
+Keep the administrator's injection and exact runtime refusal; admit only that
+single added DELETE bit before a fresh parent. Require real ordered gates, the
+fixed successful Job, corrected runtime TCP success and ACL bytes identical to
+first success. Retain five Jobs/six Workflows; other five scenarios keep
+administrator correction. No automatic repair or fallback is introduced.
+This establishes bootstrap success, authorization, contention, attempted-GRANT
+rollback and owner correction acceptance, not production cutover, admission or ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.

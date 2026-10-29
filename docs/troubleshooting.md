@@ -1709,6 +1709,17 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+For `grant-parent-corrected`, first require the existing excess-DELETE runtime
+probe to prove its exact policy refusal. The fresh ACL snapshot must differ from
+first success only by the one added runtime DELETE on runs; other principals,
+grantors, grant options, tables or schema ACL changes refuse before submission.
+The unchanged owner parent must pass its real gates and fixed Job, preserve
+non-ACL state and restore original ACL bytes, followed by the corrected runtime
+TCP probe. Do not fall back to administrator SQL after a failed boundary. Final
+retention must preserve the additional successful Job/Workflow and replay exact
+correction evidence. [ADR 0060](decisions/0060-exercise-owner-grant-correction.md)
+changes only the initial scenario; other five scenarios keep their existing path.
+
 For `grant-rollback-fixture`, `grant-parent-rollback` or `grant-rollback-proof`,
 inspect private `grant-rollback.*` catalogs, worker/server logs and retained
 state. Expected refusal requires the unique fixture exception for the exact
