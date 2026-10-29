@@ -1709,6 +1709,20 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+For `grant-rollback-fixture`, `grant-parent-rollback` or `grant-rollback-proof`,
+inspect private `grant-rollback.*` catalogs, worker/server logs and retained
+state. Expected refusal requires the unique fixture exception for the exact
+owner/application/schema-USAGE statement during the real grant Pod's lifetime.
+The read-only fixture function must observe USAGE inside the transaction, while
+committed ACLs afterward match the ungranted baseline. An unrelated SQL error,
+changed definition/owner/OID, active grant session or leftover key lock blocks
+cleanup. Only complete rollback/retention proof generates guarded transactional
+DROP RESTRICT; never use CASCADE, replace foreign objects or add EXIT repair.
+Cleanup must restore the original catalog before fresh grants, and final
+retention must find no fixture objects with successful runtime USAGE established.
+See [ADR 0059](decisions/0059-exercise-runtime-grant-rollback.md); actual trigger
+proof runs post-merge, while ambiguity and local execution remain outside scope.
+
 For `grant-contention-holder`, `grant-parent-contention` or
 `grant-contention-proof`, inspect the private catalog stream, exact worker/Job
 evidence and timestamped PostgreSQL log. Expected refusal requires the actual

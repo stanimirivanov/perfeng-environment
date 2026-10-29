@@ -52,14 +52,16 @@ def execution(
     *,
     denied: bool = False,
     contention: bool = False,
+    rollback: bool = False,
     diagnostic: str = "",
 ) -> dict[str, Any]:
     """Require actual native stages, authority, provenance and fixed owner Job."""
     assert workflow["metadata"]["namespace"] == "argo-workflows"
     assert workflow["spec"]["workflowTemplateRef"] == {"name": "perfeng-release-runtime-grants-v1"}
     assert not workflow["spec"].get("shutdown")
-    assert not (denied and contention)
-    failed_job = denied or contention
+    assert sum((denied, contention, rollback)) <= 1
+    sql_failure = contention or rollback
+    failed_job = denied or sql_failure
     assert workflow["status"]["phase"] in ({"Failed", "Error"} if failed_job else {"Succeeded"})
     args = workflow["spec"]["arguments"]["parameters"]
     assert len(args) == 4 and {p["name"]: p["value"] for p in args} == parameters
@@ -170,12 +172,12 @@ def execution(
         <= datetime.fromisoformat(job["metadata"]["creationTimestamp"])
         <= datetime.fromisoformat(sequence[4]["finishedAt"])
     )
-    state, other = ("failed", "succeeded") if contention else ("succeeded", "failed")
+    state, other = ("failed", "succeeded") if sql_failure else ("succeeded", "failed")
     assert job["status"].get(state) == 1 and not job["status"].get(other)
     assert any(
-        c["type"] == ("Failed" if contention else "Complete")
+        c["type"] == ("Failed" if sql_failure else "Complete")
         and c["status"] == "True"
-        and (not contention or c["reason"] == "BackoffLimitExceeded")
+        and (not sql_failure or c["reason"] == "BackoffLimitExceeded")
         for c in job["status"]["conditions"]
     )
     assert len(pods["items"]) == 1
@@ -237,11 +239,11 @@ def execution(
             and security.get("runAsUser", 999) == security.get("runAsGroup", 999) == 999
         )
         assert security.get("procMount", "Default") == "Default"
-    assert pod["status"]["phase"] == ("Failed" if contention else "Succeeded")
+    assert pod["status"]["phase"] == ("Failed" if sql_failure else "Succeeded")
     statuses = pod["status"]["containerStatuses"]
     assert len(statuses) == 1 and statuses[0]["name"] == "grant"
     assert (
-        statuses[0]["state"]["terminated"]["exitCode"] == (1 if contention else 0)
+        statuses[0]["state"]["terminated"]["exitCode"] == (1 if sql_failure else 0)
         and statuses[0].get("restartCount", 0) == 0
     )
     values = {
@@ -251,7 +253,7 @@ def execution(
         .get("parameters", [])
         if "value" in p
     }
-    if contention:
+    if sql_failure:
         assert statuses[0]["state"]["terminated"]["reason"] == "Error"
         assert not values.get("checkpoint") and not values.get("job-name")
     else:
@@ -259,7 +261,9 @@ def execution(
             json.loads(values["checkpoint"]) == checkpoint and values["job-name"] == expected_name
         )
     return {
-        "decision": "owner-grant-contention-refused"
+        "decision": "owner-grant-rollback-refused"
+        if rollback
+        else "owner-grant-contention-refused"
         if contention
         else "owner-grant-parent-verified",
         "workflowUID": uid,
@@ -270,7 +274,7 @@ def execution(
 
 def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[str, Any] | None:
     """Replay immutable input, native execution and retained-state evidence."""
-    assert label in {"denied", "contention", "first", "repeat"}
+    assert label in {"denied", "contention", "rollback", "first", "repeat"}
 
     def load(name: str) -> Any:
         return json.loads((root / name).read_text())
@@ -321,7 +325,7 @@ def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[st
         assert (root / f"grant-{label}-before.{suffix}").read_bytes() == (
             root / f"grant-{label}-after.{suffix}"
         ).read_bytes()
-    if label in {"denied", "contention"}:
+    if label in {"denied", "contention", "rollback"}:
         assert (root / f"grant-{label}-before.acl.json").read_bytes() == (
             root / f"grant-{label}-after.acl.json"
         ).read_bytes()
@@ -329,10 +333,10 @@ def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[st
         assert install.inventory(load("grant-denied-before.jobs.json")) == install.inventory(
             load("grant-denied-after.jobs.json")
         )
-    if label == "contention":
-        before_jobs = install.inventory(load("grant-contention-before.jobs.json"))
-        after_jobs = load("grant-contention-after.jobs.json")
-        expected_job = load("grant-contention.job.json")
+    if label in {"contention", "rollback"}:
+        before_jobs = install.inventory(load(f"grant-{label}-before.jobs.json"))
+        after_jobs = load(f"grant-{label}-after.jobs.json")
+        expected_job = load(f"grant-{label}.job.json")
         assert install.inventory(after_jobs) == {
             **before_jobs,
             **install.inventory({"items": [expected_job]}),
@@ -348,6 +352,7 @@ def verify_case(root: Path, label: str, *, before_only: bool = False) -> dict[st
         load(f"grant-{label}.pods.json"),
         denied=label == "denied",
         contention=label == "contention",
+        rollback=label == "rollback",
         diagnostic=(root / "grant-denied.log").read_text() if label == "denied" else "",
     )
     return report
@@ -369,18 +374,21 @@ def main() -> None:
 
     if mode == "retained":
         jobs = load("grant-retained.jobs.json")["items"]
-        originals = [load(f"grant-{label}.job.json") for label in ("contention", "first", "repeat")]
-        assert len(jobs) == 3 and len({j["metadata"]["uid"] for j in originals}) == 3
+        originals = [
+            load(f"grant-{label}.job.json")
+            for label in ("contention", "rollback", "first", "repeat")
+        ]
+        assert len(jobs) == 4 and len({j["metadata"]["uid"] for j in originals}) == 4
         assert {j["metadata"]["uid"] for j in jobs} == {j["metadata"]["uid"] for j in originals}
         for job in originals:
             parent.retained_job(
                 job,
                 next(j for j in jobs if j["metadata"]["uid"] == job["metadata"]["uid"]),
-                failed=job is originals[0],
+                failed=job["metadata"]["uid"] in {j["metadata"]["uid"] for j in originals[:2]},
             )
-        labels = ("denied", "contention", "first", "repeat")
+        labels = ("denied", "contention", "rollback", "first", "repeat")
         workflows = [load(f"grant-{label}.workflow.json") for label in labels]
-        assert len({w["metadata"]["uid"] for w in workflows}) == 4
+        assert len({w["metadata"]["uid"] for w in workflows}) == 5
         for label, workflow in zip(labels, workflows, strict=True):
             current = load(f"grant-{label}.retained-workflow.json")
             assert install.inventory({"items": [workflow]}) == install.inventory(
@@ -388,7 +396,9 @@ def main() -> None:
             )
             assert current["status"]["phase"] == workflow["status"]["phase"]
             assert current["status"]["phase"] in (
-                {"Failed", "Error"} if label in {"denied", "contention"} else {"Succeeded"}
+                {"Failed", "Error"}
+                if label in {"denied", "contention", "rollback"}
+                else {"Succeeded"}
             )
             assert (
                 installed(label + "-before") == installed(label + "-after") == installed("retained")
@@ -404,7 +414,13 @@ def main() -> None:
             (results / f"grant-parent-{label}.outcome.json").write_text(json.dumps(report) + "\n")
         return
     action, label = mode.split("-", 1)
-    assert action in {"before", "verify"} and label in {"denied", "contention", "first", "repeat"}
+    assert action in {"before", "verify"} and label in {
+        "denied",
+        "contention",
+        "rollback",
+        "first",
+        "repeat",
+    }
     report = verify_case(root, label, before_only=action == "before")
     if report is not None:
         (root / f"grant-{label}.verified.json").write_text(json.dumps(report) + "\n")

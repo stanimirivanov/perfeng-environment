@@ -251,5 +251,8 @@ supported command or production verifier source is removed.
 The [grant SQL contention slice](decisions/0058-exercise-runtime-grant-sql-contention.md)
 adds bounded refusal/owned-session evidence only, with live proof post-merge.
 It changes no host command and adds no retirement credit.
+The [attempted-GRANT rollback slice](decisions/0059-exercise-runtime-grant-rollback.md)
+adds only CI fault/cleanup evidence and retains both failed SQL Jobs. Live proof
+remains post-merge; no host command or production verifier source is retired.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

@@ -263,6 +263,7 @@ a() { echo '{}'; }; k() { echo '{}'; }; jq() { echo native-id; }
 uv() { step "verify-${6}"; }
 runtime_grant_access() { step final-rights; }
 runtime_grant_contention_retention() { step contention-retained; }
+runtime_grant_rollback_retention() { step rollback-retained; }
 timeout() { return "$WAIT_CODE"; }
 """
         with tempfile.TemporaryDirectory() as temporary:
@@ -273,7 +274,13 @@ timeout() { return "$WAIT_CODE"; }
             ]
             cases += [
                 (name, 0, retained, "runtime_grant_retention", name == "pass")
-                for name in ("pass", "final-rights", "verify-final", "contention-retained")
+                for name in (
+                    "pass",
+                    "final-rights",
+                    "verify-final",
+                    "contention-retained",
+                    "rollback-retained",
+                )
             ]
             for name, code, library, command, success in cases:
                 case = root / name

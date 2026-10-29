@@ -154,3 +154,4 @@ How will the assumptions and consequences be verified?
 | [0056](0056-exercise-owner-runtime-grants.md) | Proposed | Prove unchanged owner-parent first/repeat grants on the paused initial CI fixture, with runtime TCP policy checks and retained state/Jobs. |
 | [0057](0057-refuse-runtime-grant-job-create.md) | Proposed | Prove exact native grant Job-create Forbidden with unchanged ACLs/state, guarded Role restoration and retained failed Workflow before existing successes. |
 | [0058](0058-exercise-runtime-grant-sql-contention.md) | Proposed | Prove exact grant SQL lock contention without ACL/state drift, then owned disconnect and fresh first/repeat execution with failed Job/Workflow retention. |
+| [0059](0059-exercise-runtime-grant-rollback.md) | Proposed | Prove actual schema GRANT effects roll back after a scoped fixture event-trigger error, then guarded fixture-only cleanup and fresh execution. |

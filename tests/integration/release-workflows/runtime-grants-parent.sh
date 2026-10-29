@@ -24,7 +24,7 @@ grant_snapshot() {
 
 runtime_grant_parent() {
   local label=$1 previous=$current_stage name uid rc
-  [[ $label == denied || $label == contention || $label == first || $label == repeat ]] || return 2
+  [[ $label == denied || $label == contention || $label == rollback || $label == first || $label == repeat ]] || return 2
   start_stage "grant-parent-$label"
   grant_snapshot "$label-before"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_parent.py" "before-$label" "$fixture" "$results"
@@ -48,6 +48,12 @@ runtime_grant_parent() {
     local since
     since=$(jq -er .observedAt "$fixture/grant-contention.held.json")
     k -n perf-platform logs "$database_pod" -c postgres --since-time="$since" --timestamps=true --tail=200 --limit-bytes=65536 > "$fixture/grant-contention.postgres.private"
+  elif [[ $label == rollback ]]; then
+    [[ $rc != 0 && $rc != 124 && $rc != 137 ]]
+    k -n perf-platform logs "job/perfeng-runtime-grants-$uid" -c grant --tail=20 --limit-bytes=8192 > "$fixture/grant-rollback.worker.private"
+    local since
+    since=$(jq -er .observedAt "$fixture/grant-rollback.catalog-installed.json")
+    k -n perf-platform logs "$database_pod" -c postgres --since-time="$since" --timestamps=true --tail=200 --limit-bytes=65536 > "$fixture/grant-rollback.postgres.private"
   elif [[ $rc != 0 ]]; then
     printf '%s\n' '[RUNTIME-GRANT-PARENT] Parent did not succeed. Inspect private grant case evidence and stage reports; no retry, correction or activation was performed.' >&2
     return 1
@@ -61,7 +67,7 @@ runtime_grant_parent() {
 runtime_grant_retention() {
   local label name
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-runtime-grants -o json > "$fixture/grant-retained.jobs.json"
-  for label in denied contention first repeat; do
+  for label in denied contention rollback first repeat; do
     name=$(jq -er .metadata.name "$fixture/grant-$label.workflow.json")
     a get "$name" -o json > "$fixture/grant-$label.retained-workflow.json"
   done
@@ -70,6 +76,7 @@ runtime_grant_retention() {
   runtime_grant_access false
   PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_denial.py" final "$fixture"
   runtime_grant_contention_retention
+  runtime_grant_rollback_retention
   PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_parent.py" retained "$fixture" "$results"
 }
 
@@ -120,3 +127,4 @@ for grant_file in runtime-grants-sql-v1.yaml runtime-grants-job-v1.yaml release-
   k apply -f "gitops/release-workflows/$grant_file"
 done
 source "$source_dir/runtime-grants-contention.sh"
+source "$source_dir/runtime-grants-rollback.sh"

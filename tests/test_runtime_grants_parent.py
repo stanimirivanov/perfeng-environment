@@ -44,7 +44,7 @@ def populate(root, results):
         obj["metadata"]["uid"] = obj["metadata"]["name"]
     config = yaml.safe_load((MODULE.parent.DIRECTORY / "runtime-grants-sql-v1.yaml").read_text())
     config["metadata"]["uid"] = "sql-uid"
-    for label in ("denied", "contention", "first", "repeat"):
+    for label in ("denied", "contention", "rollback", "first", "repeat"):
         for when in ("before", "after"):
             for suffix in ("objects", "applications", "pods", "pvs", "namespace", "roles"):
                 save(
@@ -107,7 +107,7 @@ def populate(root, results):
             {"kind": "Job", "name": job_name, "uid": job["metadata"]["uid"], "controller": True}
         ]
         pod["status"]["containerStatuses"][0]["name"] = "grant"
-        if label == "contention":
+        if label in {"contention", "rollback"}:
             workflow["status"]["phase"] = "Failed"
             nodes[workflow["metadata"]["name"]].update(phase="Failed")
             nodes[workflow["metadata"]["name"]].pop("outputs")
@@ -126,8 +126,8 @@ def populate(root, results):
                 "startedAt": "2026-10-28T00:00:16.2+00:00",
                 "finishedAt": "2026-10-28T00:00:22.2+00:00",
             }
-            save("grant-contention-before.jobs.json", {"items": []})
-            save("grant-contention-after.jobs.json", {"items": [job]})
+            save(f"grant-{label}-before.jobs.json", {"items": []})
+            save(f"grant-{label}-after.jobs.json", {"items": [job]})
         if label == "denied":
             workflow["status"]["phase"] = "Failed"
             nodes[workflow["metadata"]["name"]].update(phase="Failed")
@@ -156,6 +156,8 @@ def populate(root, results):
         "denied-after",
         "contention-before",
         "contention-after",
+        "rollback-before",
+        "rollback-after",
         "first-before",
         "first-after",
         "repeat-before",
@@ -167,7 +169,12 @@ def populate(root, results):
         save(f"grant-{label}.intent.json", load("schema-install.intent-before.json"))
     save(
         "grant-retained.jobs.json",
-        {"items": [load(f"grant-{label}.job.json") for label in ("contention", "first", "repeat")]},
+        {
+            "items": [
+                load(f"grant-{label}.job.json")
+                for label in ("contention", "rollback", "first", "repeat")
+            ]
+        },
     )
 
 
@@ -183,12 +190,12 @@ class RuntimeGrantsParentTests(unittest.TestCase):
             results = root / "results"
             results.mkdir()
             populate(root, results)
-            for label in ("denied", "contention", "first", "repeat"):
+            for label in ("denied", "contention", "rollback", "first", "repeat"):
                 run("before-" + label, root, results)
                 run("verify-" + label, root, results)
             self.assertFalse(list(results.glob("grant-parent-*")))
             run("retained", root, results)
-            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 4)
+            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 5)
             for path in results.glob("grant-parent-*.outcome.json"):
                 self.assertEqual(
                     set(json.loads(path.read_text())),
@@ -280,7 +287,7 @@ class RuntimeGrantsParentTests(unittest.TestCase):
             results = root / "results"
             results.mkdir()
             populate(root, results)
-            for label in ("denied", "contention", "first", "repeat"):
+            for label in ("denied", "contention", "rollback", "first", "repeat"):
                 run("verify-" + label, root, results)
             for name, mutate in (
                 ("grant-retained.jobs.json", lambda x: x["items"].pop()),
@@ -372,6 +379,7 @@ timeout() { record wait; [[ $FAIL != wait ]]; }
                 'runtime_grant_parent() { echo "parent $1" >> trace; [[ $1 != ${FAIL:-pass} ]]; }\n'
                 "runtime_grant_denial() { echo denial >> trace; [[ ${FAIL:-pass} != denied ]]; }\n"
                 "runtime_grant_contention() { echo contention >> trace; [[ ${FAIL:-pass} != contention ]]; }\n"
+                "runtime_grant_rollback() { echo rollback >> trace; [[ ${FAIL:-pass} != rollback ]]; }\n"
             )
             for scenario in (
                 "initial",
@@ -411,7 +419,7 @@ sql() { echo admin >> trace; }
                     trace.index("probe corrected success"),
                 )
                 (root / "trace").unlink()
-            for fail in ("denied", "contention", "first", "repeat"):
+            for fail in ("denied", "contention", "rollback", "first", "repeat"):
                 process = subprocess.run(
                     [str(BASH), str(script)],
                     cwd=root,

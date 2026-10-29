@@ -116,6 +116,13 @@ lock-timeout error, with unchanged ACLs/schema/data/credentials/storage. Only
 proved failure permits normal holder disconnect; both sessions/locks must be
 gone before fresh first/repeat grants. Retain the failed SQL Job and Workflow
 alongside the successes. Unverified outcomes stop without repair or continuation.
-This establishes bootstrap success, authorization and contention refusal, not
-production cutover, admission or partial-write/ambiguous-commit recovery. Supported host
+After contention cleanup, a scoped fixture event trigger now raises only after
+observing the exact schema-USAGE GRANT's effect inside the transaction
+([ADR 0059](decisions/0059-exercise-runtime-grant-rollback.md)). Require the unique
+error, unchanged committed ACLs and retained state before generating transactional
+OID/owner/definition-guarded DROP RESTRICT of only the trigger/function. Verify
+the original baseline before fresh first/repeat execution; retain both SQL-failed
+Jobs and all parent evidence through final gates. No automatic cleanup or repair.
+This establishes bootstrap success, authorization, contention and attempted-GRANT
+rollback acceptance, not production cutover, admission or ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.
