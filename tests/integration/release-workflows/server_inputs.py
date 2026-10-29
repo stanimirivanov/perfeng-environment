@@ -26,6 +26,43 @@ def source_selection(source: Path) -> release.DeploymentLock:
     return lock
 
 
+def pull_secret(source: dict[str, Any]) -> dict[str, Any]:
+    """Clone only the existing fixture registry data under the selected fixed name."""
+    assert source["type"] == "kubernetes.io/dockerconfigjson" and source["metadata"]["uid"]
+    assert set(source["data"]) == {".dockerconfigjson"}
+    return {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "type": source["type"],
+        "immutable": True,
+        "metadata": {"name": "perfeng-control-plane-registry", "namespace": "perf-platform"},
+        "data": source["data"],
+    }
+
+
+def retained_pull(original: dict[str, Any], current: dict[str, Any]) -> None:
+    """Refuse replacement, credential drift or an unsafe preexisting pull Secret."""
+    for obj in (original, current):
+        assert obj["apiVersion"] == "v1" and obj["kind"] == "Secret"
+        assert obj["metadata"]["name"] == "perfeng-control-plane-registry"
+        assert obj["metadata"]["namespace"] == "perf-platform" and obj["metadata"]["uid"]
+        assert obj["immutable"] is True and obj["type"] == "kubernetes.io/dockerconfigjson"
+        assert set(obj["data"]) == {".dockerconfigjson"}
+        assert not any(obj["metadata"].get(k) for k in ("deletionTimestamp", "ownerReferences"))
+    assert {k: v for k, v in original.items() if k != "metadata"} == {
+        k: v for k, v in current.items() if k != "metadata"
+    }
+    assert {
+        k: v
+        for k, v in original["metadata"].items()
+        if k not in {"resourceVersion", "managedFields"}
+    } == {
+        k: v
+        for k, v in current["metadata"].items()
+        if k not in {"resourceVersion", "managedFields"}
+    }
+
+
 def prepare(source: Path, directory: Path) -> None:
     """Write only private fixture Secrets and non-secret reviewed Helm values."""
     lock = source_selection(source)
@@ -76,6 +113,14 @@ def prepare(source: Path, directory: Path) -> None:
             "data": stored["migration-ci-registry"]["data"],
         }
     )
+    if (directory / "schema-install.pull-before.json").exists():
+        original = json.loads((directory / "schema-install.pull-before.json").read_text())
+        current = json.loads((directory / "server-pull-current.json").read_text())
+        retained_pull(original, current)
+        assert documents[-1]["data"] == current["data"]
+        documents.pop()  # The verified immutable Secret is retained, never created twice.
+    else:
+        assert not (directory / "server-pull-current.json").exists()
     (directory / "server-secrets.json").write_text(
         json.dumps({"apiVersion": "v1", "kind": "List", "items": documents}), encoding="utf-8"
     )

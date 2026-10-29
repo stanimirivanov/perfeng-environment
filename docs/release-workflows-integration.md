@@ -256,8 +256,9 @@ See PostgreSQL's [environment-variable documentation](https://www.postgresql.org
 ### Selected migration-image parity
 
 After external-state preparation, the main-only job runs the exact control-plane
-image selected by `deployments/local-control-plane.json`. Its CI resource wrapper
-executes `/usr/local/bin/migrate` directly; no rebuilt binary, mutable image tag
+image selected by `deployments/local-control-plane.json`. The initial leg uses
+the unchanged complete schema parent for first installation ([ADR 0052](decisions/0052-exercise-complete-schema-first-install.md)); other invocations keep the CI resource wrapper.
+Both execute `/usr/local/bin/migrate` directly; no rebuilt binary, mutable image tag
 or shell substitute is used. `migration-image.json` records the selected image,
 source commit and raw SHA-256 of the eighteen SQL files embedded by that source.
 These are test expectations, not copied SQL or a new shared release contract.
@@ -1889,8 +1890,8 @@ The existing upgrade-request is the valid forward-only/0018 input. Exactly one
 new migration-none request, identical apart from migration intent, is published
 only in the initial leg's existing commit/ref. The other three fixtures and
 five scenarios are unchanged. No new CI jobs, scenarios, refs, credentials,
-rights or budget are introduced. Both Jobs and all four Workflows remain
-retained; installed source/policy identities must remain unchanged.
+rights or budget are introduced. Both new Jobs and all four paused-suite Workflows remain
+retained, alongside the initial installation Job/Workflow; installed source/policy identities must remain unchanged.
 
 While still paused, require original receipt/pointer provenance, Secret/config
 bytes, foundation/workload/storage identities, SQL/S3 data, schema-ledger
@@ -1922,3 +1923,38 @@ that failed worker's bounded main log for refusal attribution; generic startup
 projections remain diagnostic-only. Only all proof permits a fresh guarded Role
 restoration; validate restored rules/access before repeats and again at final
 retention. No EXIT repair, new recovery or local operation is authorized.
+
+
+### Complete schema-parent first-install acceptance
+
+[ADR 0052](decisions/0052-exercise-complete-schema-first-install.md) runs
+`schema-migration-install.sh` only instead of the initial leg's first CI-only
+successful migration invocation. Runtime-role denial and the independent
+checkpoint remain; other five scenarios retain their original migration path.
+Before submission, prove a naturally absent schema and zero application
+relations, paused explicit bootstrap Applications/Deployment and no native
+migration Jobs. No database is reset or deleted.
+
+Create the fixed immutable server pull Secret earlier using the same approved
+registry bytes, refusing a preexisting target. The later server-input generator
+requires a fresh matching UID/type/data observation and omits that Secret from
+its create list. Require real unchanged parent stage/worker order, selected
+native Job/Pod, fixed command/security/credential references, all 18 migrations,
+stable source/policy UIDs and retained foundation/workload/config/Secret/storage
+and SQL-role observations. Shared pure execution evidence also checks the later
+adopted repeats; first installation does not claim adopted server readiness.
+
+Inspect `schema-install-setup`, `schema-install-parent`, bounded startup/outcome
+projections, and private parent/Job/Pod/Secret/role/resource snapshots. The old
+first image-parity projection contract remains, with its independently verified
+fixed server pull Secret and migration application name. Raw parent/Pod/logs and
+credential observations stay private. A failed submit stops its bounded observer;
+failed execution cannot fall back to the CI migrator or continue into repeats.
+
+The paused suite requires exactly the original successful install Job before
+its own cases. No-create refusals retain it; repeats add exactly two fresh Jobs.
+Recheck install Job spec/UID/provenance, original Workflow identity/spec/outputs
+and immutable pull-Secret identity/data before the complete suite outcome and
+existing recovery. All three Jobs and five parent Workflows stay retained.
+No new job/scenario/ref/request, token/right, budget, local action, SQL repair or
+recovery path is added. Heavy checks stay on PR CI; live proof is post-merge.

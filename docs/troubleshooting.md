@@ -1633,3 +1633,25 @@ an unproved case green. Only proved refusal and retention permit the captured
 rules' UID/resourceVersion/rules-guarded restoration. A stale patch or changed
 Role stops acceptance for owned disposable cleanup. Heavy checks stay on CI;
 live proof remains post-merge, with no local action.
+
+
+### Complete schema first installation stops
+
+`schema-install-setup` and `schema-install-parent` run only in the trusted-main
+initial leg ([ADR 0052](decisions/0052-exercise-complete-schema-first-install.md)).
+Setup must observe the naturally empty database and explicit paused bootstrap
+objects. A preexisting schema, application relation, native migration Job or
+fixed pull Secret is a refusal, never a reason to delete or reset anything.
+Inspect bounded startup/stage projections, then the private complete-parent,
+Job/Pod, role/resource and Secret snapshots. Missing Job, failed prefix/intent,
+image startup, nonzero migrator, incomplete schema ledger or retained-state drift
+cannot qualify. Raw credentials, SQL and logs must stay out of shared artifacts.
+
+Server setup must reuse the exact early immutable pull Secret. A different UID,
+credential data/type/metadata or missing observation stops before resource
+creation; do not recreate or rotate it as a repair. The paused-suite baseline
+must contain exactly the original install Job, and final retention must preserve
+its Job/Workflow/Secret before aggregate success or checked recovery. Failure
+stops for owned disposable cleanup, without fallback migrators, retries, SQL
+repair or local infrastructure actions. Full checks stay on CI and live proof
+remains post-merge; placeholder installation is not adopted server readiness.

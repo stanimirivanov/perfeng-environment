@@ -90,6 +90,33 @@ class ServerIntegrationTests(unittest.TestCase):
             )
             self.assertTrue(all(d["immutable"] for d in documents))
             self.assertEqual(len(documents), 3)
+            early = documents[-1]
+            early["metadata"].update(uid="early-pull", resourceVersion="10")
+            (directory / "schema-install.pull-before.json").write_text(json.dumps(early))
+            (directory / "server-pull-current.json").write_text(json.dumps(early))
+            with patch.object(MODULE, "source_selection", return_value=MODULE.release.load_lock()):
+                MODULE.prepare(Path("unused"), directory)
+            reused = json.loads((directory / "server-secrets.json").read_text())["items"]
+            self.assertEqual(len(reused), 2)
+            self.assertNotIn(
+                "perfeng-control-plane-registry", [o["metadata"]["name"] for o in reused]
+            )
+            for field in ("uid", "data", "immutable"):
+                changed = json.loads(json.dumps(early))
+                if field == "uid":
+                    changed["metadata"]["uid"] = "replacement"
+                elif field == "data":
+                    changed["data"][".dockerconfigjson"] = "changed"
+                else:
+                    changed["immutable"] = False
+                (directory / "server-pull-current.json").write_text(json.dumps(changed))
+                with (
+                    patch.object(
+                        MODULE, "source_selection", return_value=MODULE.release.load_lock()
+                    ),
+                    self.assertRaises(AssertionError),
+                ):
+                    MODULE.prepare(Path("unused"), directory)
 
     def test_native_projection_refuses_wrong_image_mounts_uid_stale_rollout_and_service(self):
         lock = MODULE.release.load_lock()

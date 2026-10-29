@@ -209,6 +209,7 @@ def populate(directory, results):
     source = image.MigrationImageIntegrationTests()
     source.setUp()
     schema = source.schema()
+    save("schema-parent-baseline.jobs.json", {"items": []})
     save("parent-parameters.json", pause.evidence()[2])
     save("schema-parent-baseline.schema.json", schema)
     save("schema-parent-baseline.roles.json", {"roles": "unchanged"})
@@ -250,6 +251,43 @@ def populate(directory, results):
 
 
 class SchemaMigrationParentTests(unittest.TestCase):
+    def test_refusals_create_nothing_and_repeats_preserve_a_prior_install_job(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            results = root / "results"
+            results.mkdir()
+            populate(root, results)
+            installed = deepcopy(evidence("first")[8])
+            installed["metadata"].update(uid="install-job", name="perfeng-schema-install")
+            (root / "schema-parent-baseline.jobs.json").write_text(
+                json.dumps({"items": [installed]})
+            )
+            files = ["schema-parent.retained-jobs.json"] + [
+                f"schema-parent-{label}.jobs-{when}.json"
+                for label in MODULE.LABELS
+                for when in ("before", "after")
+            ]
+            for name in files:
+                path = root / name
+                value = json.loads(path.read_text())
+                value["items"].insert(0, deepcopy(installed))
+                path.write_text(json.dumps(value))
+            with patch("sys.argv", ["evidence", "complete", str(root), str(results)]):
+                MODULE.main()
+            report = results / "schema-parent-complete.outcome.json"
+            self.assertTrue(report.exists())
+            report.unlink()
+            path = root / "schema-parent-denied.jobs-after.json"
+            value = json.loads(path.read_text())
+            value["items"][0]["spec"]["backoffLimit"] = 1
+            path.write_text(json.dumps(value))
+            with (
+                patch("sys.argv", ["evidence", "complete", str(root), str(results)]),
+                self.assertRaises(AssertionError),
+            ):
+                MODULE.main()
+            self.assertFalse(report.exists())
+
     def test_denial_requires_exact_native_failure_and_successful_prefix(self):
         args = evidence("denied")
         log = denied_log(args[1])
@@ -623,11 +661,13 @@ start_stage() { echo "stage $1" >> "$fixture/trace"; }; complete_stage() { echo 
 k() { echo '{}'; }; jq() { cat >/dev/null; echo workflow; }
 schema_parent_snapshot() { echo baseline >> "$fixture/trace"; [[ $failure != baseline ]]; }
 schema_parent_sources() { echo "installed-$1" >> "$fixture/trace"; [[ $failure != "installed-$1" ]]; }
+schema_install_retention() { echo install-retention >> "$fixture/trace"; [[ $failure != install-retention ]]; }
 schema_parent_denial() { schema_parent_case denied; }
 schema_parent_access() { echo authority-final >> "$fixture/trace"; [[ $failure != authority-final ]]; }
 schema_parent_case() { echo "case-$1" >> "$fixture/trace"; [[ $failure != "$1" ]]; }
 uv() {
   if [[ $* == *' baseline '* ]]; then step=verify-baseline
+  elif [[ $* == *' baseline-retained '* ]]; then step=verify-install-baseline
   elif [[ $* == *' final '* ]]; then step=verify-authority
   else step=verify-complete; fi
   echo "$step" >> "$fixture/trace"; [[ $failure != "$step" ]];
@@ -643,6 +683,7 @@ echo recovery >> "$fixture/trace"
             for failure in (
                 "pass",
                 "baseline",
+                "verify-install-baseline",
                 "installed-before",
                 "verify-baseline",
                 "none",
@@ -653,6 +694,7 @@ echo recovery >> "$fixture/trace"
                 "authority-final",
                 "verify-authority",
                 "verify-complete",
+                "install-retention",
             ):
                 fixture = directory / failure
                 fixture.mkdir()

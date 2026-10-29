@@ -211,3 +211,11 @@ Bounded complete-parent Job-create denial ([ADR 0051](decisions/0051-exercise-sc
 adds CI-only Role guards and refusal/retention evidence. It changes no production
 Python or supported task, and retires no host entrypoint. Two modules/708 lines
 remain unchanged; operational cutover and measured deletion remain pending.
+
+
+Complete-parent first-install acceptance ([ADR 0052](decisions/0052-exercise-complete-schema-first-install.md))
+replaces only a CI migrator invocation and moves fixture credential creation.
+Its evidence helpers are CI-only; production definitions and supported host tasks
+remain unchanged. No retirement credit is claimed: 13 entrypoints remain, with
+the same two-module/708-line production verifier budget. SQL failure/recovery,
+operational cutover and measured deletion remain separate gates.

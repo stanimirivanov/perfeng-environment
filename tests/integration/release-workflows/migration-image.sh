@@ -71,6 +71,10 @@ for field, parameter in (("requestRevision","request-revision"),("requestDigest"
     assert checkpoint[field] == parameters[parameter]
 assert checkpoint["clusterUID"] == sys.argv[3]
 PY
+  if [[ ${scenario:-} == initial && $migration_label == first ]]; then
+    source "$source_dir/schema-migration-install.sh"
+    return
+  fi
   migration_name=$(a submit "$source_dir/migration-image-workflow.yaml" -p "image=$image" \
     -p "credential-key=$migration_key" -p "application-name=migration-ci-$migration_label" -o json | jq -er .metadata.name)
   # Native Job deadline cleanup can delete a Pending Pod before argo wait returns.

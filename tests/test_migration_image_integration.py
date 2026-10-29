@@ -370,6 +370,28 @@ printf '%s %s' "$migration_rc" "$migration_watch_rc"
             self.populate(directory)
             EVIDENCE.check(directory, self.contract)
 
+    def test_first_parent_projection_requires_its_fixed_pull_and_application_name(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.populate(root)
+            path = root / "migration-image-first.workflow.json"
+            workflow = json.loads(path.read_text())
+            workflow["spec"] = {
+                "workflowTemplateRef": {"name": "perfeng-release-schema-migration-v1"}
+            }
+            path.write_text(json.dumps(workflow))
+            path = root / "migration-image-first.job.json"
+            job = json.loads(path.read_text())
+            pod = job["spec"]["template"]["spec"]
+            pod["imagePullSecrets"] = [{"name": "perfeng-control-plane-registry"}]
+            pod["containers"][0]["env"][1]["value"] = "perfeng-schema-migration-v1"
+            path.write_text(json.dumps(job))
+            EVIDENCE.check(root, self.contract)
+            pod["imagePullSecrets"] = [{"name": "migration-ci-registry"}]
+            path.write_text(json.dumps(job))
+            with self.assertRaises(AssertionError):
+                EVIDENCE.check(root, self.contract)
+
     def test_schema_rejects_wrong_missing_duplicate_or_foreign_ledger(self):
         for change in ("digest", "missing", "duplicate", "owner"):
             with self.subTest(change=change):
