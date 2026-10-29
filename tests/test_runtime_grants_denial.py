@@ -273,7 +273,7 @@ timeout() { return "$WAIT_CODE"; }
                 for code in (0, 1, 124, 137)
             ]
             cases += [
-                (name, 0, retained, "runtime_grant_retention", name == "pass")
+                (name, 0, retained, "runtime_grant_retention bootstrap", name == "pass")
                 for name in (
                     "pass",
                     "final-rights",

@@ -39,6 +39,7 @@ PYTHONPATH=. uv run --locked --offline python "$source_dir/maintenance_pause_evi
 complete_stage
 
 source "$source_dir/schema-migration-parent.sh"
+source "$source_dir/runtime-grants-adopted.sh"
 
 # Only a proved successful pause may reach this independently authorized CI recovery.
 start_stage maintenance-recovery

@@ -356,6 +356,9 @@ source() {
   if [[ $1 == */schema-migration-parent.sh ]]; then
     echo schema-parent-acceptance
     [[ $failure != schema-parent ]] || return 17
+  elif [[ $1 == */runtime-grants-adopted.sh ]]; then
+    echo adopted-grant-acceptance
+    [[ $failure != adopted-grants ]] || return 17
   elif [[ $1 == */maintenance-authority.sh ]]; then
     echo authority-audit
     [[ $failure != authority ]] || return 17
@@ -367,7 +370,14 @@ source "$source_dir/maintenance-pause.sh"
             directory = Path(temporary)
             script = directory / "rehearsal.sh"
             script.write_text(shell, encoding="utf-8", newline="\n")
-            for failure in ("authority", "paused", "schema-parent", "recovered", "none"):
+            for failure in (
+                "authority",
+                "paused",
+                "schema-parent",
+                "adopted-grants",
+                "recovered",
+                "none",
+            ):
                 with self.subTest(failure=failure):
                     fixture = directory / failure
                     results = fixture / "results"
@@ -390,7 +400,7 @@ source "$source_dir/maintenance-pause.sh"
                     self.assertEqual(
                         result.returncode, 0 if failure == "none" else 17, result.stderr
                     )
-                    if failure in {"authority", "paused", "schema-parent"}:
+                    if failure in {"authority", "paused", "schema-parent", "adopted-grants"}:
                         self.assertNotIn("recovery-sync", result.stdout)
                     else:
                         self.assertIn("recovery-sync", result.stdout)

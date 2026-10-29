@@ -443,6 +443,25 @@ publishing the additional bounded `grant-parent-corrected.outcome.json`.
 See [ADR 0060](decisions/0060-exercise-owner-grant-correction.md); live proof
 remains post-merge, with no new fault or production change.
 
+The same initial job later exercises the unchanged grant parent against the real
+adopted/paused application, after schema-parent acceptance and before existing
+checked recovery ([ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)).
+Reuse upgrade-request parameters, checking expectedCurrent and receipt/pointer
+identity in CI before submission. Real ordered gates, a distinct owner Job,
+runtime TCP success and byte-identical ACLs must preserve schema/ledger/roles/
+credentials, SQL/S3 bytes and paused workload/storage identities. The accepted
+ledger is unchanged; this does not promote the candidate.
+
+Private `grant-adopted-*` snapshots and native/probe evidence are validated before
+recovery. The sixth runtime probe uses its existing runtime-only wrapper; its
+declaration, SQL-policy marker and identities remain checked through final gates.
+Parent/Job and probe identities are re-read before recovery as well as at final retention.
+Bootstrap grant retention explicitly expects five Jobs/six parent Workflows;
+final retention requires six/seven and adopted evidence. Neither missing files
+nor a failed probe may silently skip that requirement. Only final acceptance
+publishes `grant-parent-adopted.outcome.json`. The existing recovery/baseline
+advance and Pod-replacement rules, other scenarios and CI budgets stay unchanged.
+
 Run offline checks with `make validate` and lint the CI wrapper alongside the
 staged production templates with Argo. Live acceptance first runs on trusted main
 after merge. This phase does not run the control-plane server, load its chart or

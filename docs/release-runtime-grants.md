@@ -131,6 +131,14 @@ single added DELETE bit before a fresh parent. Require real ordered gates, the
 fixed successful Job, corrected runtime TCP success and ACL bytes identical to
 first success. Retain five Jobs/six Workflows; other five scenarios keep
 administrator correction. No automatic repair or fallback is introduced.
-This establishes bootstrap success, authorization, contention, attempted-GRANT
-rollback and owner correction acceptance, not production cutover, admission or ambiguous-commit recovery. Supported host
+After real adoption and maintenance pause, the initial job now submits one more
+unchanged grant parent after schema-migration acceptance, before existing checked
+recovery ([ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)).
+CI binds the pinned upgrade request's expectedCurrent to the original receipt/
+pointer, requires real ordered gates and a fresh native Job/runtime TCP probe,
+and preserves ACLs, SQL/S3 data, ledger and workload/storage identities. Recovery
+stays blocked until all gates pass. Final retention explicitly requires six
+native Jobs/seven parent Workflows and the additional probe; bootstrap retention
+remains five/six. There is no new fault, recovery or production admission.
+This establishes bootstrap and adopted/paused grant acceptance, not production cutover, admission or ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.
