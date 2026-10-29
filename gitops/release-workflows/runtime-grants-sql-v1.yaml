@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: perfeng-runtime-grants-sql-v1
+  namespace: perf-platform
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '-2'
+immutable: true
+data:
+  runtime-grants.sql: |
+    BEGIN;
+    SET LOCAL lock_timeout = '5s';
+    SET LOCAL statement_timeout = '15s';
+    SET LOCAL search_path = pg_catalog;
+    SELECT pg_advisory_xact_lock(70657266656);
+    DO $guard$
+    BEGIN
+      IF current_user <> 'perfeng_migration' OR session_user <> 'perfeng_migration' THEN
+        RAISE EXCEPTION 'Runtime grants require the migration owner connection';
+      END IF;
+      IF EXISTS (SELECT FROM pg_roles WHERE rolname=current_user
+                 AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)) THEN
+        RAISE EXCEPTION 'Migration owner has unexpected authority';
+      END IF;
+      IF NOT EXISTS (SELECT FROM pg_namespace WHERE nspname='perfeng_control'
+                     AND pg_get_userbyid(nspowner)=current_user) THEN
+        RAISE EXCEPTION 'Reviewed schema owner is missing';
+      END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='perfeng_runtime' AND rolcanlogin
+                     AND NOT (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls))
+         OR EXISTS (SELECT FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='perfeng_runtime'))
+         OR has_database_privilege('perfeng_runtime',current_database(),'CREATE') THEN
+        RAISE EXCEPTION 'Runtime identity has unexpected authority';
+      END IF;
+      IF EXISTS (SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                 WHERE n.nspname='perfeng_control' AND pg_get_userbyid(c.relowner)<>current_user) THEN
+        RAISE EXCEPTION 'Schema contains an object owned by another identity';
+      END IF;
+      IF EXISTS (
+        SELECT FROM (VALUES ('runs'),('create_bindings'),('baselines'),('artifacts'),
+                     ('kubernetes_executions'),('reconciliation_leases'),
+                     ('benchmark_target_reservations'),('schema_migrations')) required(name)
+        LEFT JOIN pg_namespace n ON n.nspname='perfeng_control'
+        LEFT JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=required.name
+        WHERE c.oid IS NULL OR c.relkind<>'r' OR pg_get_userbyid(c.relowner)<>current_user
+      ) THEN
+        RAISE EXCEPTION 'Required migration-owned tables are missing';
+      END IF;
+      IF EXISTS (SELECT FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
+                 JOIN pg_namespace n ON n.oid=c.relnamespace
+                 WHERE n.nspname='perfeng_control' AND a.attacl IS NOT NULL) THEN
+        RAISE EXCEPTION 'Column grants require separate review';
+      END IF;
+    END;
+    $guard$;
+    REVOKE ALL ON SCHEMA perfeng_control FROM PUBLIC, perfeng_runtime;
+    GRANT USAGE ON SCHEMA perfeng_control TO perfeng_runtime;
+    REVOKE ALL ON ALL TABLES IN SCHEMA perfeng_control FROM PUBLIC, perfeng_runtime;
+    GRANT SELECT, INSERT, UPDATE ON perfeng_control.runs, perfeng_control.create_bindings, perfeng_control.baselines TO perfeng_runtime;
+    GRANT SELECT, INSERT ON perfeng_control.artifacts, perfeng_control.kubernetes_executions TO perfeng_runtime;
+    GRANT SELECT, INSERT, UPDATE ON perfeng_control.reconciliation_leases TO perfeng_runtime;
+    GRANT SELECT, INSERT, UPDATE ON perfeng_control.benchmark_target_reservations TO perfeng_runtime;
+    DO $verify$
+    DECLARE object record; privilege text; expected text[];
+    BEGIN
+      IF NOT has_schema_privilege('perfeng_runtime','perfeng_control','USAGE')
+         OR has_schema_privilege('perfeng_runtime','perfeng_control','CREATE')
+         OR has_schema_privilege('perfeng_runtime','perfeng_control','USAGE WITH GRANT OPTION') THEN
+        RAISE EXCEPTION 'Runtime schema privileges differ from policy';
+      END IF;
+      FOR object IN SELECT c.oid,c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                    WHERE n.nspname='perfeng_control' AND c.relkind IN ('r','p','v','m','f') LOOP
+        expected := CASE WHEN object.relname IN ('runs','create_bindings','baselines',
+                            'reconciliation_leases','benchmark_target_reservations')
+                         THEN ARRAY['SELECT','INSERT','UPDATE']
+                         WHEN object.relname IN ('artifacts','kubernetes_executions')
+                         THEN ARRAY['SELECT','INSERT'] ELSE ARRAY[]::text[] END;
+        FOREACH privilege IN ARRAY ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN'] LOOP
+          IF has_table_privilege('perfeng_runtime',object.oid,privilege) IS DISTINCT FROM (privilege=ANY(expected))
+             OR has_table_privilege('perfeng_runtime',object.oid,privilege || ' WITH GRANT OPTION') THEN
+            RAISE EXCEPTION 'Runtime table privileges differ from policy';
+          END IF;
+        END LOOP;
+      END LOOP;
+    END;
+    $verify$;
+    COMMIT;

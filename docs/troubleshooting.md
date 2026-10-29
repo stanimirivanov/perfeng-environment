@@ -1705,3 +1705,25 @@ repair is authorized. After normal cleanup, require the original empty catalog
 and retained surrounding state before fresh installation. Both failed Jobs and
 Workflows remain retained; live proof is post-merge and heavy checks stay on CI.
 This does not establish ambiguous-commit recovery or authorize local execution.
+
+
+### Staged runtime grant worker refuses input or authority
+
+[ADR 0055](decisions/0055-stage-native-runtime-grants.md) stages the owner-only
+runtime-grants parent; no local/live execution or host cutover is authorized by
+its staging PR. An input refusal occurs before psql when migration-url differs
+from the reviewed local owner/host/port/database/password contract. Inspect the
+Secret mapping through an explicitly authorized path; never print its URL or
+rotate credentials as repair. Inherited libpq service/options/address overrides
+are cleared before connection.
+
+A fixed `[RUNTIME-GRANTS]` failure means the retained Job needs inspection;
+public output deliberately withholds vendor diagnostics. Missing/wrong owners,
+required tables, unsafe roles/memberships, existing column ACLs or unexpected
+effective privileges abort the transaction. Keep the service paused and inspect
+private Pod diagnostics and effective ACLs before a separately authorized fresh
+parent. A failed response does not prove ACLs were unchanged. Do not retry nodes,
+delete/replace Jobs, grant administrator authority, repair roles or sync workloads
+to pass. The worker mounts no PostgreSQL administrator Secret. Complete live
+first/repeat/refusal/data-retention proof remains a later scoped acceptance PR;
+existing fixture-administrator parity does not establish this new parent.
