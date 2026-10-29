@@ -94,7 +94,16 @@ is implemented. Git removal does not automatically revoke installed authority.
 
 Offline structure/policy/shell tests, Kustomize Project/ConfigMap validation and
 pinned Argo lint cover staging. Heavy full/cross-platform checks run on PR CI.
-Complete-parent live grant success/repeat/refusal and data/credential retention
-remain a later acceptance slice. Existing CI administrator grant parity does not
-prove this new owner-only parent. Supported host commands and retirement counts
-remain unchanged.
+The initial trusted-main job now submits the unchanged parent for first/repeat
+grants after schema installation, while the bootstrap Applications/Deployment
+stay paused ([ADR 0056](decisions/0056-exercise-owner-runtime-grants.md)). Existing
+runtime TCP probes verify exact privileges; both distinct owner Jobs, their
+provenance and SQL/template identities remain retained through the scenario.
+Schema/ledger/OIDs/data, roles/passwords, Secrets and foundation/storage identities
+must remain unchanged. The other five scenarios retain administrator grant parity;
+the excess-DELETE fault and administrator correction are unchanged everywhere.
+
+Heavy checks run on PR CI; complete-parent live proof first runs after merge on
+trusted main. This establishes bootstrap first/repeat acceptance, not production
+cutover, admission or grant-failure/ambiguous-commit recovery. Supported host
+commands and retirement counts remain unchanged.

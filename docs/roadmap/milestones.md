@@ -703,8 +703,11 @@ admission, operational cutover and measured retirement remain open; existing
 CI image parity is separate. A [staged runtime-grants parent](../release-runtime-grants.md)
 now applies the reviewed policy through a fixed owner-only Job behind pinned
 intent/quiescence, using separate trusted authority ([ADR 0055](../decisions/0055-stage-native-runtime-grants.md)).
-This PR has offline/PR-CI verification only; complete live grant acceptance and
-host migration/grant retirement remain open.
+Initial-scenario complete owner-parent first/repeat acceptance is now wired
+([ADR 0056](../decisions/0056-exercise-owner-runtime-grants.md)), retaining native
+Jobs, exact runtime privileges and surrounding state. Heavy PR checks stay on CI;
+live proof remains post-merge. Grant-failure/ambiguity, admission and operational
+cutover/host migration-grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the

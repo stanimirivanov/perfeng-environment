@@ -84,10 +84,19 @@ sql -c "SELECT oid::text FROM pg_class WHERE oid='public.migration_ci_sentinel':
 [[ $(sql -c 'SELECT value FROM public.migration_ci_sentinel WHERE id=1;') == migration-image-parity-v1 ]]
 k -n perf-platform create configmap runtime-grants-ci --from-file="probe.sql=$source_dir/runtime-grants-probe.sql"
 runtime_probe ungranted failure
-sql < "$source_dir/runtime-grants.sql"
+if [[ ${scenario:-} == initial ]]; then
+  source "$source_dir/runtime-grants-parent.sh"
+  runtime_grant_parent first
+else
+  sql < "$source_dir/runtime-grants.sql"
+fi
 runtime_probe first success
 runtime_acl_snapshot "$results/runtime-grants-first.acl.json"
-sql < "$source_dir/runtime-grants.sql"
+if [[ ${scenario:-} == initial ]]; then
+  runtime_grant_parent repeat
+else
+  sql < "$source_dir/runtime-grants.sql"
+fi
 runtime_probe repeat success
 runtime_acl_snapshot "$results/runtime-grants-repeat.acl.json"
 cmp "$results/runtime-grants-first.acl.json" "$results/runtime-grants-repeat.acl.json"
@@ -121,4 +130,6 @@ for suffix in workflow job; do
     [[ $(k -n "$namespace" get "$suffix" "$name" -o jsonpath='{.metadata.uid}') == "$uid" ]]
   done
 done
+
+if [[ ${scenario:-} == initial ]]; then runtime_grant_retention; fi
 echo 'Runtime grant parity passed; actual server/readiness and production cutover remain separate.'
