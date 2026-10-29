@@ -415,6 +415,20 @@ native Jobs and four parent Workflows and refreshes session/lock absence before
 publishing bounded parent outcomes. Other scenarios and the DELETE fault stay
 unchanged; this proves contention/fresh retry, not partial writes or ambiguous commits.
 
+The next initial-job case proves rollback after the schema-USAGE GRANT actually
+takes effect inside its transaction ([ADR 0059](decisions/0059-exercise-runtime-grant-rollback.md)).
+Create only the owned event trigger/function; target the exact migration owner,
+application and published statement, and raise the unique error only after
+observing schema USAGE. The unchanged parent must fail with unchanged committed
+ACLs/schema/data/credentials/storage. Only complete rollback proof permits a
+fresh full catalog comparison and transactional DROP RESTRICT of those two
+fixture objects. No application DDL or automatic/EXIT cleanup occurs. Verify
+the original baseline before existing first/repeat grants. Private
+`grant-rollback.*` evidence retains full definitions, errors and state; final
+gates now preserve four Jobs and five parent Workflows and require fresh fixture
+absence plus expected successful USAGE. Other scenarios and budgets are unchanged;
+actual trigger/parent execution remains post-merge main-only, with ambiguity open.
+
 Run offline checks with `make validate` and lint the CI wrapper alongside the
 staged production templates with Argo. Live acceptance first runs on trusted main
 after merge. This phase does not run the control-plane server, load its chart or
