@@ -105,6 +105,34 @@ def verify(
             else {"mode": "forward-only", "id": "0018"},
         },
     }
+    return execution(
+        label,
+        workflow,
+        workers,
+        parameters,
+        request,
+        before["namespace"]["metadata"]["uid"],
+        [*after["applications"]["items"], after["deployment"]],
+        job,
+        pods,
+        diagnostic,
+    )
+
+
+def execution(
+    label: str,
+    workflow: dict[str, Any],
+    workers: list[dict[str, Any]],
+    parameters: dict[str, str],
+    request: dict[str, Any],
+    cluster_uid: str,
+    resources: list[dict[str, Any]],
+    job: Any,
+    pods: dict[str, Any],
+    diagnostic: str = "",
+) -> dict[str, Any]:
+    """Validate the unchanged native parent independently of adopted/empty baseline."""
+    assert label in {*LABELS, "install"}
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     assert workflow["spec"]["workflowTemplateRef"] == {
         "name": "perfeng-release-schema-migration-v1"
@@ -126,11 +154,7 @@ def verify(
         == parameters["selection-revision"]
         == request["selection"]["revision"]
     )
-    assert (
-        result["clusterUID"]
-        == before["namespace"]["metadata"]["uid"]
-        == request["environment"]["clusterUID"]
-    )
+    assert result["clusterUID"] == cluster_uid == request["environment"]["clusterUID"]
     assert result["lockDigests"] == request["selection"]["lockDigests"]
     assert result["environment"] == request["environment"]["name"] == "perfeng-local"
     selection, intent_node = (
@@ -186,6 +210,8 @@ def verify(
         if label == "none"
         else "schema-parent-job-create-refused"
         if label == "denied"
+        else "schema-parent-install-verified"
+        if label == "install"
         else "schema-parent-repeat-verified",
         "workflowUID": workflow["metadata"]["uid"],
         "requestDigest": parameters["request-sha256"],
@@ -219,8 +245,7 @@ def verify(
             for k in ("requestRevision", "requestDigest", "selectionRevision", "clusterUID")
         )
         assert {(o["kind"], o["name"], o["uid"]) for o in checkpoint["resources"]} == {
-            (o["kind"], o["metadata"]["name"], o["metadata"]["uid"])
-            for o in [*after["applications"]["items"], after["deployment"]]
+            (o["kind"], o["metadata"]["name"], o["metadata"]["uid"]) for o in resources
         }
         expected_name = "perfeng-schema-" + workflow["metadata"]["uid"]
         if label == "denied":
@@ -360,6 +385,21 @@ def ordered(sequence: list[dict[str, Any]]) -> None:
         assert datetime.fromisoformat(earlier["finishedAt"]) <= datetime.fromisoformat(
             later["startedAt"]
         )
+
+
+def retained_job(original: dict[str, Any], current: dict[str, Any]) -> None:
+    """Retain native Job identity, declaration and provenance through controller refreshes."""
+    assert current["spec"] == original["spec"]
+    assert {
+        k: v
+        for k, v in current["metadata"].items()
+        if k not in {"resourceVersion", "managedFields"}
+    } == {
+        k: v
+        for k, v in original["metadata"].items()
+        if k not in {"resourceVersion", "managedFields"}
+    }
+    assert current["status"]["succeeded"] == original["status"]["succeeded"] == 1
 
 
 def main() -> None:
@@ -514,10 +554,16 @@ def main() -> None:
         )
         previous_jobs = load(prefix + ".jobs-before.json")["items"]
         current_jobs = load(prefix + ".jobs-after.json")["items"]
-        assert len(previous_jobs) == (1 if label == "repeat" else 0)
-        assert len(current_jobs) == (
+        baseline_jobs = load("schema-parent-baseline.jobs.json")["items"]
+        assert len(previous_jobs) == len(baseline_jobs) + (1 if label == "repeat" else 0)
+        assert len(current_jobs) == len(baseline_jobs) + (
             0 if label in {"none", "denied"} else 1 if label == "first" else 2
         )
+        for original in baseline_jobs:
+            current = next(
+                o for o in current_jobs if o["metadata"]["uid"] == original["metadata"]["uid"]
+            )
+            retained_job(original, current)
         assert {o["metadata"]["uid"] for o in previous_jobs} <= {
             o["metadata"]["uid"] for o in current_jobs
         }
@@ -529,23 +575,18 @@ def main() -> None:
     reports = [check(label) for label in LABELS]
     assert len({r["workflowUID"] for r in reports}) == len(LABELS)
     jobs = load("schema-parent.retained-jobs.json")["items"]
-    assert len(jobs) == 2 and {o["metadata"]["uid"] for o in jobs} == {
+    baseline_jobs = load("schema-parent-baseline.jobs.json")["items"]
+    assert len(jobs) == 2 + len(baseline_jobs) and {o["metadata"]["uid"] for o in jobs} == {
         r["jobUID"] for r in reports if "jobUID" in r
-    }
+    } | {o["metadata"]["uid"] for o in baseline_jobs}
+    for original in baseline_jobs:
+        retained_job(
+            original, next(o for o in jobs if o["metadata"]["uid"] == original["metadata"]["uid"])
+        )
     for label in ("first", "repeat"):
         original = load(f"schema-parent-{label}.job.json")
         current = next(o for o in jobs if o["metadata"]["uid"] == original["metadata"]["uid"])
-        assert current["spec"] == original["spec"]
-        assert {
-            k: v
-            for k, v in current["metadata"].items()
-            if k not in {"resourceVersion", "managedFields"}
-        } == {
-            k: v
-            for k, v in original["metadata"].items()
-            if k not in {"resourceVersion", "managedFields"}
-        }
-        assert current["status"]["succeeded"] == 1
+        retained_job(original, current)
     retained = load("schema-parent.retained-workflows.json")["items"]
     assert len(retained) == len(LABELS) and {o["metadata"]["uid"] for o in retained} == {
         r["workflowUID"] for r in reports

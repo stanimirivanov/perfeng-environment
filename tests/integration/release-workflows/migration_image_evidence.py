@@ -211,7 +211,12 @@ def check(directory: Path, contract: dict) -> None:
         assert checkpoint_time <= workflow_time <= job_time
         pod = job["spec"]["template"]["spec"]
         assert pod["automountServiceAccountToken"] is False
-        assert pod["imagePullSecrets"] == [{"name": "migration-ci-registry"}]
+        install = label == "first" and workflow.get("spec", {}).get("workflowTemplateRef") == {
+            "name": "perfeng-release-schema-migration-v1"
+        }
+        assert pod["imagePullSecrets"] == [
+            {"name": "perfeng-control-plane-registry" if install else "migration-ci-registry"}
+        ]
         assert len(pod["containers"]) == 1
         container = pod["containers"][0]
         assert container["imagePullPolicy"] == "Always"
@@ -223,7 +228,9 @@ def check(directory: Path, contract: dict) -> None:
             "name": "perfeng-control-plane-database",
             "key": key,
         }
-        assert environment["PGAPPNAME"]["value"] == f"migration-ci-{label}"
+        assert environment["PGAPPNAME"]["value"] == (
+            "perfeng-schema-migration-v1" if install else f"migration-ci-{label}"
+        )
         assert len(workers) == 1 and workers[0]["uid"]
         assert workers[0]["containers"] == [
             {"name": "migrate", "exitCode": code, "waitingReason": None}

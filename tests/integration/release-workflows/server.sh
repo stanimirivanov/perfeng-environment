@@ -11,6 +11,10 @@ migration_snapshot "$results/server-schema-before.json"
 external_secrets "$fixture/server-external-before.json"
 role_snapshot "$fixture/server-roles-before.json"
 k -n perf-platform get secrets perfeng-control-plane-database perfeng-s3-auth migration-ci-registry -o json > "$fixture/server-input-secrets.json"
+if [[ ${scenario:-} == initial ]]; then
+  [[ -s $fixture/schema-install.pull-before.json ]]
+  k -n perf-platform get secret perfeng-control-plane-registry -o json > "$fixture/server-pull-current.json"
+fi
 source_checkout=.ci/perfeng-k8s
 PYTHONPATH=. uv run --locked --offline python "$source_dir/server_inputs.py" prepare "$source_checkout" "$fixture"
 helm template control-plane "$source_checkout/charts/control-plane" --namespace perf-platform \

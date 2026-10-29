@@ -121,6 +121,8 @@ schema_parent_suite() {
   k apply -f gitops/release-workflows-bootstrap/schema-migration-application-access.yaml
   for name in schema-migration-intent-v1.yaml schema-migration-job-v1.yaml release-schema-migration-v1.yaml; do k apply -f "gitops/release-workflows/$name"; done
   schema_parent_snapshot "$fixture/schema-parent-baseline"
+  k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-control-plane-migration -o json > "$fixture/schema-parent-baseline.jobs.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_install.py" baseline-retained "$fixture" "$results"
   schema_parent_sources before
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_parent.py" baseline "$fixture" "$results"
   complete_stage
@@ -138,6 +140,7 @@ schema_parent_suite() {
   k -n perf-platform get role/release-schema-migration -o json > "$fixture/schema-parent-denied.role-final.json"
   schema_parent_access false
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_denial.py" final "$fixture"
+  schema_install_retention
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_parent.py" complete "$fixture" "$results"
   complete_stage
   current_stage=$previous

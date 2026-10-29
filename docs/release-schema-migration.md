@@ -112,7 +112,8 @@ Kustomize/Project checks verify the staged inventory; PR CI performs heavy full,
 cross-platform and pinned Argo lint/render checks. No Docker/cluster execution
 is introduced into offline validation. Complete-parent repeat/data retention
 acceptance is staged in the existing initial CI leg, with live proof post-merge.
-Full-parent fresh installation and partial/ambiguous SQL failure remain deferred.
+Bounded complete-parent first installation is staged in the initial CI leg;
+partial/ambiguous SQL failure remains deferred.
 Bounded Job-create denial acceptance is staged under [ADR 0051](decisions/0051-exercise-schema-job-create-denial.md).
 All 13 host deployment entrypoints remain supported and no script is retired.
 
@@ -153,3 +154,30 @@ restored access. All four Workflows remain retained. Failure stops without Role
 repair or recovery; production authority and local infrastructure are unchanged.
 Heavy checks stay on CI and live proof remains post-merge. This adds no script
 retirement credit or SQL failure/recovery claim.
+
+## Complete-parent first installation
+
+[ADR 0052](decisions/0052-exercise-complete-schema-first-install.md) replaces only
+the initial scenario's first CI-only successful migrator with the unchanged
+complete parent. The database is naturally empty: no reset or deletion is used.
+The existing forward-only parent request passes real preflight, selection,
+intent and quiescence against explicit paused bootstrap Applications and the
+never-started zero-replica Deployment. Require the selected fixed native Job/Pod
+and all 18 migration versions/checksums. This stage proves first installation;
+the later real adopted application and repeat proofs remain separate.
+
+The immutable server pull Secret is created earlier from the same approved
+fixture credentials. Later server setup must verify its original UID/type/data
+and reuse it, creating only runtime/authentication Secrets. Drift or replacement
+stops execution. Other five scenarios retain their original timing/path.
+Preserve roles, existing platform resources/config/Secrets, running ready
+foundation Pods, PV/claim bindings and cluster identity through installation.
+
+The later paused suite requires exactly the retained install Job at baseline;
+refusal cases add zero, and successful repeats add one each. Require all three
+Jobs, four later Workflows plus the installation Workflow, and the original
+pull Secret before publishing complete acceptance or allowing existing recovery.
+No production templates, credentials/rights, CI jobs/scenarios/refs/budgets,
+local infrastructure or supported host commands change. Heavy checks run on
+PR CI; live proof remains post-merge. SQL failure/recovery, retained upgrades,
+production multi-user security, cutover and measured retirement remain open.
