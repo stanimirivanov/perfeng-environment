@@ -245,5 +245,8 @@ host migration/grant command remains until complete-parent live grant acceptance
 and operational cutover are approved. Initial bootstrap owner-parent first/repeat
 acceptance is wired by [ADR 0056](decisions/0056-exercise-owner-runtime-grants.md),
 with live proof post-merge; this CI evidence adds no retirement credit.
+The [Job-create denial slice](decisions/0057-refuse-runtime-grant-job-create.md)
+adds only disposable authority/refusal evidence and guarded restoration; no
+supported command or production verifier source is removed.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

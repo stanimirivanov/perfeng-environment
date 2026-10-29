@@ -387,6 +387,19 @@ administrator call, retries a parent or starts workloads. See
 [ADR 0056](decisions/0056-exercise-owner-runtime-grants.md); live proof remains
 post-merge and bootstrap-specific, with no local execution or cutover claim.
 
+Before first success, the initial job now narrows only Jobs create on the grant
+Role ([ADR 0057](decisions/0057-refuse-runtime-grant-job-create.md)). Effective
+create/get/watch checks include the real identity's groups and reject transport
+errors/warnings. The unchanged parent must pass its real input/quiescence gates
+then fail at its exact native create, with no Job/Pod or parent output. The
+`grant-denied` private snapshots must preserve ACLs, all Jobs and the existing
+SQL/resource baseline. Only exact refusal and retention permit UID/version/rules-
+guarded restoration and the existing first/repeat runs. No EXIT repair occurs.
+Retain the failed Workflow alongside the two successful parents; phase/final
+retention rechecks restored Role identity/rules/effective rights and publishes
+its bounded `grant-parent-denied.outcome.json`. No scenario or budget is added;
+SQL failure and ambiguous commits remain outside this fault's proof.
+
 Run offline checks with `make validate` and lint the CI wrapper alongside the
 staged production templates with Argo. Live acceptance first runs on trusted main
 after merge. This phase does not run the control-plane server, load its chart or

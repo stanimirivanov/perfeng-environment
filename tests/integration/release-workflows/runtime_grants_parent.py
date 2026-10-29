@@ -1,6 +1,7 @@
 """CI evidence for unchanged owner-only grants on paused bootstrap resources."""
 
 import json
+import re
 import sys
 from copy import deepcopy
 from datetime import datetime
@@ -46,13 +47,17 @@ def execution(
     parameters: dict[str, str],
     request: dict[str, Any],
     resources: list[dict[str, Any]],
-    job: dict[str, Any],
+    job: dict[str, Any] | None,
     pods: dict[str, Any],
+    *,
+    denied: bool = False,
+    diagnostic: str = "",
 ) -> dict[str, Any]:
     """Require actual native stages, authority, provenance and fixed owner Job."""
     assert workflow["metadata"]["namespace"] == "argo-workflows"
     assert workflow["spec"]["workflowTemplateRef"] == {"name": "perfeng-release-runtime-grants-v1"}
-    assert not workflow["spec"].get("shutdown") and workflow["status"]["phase"] == "Succeeded"
+    assert not workflow["spec"].get("shutdown")
+    assert workflow["status"]["phase"] in ({"Failed", "Error"} if denied else {"Succeeded"})
     args = workflow["spec"]["arguments"]["parameters"]
     assert len(args) == 4 and {p["name"]: p["value"] for p in args} == parameters
     named, outputs = parent.maintenance.readiness.named, parent.maintenance.readiness.outputs
@@ -72,7 +77,9 @@ def execution(
         ("preflight", "run", "migration-intent", "run", "run"),
         strict=True,
     ):
-        assert node["phase"] == "Succeeded"
+        assert node["phase"] in (
+            {"Failed", "Error"} if denied and node is sequence[-1] else {"Succeeded"}
+        )
         assert node["templateRef"] == {"name": reference, "template": template}
     parent.ordered(sequence)
     result = outputs(sequence[0])["result"]
@@ -111,14 +118,38 @@ def execution(
     }
     assert len(workers) == len(nodes) and len({w["uid"] for w in workers}) == len(workers)
     assert {w["nodeID"] for w in workers} == {n["id"] for n in nodes}
-    assert all(
-        w["uid"] and w["account"] == "release-runtime-grants" and w["exitCode"] == 0
-        for w in workers
-    )
-    assert all(n["phase"] == "Succeeded" for n in nodes)
+    for node in nodes:
+        failed = denied and node["displayName"] == "grant"
+        worker = next(w for w in workers if w["nodeID"] == node["id"])
+        assert worker["uid"] and worker["account"] == "release-runtime-grants"
+        assert worker["exitCode"] == (1 if failed else 0)
+        assert node["phase"] in ({"Failed", "Error"} if failed else {"Succeeded"})
     uid = workflow["metadata"]["uid"]
     assert uid and not workflow["metadata"].get("deletionTimestamp")
     expected_name = "perfeng-runtime-grants-" + uid
+    if denied:
+        assert job is None and pods["items"] == []
+        values = {
+            p["name"]: p["value"]
+            for p in workflow["status"]["nodes"][workflow["metadata"]["name"]]
+            .get("outputs", {})
+            .get("parameters", [])
+            if "value" in p
+        }
+        assert not values.get("checkpoint") and not values.get("job-name")
+        assert re.search(
+            r'Error from server \(Forbidden\): [^\r\n]*jobs\.batch(?: "'
+            + re.escape(expected_name)
+            + r'")? is forbidden: User "system:serviceaccount:argo-workflows:release-runtime-grants" '
+            r'cannot create resource "jobs" in API group "batch" in (?:the )?namespace "perf-platform"',
+            diagnostic,
+        )
+        return {
+            "decision": "owner-grant-job-create-refused",
+            "workflowUID": uid,
+            "requestDigest": parameters["request-sha256"],
+        }
+    assert isinstance(job, dict)
     manifest = yaml.safe_load((parent.DIRECTORY / "runtime-grants-job-v1.yaml").read_text())[
         "spec"
     ]["templates"][0]["resource"]["manifest"]
@@ -239,17 +270,22 @@ def main() -> None:
         originals = [load(f"grant-{label}.job.json") for label in ("first", "repeat")]
         assert len(jobs) == 2 and len({j["metadata"]["uid"] for j in originals}) == 2
         assert {j["metadata"]["uid"] for j in jobs} == {j["metadata"]["uid"] for j in originals}
-        workflows = [load(f"grant-{label}.workflow.json") for label in ("first", "repeat")]
-        assert len({w["metadata"]["uid"] for w in workflows}) == 2
-        for label, job, workflow in zip(("first", "repeat"), originals, workflows, strict=True):
+        for job in originals:
             parent.retained_job(
                 job, next(j for j in jobs if j["metadata"]["uid"] == job["metadata"]["uid"])
             )
+        labels = ("denied", "first", "repeat")
+        workflows = [load(f"grant-{label}.workflow.json") for label in labels]
+        assert len({w["metadata"]["uid"] for w in workflows}) == 3
+        for label, workflow in zip(labels, workflows, strict=True):
             current = load(f"grant-{label}.retained-workflow.json")
             assert install.inventory({"items": [workflow]}) == install.inventory(
                 {"items": [current]}
             )
-            assert current["status"]["phase"] == "Succeeded"
+            assert current["status"]["phase"] == workflow["status"]["phase"]
+            assert current["status"]["phase"] in (
+                {"Failed", "Error"} if label == "denied" else {"Succeeded"}
+            )
             assert (
                 installed(label + "-before") == installed(label + "-after") == installed("retained")
             )
@@ -259,12 +295,12 @@ def main() -> None:
             == (root / "grant-repeat-after.acl.json").read_bytes()
         )
         # Only bounded, validated identifiers reach shared artifacts, after all phase gates.
-        for label in ("first", "repeat"):
+        for label in labels:
             report = load(f"grant-{label}.verified.json")
             (results / f"grant-parent-{label}.outcome.json").write_text(json.dumps(report) + "\n")
         return
     action, label = mode.split("-", 1)
-    assert action in {"before", "verify"} and label in {"first", "repeat"}
+    assert action in {"before", "verify"} and label in {"denied", "first", "repeat"}
     parameters, request = install.request_input(root)
     before = "grant-" + label + "-before"
     resources = install.baseline(
@@ -304,6 +340,13 @@ def main() -> None:
         assert (root / f"grant-{label}-before.{suffix}").read_bytes() == (
             root / f"grant-{label}-after.{suffix}"
         ).read_bytes()
+    if label == "denied":
+        assert (root / "grant-denied-before.acl.json").read_bytes() == (
+            root / "grant-denied-after.acl.json"
+        ).read_bytes()
+        assert install.inventory(load("grant-denied-before.jobs.json")) == install.inventory(
+            load("grant-denied-after.jobs.json")
+        )
     report = execution(
         load(f"grant-{label}.workflow.json"),
         load(f"grant-{label}.workers.json"),
@@ -312,6 +355,8 @@ def main() -> None:
         resources,
         load(f"grant-{label}.job.json"),
         load(f"grant-{label}.pods.json"),
+        denied=label == "denied",
+        diagnostic=(root / "grant-denied.log").read_text() if label == "denied" else "",
     )
     (root / f"grant-{label}.verified.json").write_text(json.dumps(report) + "\n")
 
