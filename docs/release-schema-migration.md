@@ -222,3 +222,14 @@ release-ledger edit is permitted. Independently prove the original empty catalog
 and retained state before fresh installation. Retain both failed Jobs/Workflows
 through final recovery gates. Heavy checks stay on CI and actual database proof
 remains post-merge. Ambiguous commits remain separate work.
+
+
+## Runtime privileges remain a separate phase
+
+The [staged runtime-grants parent](release-runtime-grants.md) now declares the
+existing reviewed grant transaction through a separate native Job using the
+migration owner. It reuses this parent's published intent template, not its
+migration Job. It remains outside the active root with offline/PR-CI verification
+only; complete-parent live grant acceptance and host cutover are separate.
+Do not treat schema migration success as proof that runtime privileges were
+established, or staged grants as proof of migration-ledger qualification.

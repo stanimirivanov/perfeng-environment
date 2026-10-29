@@ -699,8 +699,12 @@ Attempted-DDL rollback is now staged through the unchanged parent, with exact
 collision/retention evidence and guarded fixture-only cleanup before fresh
 installation ([ADR 0054](../decisions/0054-exercise-schema-ddl-rollback.md)).
 Live proof remains post-merge; ambiguous-commit proof, retained-release
-admission, runtime grants, operational cutover and measured retirement remain
-open; existing CI image parity is separate.
+admission, operational cutover and measured retirement remain open; existing
+CI image parity is separate. A [staged runtime-grants parent](../release-runtime-grants.md)
+now applies the reviewed policy through a fixed owner-only Job behind pinned
+intent/quiescence, using separate trusted authority ([ADR 0055](../decisions/0055-stage-native-runtime-grants.md)).
+This PR has offline/PR-CI verification only; complete live grant acceptance and
+host migration/grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the

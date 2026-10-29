@@ -235,3 +235,12 @@ Guarded fixture cleanup does not retire a host command or authorize production
 recovery. The 13-entrypoint baseline and two-module/708-line production verifier
 budget remain unchanged; ambiguous commits, operational cutover and measured
 retirement remain separate gates.
+
+
+The [staged runtime-grants parent](release-runtime-grants.md)
+([ADR 0055](decisions/0055-stage-native-runtime-grants.md)) now declares the
+remaining reviewed grant transaction through a fixed native owner-only Job.
+This staging adds no production Python and no retirement credit. The supported
+host migration/grant command remains until complete-parent live grant acceptance
+and operational cutover are approved. All 13 host entrypoints and the two-module/
+708-line production verifier budget remain unchanged.

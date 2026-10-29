@@ -48,6 +48,13 @@ resources:
   - schema-migration-intent-v1.yaml
   - schema-migration-job-v1.yaml
   - release-schema-migration-v1.yaml
+  - rbac/runtime-grants/serviceaccount.yaml
+  - rbac/runtime-grants/workflow-access.yaml
+  - rbac/runtime-grants/cluster-identity.yaml
+  - rbac/runtime-grants/platform-observation.yaml
+  - runtime-grants-sql-v1.yaml
+  - runtime-grants-job-v1.yaml
+  - release-runtime-grants-v1.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform

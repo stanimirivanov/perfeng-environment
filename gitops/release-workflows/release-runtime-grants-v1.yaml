@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-runtime-grants-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-runtime-grants
+  entrypoint: grant
+  activeDeadlineSeconds: 1200
+  synchronization:
+    mutexes:
+    - name: perfeng-local-external-state
+  arguments:
+    parameters:
+    - name: request-revision
+    - name: request-path
+    - name: request-sha256
+    - name: selection-revision
+  templates:
+  - name: grant
+    steps:
+    - - name: preflight
+        templateRef:
+          name: perfeng-release-preflight-v3
+          template: preflight
+    - - name: task-selection
+        templateRef:
+          name: perfeng-release-task-selection-v3
+          template: run
+        arguments:
+          parameters:
+          - name: preflight-result
+            value: '{{steps.preflight.outputs.parameters.result}}'
+          - name: expected-environment
+            value: perfeng-local
+          - name: expected-lock-path
+            value: deployments/local-control-plane.json
+          - name: expected-lock-digest
+            value: sha256:a0d206a41e14c06d2d019dbb0dda7c50e07f93a72d52e0cd6a0b76e7ec9601ec
+    - - name: migration-intent
+        templateRef:
+          name: perfeng-release-schema-migration-v1
+          template: migration-intent
+    - - name: quiescence
+        templateRef:
+          name: perfeng-verify-release-quiescence-v3
+          template: run
+        arguments:
+          parameters:
+          - name: preflight-result
+            value: '{{steps.preflight.outputs.parameters.result}}'
+    - - name: grant
+        templateRef:
+          name: perfeng-runtime-grants-job-v1
+          template: run
+    outputs:
+      parameters:
+      - name: checkpoint
+        valueFrom:
+          parameter: '{{steps.quiescence.outputs.parameters.result}}'
+      - name: job-name
+        valueFrom:
+          parameter: '{{steps.grant.outputs.parameters.job-name}}'
