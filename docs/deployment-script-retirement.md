@@ -242,5 +242,8 @@ The [staged runtime-grants parent](release-runtime-grants.md)
 remaining reviewed grant transaction through a fixed native owner-only Job.
 This staging adds no production Python and no retirement credit. The supported
 host migration/grant command remains until complete-parent live grant acceptance
-and operational cutover are approved. All 13 host entrypoints and the two-module/
+and operational cutover are approved. Initial bootstrap owner-parent first/repeat
+acceptance is wired by [ADR 0056](decisions/0056-exercise-owner-runtime-grants.md),
+with live proof post-merge; this CI evidence adds no retirement credit.
+All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

@@ -335,8 +335,12 @@ manual pause/backup/migration/recovery process remains authoritative.
 
 After selected-image migration, the same trusted-main fixture applies the exact
 reviewed grant transaction from `scripts/control_plane_migration.py`. The CI SQL
-copy is byte-checked offline against that function. Fixture administration alone
-applies grants; this is not a new production migration/grant WorkflowTemplate.
+copy is byte-checked offline against that function. In the initial scenario only,
+the first/repeat calls submit the unchanged `perfeng-release-runtime-grants-v1`
+owner parent with the existing pinned request, installed schema and explicitly
+paused bootstrap Applications/Deployment. Real preflight/selection/intent/quiescence
+must precede the fixed grant Job. The other five scenarios retain administrator
+grants; all scenarios retain the existing administrator DELETE fault/correction.
 
 A CI-only Argo resource wrapper creates PostgreSQL client Jobs pinned to the
 fixture server digest. Workers receive only the existing `runtime-url` Secret
@@ -346,7 +350,7 @@ read-only root filesystem. No CI token scope or stored credential is added.
 | Case | Required evidence |
 |:--|:--|
 | Ungranted | Worker exits 3 at the exact SQL privilege-matrix refusal. |
-| First | Administrator applies reviewed grants; worker verifies the effective table privilege matrix, schema USAGE and no schema/database CREATE. |
+| First | Initial uses the owner-only parent; others use administrator grants. A runtime worker verifies the effective table privilege matrix, schema USAGE and no schema/database CREATE. |
 | Repeat | Reapply the transaction; a fresh worker succeeds and table/schema ACLs match the first application. |
 | Excess DELETE | Administrator deliberately grants DELETE on `runs`; a fresh worker refuses at the same exact policy boundary. No rows are deleted. |
 | Corrected | Administrator reapplies the reviewed transaction; a fresh worker succeeds and ACLs match the first application. |
@@ -368,6 +372,20 @@ stay private. Before/after checks preserve all table data, schema/relation OIDs,
 ledger hashes/timestamps, sentinel bytes, role/password and Secret identities,
 PostgreSQL Pod and cluster UID. Five distinct Workflows/Jobs remain queryable
 until normal owned-cluster cleanup; failed attempts are never replaced.
+
+The initial scenario additionally retains two distinct complete owner parents
+and native grant Jobs. Private `grant-<first|repeat>` evidence checks all seven
+real parent workers use release-runtime-grants, stage order, exact fixed Job,
+SQL/template identities and request provenance. Independent before/after
+snapshots preserve schema/ledger/data/sentinel, roles/passwords, Secrets, paused
+resources and ready foundation/storage identities. The repeat must leave ACLs
+identical. Bounded `grant-parent-<case>.outcome.json` reports appear only after
+both parent runs and the existing phase retention gates. Final scenario checks
+re-read retained Jobs/Workflows and sources. These artifacts are separate from
+the five existing runtime-probe artifacts. Failure never falls back to an
+administrator call, retries a parent or starts workloads. See
+[ADR 0056](decisions/0056-exercise-owner-runtime-grants.md); live proof remains
+post-merge and bootstrap-specific, with no local execution or cutover claim.
 
 Run offline checks with `make validate` and lint the CI wrapper alongside the
 staged production templates with Argo. Live acceptance first runs on trusted main

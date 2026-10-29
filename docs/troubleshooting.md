@@ -1709,6 +1709,18 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+For the trusted-main initial scenario, inspect the `grant-parent-first` or
+`grant-parent-repeat` stage and private `grant-<case>` evidence. The unchanged
+owner parent must complete real ordered input/quiescence gates and its exact
+native Job; timeout or missing Job cannot count as success. Before/after state
+and repeat ACL retention must pass before server setup. The final scenario gate
+also re-reads both Jobs/Workflows and installed sources. Shared artifacts contain
+only validated `grant-parent-<case>.outcome.json` identifiers, not SQL/credential
+diagnostics. A failure leaves the fixture paused: do not replace Jobs, fall back
+to administrator grants or infer that a failed response rolled back SQL.
+[ADR 0056](decisions/0056-exercise-owner-runtime-grants.md) authorizes disposable
+first/repeat acceptance only; no local execution, cutover or recovery is added.
+
 [ADR 0055](decisions/0055-stage-native-runtime-grants.md) stages the owner-only
 runtime-grants parent; no local/live execution or host cutover is authorized by
 its staging PR. An input refusal occurs before psql when migration-url differs
