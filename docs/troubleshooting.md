@@ -1709,6 +1709,18 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+For the initial fixture's `grant-denied-authority` / `grant-parent-denied` stages,
+an expected refusal must come from the grant worker's own native Job CREATE,
+after real input/quiescence success. Preliminary GET Forbidden, image failure,
+timeout or generic authorization messages do not qualify. Inspect private
+`grant-denied.log`, Workflow/worker evidence and before/after ACL, Job and retained
+state snapshots. Preserve get/watch and all reads while denying only create.
+Only verified refusal/retention allows guarded restoration of the captured Role;
+any failed boundary stops with no EXIT repair or successful grant continuation.
+Final retention must attest the restored Role and its effective rights as well
+as the failed Workflow. [ADR 0057](decisions/0057-refuse-runtime-grant-job-create.md)
+adds no SQL fault recovery or local execution.
+
 For the trusted-main initial scenario, inspect the `grant-parent-first` or
 `grant-parent-repeat` stage and private `grant-<case>` evidence. The unchanged
 owner parent must complete real ordered input/quiescence gates and its exact

@@ -152,3 +152,4 @@ How will the assumptions and consequences be verified?
 | [0054](0054-exercise-schema-ddl-rollback.md) | Proposed | Prove complete-parent rollback after attempted DDL, then identity/ownership-guarded fixture-only cleanup before fresh installation and final retention. |
 | [0055](0055-stage-native-runtime-grants.md) | Proposed | Stage pinned runtime privilege establishment through a separate trusted native Job using the migration owner, without administrator credentials or host cutover. |
 | [0056](0056-exercise-owner-runtime-grants.md) | Proposed | Prove unchanged owner-parent first/repeat grants on the paused initial CI fixture, with runtime TCP policy checks and retained state/Jobs. |
+| [0057](0057-refuse-runtime-grant-job-create.md) | Proposed | Prove exact native grant Job-create Forbidden with unchanged ACLs/state, guarded Role restoration and retained failed Workflow before existing successes. |

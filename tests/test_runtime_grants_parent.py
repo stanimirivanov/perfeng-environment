@@ -44,7 +44,7 @@ def populate(root, results):
         obj["metadata"]["uid"] = obj["metadata"]["name"]
     config = yaml.safe_load((MODULE.parent.DIRECTORY / "runtime-grants-sql-v1.yaml").read_text())
     config["metadata"]["uid"] = "sql-uid"
-    for label in ("first", "repeat"):
+    for label in ("denied", "first", "repeat"):
         for when in ("before", "after"):
             for suffix in ("objects", "applications", "pods", "pvs", "namespace", "roles"):
                 save(
@@ -107,6 +107,21 @@ def populate(root, results):
             {"kind": "Job", "name": job_name, "uid": job["metadata"]["uid"], "controller": True}
         ]
         pod["status"]["containerStatuses"][0]["name"] = "grant"
+        if label == "denied":
+            workflow["status"]["phase"] = "Failed"
+            nodes[workflow["metadata"]["name"]].update(phase="Failed")
+            nodes[workflow["metadata"]["name"]].pop("outputs")
+            nodes["grant"]["phase"] = "Failed"
+            next(w for w in workers if w["nodeID"] == "grant")["exitCode"] = 1
+            job, pods = None, {"items": []}
+            (root / "grant-denied.log").write_text(
+                'Error from server (Forbidden): jobs.batch "'
+                + job_name
+                + '" is forbidden: User "system:serviceaccount:argo-workflows:release-runtime-grants" '
+                'cannot create resource "jobs" in API group "batch" in the namespace "perf-platform"\n'
+            )
+            for when in ("before", "after"):
+                save(f"grant-denied-{when}.jobs.json", {"items": []})
         for suffix, value in (
             ("workflow", workflow),
             ("retained-workflow", workflow),
@@ -115,7 +130,15 @@ def populate(root, results):
             ("pods", pods),
         ):
             save(f"grant-{label}.{suffix}.json", value)
-    for label in ("first-before", "first-after", "repeat-before", "repeat-after", "retained"):
+    for label in (
+        "denied-before",
+        "denied-after",
+        "first-before",
+        "first-after",
+        "repeat-before",
+        "repeat-after",
+        "retained",
+    ):
         save(f"grant-{label}.templates.json", {"items": templates})
         save(f"grant-{label}.sql.json", config)
         save(f"grant-{label}.intent.json", load("schema-install.intent-before.json"))
@@ -137,16 +160,18 @@ class RuntimeGrantsParentTests(unittest.TestCase):
             results = root / "results"
             results.mkdir()
             populate(root, results)
-            for label in ("first", "repeat"):
+            for label in ("denied", "first", "repeat"):
                 run("before-" + label, root, results)
                 run("verify-" + label, root, results)
             self.assertFalse(list(results.glob("grant-parent-*")))
             run("retained", root, results)
-            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 2)
+            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 3)
             for path in results.glob("grant-parent-*.outcome.json"):
                 self.assertEqual(
                     set(json.loads(path.read_text())),
-                    {"decision", "workflowUID", "jobUID", "requestDigest"},
+                    {"decision", "workflowUID", "requestDigest"}
+                    if "denied" in path.name
+                    else {"decision", "workflowUID", "jobUID", "requestDigest"},
                 )
 
     def test_refuse_wrong_authority_order_job_sql_and_retained_state_before_publication(self):
@@ -232,7 +257,7 @@ class RuntimeGrantsParentTests(unittest.TestCase):
             results = root / "results"
             results.mkdir()
             populate(root, results)
-            for label in ("first", "repeat"):
+            for label in ("denied", "first", "repeat"):
                 run("verify-" + label, root, results)
             for name, mutate in (
                 ("grant-retained.jobs.json", lambda x: x["items"].pop()),
@@ -242,6 +267,10 @@ class RuntimeGrantsParentTests(unittest.TestCase):
                 ),
                 (
                     "grant-first.retained-workflow.json",
+                    lambda x: x["metadata"].update(uid="replacement"),
+                ),
+                (
+                    "grant-denied.retained-workflow.json",
                     lambda x: x["metadata"].update(uid="replacement"),
                 ),
                 ("grant-retained.sql.json", lambda x: x["metadata"].update(uid="replacement")),
@@ -318,6 +347,7 @@ timeout() { record wait; [[ $FAIL != wait ]]; }
             (root / "runtime-grants.sql").write_text("legacy grants")
             (root / "runtime-grants-parent.sh").write_text(
                 'runtime_grant_parent() { echo "parent $1" >> trace; [[ $1 != ${FAIL:-pass} ]]; }\n'
+                "runtime_grant_denial() { echo denial >> trace; [[ ${FAIL:-pass} != denied ]]; }\n"
             )
             for scenario in (
                 "initial",
@@ -357,7 +387,7 @@ sql() { echo admin >> trace; }
                     trace.index("probe corrected success"),
                 )
                 (root / "trace").unlink()
-            for fail in ("first", "repeat"):
+            for fail in ("denied", "first", "repeat"):
                 process = subprocess.run(
                     [str(BASH), str(script)],
                     cwd=root,

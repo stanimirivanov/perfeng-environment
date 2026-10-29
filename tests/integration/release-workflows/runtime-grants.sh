@@ -86,6 +86,7 @@ k -n perf-platform create configmap runtime-grants-ci --from-file="probe.sql=$so
 runtime_probe ungranted failure
 if [[ ${scenario:-} == initial ]]; then
   source "$source_dir/runtime-grants-parent.sh"
+  runtime_grant_denial
   runtime_grant_parent first
 else
   sql < "$source_dir/runtime-grants.sql"

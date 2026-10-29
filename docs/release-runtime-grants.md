@@ -104,6 +104,12 @@ must remain unchanged. The other five scenarios retain administrator grant parit
 the excess-DELETE fault and administrator correction are unchanged everywhere.
 
 Heavy checks run on PR CI; complete-parent live proof first runs after merge on
-trusted main. This establishes bootstrap first/repeat acceptance, not production
-cutover, admission or grant-failure/ambiguous-commit recovery. Supported host
+trusted main. The initial fixture now also removes only Jobs create from the
+grant Role before first success ([ADR 0057](decisions/0057-refuse-runtime-grant-job-create.md)).
+Require the real successful prefix, exact native Forbidden, absent Job/Pod/output
+and unchanged ACLs/schema/data/credentials/storage before guarded rule restoration.
+Retain that failed Workflow and recheck restored authority at final retention.
+Unverified outcomes stop without repair or continuation. This establishes
+bootstrap success and authorization-refusal acceptance, not production
+cutover, admission or SQL-failure/ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.

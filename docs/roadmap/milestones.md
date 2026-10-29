@@ -706,7 +706,10 @@ intent/quiescence, using separate trusted authority ([ADR 0055](../decisions/005
 Initial-scenario complete owner-parent first/repeat acceptance is now wired
 ([ADR 0056](../decisions/0056-exercise-owner-runtime-grants.md)), retaining native
 Jobs, exact runtime privileges and surrounding state. Heavy PR checks stay on CI;
-live proof remains post-merge. Grant-failure/ambiguity, admission and operational
+live proof remains post-merge. Bounded grant Job-create denial now gates the
+same initial successes, with exact native Forbidden, unchanged state and guarded
+authority restoration ([ADR 0057](../decisions/0057-refuse-runtime-grant-job-create.md)).
+SQL-failure/ambiguity, admission and operational
 cutover/host migration-grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.
