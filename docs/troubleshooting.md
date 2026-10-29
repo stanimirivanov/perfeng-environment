@@ -1655,3 +1655,31 @@ its Job/Workflow/Secret before aggregate success or checked recovery. Failure
 stops for owned disposable cleanup, without fallback migrators, retries, SQL
 repair or local infrastructure actions. Full checks stay on CI and live proof
 remains post-merge; placeholder installation is not adopted server readiness.
+
+
+### Schema SQL contention does not qualify
+
+[ADR 0053](decisions/0053-exercise-schema-sql-contention.md) requires exact
+catalog evidence before an expected failed native execution can qualify.
+`schema-contention-holder` must show one owned granted lock on the exact key.
+A partial owned-connection startup observation may be pending; a foreign holder,
+wrong key/database or malformed observation is a failure. During the unchanged
+parent, require a pre-exit waiting backend bound to the actual migration Pod IP,
+role/application, PID/backend start, exact query and sole owned blocker.
+A generic failed Job, missing sample, deadline, image or transport failure is
+not SQL contention proof.
+
+At `schema-contention-proof`, confirm absent schema/zero application relations,
+retained state and the same idle holder after terminal native failure. Never
+terminate database backends, alter roles/Secrets, release arbitrary sessions,
+retry nodes or repair SQL to pass. Only proved refusal/retention permits normal
+`\q` disconnect of the owned fixture session. A failed migration backend may
+linger until that release; require its disappearance and continued schema
+absence before fresh installation. Unknown/reused backend identities stop the
+cleanup gate. Failed proof leaves cleanup to the owned disposable-cluster boundary.
+
+Raw catalog, IP, log and credential observations stay private; artifacts contain
+only bounded diagnostics and validated outcomes. Require retention of the failed
+Job/Workflow alongside successful install/repeat evidence before recovery.
+Heavy checks stay on CI and live proof remains post-merge. This is not proof of
+partial-write rollback or ambiguous-commit recovery.

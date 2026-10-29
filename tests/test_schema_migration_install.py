@@ -120,9 +120,17 @@ def populate(root, results):
     save("schema-install.job.json", job)
     save("schema-install.retained-job.json", job)
     save("schema-install.job-pods.json", pods)
-    save("schema-parent-baseline.jobs.json", {"items": [job]})
+    failed = deepcopy(job)
+    failed["metadata"].update(uid="failed-job", name="perfeng-schema-failed")
+    failed["status"] = {
+        "failed": 1,
+        "conditions": [{"type": "Failed", "status": "True", "reason": "BackoffLimitExceeded"}],
+    }
+    save("schema-contention.job.json", failed)
+    save("schema-contention.workflow.json", {"metadata": {"uid": "failed-workflow"}})
+    save("schema-parent-baseline.jobs.json", {"items": [failed, job]})
     save("schema-install.jobs-before.json", {"items": []})
-    save("schema-install.jobs-after.json", {"items": [job]})
+    save("schema-install.jobs-after.json", {"items": [failed, job]})
     source = repeats.image.MigrationImageIntegrationTests()
     source.setUp()
     (results / "migration-image-first.schema.json").write_text(json.dumps(source.schema()))
@@ -257,7 +265,7 @@ class SchemaMigrationInstallTests(unittest.TestCase):
         assert BASH
         text = (repeats.pause.FIXTURE / "schema-migration-install.sh").read_text()
         library = text[
-            text.index("schema_install_suite() {") : text.rindex("\nschema_install_suite")
+            text.index("schema_native_parent() {") : text.rindex("\nschema_install_suite")
         ]
         setup = r"""#!/usr/bin/env bash
 set -euo pipefail
@@ -292,7 +300,8 @@ echo legacy-repeat >> "$fixture/trace"
                 "verify-before",
                 "submit",
                 "wait",
-                "verify-diagnose",
+                "verify-diagnose-install",
+                "contention",
                 "snapshot-after",
                 "sources-after",
                 "schema",
@@ -300,6 +309,9 @@ echo legacy-repeat >> "$fixture/trace"
             ):
                 case = root / failure
                 case.mkdir()
+                (case / "schema-migration-contention.sh").write_text(
+                    "step contention\n", newline="\n"
+                )
                 process = subprocess.run(
                     [
                         BASH,

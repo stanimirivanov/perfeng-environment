@@ -693,7 +693,9 @@ live proof remains post-merge. Bounded complete-parent Job-create denial is
 now staged with guarded Role restoration ([ADR 0051](../decisions/0051-exercise-schema-job-create-denial.md)); no SQL mutation occurs in that refusal case.
 Complete-parent first installation is now staged against the naturally empty
 initial fixture and explicit paused bootstrap placeholders ([ADR 0052](../decisions/0052-exercise-complete-schema-first-install.md)), with exact early pull-Secret reuse and retained install Job/Workflow gates.
-Live first-install proof remains post-merge; SQL-failure proof, retained-release
+Bounded complete-parent SQL contention failure and fresh execution are now
+staged with owned-session release and failed Job/Workflow retention ([ADR 0053](../decisions/0053-exercise-schema-sql-contention.md)).
+Live proof remains post-merge; partial-write/ambiguous-commit proof, retained-release
 admission, runtime grants, operational cutover and measured retirement remain
 open; existing CI image parity is separate.
 

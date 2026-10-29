@@ -22,6 +22,7 @@ schema_install_sources() {
 }
 
 schema_install_retention() {
+  schema_contention_retention
   local name uid
   name=$(jq -er .metadata.name "$fixture/schema-install.workflow.json")
   uid=$(jq -er .metadata.uid "$fixture/schema-install.workflow.json")
@@ -31,8 +32,40 @@ schema_install_retention() {
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_install.py" retained "$fixture" "$results"
 }
 
+schema_native_parent() {
+  local label=$1 prefix="schema-$1" name uid rc watch_pid watch_rc failed_pod
+  [[ $label == install || $label == contention ]] || return 2
+  if [[ $label == install ]]; then start_stage "$prefix-parent"; fi
+  timeout --kill-after=5s 1240s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local -n perf-platform get pods -l batch.kubernetes.io/job-name --watch --output-watch-events -o json > "$fixture/$prefix.watch.json" 2> "$fixture/$prefix.watch.private" &
+  watch_pid=$!
+  if name=$(a submit --from workflowtemplate/perfeng-release-schema-migration-v1 --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name); then :; else
+    kill "$watch_pid" 2> /dev/null || true
+    wait "$watch_pid" || true
+    return 1
+  fi
+  if timeout 1230s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$name" > "$fixture/$prefix.wait.private" 2>&1; then rc=0; else rc=$?; fi
+  kill "$watch_pid" 2> /dev/null || true
+  if wait "$watch_pid"; then watch_rc=0; else watch_rc=$?; fi
+  printf '%s\n' "$rc" > "$fixture/$prefix.wait-code.txt"
+  printf '%s\n' "$watch_rc" > "$fixture/$prefix.watch-code.txt"
+  a get "$name" -o json > "$fixture/$prefix.workflow.json"
+  uid=$(jq -er .metadata.uid "$fixture/$prefix.workflow.json")
+  k -n argo-workflows get pods -l "workflows.argoproj.io/workflow=$name" -o json > "$fixture/$prefix.workflow-pods.json"
+  jq '[.items[]|{uid:.metadata.uid,nodeID:.metadata.annotations["workflows.argoproj.io/node-id"],account:.spec.serviceAccountName,exitCode:([.status.containerStatuses[]?|select(.name=="main")|.state.terminated.exitCode][0])}]' "$fixture/$prefix.workflow-pods.json" > "$fixture/$prefix.workers.json"
+  k -n perf-platform get job "perfeng-schema-$uid" --ignore-not-found -o json | jq -s '.[0] // null' > "$fixture/$prefix.job.json"
+  k -n perf-platform get pods -l "batch.kubernetes.io/job-name=perfeng-schema-$uid" -o json > "$fixture/$prefix.job-pods.json"
+  if [[ $rc != 0 ]]; then
+    while IFS= read -r failed_pod; do k -n argo-workflows logs "$failed_pod" --all-containers=true --tail=30 --limit-bytes=16384 > "$fixture/$prefix.$failed_pod.private" 2>&1 || true; done < <(jq -r '.items[]|select(any(((.status.containerStatuses // []) + (.status.initContainerStatuses // []))[]; (.state.terminated.exitCode // 0)>0))|.metadata.name' "$fixture/$prefix.workflow-pods.json" | head -n 10)
+  fi
+  if [[ $rc != 0 ]] && jq -e '.!=null' "$fixture/$prefix.job.json" > /dev/null; then
+    k -n perf-platform logs "job/perfeng-schema-$uid" -c migrate --tail=20 --limit-bytes=8192 > "$fixture/$prefix.migrator.private" 2>&1 || true
+  fi
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_install.py" "diagnose-$label" "$fixture" "$results"
+  if [[ $label == install ]]; then [[ $rc == 0 ]]; else [[ $rc != 0 && $rc != 124 && $rc != 137 ]]; fi
+}
+
 schema_install_suite() {
-  local previous=$current_stage name uid rc watch_pid watch_rc failed_pod
+  local previous=$current_stage name
   start_stage schema-install-setup
   [[ -z $(k -n perf-platform get secret perfeng-control-plane-registry --ignore-not-found -o name) ]]
   k -n perf-platform get secret migration-ci-registry -o json > "$fixture/schema-install.pull-source.json"
@@ -54,33 +87,8 @@ SQL
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-control-plane-migration -o json > "$fixture/schema-install.jobs-before.json"
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_install.py" before "$fixture" "$results"
   complete_stage
-  start_stage schema-install-parent
-  timeout --kill-after=5s 1240s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local -n perf-platform get pods -l batch.kubernetes.io/job-name --watch --output-watch-events -o json > "$fixture/schema-install.watch.json" 2> "$fixture/schema-install.watch.private" &
-  watch_pid=$!
-  if name=$(a submit --from workflowtemplate/perfeng-release-schema-migration-v1 --parameter-file "$fixture/parent-parameters.json" -o json | jq -er .metadata.name); then :; else
-    kill "$watch_pid" 2> /dev/null || true
-    wait "$watch_pid" || true
-    return 1
-  fi
-  if timeout 1230s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$name" > "$fixture/schema-install.wait.private" 2>&1; then rc=0; else rc=$?; fi
-  kill "$watch_pid" 2> /dev/null || true
-  if wait "$watch_pid"; then watch_rc=0; else watch_rc=$?; fi
-  printf '%s\n' "$rc" > "$fixture/schema-install.wait-code.txt"
-  printf '%s\n' "$watch_rc" > "$fixture/schema-install.watch-code.txt"
-  a get "$name" -o json > "$fixture/schema-install.workflow.json"
-  uid=$(jq -er .metadata.uid "$fixture/schema-install.workflow.json")
-  k -n argo-workflows get pods -l "workflows.argoproj.io/workflow=$name" -o json > "$fixture/schema-install.workflow-pods.json"
-  jq '[.items[]|{uid:.metadata.uid,nodeID:.metadata.annotations["workflows.argoproj.io/node-id"],account:.spec.serviceAccountName,exitCode:([.status.containerStatuses[]?|select(.name=="main")|.state.terminated.exitCode][0])}]' "$fixture/schema-install.workflow-pods.json" > "$fixture/schema-install.workers.json"
-  k -n perf-platform get job "perfeng-schema-$uid" --ignore-not-found -o json | jq -s '.[0] // null' > "$fixture/schema-install.job.json"
-  k -n perf-platform get pods -l "batch.kubernetes.io/job-name=perfeng-schema-$uid" -o json > "$fixture/schema-install.job-pods.json"
-  if [[ $rc != 0 ]]; then
-    while IFS= read -r failed_pod; do k -n argo-workflows logs "$failed_pod" --all-containers=true --tail=30 --limit-bytes=16384 > "$fixture/schema-install.$failed_pod.private" 2>&1 || true; done < <(jq -r '.items[]|select(any(((.status.containerStatuses // []) + (.status.initContainerStatuses // []))[]; (.state.terminated.exitCode // 0)>0))|.metadata.name' "$fixture/schema-install.workflow-pods.json" | head -n 10)
-  fi
-  if [[ $rc != 0 ]] && jq -e '.!=null' "$fixture/schema-install.job.json" > /dev/null; then
-    k -n perf-platform logs "job/perfeng-schema-$uid" -c migrate --tail=20 --limit-bytes=8192 > "$fixture/schema-install.migrator.private" 2>&1 || true
-  fi
-  PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_install.py" diagnose "$fixture" "$results"
-  [[ $rc == 0 ]]
+  source "$source_dir/schema-migration-contention.sh"
+  schema_native_parent install
   schema_install_snapshot after
   schema_install_sources after
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-control-plane-migration -o json > "$fixture/schema-install.jobs-after.json"
