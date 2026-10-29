@@ -227,3 +227,11 @@ It retires no host entrypoint and changes no production verifier, command or
 manifest. The 13-entrypoint baseline and two-module/708-line verifier budget
 remain unchanged; partial/ambiguous SQL recovery, cutover and measured deletion
 remain separate gates.
+
+
+Attempted-DDL rollback acceptance ([ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md))
+adds only CI fixture SQL/evidence around the unchanged native schema parent.
+Guarded fixture cleanup does not retire a host command or authorize production
+recovery. The 13-entrypoint baseline and two-module/708-line production verifier
+budget remain unchanged; ambiguous commits, operational cutover and measured
+retirement remain separate gates.

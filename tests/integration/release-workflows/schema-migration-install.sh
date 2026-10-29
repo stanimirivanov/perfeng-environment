@@ -23,6 +23,7 @@ schema_install_sources() {
 
 schema_install_retention() {
   schema_contention_retention
+  schema_rollback_retention
   local name uid
   name=$(jq -er .metadata.name "$fixture/schema-install.workflow.json")
   uid=$(jq -er .metadata.uid "$fixture/schema-install.workflow.json")
@@ -34,7 +35,7 @@ schema_install_retention() {
 
 schema_native_parent() {
   local label=$1 prefix="schema-$1" name uid rc watch_pid watch_rc failed_pod
-  [[ $label == install || $label == contention ]] || return 2
+  [[ $label == install || $label == contention || $label == rollback ]] || return 2
   if [[ $label == install ]]; then start_stage "$prefix-parent"; fi
   timeout --kill-after=5s 1240s kubectl --kubeconfig "$KUBECONFIG" --context kind-perfeng-local -n perf-platform get pods -l batch.kubernetes.io/job-name --watch --output-watch-events -o json > "$fixture/$prefix.watch.json" 2> "$fixture/$prefix.watch.private" &
   watch_pid=$!
@@ -88,6 +89,7 @@ SQL
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_migration_install.py" before "$fixture" "$results"
   complete_stage
   source "$source_dir/schema-migration-contention.sh"
+  source "$source_dir/schema-migration-rollback.sh"
   schema_native_parent install
   schema_install_snapshot after
   schema_install_sources after

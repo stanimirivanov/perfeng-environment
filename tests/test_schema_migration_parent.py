@@ -251,7 +251,7 @@ def populate(directory, results):
 
 
 class SchemaMigrationParentTests(unittest.TestCase):
-    def test_refusals_and_repeats_preserve_install_and_failed_contention_jobs(self):
+    def test_refusals_and_repeats_preserve_install_and_both_failed_jobs(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             results = root / "results"
@@ -268,8 +268,11 @@ class SchemaMigrationParentTests(unittest.TestCase):
                 ],
             }
             (root / "schema-contention.job.json").write_text(json.dumps(failed))
+            rollback = deepcopy(failed)
+            rollback["metadata"].update(uid="rollback-job", name="perfeng-schema-rollback")
+            (root / "schema-rollback.job.json").write_text(json.dumps(rollback))
             (root / "schema-parent-baseline.jobs.json").write_text(
-                json.dumps({"items": [installed, failed]})
+                json.dumps({"items": [installed, failed, rollback]})
             )
             files = ["schema-parent.retained-jobs.json"] + [
                 f"schema-parent-{label}.jobs-{when}.json"
@@ -279,7 +282,7 @@ class SchemaMigrationParentTests(unittest.TestCase):
             for name in files:
                 path = root / name
                 value = json.loads(path.read_text())
-                value["items"][:0] = [deepcopy(installed), deepcopy(failed)]
+                value["items"][:0] = [deepcopy(installed), deepcopy(failed), deepcopy(rollback)]
                 path.write_text(json.dumps(value))
             with patch("sys.argv", ["evidence", "complete", str(root), str(results)]):
                 MODULE.main()

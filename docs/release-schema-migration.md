@@ -114,7 +114,8 @@ is introduced into offline validation. Complete-parent repeat/data retention
 acceptance is staged in the existing initial CI leg, with live proof post-merge.
 Bounded complete-parent first installation is staged in the initial CI leg;
 bounded SQL contention failure and fresh execution are staged under
-[ADR 0053](decisions/0053-exercise-schema-sql-contention.md); partial writes and
+[ADR 0053](decisions/0053-exercise-schema-sql-contention.md). Bounded attempted-DDL
+rollback is staged under [ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md);
 ambiguous commits remain deferred.
 Bounded Job-create denial acceptance is staged under [ADR 0051](decisions/0051-exercise-schema-job-create-denial.md).
 All 13 host deployment entrypoints remain supported and no script is retired.
@@ -175,13 +176,14 @@ stops execution. Other five scenarios retain their original timing/path.
 Preserve roles, existing platform resources/config/Secrets, running ready
 foundation Pods, PV/claim bindings and cluster identity through installation.
 
-The later paused suite requires the retained install and failed contention Jobs
-at baseline; refusal cases add zero, and successful repeats add one each. Require all four
-Jobs, four later Workflows plus the installation and contention Workflows, and
-the original pull Secret before publishing complete acceptance or allowing existing recovery.
+The later paused suite requires the retained install and both failed Jobs
+at baseline; refusal cases add zero, and successful repeats add one each.
+Require all five Jobs, four later Workflows plus the installation and two failed Workflows, and
+the original pull Secret before publishing complete acceptance or allowing
+existing recovery.
 No production templates, credentials/rights, CI jobs/scenarios/refs/budgets,
 local infrastructure or supported host commands change. Heavy checks run on
-PR CI; live proof remains post-merge. Partial/ambiguous SQL recovery, retained upgrades,
+PR CI; live proof remains post-merge. Ambiguous SQL recovery, retained upgrades,
 production multi-user security, cutover and measured retirement remain open.
 
 ## SQL contention before installation
@@ -202,3 +204,21 @@ termination, node retry, fallback or SQL repair is permitted. Retain the failed
 Job/Workflow through installation, paused refusals/repeats and final recovery
 gates. Heavy checks stay on CI; live proof remains post-merge. This proves
 pre-DDL contention failure/retry, not partial writes or ambiguous commits.
+
+## Attempted-DDL rollback before installation
+
+[ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md) adds the selected
+component's existing artifacts-table collision after contention cleanup and
+before first installation in the initial CI leg. Create only a fixture-owned
+schema/table/sentinel, then require the unchanged parent's real successful
+prefix and exact native/PostgreSQL relation-collision failure. Catalog evidence
+must preserve fixture OIDs/owners/markers/columns/sentinel while showing no
+persisted migration-created tables or ledger and unchanged surrounding state.
+
+Only that proof generates cleanup SQL. A bounded transaction locks the fixture
+table, rechecks catalog identity/ownership/inventory and sentinel, and drops
+only that table/schema using RESTRICT. No CASCADE, IF EXISTS, EXIT repair or
+release-ledger edit is permitted. Independently prove the original empty catalog
+and retained state before fresh installation. Retain both failed Jobs/Workflows
+through final recovery gates. Heavy checks stay on CI and actual database proof
+remains post-merge. Ambiguous commits remain separate work.
