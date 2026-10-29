@@ -254,5 +254,8 @@ It changes no host command and adds no retirement credit.
 The [attempted-GRANT rollback slice](decisions/0059-exercise-runtime-grant-rollback.md)
 adds only CI fault/cleanup evidence and retains both failed SQL Jobs. Live proof
 remains post-merge; no host command or production verifier source is retired.
+The [owner-correction slice](decisions/0060-exercise-owner-grant-correction.md)
+replaces only one initial CI administrator call with the existing parent. It
+adds no script, production definition or retirement credit; cutover stays separate.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

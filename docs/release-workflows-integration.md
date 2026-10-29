@@ -340,7 +340,9 @@ the first/repeat calls submit the unchanged `perfeng-release-runtime-grants-v1`
 owner parent with the existing pinned request, installed schema and explicitly
 paused bootstrap Applications/Deployment. Real preflight/selection/intent/quiescence
 must precede the fixed grant Job. The other five scenarios retain administrator
-grants; all scenarios retain the existing administrator DELETE fault/correction.
+grants; all scenarios retain the existing administrator DELETE fault. The initial
+scenario now uses the unchanged owner parent for correction; the other five keep
+administrator correction ([ADR 0060](decisions/0060-exercise-owner-grant-correction.md)).
 
 A CI-only Argo resource wrapper creates PostgreSQL client Jobs pinned to the
 fixture server digest. Workers receive only the existing `runtime-url` Secret
@@ -353,7 +355,7 @@ read-only root filesystem. No CI token scope or stored credential is added.
 | First | Initial uses the owner-only parent; others use administrator grants. A runtime worker verifies the effective table privilege matrix, schema USAGE and no schema/database CREATE. |
 | Repeat | Reapply the transaction; a fresh worker succeeds and table/schema ACLs match the first application. |
 | Excess DELETE | Administrator deliberately grants DELETE on `runs`; a fresh worker refuses at the same exact policy boundary. No rows are deleted. |
-| Corrected | Administrator reapplies the reviewed transaction; a fresh worker succeeds and ACLs match the first application. |
+| Corrected | Initial uses a fresh owner-only parent; others use administrator correction. A fresh runtime worker succeeds and ACL bytes match the first application. |
 
 Successful workers execute real reads and zero-row INSERT/UPDATE statements on
 permitted tables inside a rolled-back transaction. They also require actual
@@ -428,6 +430,18 @@ the original baseline before existing first/repeat grants. Private
 gates now preserve four Jobs and five parent Workflows and require fresh fixture
 absence plus expected successful USAGE. Other scenarios and budgets are unchanged;
 actual trigger/parent execution remains post-merge main-only, with ambiguity open.
+
+Initial-only owner correction reuses the existing DELETE fault and probe refusal.
+Before its unchanged complete parent is submitted, `grant-corrected-before`
+must differ from first-success ACLs only by one added runtime DELETE bit on runs,
+with the same owner grantor and no other entries/flags changed. Require real
+ordered gates, fixed owner Job, unchanged non-ACL state and original ACL bytes
+after correction; the existing corrected TCP probe still runs independently.
+There is no administrator fallback after failure. Phase/final retention now
+preserves five Jobs/six parent Workflows and replays correction evidence before
+publishing the additional bounded `grant-parent-corrected.outcome.json`.
+See [ADR 0060](decisions/0060-exercise-owner-grant-correction.md); live proof
+remains post-merge, with no new fault or production change.
 
 Run offline checks with `make validate` and lint the CI wrapper alongside the
 staged production templates with Argo. Live acceptance first runs on trusted main

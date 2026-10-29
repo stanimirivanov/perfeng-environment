@@ -44,7 +44,7 @@ def populate(root, results):
         obj["metadata"]["uid"] = obj["metadata"]["name"]
     config = yaml.safe_load((MODULE.parent.DIRECTORY / "runtime-grants-sql-v1.yaml").read_text())
     config["metadata"]["uid"] = "sql-uid"
-    for label in ("denied", "contention", "rollback", "first", "repeat"):
+    for label in ("denied", "contention", "rollback", "first", "repeat", "corrected"):
         for when in ("before", "after"):
             for suffix in ("objects", "applications", "pods", "pvs", "namespace", "roles"):
                 save(
@@ -58,7 +58,43 @@ def populate(root, results):
             for suffix, value in (
                 ("data.txt", "row-digests"),
                 ("sentinel.txt", "123|migration-image-parity-v1"),
-                ("acl.json", "reviewed-acls"),
+                (
+                    "acl.json",
+                    json.dumps(
+                        {
+                            "schemaACL": [
+                                "perfeng_migration=UC/perfeng_migration",
+                                "perfeng_runtime=U/perfeng_migration",
+                            ],
+                            "tables": [
+                                {
+                                    "name": "artifacts",
+                                    "acl": [
+                                        "perfeng_migration=arwdDxtm/perfeng_migration",
+                                        "perfeng_runtime=ar/perfeng_migration",
+                                    ],
+                                },
+                                {
+                                    "name": "runs",
+                                    "acl": [
+                                        "perfeng_migration=arwdDxtm/perfeng_migration",
+                                        "perfeng_runtime="
+                                        + (
+                                            "arwd"
+                                            if label == "corrected" and when == "before"
+                                            else "arw"
+                                        )
+                                        + "/perfeng_migration",
+                                    ],
+                                },
+                                {
+                                    "name": "schema_migrations",
+                                    "acl": ["perfeng_migration=arwdDxtm/perfeng_migration"],
+                                },
+                            ],
+                        }
+                    ),
+                ),
             ):
                 (root / f"grant-{label}-{when}.{suffix}").write_text(value)
         workflow = deepcopy(load("schema-install.workflow.json"))
@@ -162,6 +198,8 @@ def populate(root, results):
         "first-after",
         "repeat-before",
         "repeat-after",
+        "corrected-before",
+        "corrected-after",
         "retained",
     ):
         save(f"grant-{label}.templates.json", {"items": templates})
@@ -172,7 +210,7 @@ def populate(root, results):
         {
             "items": [
                 load(f"grant-{label}.job.json")
-                for label in ("contention", "rollback", "first", "repeat")
+                for label in ("contention", "rollback", "first", "repeat", "corrected")
             ]
         },
     )
@@ -184,18 +222,90 @@ def run(mode, root, results):
 
 
 class RuntimeGrantsParentTests(unittest.TestCase):
+    def test_correction_requires_exact_delete_drift_and_original_acl_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            results = root / "results"
+            results.mkdir()
+            populate(root, results)
+            run("before-corrected", root, results)
+            run("verify-corrected", root, results)
+            path = root / "grant-corrected-before.acl.json"
+            raw = path.read_bytes()
+            changes = (
+                lambda x: x["schemaACL"].append("foreign=U/perfeng_migration"),
+                lambda x: x["tables"][0]["acl"].append("foreign=r/perfeng_migration"),
+                lambda x: x["tables"][1]["acl"].__setitem__(
+                    1, "perfeng_runtime=arw/perfeng_migration"
+                ),
+                lambda x: x["tables"][1]["acl"].__setitem__(
+                    1, "perfeng_runtime=arwd*/perfeng_migration"
+                ),
+                lambda x: x["tables"][1]["acl"].__setitem__(1, "perfeng_runtime=arwd/postgres"),
+                lambda x: x["tables"][1]["acl"].__setitem__(
+                    1, "perfeng_runtime=arwdD/perfeng_migration"
+                ),
+                lambda x: x["tables"][1]["acl"].append("perfeng_runtime=arwd/perfeng_migration"),
+            )
+            for mutate in changes:
+                value = json.loads(raw)
+                mutate(value)
+                path.write_text(json.dumps(value))
+                with self.assertRaises(AssertionError):
+                    run("before-corrected", root, results)
+            path.write_bytes(raw)
+            after = root / "grant-corrected-after.acl.json"
+            after.write_bytes(raw)
+            with self.assertRaises(AssertionError):
+                run("verify-corrected", root, results)
+            self.assertFalse(list(results.glob("grant-parent-*")))
+
+    def test_correction_refuses_changed_state_identity_or_failed_owner_job(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            results = root / "results"
+            results.mkdir()
+            populate(root, results)
+            for name, mutate in (
+                (
+                    "grant-corrected.workers.json",
+                    lambda x: x[0].update(account="release-external-state"),
+                ),
+                (
+                    "grant-corrected.workflow.json",
+                    lambda x: x["status"]["nodes"]["quiescence"].update(phase="Skipped"),
+                ),
+                ("grant-corrected.job.json", lambda x: x["status"].update(succeeded=0, failed=1)),
+                (
+                    "schema-install.grant-corrected-after.roles.json",
+                    lambda x: x.update(roles="changed-password"),
+                ),
+                (
+                    "schema-install.grant-corrected-after.objects.json",
+                    lambda x: x["items"][1]["data"].clear(),
+                ),
+            ):
+                path = root / name
+                raw = path.read_bytes()
+                value = json.loads(raw)
+                mutate(value)
+                path.write_text(json.dumps(value))
+                with self.subTest(name=name), self.assertRaises((AssertionError, KeyError)):
+                    run("verify-corrected", root, results)
+                path.write_bytes(raw)
+
     def test_complete_parents_and_retention_publish_only_bounded_verified_outcomes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             results = root / "results"
             results.mkdir()
             populate(root, results)
-            for label in ("denied", "contention", "rollback", "first", "repeat"):
+            for label in ("denied", "contention", "rollback", "first", "repeat", "corrected"):
                 run("before-" + label, root, results)
                 run("verify-" + label, root, results)
             self.assertFalse(list(results.glob("grant-parent-*")))
             run("retained", root, results)
-            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 5)
+            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 6)
             for path in results.glob("grant-parent-*.outcome.json"):
                 self.assertEqual(
                     set(json.loads(path.read_text())),
@@ -287,7 +397,7 @@ class RuntimeGrantsParentTests(unittest.TestCase):
             results = root / "results"
             results.mkdir()
             populate(root, results)
-            for label in ("denied", "contention", "rollback", "first", "repeat"):
+            for label in ("denied", "contention", "rollback", "first", "repeat", "corrected"):
                 run("verify-" + label, root, results)
             for name, mutate in (
                 ("grant-retained.jobs.json", lambda x: x["items"].pop()),
@@ -301,6 +411,10 @@ class RuntimeGrantsParentTests(unittest.TestCase):
                 ),
                 (
                     "grant-denied.retained-workflow.json",
+                    lambda x: x["metadata"].update(uid="replacement"),
+                ),
+                (
+                    "grant-corrected.retained-workflow.json",
                     lambda x: x["metadata"].update(uid="replacement"),
                 ),
                 ("grant-retained.sql.json", lambda x: x["metadata"].update(uid="replacement")),
@@ -364,7 +478,7 @@ timeout() { record wait; [[ $FAIL != wait ]]; }
                     self.assertNotIn("snapshot first-after", trace)
 
     @unittest.skipUnless(BASH, "Bash required for scenario routing")
-    def test_only_initial_replaces_first_two_calls_and_preserves_admin_correction(self):
+    def test_only_initial_uses_owner_correction_and_never_falls_back_after_failure(self):
         assert BASH
         shell = (FIXTURE / "runtime-grants.sh").read_text()
         section = shell[
@@ -409,17 +523,19 @@ sql() { echo admin >> trace; }
                 )
                 self.assertEqual(process.returncode, 0, process.stderr)
                 trace = (root / "trace").read_text().splitlines()
-                self.assertEqual(trace.count("admin"), 2 if scenario == "initial" else 4)
+                self.assertEqual(trace.count("admin"), 1 if scenario == "initial" else 4)
                 self.assertEqual(
                     [line for line in trace if line.startswith("parent")],
-                    ["parent first", "parent repeat"] if scenario == "initial" else [],
+                    ["parent first", "parent repeat", "parent corrected"]
+                    if scenario == "initial"
+                    else [],
                 )
                 self.assertLess(
                     trace.index("probe excess-delete failure"),
                     trace.index("probe corrected success"),
                 )
                 (root / "trace").unlink()
-            for fail in ("denied", "contention", "rollback", "first", "repeat"):
+            for fail in ("denied", "contention", "rollback", "first", "repeat", "corrected"):
                 process = subprocess.run(
                     [str(BASH), str(script)],
                     cwd=root,
@@ -430,9 +546,13 @@ sql() { echo admin >> trace; }
                 )
                 self.assertEqual(process.returncode, 1, process.stderr)
                 trace = (root / "trace").read_text().splitlines()
-                self.assertNotIn("admin", trace)
                 self.assertNotIn(f"probe {fail} success", trace)
-                self.assertNotIn("probe excess-delete failure", trace)
+                if fail == "corrected":
+                    self.assertEqual(trace.count("admin"), 1)
+                    self.assertIn("probe excess-delete failure", trace)
+                else:
+                    self.assertNotIn("admin", trace)
+                    self.assertNotIn("probe excess-delete failure", trace)
                 (root / "trace").unlink()
 
 

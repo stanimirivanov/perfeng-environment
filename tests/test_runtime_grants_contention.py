@@ -109,7 +109,7 @@ def populate(root, results):
         + prefix
         + f"STATEMENT:  SELECT pg_advisory_xact_lock({MODULE.LOCK});\n"
     )
-    for label in ("denied", "contention", "rollback", "first", "repeat"):
+    for label in ("denied", "contention", "rollback", "first", "repeat", "corrected"):
         grants.run("verify-" + label, root, results)
 
 
@@ -129,7 +129,7 @@ class RuntimeGrantsContentionTests(unittest.TestCase):
                 run(mode, root, results)
             self.assertFalse(list(results.glob("grant-parent-*")))
             grants.run("retained", root, results)
-            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 5)
+            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 6)
             report = json.loads((results / "grant-parent-contention.outcome.json").read_text())
             self.assertEqual(report["decision"], "owner-grant-contention-refused")
 
