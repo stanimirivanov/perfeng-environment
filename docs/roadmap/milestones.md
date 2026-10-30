@@ -756,6 +756,14 @@ source/authority identity and unchanged SQL/data state must pass before recovery
 and final success. Live proof is post-merge main-only; no host retirement,
 preparation composition, general upgrade or SQL-fault acceptance credit.
 
+The [staged database-preparation parent](../release-database-preparation.md)
+now composes the unchanged migration-v2, qualification-v1 and grants-v2
+entrypoints ([ADR 0068](../decisions/0068-stage-database-preparation-composition.md)).
+One outer caller/mutex and 1,800-second deadline govern all three phases;
+each phase retains its own admission and fresh quiescence. Complete-parent live
+composition/failure/retention proof remains separately approved work. No host
+task, active root, CI execution selection or retirement count changes.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

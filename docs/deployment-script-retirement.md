@@ -283,3 +283,12 @@ production Python or host command. Live proof and preparation composition remain
 separate; no retirement credit is claimed.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.
+
+
+[ADR 0068](decisions/0068-stage-database-preparation-composition.md) stages a
+single native database-preparation composition using the existing three parents.
+It adds no production Python and changes no supported host task. All 13 baseline
+entrypoints and the two-module/708-line production verifier budget remain;
+complete-parent live composition/failure acceptance and operational cutover
+must precede measured retirement. Composition staging alone earns no deletion
+credit and does not replace the full kubernetes:prepare task.

@@ -65,3 +65,10 @@ The staged Project adds only their dedicated ledger destination; do not broaden
 `argocd` permissions or manage runtime history with Helm/Kustomize. See
 [release adoption](../docs/release-adoption.md) for create-only initialization,
 retention and the separate future pointer-advancement boundary.
+
+
+The staged `perfeng-release-database-prepare-v1` composes the published migration,
+qualification and grants Steps entrypoints through templateRef. It adds only a
+WorkflowTemplate in `release-workflows`; no Helm boundary, active root, RBAC or
+live CI execution changes. See [database preparation](../docs/release-database-preparation.md)
+for the explicit caller-identity, prerequisite, failure and deferred-live boundary.
