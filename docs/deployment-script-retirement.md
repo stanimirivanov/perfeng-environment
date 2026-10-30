@@ -300,3 +300,10 @@ strict cohort accounting change no supported host path or production Python.
 All 13 entrypoints and the two-module/708-line production verifier budget remain.
 Live complete-parent proof, fault acceptance and operational cutover remain gates;
 no retirement credit follows merely from wiring the fixture.
+
+
+[ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md) adds only
+CI refusal/guarded-restoration evidence around the unchanged complete parent.
+No production source, supported command or baseline entrypoint is retired.
+The 13-entrypoint baseline and two-module/708-line production verifier budget
+remain unchanged; live proof, SQL recovery and operational cutover stay separate.

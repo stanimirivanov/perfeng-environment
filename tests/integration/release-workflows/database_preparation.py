@@ -4,10 +4,12 @@ import hashlib
 import json
 import re
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 import preparation_scope as scope
+import schema_migration_denial as denial
 import schema_qualification_parent as qualification
 import yaml
 
@@ -98,6 +100,13 @@ def installed(root: Path, label: str) -> Any:
         obj = actual_authority[
             (wanted["kind"], wanted["metadata"].get("namespace"), wanted["metadata"]["name"])
         ]
+        if label == "denied" and (wanted["kind"], wanted["metadata"].get("namespace")) == (
+            "Role",
+            "perf-platform",
+        ):
+            denial.validate(load(root, "preparation-denied.role-original.json"), obj, True, wanted)
+            # Normalize only the exactly validated create-only fault for identity comparison.
+            obj["rules"] = deepcopy(wanted["rules"])
         parent.subset(wanted, obj)
         for key in ("rules", "roleRef", "subjects"):
             assert obj.get(key) == wanted.get(key)
@@ -118,6 +127,8 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     before, after = stable(root, "before"), stable(root, label)
     parameters, candidate = adopted.request(root, before)
     refused = label == "null"
+    denied = label == "denied"
+    failed = refused or denied
     raw = (root / "upgrade-request-request.json").read_bytes()
     accepted = (root / "parent-request.json").read_bytes()
     if refused:
@@ -138,7 +149,7 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     workflow = load(root, f"preparation-{label}.{suffix}workflow.json")
     workers = load(root, f"preparation-{label}.{suffix}workers.json")
     wanted = yaml.safe_load((parent.DIRECTORY / SOURCES[0]).read_text())["spec"]
-    views = scope.scopes(workflow, wanted, parameters, refused=refused)
+    views = scope.scopes(workflow, wanted, parameters, migration_failed=failed)
     pods = [n for n in workflow["status"]["nodes"].values() if n["type"] == "Pod"]
     assert len(workers) == len(pods) == len({w["uid"] for w in workers})
     assert {w["nodeID"] for w in workers} == {n["id"] for n in pods}
@@ -147,10 +158,10 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     for phase, view in views.items():
         node_ids = {n["id"] for n in view["status"]["nodes"].values()}
         phase_workers = [w for w in workers if w["nodeID"] in node_ids]
-        job = None if refused else load(root, f"preparation-{label}.{phase}.{suffix}job.json")
+        job = None if failed else load(root, f"preparation-{label}.{phase}.{suffix}job.json")
         job_pods = (
             {"items": []}
-            if refused
+            if failed
             else load(root, f"preparation-{label}.{phase}.{suffix}pods.json")
         )
         if phase == "migrate":
@@ -164,6 +175,7 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
                 [*after["applications"]["items"], after["deployment"]],
                 job,
                 job_pods,
+                denied_log(root, view, phase_workers) if denied else "",
                 retained_admission=True,
                 account="release-runtime-grants",
             )
@@ -181,6 +193,7 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
             )
         if not refused:
             parent.admission_nodes(view, raw, after)
+        if not failed:
             assert job is not None
             jobs.append(job)
             if retained:
@@ -193,10 +206,10 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     top = workflow["status"]["nodes"][workflow["metadata"]["name"]]
     outputs = top.get("outputs", {}).get("parameters", [])
     values = {p["name"]: p.get("value") for p in outputs}
-    if refused:
+    if failed:
         for phase in scope.PHASES:
-            assert load(root, f"preparation-{label}.{phase}.job.json") is None
-            assert load(root, f"preparation-{label}.{phase}.pods.json")["items"] == []
+            assert load(root, f"preparation-{label}.{phase}.{suffix}job.json") is None
+            assert load(root, f"preparation-{label}.{phase}.{suffix}pods.json")["items"] == []
         assert not any(values.values())
         assert not any(
             p.get("value") for p in workflow["status"].get("outputs", {}).get("parameters", [])
@@ -230,11 +243,37 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     return {
         "decision": "database-preparation-null-refused"
         if refused
+        else "database-preparation-job-create-refused"
+        if denied
         else "database-preparation-verified",
         "workflowUID": workflow["metadata"]["uid"],
         "requestDigest": parameters["request-sha256"],
         "jobUIDs": [j["metadata"]["uid"] for j in jobs],
     }
+
+
+def role_source() -> Any:
+    return next(
+        obj
+        for obj in yaml.safe_load_all(
+            (parent.DIRECTORY / "rbac/runtime-grants/platform-observation.yaml").read_text()
+        )
+        if obj["kind"] == "Role"
+    )
+
+
+def denied_log(root: Path, view: Any, workers: Any) -> str:
+    """Bind the supplied Forbidden diagnostic to the exact failed native worker."""
+    node = parent.maintenance.readiness.named(view, "migrate")
+    worker = next(w for w in workers if w["nodeID"] == node["id"])
+    pod = load(root, "preparation-denied.diagnostic-pod.json")
+    assert pod["metadata"]["namespace"] == "argo-workflows"
+    assert pod["metadata"]["uid"] == worker["uid"]
+    assert pod["metadata"]["annotations"]["workflows.argoproj.io/node-id"] == node["id"]
+    assert pod["spec"]["serviceAccountName"] == worker["account"] == "release-runtime-grants"
+    main = [s for s in pod["status"]["containerStatuses"] if s["name"] == "main"]
+    assert len(main) == 1 and main[0]["state"]["terminated"]["exitCode"] == worker["exitCode"] == 1
+    return (root / "preparation-denied.worker.private").read_text()
 
 
 def probe(root: Path, results: Path) -> None:
@@ -256,7 +295,7 @@ def probe(root: Path, results: Path) -> None:
 
 
 def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
-    assert mode in {"before", "null", "first", "repeat", "complete", "retained", "final"}
+    assert mode in {"before", "null", "denied", "first", "repeat", "complete", "retained", "final"}
     adopted.request(root, stable(root, "before"))
     installed(root, "before")
     if mode == "before":
@@ -264,9 +303,11 @@ def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
     labels = (
         ("null",)
         if mode == "null"
-        else ("null", "first")
+        else ("null", "denied")
+        if mode == "denied"
+        else ("null", "denied", "first")
         if mode == "first"
-        else ("null", "first", "repeat")
+        else ("null", "denied", "first", "repeat")
     )
     retained = mode in {"retained", "final"}
     reports = [execution(root, label, retained=retained) for label in labels]
@@ -275,8 +316,12 @@ def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
     assert (
         len(identities)
         == len(set(identities))
-        == (0 if mode == "null" else 3 if mode == "first" else 6)
+        == (0 if mode in {"null", "denied"} else 3 if mode == "first" else 6)
     )
+    if mode not in {"null", "denied"}:
+        denial.execute(
+            "final" if retained else "restored", root, "preparation-denied", role_source()
+        )
     sample = mode if retained else labels[-1]
     if retained:
         stable(root, mode, final=mode == "final")
@@ -288,7 +333,7 @@ def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
     new_jobs = [
         load(root, f"preparation-{label}.{phase}.job.json")
         for label in labels
-        if label != "null"
+        if label not in {"null", "denied"}
         for phase in scope.PHASES
     ]
     assert grants.install.inventory({"items": actual}) == grants.install.inventory(
@@ -340,7 +385,13 @@ def partition(root: Path, results: Path, phase: str, kind: str, path: Path) -> N
 def main() -> None:
     mode, directory, output, *extra = sys.argv[1:]
     root, results = Path(directory), Path(output)
-    if mode == "partition":
+    if mode.startswith("role-"):
+        action = mode.removeprefix("role-")
+        assert not extra
+        if action == "restore":
+            verify(root, results, "denied")
+        denial.execute(action, root, "preparation-denied", role_source())
+    elif mode == "partition":
         phase, kind, path = extra
         partition(root, results, phase, kind, Path(path))
     else:

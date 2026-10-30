@@ -113,5 +113,26 @@ keep the full private `.all.json` inventory, remove exactly two validated Job
 UIDs of that kind from the legacy input, then retain strict legacy checks on
 all remaining Jobs. Unknown, missing, replaced or altered Jobs cannot be ignored.
 No failed gate permits probe/recovery or automatic repair. Offline tests do not
-establish live proof; main-only execution after merge must supply it. Fault
-injection, general upgrade safety and operational cutover remain separate.
+establish live proof; main-only execution after merge must supply it. The bounded
+Job-create denial below extends fault coverage; partial SQL faults, general
+upgrade safety and operational cutover remain separate.
+
+
+## Complete-parent Job-create denial
+
+[ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md) adds one
+failed complete parent after null-current refusal and before existing first/
+repeat. Temporarily remove only Jobs create from the grants caller's fixture
+Role. Require real migration admission/quiescence and the exact native create
+Forbidden, with no later qualification/grant workers, SQL Job/Pod or preparation
+success output. Keep data, credentials, ledger and workload identities unchanged.
+
+Only proved refusal/retention allows a fresh UID/resourceVersion/rules-guarded
+restore to the captured reviewed rules. Verify effective create/get/watch before
+fresh runs, and the failed execution plus restored authority again before
+recovery/final success. All preparation-denied evidence has a separate prefix;
+earlier denial records and the six successful cohort Jobs remain unchanged.
+No automatic repair, additional SQL Job, CI job/scenario/ref/right/credential/
+budget, production change or local execution. Heavy checks remain on PR CI;
+live API/controller proof stays post-merge main-only. This proves refusal before
+SQL Job creation, not recovery after partial or ambiguous SQL commits.

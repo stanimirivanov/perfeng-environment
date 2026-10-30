@@ -772,6 +772,13 @@ state must pass fresh retention before recovery/final publication. The existing
 job budget, inputs, credentials and authority remain unchanged. Live proof is
 post-merge main-only; failure/partial-state injection and host cutover stay open.
 
+[ADR 0070](../decisions/0070-refuse-complete-preparation-job-create.md) wires
+complete preparation Job-create denial before first/repeat, using only a guarded
+create-only reduction/restoration of existing grants authority. Exact native
+refusal, unchanged state and failed-parent/restored-authority retention gate
+fresh runs and recovery. No additional SQL Job or CI budget; live proof remains
+post-merge main-only. Partial SQL/ambiguous commits and cutover stay separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

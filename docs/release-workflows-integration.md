@@ -2202,3 +2202,24 @@ other five legs, requests/refs, credentials and permissions. Heavy checks stay o
 PR CI; live proof is post-merge main-only. See [ADR 0069](decisions/0069-exercise-complete-database-preparation.md).
 Failure/partial-state injection, general upgrades and operational cutover remain
 separate; existing standalone passes do not establish the new complete parent.
+
+
+### Complete preparation Job-create denial
+
+The existing initial preparation suite now runs a bounded denied-create case
+between null-current refusal and the two successful parents. Reuse the reviewed
+grants Role guard with a distinct preparation-denied prefix; remove only Jobs
+create and verify effective denial while preserving get/watch. The unchanged
+complete parent must finish real migration input/admission/quiescence gates,
+then fail specifically at its native Job create for the grants identity.
+
+Require worker-bound Forbidden/main-exit evidence, no later phase/SQL Job/Pod or
+success output, unchanged state and exact narrowed authority. Only verification
+permits current UID/resourceVersion/rules-guarded restoration; require effective
+rights and returned Role proof before fresh first/repeat. Retain the failed raw
+Workflow and restored authority through existing recovery/final gates. No Job is
+added to the six-Job cohort; no wildcard inventory exception or old denial-file
+overwrite. Nothing repairs on EXIT. No new GitHub job/scenario/ref/credential/
+right/budget, production change or local action. Heavy checks remain on PR CI;
+full-parent live proof stays post-merge. See [ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md).
+Partial SQL and ambiguous-commit outcomes remain outside this refusal case.

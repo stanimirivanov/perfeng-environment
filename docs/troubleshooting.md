@@ -1945,3 +1945,26 @@ never retry nodes, repair on EXIT or resume based on a partial output. Diagnose
 within the existing budget before proposing a cost change. [ADR 0069](decisions/0069-exercise-complete-database-preparation.md)
 limits this to disposable trusted-main acceptance; local execution, deliberate
 fault injection and production cutover require separate scope.
+
+
+### Complete preparation denied-create proof or restoration stops
+
+Inspect `database-preparation-denied-authority`, `database-preparation-denied`
+or `database-preparation-denied-restoration`. Keep private preparation-denied
+Role snapshots/patches, raw Workflow/worker/Job observations and the worker log
+separate from earlier denial cases. Only exact migration Job-create Forbidden
+for the grants identity after real admission/quiescence qualifies; timeout,
+image failure, another identity's diagnostic or generic phase failure must stop.
+
+The failed native worker's main must exit 1, no later phase or SQL Job/Pod may
+exist, and state must be unchanged. Extra Role changes, changed UID/rules or
+unproved state prevent restore-patch generation. Both Role writes test current
+UID/resourceVersion/rules. Do not remove guards, restore on EXIT, overwrite
+historical evidence or manually run later phases to pass. Fresh first/repeat
+requires verified returned rules and effective create/get/watch restoration.
+
+Before recovery/final success, require the failed complete parent and current
+restored authority again. No new SQL Jobs are expected from this case. No local
+execution or production authority change is authorized. [ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md)
+limits this to disposable trusted-main acceptance; partial/ambiguous SQL outcomes
+need independent diagnosis and separately reviewed recovery.
