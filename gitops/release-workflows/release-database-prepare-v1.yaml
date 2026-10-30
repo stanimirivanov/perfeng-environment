@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-database-prepare-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-runtime-grants
+  entrypoint: prepare
+  activeDeadlineSeconds: 1800
+  synchronization:
+    mutexes:
+      - name: perfeng-local-external-state
+  arguments:
+    parameters:
+      - name: request-revision
+      - name: request-path
+      - name: request-sha256
+      - name: selection-revision
+  templates:
+    - name: prepare
+      steps:
+        - - name: migrate
+            templateRef:
+              name: perfeng-release-schema-migration-v2
+              template: migrate
+        - - name: qualify
+            templateRef:
+              name: perfeng-release-schema-qualification-v1
+              template: qualify
+        - - name: grant
+            templateRef:
+              name: perfeng-release-runtime-grants-v2
+              template: grant
+      outputs:
+        parameters:
+          - name: migration-job-name
+            valueFrom:
+              parameter: '{{steps.migrate.outputs.parameters.job-name}}'
+          - name: qualification-job-name
+            valueFrom:
+              parameter: '{{steps.qualify.outputs.parameters.job-name}}'
+          - name: grants-job-name
+            valueFrom:
+              parameter: '{{steps.grant.outputs.parameters.job-name}}'
+          - name: checkpoint
+            valueFrom:
+              parameter: '{{steps.grant.outputs.parameters.checkpoint}}'

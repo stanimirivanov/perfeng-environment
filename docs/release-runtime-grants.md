@@ -202,3 +202,15 @@ remains five/six. There is no new fault, recovery or production admission.
 ADR 0065 changes only the adopted run to v2 and adds the no-Job refusal described
 above. Full v2 live proof remains post-merge; this is not production cutover or ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.
+
+
+## Staged database-preparation composition
+
+[Database preparation](release-database-preparation.md) and
+[ADR 0068](decisions/0068-stage-database-preparation-composition.md) compose the
+unchanged migration-v2 → qualification-v1 → grants-v2 entrypoints within one
+Workflow. The outer release-runtime-grants caller applies to every phase,
+including migration; each retains its own full admission and fresh quiescence.
+Standalone behavior remains supported. This stages only the retained-baseline
+local database subphase, without active-root/CI execution selection, local
+submission or cutover. Complete-parent live acceptance remains separate.

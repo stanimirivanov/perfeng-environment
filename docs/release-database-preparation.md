@@ -1,0 +1,89 @@
+# Staged database preparation
+
+## TL;DR
+
+- `perfeng-release-database-prepare-v1` composes migration v2 → read-only qualification v1 → runtime grants v2.
+- Reuse the four pinned inputs and unchanged complete entrypoints; every phase rechecks admission and quiescence.
+- One outer release-runtime-grants identity, shared mutex and total 1,800-second deadline govern the sequence.
+- Return three retained Job names and the last phase's pre-Job checkpoint; leave the application paused.
+- Staged only: no active-root selection, live execution, host-task replacement or retirement credit.
+
+## Scope and prerequisites
+
+[ADR 0068](decisions/0068-stage-database-preparation-composition.md) authorizes
+staging this database subphase. It does not replace the full kubernetes:prepare
+task, provision external state, pause workloads, select runtime packages or
+activate a release. The supported host path and three standalone parents remain.
+
+Require the fixed selected local release, reviewed manual/forward-only/0018
+request with expectedCurrent bound to the adopted receipt, healthy foundations,
+retained current/receipt identities and an already-paused root/child/Deployment
+with no matching Pods. This is the v2 retained-baseline path, not fresh bootstrap
+or admission of an arbitrary new schema/release. Keep drain, backup and operator
+exclusion as independent requirements; the workflow mutex is not a global lease.
+
+Explicitly install the staged definitions and existing release-runtime-grants
+ServiceAccount/observation/Job authority, Application access and standalone
+ledger-get Role/Binding. Existing preflight Git-read Secret, verifier/intent/SQL
+ConfigMaps, database migration-url and selected migration image pull Secret must
+already be present. Referenced WorkflowTemplate specs do not install these
+prerequisites or switch caller identity. No new RBAC or credentials are added.
+
+## Native flow and outputs
+
+```text
+four pinned inputs + one outer mutex
+  -> schema-migration-v2 / migrate
+  -> schema-qualification-v1 / qualify
+  -> runtime-grants-v2 / grant
+  -> three retained Job names + grants pre-Job checkpoint; remain paused
+```
+
+Each arrow waits for successful completion. Each phase retains its own complete
+preflight, exact-lock/intent, accepted-byte/current/receipt admission and fresh
+quiescence/final identity checks. Nothing caches a prior admission result across
+phases. templateRef invokes the unchanged Steps entrypoints within one Workflow;
+it does not submit nested Workflows or reacquire their spec-level mutexes.
+
+The outer caller is release-runtime-grants even during migration. The owner
+approved that expanded reviewed use; broad existing Job creation already permits
+arbitrary Job manifests/Secret mounts, so this remains trusted-operator authority.
+All phases share the same four Workflow arguments. Native operation-specific Job
+prefixes keep their names distinct despite sharing the outer Workflow UID.
+
+The total deadline is 1,800 seconds, not three independent Workflow budgets.
+Existing template/Job limits remain in force. No retries, continueOn, optional
+phases, exit cleanup or automatic recovery is configured.
+
+Successful output parameters are migration-job-name, qualification-job-name,
+grants-job-name and checkpoint. All are required. The checkpoint is the grants
+phase's observation before its Job, not a post-grant/runtime TCP check, promotion
+receipt or reusable authorization. Qualification checks selected ledger/ownership;
+it does not establish complete DDL equivalence or grant/HTTP readiness.
+
+## Failure and rollout boundary
+
+Failure stops later phases, leaves the application paused and preserves native
+execution evidence. Migration or grants may have committed before an error or
+lost response. Do not assume global rollback, retry nodes, delete/recreate Jobs,
+edit the ledger, rotate credentials or resume to make the sequence pass. Inspect
+actual retained state under explicit authority and obtain a reviewed recovery
+decision. No successful preparation output authorizes activation.
+
+Only staged release-workflows Kustomize selects this new declaration. Its
+AppProject boundary and active local root remain unchanged. No integration/CI
+execution path invokes it in this PR. Removing staging selection does not prune
+installed versions or evidence. Operational withdrawal needs explicit approval.
+
+## Verification and remaining work
+
+Focused tests check serial failure-closed structure, references and admission
+chains, required outputs, Job naming, caller authority and staging isolation.
+Staged rendering/AppProject validation and pinned Argo lint resolve references
+offline. These do not simulate or prove controller/SQL execution. Heavy full
+checks stay on PR CI; live complete-parent first/repeat and failure/retention
+acceptance follows as a separately approved slice.
+
+General upgrades, ambiguous commits, SQL fault qualification, operator exclusion,
+backup, readiness, promotion/resume, non-local/multi-user operation, host cutover
+and measured script retirement remain separate. No production Python is added.

@@ -115,3 +115,15 @@ Other five scenarios remain unchanged. PR checks are offline evidence/coordinato
 checks; real PostgreSQL/controller acceptance remains post-merge main-only.
 SQL refusal faults and preparation-flow composition are deferred. Do not infer
 full DDL equivalence, general upgrade safety or retirement from passing fixtures.
+
+
+## Staged database-preparation composition
+
+[Database preparation](release-database-preparation.md) and
+[ADR 0068](decisions/0068-stage-database-preparation-composition.md) compose the
+unchanged migration-v2 → qualification-v1 → grants-v2 entrypoints within one
+Workflow. The outer release-runtime-grants caller applies to every phase,
+including migration; each retains its own full admission and fresh quiescence.
+Standalone behavior remains supported. This stages only the retained-baseline
+local database subphase, without active-root/CI execution selection, local
+submission or cutover. Complete-parent live acceptance remains separate.

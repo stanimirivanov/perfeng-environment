@@ -1893,3 +1893,29 @@ never upload passwords or raw diagnostic files. Fix the actual prerequisite or
 implementation and use a fresh owned disposable run; do not repair on EXIT.
 [ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md) bounds this
 acceptance; SQL faults, local execution and production cutover remain separate.
+
+
+### Staged database preparation cannot complete
+
+`perfeng-release-database-prepare-v1` is staged only. An unresolved templateRef
+requires the complete existing phase definitions/prerequisites, not a new custom
+script or copied policy. Check offline `make workflow-lint` and staged rendering.
+The same four pinned arguments apply to every phase; null expectedCurrent,
+unowned/stale receipt or wrong selection must refuse before a migration Job.
+
+The outer caller is release-runtime-grants throughout. Referenced parent specs
+do not switch identity to release-schema-migration. Check the existing grants
+ServiceAccount/Job observation rights, explicit Application and ledger-get
+bootstrap, Git-read Secret, fixed SQL ConfigMaps, migration-url and selected
+migration pull Secret. Do not grant administrator access as a repair. This
+composition adds no RBAC or credential provisioning.
+
+Find the first failed migrate/qualify/grant phase and follow its existing guide.
+The total deadline covers all phases; a timeout does not prove that prior SQL
+rolled back. Later phases must stop and no successful preparation result may be
+used. Preserve Jobs/Workflows, database and paused workloads; do not retry nodes,
+remove evidence, manually finish grants or resume on EXIT. Inspect actual state
+under explicit authority and obtain a reviewed recovery decision. The checkpoint
+output is the grants phase's pre-Job observation, not post-grant readiness or
+activation authority. [ADR 0068](decisions/0068-stage-database-preparation-composition.md)
+defers live complete-parent failure/retention acceptance and operational cutover.

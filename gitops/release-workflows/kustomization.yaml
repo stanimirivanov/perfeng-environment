@@ -60,6 +60,7 @@ resources:
   - schema-qualification-sql-v1.yaml
   - schema-qualification-job-v1.yaml
   - release-schema-qualification-v1.yaml
+  - release-database-prepare-v1.yaml
 configMapGenerator:
   - name: perfeng-external-state-scripts-v1
     namespace: perf-platform
