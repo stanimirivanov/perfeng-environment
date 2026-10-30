@@ -719,6 +719,12 @@ The initial fixture's existing excess-DELETE correction now uses the unchanged
 owner parent, with strict drift admission, runtime TCP/ACL proof and retained
 execution ([ADR 0060](../decisions/0060-exercise-owner-grant-correction.md));
 other scenarios keep administrator correction.
+The real adopted/paused window now includes an unchanged grant parent and runtime
+TCP probe after schema acceptance and before existing recovery, preserving
+expected-current identity, SQL/S3 data and workloads
+([ADR 0061](../decisions/0061-exercise-grants-on-adopted-paused-application.md)).
+Final retention requires this additional execution explicitly; live proof stays
+post-merge without new production admission or recovery.
 Live proof stays post-merge; ambiguous commits, admission and operational
 cutover/host migration-grant retirement remain open.
 

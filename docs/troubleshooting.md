@@ -1709,6 +1709,18 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+For `grant-parent-adopted` or `grant-adopted-runtime`, inspect the private
+`grant-adopted-*` snapshots, owner Job and `runtime-grants-adopted` probe. The
+upgrade request must name the accepted receipt/pointer digest as expectedCurrent;
+wrong ledger UID/bytes, bootstrap placeholders or unpaused resources refuse
+before submission. Require real native order, fixed owner Job, runtime SQL-policy
+success, unchanged ACLs and SQL/S3/ledger/workload/storage retention before
+existing recovery. Final acceptance uses the explicit complete-retention mode,
+requiring the extra parent/Job and re-read probe identities; missing evidence
+cannot fall back to bootstrap-only counts. No failure may resume workloads or
+advance the baseline. [ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)
+adds CI proof only, with production admission, ambiguity and local execution deferred.
+
 For `grant-parent-corrected`, first require the existing excess-DELETE runtime
 probe to prove its exact policy refusal. The fresh ACL snapshot must differ from
 first success only by the one added runtime DELETE on runs; other principals,

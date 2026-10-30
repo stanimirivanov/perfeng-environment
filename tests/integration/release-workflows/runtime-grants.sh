@@ -138,5 +138,5 @@ for suffix in workflow job; do
   done
 done
 
-if [[ ${scenario:-} == initial ]]; then runtime_grant_retention; fi
+if [[ ${scenario:-} == initial ]]; then runtime_grant_retention bootstrap; fi
 echo 'Runtime grant parity passed; actual server/readiness and production cutover remain separate.'

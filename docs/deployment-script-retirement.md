@@ -257,5 +257,9 @@ remains post-merge; no host command or production verifier source is retired.
 The [owner-correction slice](decisions/0060-exercise-owner-grant-correction.md)
 replaces only one initial CI administrator call with the existing parent. It
 adds no script, production definition or retirement credit; cutover stays separate.
+The [adopted/paused acceptance slice](decisions/0061-exercise-grants-on-adopted-paused-application.md)
+adds only CI evidence around the same grant parent before existing recovery.
+No supported host command or production verifier source is retired; live proof
+and operational cutover remain separate gates.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

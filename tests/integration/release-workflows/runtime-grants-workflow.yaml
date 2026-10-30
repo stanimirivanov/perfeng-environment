@@ -1,4 +1,4 @@
-# CI only: the fixture administrator applies grants separately. This worker has
+# CI only: grant authority is separate from this runtime-only worker, which has
 # only the runtime URL and proves effective database authority over real TCP.
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow

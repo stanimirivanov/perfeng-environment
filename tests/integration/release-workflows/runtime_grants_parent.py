@@ -398,13 +398,21 @@ def main() -> None:
             load(f"grant-{label}.intent.json"),
         )
 
-    if mode == "retained":
+    if mode in {"retained", "retained-adopted"}:
+        adopted = mode == "retained-adopted"
+        job_labels = ["contention", "rollback", "first", "repeat", "corrected"]
+        labels = ["denied", *job_labels]
+        if adopted:
+            job_labels.append("adopted")
+            labels.append("adopted")
         jobs = load("grant-retained.jobs.json")["items"]
-        originals = [
-            load(f"grant-{label}.job.json")
-            for label in ("contention", "rollback", "first", "repeat", "corrected")
-        ]
-        assert len(jobs) == 5 and len({j["metadata"]["uid"] for j in originals}) == 5
+        originals = [load(f"grant-{label}.job.json") for label in job_labels]
+        assert (
+            len(jobs)
+            == len(originals)
+            == len({j["metadata"]["uid"] for j in originals})
+            == (6 if adopted else 5)
+        )
         assert {j["metadata"]["uid"] for j in jobs} == {j["metadata"]["uid"] for j in originals}
         for job in originals:
             parent.retained_job(
@@ -412,9 +420,8 @@ def main() -> None:
                 next(j for j in jobs if j["metadata"]["uid"] == job["metadata"]["uid"]),
                 failed=job["metadata"]["uid"] in {j["metadata"]["uid"] for j in originals[:2]},
             )
-        labels = ("denied", "contention", "rollback", "first", "repeat", "corrected")
         workflows = [load(f"grant-{label}.workflow.json") for label in labels]
-        assert len({w["metadata"]["uid"] for w in workflows}) == 6
+        assert len({w["metadata"]["uid"] for w in workflows}) == (7 if adopted else 6)
         for label, workflow in zip(labels, workflows, strict=True):
             current = load(f"grant-{label}.retained-workflow.json")
             assert install.inventory({"items": [workflow]}) == install.inventory(
