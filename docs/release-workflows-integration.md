@@ -2153,3 +2153,23 @@ Workflows before existing checked recovery. No new CI job/scenario/ref/right/
 budget, production change, role/credential/release-ledger edit, database reset
 or local action is added. Heavy checks remain on CI; live SQL proof is post-merge.
 Ambiguous-commit recovery remains open.
+
+### Complete read-only schema-qualification parent
+
+The existing trusted-main initial leg installs the three unchanged qualification
+resources and reuses the approved grants ledger-get authority and pinned upgrade
+request. `schema-qualification-parent.sh` runs first/repeat after schema acceptance
+and before adopted grants, with the real application paused. It requires distinct
+native Jobs/Workflows, ordered admission/quiescence, exact published SQL/inventory
+and installed source/authority identities, and unchanged SQL ledger/OIDs/ACL/data,
+roles/passwords, release records, Secrets and workload/storage identities.
+
+Reread both execution records, native workers, Jobs/Pods, sources and state before
+recovery and final success. Final checks allow only existing independently proved
+recovery. Missing, replaced, failed or altered evidence stops; no implicit retry,
+repair or later operation. Private `qualification-*` files retain observations;
+only bounded `schema-qualification-{retained,final}.outcome.json` summaries become
+public after verification. No new CI job/scenario, request/ref, credential, right
+or budget; the other five legs remain unchanged. Heavy PR CI verifies offline
+contracts; live proof remains post-merge main-only. SQL refusal fault injection,
+preparation composition and host cutover remain deferred. See [ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md).

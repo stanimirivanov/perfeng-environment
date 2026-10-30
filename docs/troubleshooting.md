@@ -1751,8 +1751,9 @@ Expected hashes come from raw selected upstream Git bytes. A source/inventory
 test failure requires inspecting the selected commit and immutable policy, not
 copying the CI fixture or updating published v1 in place. Success establishes
 only ledger/ownership observation, not complete DDL equivalence, a backup or a
-future mutation lease. Full PostgreSQL/controller/live refusal and retention
-proof remains separately approved work. See [schema qualification](release-schema-qualification.md)
+future mutation lease. Bounded first/repeat and retention acceptance is wired
+under ADR 0067 for post-merge trusted-main CI; live SQL refusal faults remain
+separate work. See [schema qualification](release-schema-qualification.md)
 and [ADR 0066](decisions/0066-stage-read-only-schema-qualification.md).
 
 ### Staged runtime grant worker refuses input or authority
@@ -1872,3 +1873,23 @@ delete/replace Jobs, grant administrator authority, repair roles or sync workloa
 to pass. The worker mounts no PostgreSQL administrator Secret. Complete live
 first/repeat/refusal/data-retention proof remains a later scoped acceptance PR;
 existing fixture-administrator parity does not establish this new parent.
+
+### Complete qualification acceptance blocks recovery
+
+For `schema-qualification-setup`, `first`, `repeat`, `retained` or `final` failure,
+inspect the safe stage report first, then privately inspect `qualification-*`
+workflow/wait/worker observations. Verify the existing upgrade request, grants
+ledger-get Role/Binding, three exact published qualification resources and selected
+upstream inventory. Do not reserialize requests, edit immutable SQL or replace
+retained Jobs/records to make evidence pass. The fixture requires two distinct
+read-only Jobs, ordered admission, native exit zero and unchanged SQL/ACL/data.
+
+`retained` is a fresh paused-state gate before recovery; `final` rereads execution,
+source and persistent state after existing checked recovery. A recovered running
+Deployment is expected at final retention. Missing/changed records, native worker
+failure or SQL/source drift must block success. No later grant/recovery is allowed
+from an unverified pre-recovery gate. Keep SQL vendor output and raw state private;
+never upload passwords or raw diagnostic files. Fix the actual prerequisite or
+implementation and use a fresh owned disposable run; do not repair on EXIT.
+[ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md) bounds this
+acceptance; SQL faults, local execution and production cutover remain separate.

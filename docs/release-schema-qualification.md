@@ -6,7 +6,7 @@
 - Pinned preflight, retained-baseline admission and fresh quiescence precede a bounded native read-only Job.
 - Expected names/hashes come from selected upstream Git bytes, not CI fixture state.
 - Reuse grants authority and migration-url; no new RBAC, SQL writes, grants, resume or promotion.
-- Keep it outside the active root; engine/controller proof, preparation composition and host cutover remain separate.
+- Keep it outside the active root; bounded trusted-main first/repeat acceptance runs post-merge, with preparation composition and host cutover separate.
 
 ## Inputs and source identity
 
@@ -77,8 +77,9 @@ authorized path and never upload credentials/raw diagnostics. Success prints a
 constant ledger/ownership qualification message and returns the Job name and
 prior checkpoint. No result authorizes grants, migration, repair or activation.
 
-Stage resources only under gitops/release-workflows. No active-root or existing
-CI execution selection changes; no local/live qualification is authorized here.
+Stage resources only under gitops/release-workflows. The separately approved
+trusted-main initial fixture installs and runs them as described below; no
+active-root or local execution selection changes.
 Removing Git selection does not prune installed versions or existing authority;
 withdrawal needs explicit approval. Do not delete/replace evidence or rotate
 credentials as implicit repair.
@@ -86,5 +87,31 @@ credentials as implicit repair.
 Offline source-byte/static/wiring/shell tests, focused staged Kustomize/AppProject
 validation and pinned Argo lint cover composition. They do not execute SQL against
 PostgreSQL or prove live refusal/retention. Heavy checks stay on PR CI; an approved
-complete-parent live acceptance slice must follow before operator cutover or
+complete-parent live acceptance must pass before operator cutover or
 migration/grant composition. Host commands and retirement counts remain unchanged.
+
+## Complete-parent first/repeat acceptance
+
+[ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md) authorizes
+only the existing trusted-main initial job to install the three unchanged staged
+resources and submit the complete parent twice with the existing pinned upgrade
+request. Execution follows schema acceptance and grants ledger-read setup, while
+the real adopted application is paused, before adopted grants and recovery.
+Two distinct retained read-only Jobs and Workflows must prove ordered admission,
+fresh quiescence, exact installed SQL/inventory/source/authority identities and
+native success. SQL ledger/ownership, ACLs, rows, credentials, release records,
+Secrets, SQL/S3 data and workload/storage identities must remain unchanged.
+
+The fixture rereads both execution records, native workers, Jobs/Pods and sources
+before recovery and final success. A fresh paused snapshot is required before
+recovery; final SQL/data/source retention runs after the separately checked
+recovery without requiring the recovered Deployment to remain paused. No
+qualification failure triggers repair or recovery. Raw evidence stays private;
+bounded summaries are `schema-qualification-retained.outcome.json` and
+`schema-qualification-final.outcome.json`.
+
+This adds no GitHub jobs/scenarios, requests/refs, credentials, authority or budget.
+Other five scenarios remain unchanged. PR checks are offline evidence/coordinator
+checks; real PostgreSQL/controller acceptance remains post-merge main-only.
+SQL refusal faults and preparation-flow composition are deferred. Do not infer
+full DDL equivalence, general upgrade safety or retirement from passing fixtures.

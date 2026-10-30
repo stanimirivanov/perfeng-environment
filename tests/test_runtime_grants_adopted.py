@@ -492,6 +492,7 @@ adopted_grant_retention() { step retained; }
                 "pass",
                 "setup",
                 "access",
+                "qualification",
                 "null-parent",
                 "parent",
                 "probe",
@@ -501,6 +502,9 @@ adopted_grant_retention() { step retained; }
             ):
                 case = root / failure
                 case.mkdir()
+                (case / "schema-qualification-parent.sh").write_text(
+                    "step qualification\n", newline="\n"
+                )
                 (case / "runtime-probe.log").write_text("runtime privilege policy verified\n")
                 script = case / "case.sh"
                 script.write_text(

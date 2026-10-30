@@ -349,6 +349,7 @@ uv() {
     [[ $failure != "$step" ]] || return 17
   fi
 }
+qualification_retention() { echo qualification-retained; [[ $failure != qualification ]] || return 17; }
 argocd_case() { echo recovery-sync; }
 server_case() { echo recovered-http; }
 adoption_case() { echo fresh-adoption; }
@@ -375,6 +376,7 @@ source "$source_dir/maintenance-pause.sh"
                 "paused",
                 "schema-parent",
                 "adopted-grants",
+                "qualification",
                 "recovered",
                 "none",
             ):
@@ -400,7 +402,13 @@ source "$source_dir/maintenance-pause.sh"
                     self.assertEqual(
                         result.returncode, 0 if failure == "none" else 17, result.stderr
                     )
-                    if failure in {"authority", "paused", "schema-parent", "adopted-grants"}:
+                    if failure in {
+                        "authority",
+                        "paused",
+                        "schema-parent",
+                        "adopted-grants",
+                        "qualification",
+                    }:
                         self.assertNotIn("recovery-sync", result.stdout)
                     else:
                         self.assertIn("recovery-sync", result.stdout)
