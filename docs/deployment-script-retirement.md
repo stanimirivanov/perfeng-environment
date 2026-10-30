@@ -269,5 +269,9 @@ The [v2 acceptance slice](decisions/0063-exercise-retained-schema-admission.md)
 reuses the existing two repeat Jobs and adds only CI evidence/null-current
 refusal. It changes no production source or supported command and claims no
 retirement credit; live proof remains post-merge main-only.
+The [staged grants-v2 admission slice](decisions/0064-stage-retained-runtime-grant-admission.md)
+adds only declarative composition using existing admission leaves and a standalone
+get-only ledger grant. No production Python or supported command is added or
+retired; live grants-v2 acceptance and cutover remain separate.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

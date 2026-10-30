@@ -3,6 +3,7 @@
 ## TL;DR
 
 - `perfeng-release-runtime-grants-v1` stages the reviewed runtime SQL privileges through a fixed native Job.
+- Staged v2 reuses the published retained-baseline admission chain; v1 remains for bootstrap/fault acceptance.
 - Pinned preflight, exact lock, shared manual/forward-only intent and fresh quiescence must pass first.
 - Use the migration owner URL, never the PostgreSQL administrator Secret.
 - The selected schema/roles/credentials must already be independently qualified.
@@ -35,7 +36,8 @@ activates workloads, repairs state or grants Kubernetes runtime authority.
 
 Complete the selected schema migration and its independent ledger/checksum
 qualification first. The Job checks required tables and ownership but does not
-replace schema qualification or expectedCurrent/admission. Externally prepared
+replace schema qualification. V1 does not implement expectedCurrent admission;
+v2 uses the separately described retained-baseline gate. Externally prepared
 database roles, migration-url and release-git-read must already be verified.
 Schedule downtime, drain Runs, retain an appropriate backup and exclude competing
 operators/manual syncs; quiescence alone does not prove these prerequisites.
@@ -78,6 +80,48 @@ However Job creation can mount arbitrary namespace Secrets, so this remains
 trusted-operator authority. SQL uses only migration-url and mounts no administrator
 Secret. The fixed Job has no API token, no retries/deletion/TTL, explicit limits,
 non-root execution and a read-only root filesystem. Scratch output stays private.
+
+## Retained-baseline admission in v2
+
+[ADR 0064](decisions/0064-stage-retained-runtime-grant-admission.md) adds
+`perfeng-release-runtime-grants-v2` alongside unchanged v1. It references schema
+v2's published candidate, pointer, receipt, accepted-bytes, receipt-stable and
+admission leaves; it never invokes the schema migration entrypoint or Job.
+The same four pinned inputs, exact lock and manual/forward-only intent precede
+those gates. Reused predicates require non-null expectedCurrent, the owned
+pointer/immutable receipt UID/provenance and exact accepted request byte hash,
+then fresh quiescence and root/child identity binding before the unchanged grant
+Job. Candidate and accepted non-promotion fields must match: this is the fixed
+current local selection/0018 pilot, not general upgrades.
+
+```text
+pinned preflight -> exact lock -> reviewed intent -> candidate/current check
+  -> owned pointer -> immutable receipt -> accepted request byte hash
+  -> fresh quiescence -> unchanged receipt -> final pointer/root/child binding
+  -> unchanged native owner grant Job; checkpoint + Job name; leave paused
+```
+
+Before separately authorized use, explicitly install
+`gitops/release-workflows-bootstrap/runtime-grants-ledger-access.yaml` alongside
+the existing Application-read bootstrap. It grants the existing grants identity
+ConfigMap get in the ledger namespace, including any dynamically named receipt;
+no list or writes. It is absent from the bootstrap Kustomization and active root.
+All referenced leaves run under the grants Workflow identity; no additional
+ServiceAccount, nested Workflow/mutex, policy copy, Python or image is introduced.
+
+V2 is selected only in the staged release-workflows root and has a 1,800-second
+parent deadline. Shared admission bounds and native grant/SQL timeouts remain
+unchanged. Failure stops without retry, promotion, resume or repair. Inspect
+refused or ambiguous operations while paused; never use v1 as an admission bypass.
+Installation also extends v1's identity, and existing Job-create authority remains
+trusted-operator authority. The gate is not an atomic lease or multi-user boundary;
+independent schema qualification, backup/drain/operator exclusion still apply.
+
+Existing CI scenarios continue using v1. Complete-parent v2 live acceptance is a
+separate approved slice; this change performs no local/live execution or CI
+selection/authorization/budget change. Focused shared-policy/wiring/authority
+tests, staged rendering and pinned Argo lint cover composition. Heavy full checks
+stay on PR CI. Operational cutover and measured host-script retirement remain open.
 
 ## Failure, inspection and acceptance status
 
@@ -140,5 +184,5 @@ and preserves ACLs, SQL/S3 data, ledger and workload/storage identities. Recover
 stays blocked until all gates pass. Final retention explicitly requires six
 native Jobs/seven parent Workflows and the additional probe; bootstrap retention
 remains five/six. There is no new fault, recovery or production admission.
-This establishes bootstrap and adopted/paused grant acceptance, not production cutover, admission or ambiguous-commit recovery. Supported host
+This establishes v1 bootstrap and adopted/paused grant acceptance, not v2 live admission, production cutover or ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.

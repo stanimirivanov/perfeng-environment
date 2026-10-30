@@ -732,7 +732,11 @@ Bootstrap v1 remains unchanged; this supports only the fixed current selection.
 The initial trusted-main leg now wires v2 null-current refusal and replaces only
 the existing two paused repeat executions, with exact native gate/retention
 proof before grants/recovery ([ADR 0063](../decisions/0063-exercise-retained-schema-admission.md)).
-Live v2 proof remains post-merge. Grant-parent admission, ambiguous commits, general upgrades and
+Live schema-v2 proof remains post-merge. Staged runtime-grants v2 now reuses the
+same published admission leaves with explicit read-only ledger authority
+([ADR 0064](../decisions/0064-stage-retained-runtime-grant-admission.md)); v1 remains
+the bootstrap/CI path and complete-parent grants-v2 live acceptance stays separate.
+Ambiguous commits, general upgrades and
 operational cutover/host migration-grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.
