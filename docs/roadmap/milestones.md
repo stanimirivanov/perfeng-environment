@@ -725,8 +725,12 @@ expected-current identity, SQL/S3 data and workloads
 ([ADR 0061](../decisions/0061-exercise-grants-on-adopted-paused-application.md)).
 Final retention requires this additional execution explicitly; live proof stays
 post-merge without new production admission or recovery.
-Live proof stays post-merge; ambiguous commits, admission and operational
-cutover/host migration-grant retirement remain open.
+The staged schema-migration v2 now adds retained-baseline admission against the
+owned pointer/immutable receipt, exact accepted request byte hash and fresh
+quiescence root/child identities ([ADR 0062](../decisions/0062-stage-retained-schema-admission.md)).
+Bootstrap v1 remains unchanged; this supports only the fixed current selection.
+Live v2 proof, grant-parent admission, ambiguous commits, general upgrades and
+operational cutover/host migration-grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the

@@ -3,6 +3,7 @@
 ## TL;DR
 
 - `perfeng-release-schema-migration-v1` stages migration through 0018 using pinned Git inputs and a native Argo Job.
+- Staged v2 adds retained-baseline admission; v1 remains the unchanged bootstrap path.
 - Preflight, exact lock and reviewed forward-only/manual intent must pass before fresh quiescence and Job creation.
 - It remains outside the active local root; no live execution or supported host cutover is authorized here.
 - A separate trusted identity can create Jobs and therefore potentially mount namespace Secrets; multi-user admission remains open.
@@ -82,6 +83,46 @@ It does not prove schema identity/checksums, runtime grants, operational health,
 adoption or promotion. The selected binary executes all bundled migrations
 through 0018, not a caller-supplied single SQL file. The existing CI image-parity
 phase remains separate and has not exercised this complete parent.
+
+## Retained-baseline admission in v2
+
+[ADR 0062](decisions/0062-stage-retained-schema-admission.md) adds
+`perfeng-release-schema-migration-v2` alongside v1. It uses the same four inputs,
+exact local lock and forward-only/0018 intent. Require non-null expectedCurrent,
+then verify the owned current pointer, immutable receipt UID/content/provenance
+and the exact stored request's SHA-256. Accepted and candidate requests must
+have identical non-promotion fields; the accepted request must be an initial
+manual baseline. This permits the fixed current selection's reapplication,
+not a different selected release or a general upgrade.
+
+```text
+pinned preflight -> exact lock -> reviewed intent -> candidate byte/current check
+  -> owned pointer -> immutable receipt -> accepted request byte hash
+  -> fresh quiescence -> unchanged receipt -> current pointer/root/child binding
+  -> unchanged selected native migration Job; leave paused
+```
+
+Before separately authorized use, explicitly install
+`gitops/release-workflows-bootstrap/schema-migration-ledger-access.yaml` in
+addition to the existing Application-read bootstrap. It grants only ConfigMap
+get in the ledger namespace, including dynamic receipt names; no list or writes.
+It is deliberately absent from the bootstrap Kustomization and active local root.
+V2 is selected only by the staged release-workflows Kustomization. No local/live
+execution or migration of existing CI scenarios is part of this slice.
+
+Native read predicates enforce exact ownership and refuse missing, replaced,
+deleting, malformed or conflicting records. The accepted bytes are bounded and
+hashed without adding Python. After fresh quiescence, require the receipt to
+remain unchanged except resourceVersion/managedFields, the pointer UID/data to
+remain unchanged, and receipt root/child UIDs to match the checkpoint. The parent
+deadline is 1,800 seconds; API reads have ten-second request timeouts and
+60-second worker deadlines. There is no retry, promotion, resume or repair.
+
+This is observation-based trusted-operator admission, not an atomic ledger/SQL
+lease or a multi-user boundary. Keep backup/drain/operator exclusion prerequisites.
+It does not revoke v1 authority, add admission to runtime grants, prove schema
+checksums or handle ambiguous SQL commits. Live v2 acceptance and host cutover
+remain separate approved work; heavy checks run on existing PR CI.
 
 ## Failure, retry and rollback
 

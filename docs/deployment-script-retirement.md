@@ -261,5 +261,9 @@ The [adopted/paused acceptance slice](decisions/0061-exercise-grants-on-adopted-
 adds only CI evidence around the same grant parent before existing recovery.
 No supported host command or production verifier source is retired; live proof
 and operational cutover remain separate gates.
+The [v2 schema admission slice](decisions/0062-stage-retained-schema-admission.md)
+adds native ledger predicates and bounded byte checks, with no production Python.
+It preserves bootstrap v1 and does not retire a host command. Live v2 acceptance,
+general upgrades, grant-parent admission and operational cutover remain separate.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.
