@@ -100,6 +100,7 @@ runtime_grant_retention() {
   [[ $scope == bootstrap || $scope == complete ]] || return 2
   if [[ $scope == complete ]]; then labels+=(adopted-null adopted); verification=retained-adopted; fi
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-runtime-grants -o json > "$fixture/grant-retained.jobs.json"
+  if [[ $scope == complete ]]; then preparation_inventory grant "$fixture/grant-retained.jobs.json"; fi
   for label in "${labels[@]}"; do
     name=$(jq -er .metadata.name "$fixture/grant-$label.workflow.json")
     a get "$name" -o json > "$fixture/grant-$label.retained-workflow.json"

@@ -50,27 +50,27 @@ def source_identity(root: Path, label: str) -> Any:
     )
 
 
-def stable(root: Path, label: str, *, final: bool = False) -> dict[str, Any]:
-    observed = adopted.state(root, PREFIX + label)
+def stable(root: Path, label: str, *, final: bool = False, prefix: str = PREFIX) -> dict[str, Any]:
+    observed = adopted.state(root, prefix + label)
     if not final:
-        adopted.paused(root, label, prefix=PREFIX)
+        adopted.paused(root, label, prefix=prefix)
     else:
-        baseline = adopted.state(root, PREFIX + "before")
+        baseline = adopted.state(root, prefix + "before")
         for field in ("records", "secrets", "config", "git"):
             assert observed[field] == baseline[field]
         assert observed["namespace"]["metadata"]["uid"] == baseline["namespace"]["metadata"]["uid"]
         assert not observed["namespace"]["metadata"].get("deletionTimestamp")
     for suffix in (*adopted.PERSISTENT, "schema.json", "roles.json", "data.txt"):
-        assert (root / f"{PREFIX}{label}.{suffix}").read_bytes() == (
+        assert (root / f"{prefix}{label}.{suffix}").read_bytes() == (
             root / f"schema-parent-baseline.{suffix}"
         ).read_bytes()
     # ACL is captured independently of the persistent snapshot's normalized ACL.
     if label != "before":
-        assert (root / f"{PREFIX}{label}.acl.json").read_bytes() == (
-            root / "qualification-before.acl.json"
+        assert (root / f"{prefix}{label}.acl.json").read_bytes() == (
+            root / f"{prefix}before.acl.json"
         ).read_bytes()
     adopted.grants.parent.migration.validate_schema(
-        json.loads((root / f"{PREFIX}{label}.schema.json").read_text()),
+        json.loads((root / f"{prefix}{label}.schema.json").read_text()),
         json.loads(Path("tests/integration/release-workflows/migration-image.json").read_text()),
     )
     return observed

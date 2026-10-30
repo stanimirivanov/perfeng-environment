@@ -292,3 +292,11 @@ entrypoints and the two-module/708-line production verifier budget remain;
 complete-parent live composition/failure acceptance and operational cutover
 must precede measured retirement. Composition staging alone earns no deletion
 credit and does not replace the full kubernetes:prepare task.
+
+
+[ADR 0069](decisions/0069-exercise-complete-database-preparation.md) adds only
+CI acceptance/evidence for complete preparation. Six additional native Jobs and
+strict cohort accounting change no supported host path or production Python.
+All 13 entrypoints and the two-module/708-line production verifier budget remain.
+Live complete-parent proof, fault acceptance and operational cutover remain gates;
+no retirement credit follows merely from wiring the fixture.

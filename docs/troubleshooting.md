@@ -1919,3 +1919,29 @@ under explicit authority and obtain a reviewed recovery decision. The checkpoint
 output is the grants phase's pre-Job observation, not post-grant readiness or
 activation authority. [ADR 0068](decisions/0068-stage-database-preparation-composition.md)
 defers live complete-parent failure/retention acceptance and operational cutover.
+
+
+### Complete database-preparation acceptance blocks recovery
+
+Inspect the first `database-preparation-*` failed stage and safe failure summary.
+Privately inspect `preparation-*` raw complete Workflows, worker/Job/Pod snapshots
+and wait observations. Null acceptance requires the migration candidate's exact
+exit 2 after successful input gates, not an arbitrary failed Workflow. First/
+repeat require migrate → qualify → grant under the real nested boundaries and
+six successful retained Jobs. Check the existing requests, all selected template/
+SQL/verifier sources, grants authority and already-approved pull credentials.
+
+A boundary, order, output or source mismatch is not fixed by renaming nodes,
+reserializing requests or writing standalone Workflow records. In-memory scopes
+must derive from the actual raw parent. A failed runtime TCP probe after
+composition also blocks recovery; no extra probe or repair is authorized.
+
+Before legacy inventory partitioning, complete retained/final preparation proof
+must pass. Keep `.all.json` private raw inventories. Missing, replaced, modified
+or duplicate cohort Jobs must stop; unexpected remaining Jobs are not blanket-
+filtered. Do not delete Jobs or weaken counts to pass. Preserve paused workloads,
+SQL, data, credentials and release records. Timeout can follow committed SQL;
+never retry nodes, repair on EXIT or resume based on a partial output. Diagnose
+within the existing budget before proposing a cost change. [ADR 0069](decisions/0069-exercise-complete-database-preparation.md)
+limits this to disposable trusted-main acceptance; local execution, deliberate
+fault injection and production cutover require separate scope.

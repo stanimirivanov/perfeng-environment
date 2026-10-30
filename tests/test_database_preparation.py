@@ -208,7 +208,6 @@ class DatabasePreparationTests(unittest.TestCase):
         )
         for directory in (
             ROOT / "gitops/environments/local",
-            ROOT / "tests/integration/release-workflows",
             ROOT / ".github/workflows",
         ):
             for path in directory.rglob("*"):

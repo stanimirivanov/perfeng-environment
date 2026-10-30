@@ -71,6 +71,7 @@ seaweedfs_application_acceptance
 source "$source_dir/root.sh"
 source "$source_dir/adoption-parent.sh"
 if [[ ${scenario:-} == initial ]]; then
+  preparation_retention final
   schema_parent_retention final
   runtime_grant_retention complete
   qualification_retention final

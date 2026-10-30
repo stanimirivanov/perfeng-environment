@@ -349,6 +349,7 @@ uv() {
     [[ $failure != "$step" ]] || return 17
   fi
 }
+preparation_retention() { echo preparation-retained; [[ $failure != preparation ]] || return 17; }
 qualification_retention() { echo qualification-retained; [[ $failure != qualification ]] || return 17; }
 argocd_case() { echo recovery-sync; }
 server_case() { echo recovered-http; }
@@ -377,6 +378,7 @@ source "$source_dir/maintenance-pause.sh"
                 "schema-parent",
                 "adopted-grants",
                 "qualification",
+                "preparation",
                 "recovered",
                 "none",
             ):
@@ -408,6 +410,7 @@ source "$source_dir/maintenance-pause.sh"
                         "schema-parent",
                         "adopted-grants",
                         "qualification",
+                        "preparation",
                     }:
                         self.assertNotIn("recovery-sync", result.stdout)
                     else:

@@ -45,8 +45,9 @@ qualification_case() {
 }
 
 qualification_retention() {
-  local label name uid phase=${1:-retained}
+  local label name uid phase=${1:-retained} cohort=${2:-standalone}
   [[ $phase == retained || $phase == final ]] || return 2
+  [[ $cohort == standalone || $cohort == preparation ]] || return 2
   start_stage "schema-qualification-$phase"
   for label in first repeat; do
     name=$(jq -er .metadata.name "$fixture/qualification-$label.workflow.json")
@@ -57,6 +58,7 @@ qualification_retention() {
     k -n perf-platform get pods -l "batch.kubernetes.io/job-name=perfeng-schema-qualify-$uid" -o json > "$fixture/qualification-$label.retained-job-pods.json"
   done
   qualification_snapshot "$phase"
+  if [[ $cohort == preparation || $phase == final ]]; then preparation_inventory qualify "$fixture/qualification-$phase.jobs.json"; fi
   schema_parent_ledger_access release-runtime-grants
   PYTHONPATH=. uv run --locked --offline python "$source_dir/schema_qualification_parent.py" "$phase" "$fixture" "$results"
   complete_stage

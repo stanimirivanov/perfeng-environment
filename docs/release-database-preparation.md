@@ -6,7 +6,7 @@
 - Reuse the four pinned inputs and unchanged complete entrypoints; every phase rechecks admission and quiescence.
 - One outer release-runtime-grants identity, shared mutex and total 1,800-second deadline govern the sequence.
 - Return three retained Job names and the last phase's pre-Job checkpoint; leave the application paused.
-- Staged only: no active-root selection, live execution, host-task replacement or retirement credit.
+- Outside the active root; bounded trusted-main acceptance runs post-merge, with local execution and host cutover separate.
 
 ## Scope and prerequisites
 
@@ -71,9 +71,10 @@ actual retained state under explicit authority and obtain a reviewed recovery
 decision. No successful preparation output authorizes activation.
 
 Only staged release-workflows Kustomize selects this new declaration. Its
-AppProject boundary and active local root remain unchanged. No integration/CI
-execution path invokes it in this PR. Removing staging selection does not prune
-installed versions or evidence. Operational withdrawal needs explicit approval.
+AppProject boundary and active local root remain unchanged. Only the separately
+approved trusted-main initial fixture invokes it as described below; there is no
+local execution selection. Removing staging selection does not prune installed
+versions or evidence. Operational withdrawal needs explicit approval.
 
 ## Verification and remaining work
 
@@ -81,9 +82,36 @@ Focused tests check serial failure-closed structure, references and admission
 chains, required outputs, Job naming, caller authority and staging isolation.
 Staged rendering/AppProject validation and pinned Argo lint resolve references
 offline. These do not simulate or prove controller/SQL execution. Heavy full
-checks stay on PR CI; live complete-parent first/repeat and failure/retention
-acceptance follows as a separately approved slice.
+checks stay on PR CI. Bounded first/repeat/refusal/retention acceptance is wired
+below for post-merge trusted-main execution; deliberate failure/partial-state
+injection remains separate.
 
 General upgrades, ambiguous commits, SQL fault qualification, operator exclusion,
 backup, readiness, promotion/resume, non-local/multi-user operation, host cutover
 and measured script retirement remain separate. No production Python is added.
+
+## Complete-parent trusted-main acceptance
+
+[ADR 0069](decisions/0069-exercise-complete-database-preparation.md) preserves all
+standalone coverage and adds initial-request refusal plus two complete parents
+in the existing initial adopted/paused window, before recovery. Each successful
+parent creates three retained Jobs; six additional native Jobs fit within the
+existing 60-minute job budget. Other five scenarios, requests/refs, credentials,
+rights and production templates remain unchanged.
+
+The existing adopted runtime TCP probe runs after composition, without an extra
+probe Job. Require actual nested phase ownership/order, the outer stored caller/
+mutex/deadline, all six Jobs/Pod identities, exact outputs and unchanged SQL/ACL/
+ledger/credentials/data/workload/storage state. Raw complete Workflows remain
+private and unchanged; in-memory phase views reuse existing predicates only
+after boundary validation. Recheck executions, sources/authority, probe and state
+before recovery and final success. Safe summaries are
+`database-preparation-{retained,final}.outcome.json`.
+
+Legacy suites account for the cohort only after its complete retention proof:
+keep the full private `.all.json` inventory, remove exactly two validated Job
+UIDs of that kind from the legacy input, then retain strict legacy checks on
+all remaining Jobs. Unknown, missing, replaced or altered Jobs cannot be ignored.
+No failed gate permits probe/recovery or automatic repair. Offline tests do not
+establish live proof; main-only execution after merge must supply it. Fault
+injection, general upgrade safety and operational cutover remain separate.

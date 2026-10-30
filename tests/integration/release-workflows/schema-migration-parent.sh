@@ -166,6 +166,7 @@ schema_parent_retention() {
   local -a schema_parent_workflows=()
   if [[ $phase == final ]]; then start_stage schema-parent-final-retention; else start_stage schema-parent-retention; fi
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-control-plane-migration -o json > "$fixture/schema-parent.retained-jobs.json"
+  if [[ $phase == final ]]; then preparation_inventory migrate "$fixture/schema-parent.retained-jobs.json"; fi
   for label in none denied current-null first repeat; do
     name=$(jq -er .metadata.name "$fixture/schema-parent-$label.workflow.json")
     schema_parent_workflows+=("$name")

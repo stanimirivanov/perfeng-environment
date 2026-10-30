@@ -313,6 +313,25 @@ def null_proof(
     }
 
 
+def probe_evidence(workflow: Any, job: Any, worker: Any, diagnostic: str) -> None:
+    """Validate the existing fixed runtime TCP probe without reimplementing SQL policy."""
+    source = yaml.safe_load(
+        Path("tests/integration/release-workflows/runtime-grants-workflow.yaml").read_text()
+    )
+    grants.parent.subset(source["spec"], workflow["spec"])
+    manifest = source["spec"]["templates"][0]["resource"]["manifest"].replace(
+        "{{workflow.name}}", workflow["metadata"]["name"]
+    )
+    grants.parent.subset(yaml.safe_load(manifest), job)
+    assert workflow["metadata"]["uid"] and job["metadata"]["uid"]
+    assert workflow["metadata"]["namespace"] == "argo-workflows"
+    assert not any(o["metadata"].get("deletionTimestamp") for o in (workflow, job))
+    assert workflow["status"]["phase"] == "Succeeded" and job["status"]["succeeded"] == 1
+    assert len(worker) == 1 and worker[0]["uid"]
+    assert worker[0]["containers"] == [{"name": "probe", "exitCode": 0, "waitingReason": None}]
+    assert "runtime privilege policy verified" in diagnostic
+
+
 def main() -> None:
     mode, directory, output = sys.argv[1:]
     root, results = Path(directory), Path(output)
@@ -377,21 +396,7 @@ def main() -> None:
     workflow = json.loads(prefix.with_suffix(".workflow.json").read_text())
     job = json.loads(prefix.with_suffix(".job.json").read_text())
     worker = json.loads(prefix.with_suffix(".worker.json").read_text())
-    source = yaml.safe_load(
-        Path("tests/integration/release-workflows/runtime-grants-workflow.yaml").read_text()
-    )
-    grants.parent.subset(source["spec"], workflow["spec"])
-    manifest = source["spec"]["templates"][0]["resource"]["manifest"].replace(
-        "{{workflow.name}}", workflow["metadata"]["name"]
-    )
-    grants.parent.subset(yaml.safe_load(manifest), job)
-    assert workflow["metadata"]["uid"] and job["metadata"]["uid"]
-    assert workflow["metadata"]["namespace"] == "argo-workflows"
-    assert not any(o["metadata"].get("deletionTimestamp") for o in (workflow, job))
-    assert workflow["status"]["phase"] == "Succeeded" and job["status"]["succeeded"] == 1
-    assert len(worker) == 1 and worker[0]["uid"]
-    assert worker[0]["containers"] == [{"name": "probe", "exitCode": 0, "waitingReason": None}]
-    assert "runtime privilege policy verified" in (root / "grant-adopted.probe.private").read_text()
+    probe_evidence(workflow, job, worker, (root / "grant-adopted.probe.private").read_text())
     if mode == "retained":
         assert sources("retained") == original_sources
         assert null_proof(root, retained=True) == null_report
