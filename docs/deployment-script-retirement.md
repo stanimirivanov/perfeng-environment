@@ -273,5 +273,9 @@ The [staged grants-v2 admission slice](decisions/0064-stage-retained-runtime-gra
 adds only declarative composition using existing admission leaves and a standalone
 get-only ledger grant. No production Python or supported command is added or
 retired; live grants-v2 acceptance and cutover remain separate.
+The [adopted grants-v2 acceptance slice](decisions/0065-exercise-adopted-runtime-grant-admission.md)
+replaces only the existing adopted parent invocation and adds one no-Job refusal,
+with CI-only evidence/authority checks. No production definition or host command
+is added or retired; live proof stays post-merge and cutover remains separate.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

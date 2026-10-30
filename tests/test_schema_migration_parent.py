@@ -473,15 +473,20 @@ fixture=$1; result=$3
 k() { echo "$*" >> "$fixture/trace"; if [[ $result == error ]]; then echo 'private vendor output' >&2; return 1; else echo "$result"; if [[ $result == no ]]; then return 1; fi; fi; }
 sleep() { SECONDS=$((SECONDS + 31)); }
 source "$2"
-schema_parent_ledger_access
+schema_parent_ledger_access "${4:-release-schema-migration}"
 echo ready >> "$fixture/trace"
 """
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "access.sh").write_text(library, newline="\n")
             (root / "run.sh").write_text(setup, newline="\n")
-            for answer in ("yes", "no", "error", "unexpected"):
-                fixture = root / answer
+            cases = [
+                (answer, "release-schema-migration")
+                for answer in ("yes", "no", "error", "unexpected")
+            ]
+            cases.append(("yes", "release-runtime-grants"))
+            for answer, identity in cases:
+                fixture = root / (answer + "-" + identity)
                 fixture.mkdir()
                 (fixture / "parent-parameters.json").write_text(
                     json.dumps({"request-sha256": "sha256:" + "a" * 64})
@@ -493,6 +498,7 @@ echo ready >> "$fixture/trace"
                         fixture.as_posix(),
                         (root / "access.sh").as_posix(),
                         answer,
+                        identity,
                     ],
                     env={**os.environ, "BASH_ENV": ""},
                     capture_output=True,
@@ -501,9 +507,7 @@ echo ready >> "$fixture/trace"
                 )
                 trace = (fixture / "trace").read_text()
                 self.assertEqual(process.returncode, 0 if answer == "yes" else 1)
-                self.assertIn(
-                    "--as system:serviceaccount:argo-workflows:release-schema-migration", trace
-                )
+                self.assertIn("--as system:serviceaccount:argo-workflows:" + identity, trace)
                 self.assertIn("--as-group system:authenticated", trace)
                 self.assertIn(
                     "auth can-i get configmaps/perfeng-local-current -n perfeng-release-ledger",

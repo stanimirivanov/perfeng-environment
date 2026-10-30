@@ -99,14 +99,15 @@ schema_parent_access() {
 }
 
 schema_parent_ledger_access() {
-  local digest name answer rc ready deadline=$((SECONDS + 30))
+  local digest name answer rc ready identity=${1:-release-schema-migration} deadline=$((SECONDS + 30))
+  [[ $identity == release-schema-migration || $identity == release-runtime-grants ]] || return 2
   digest=$(jq -er '.["request-sha256"]|select(test("^sha256:[0-9a-f]{64}$"))' "$fixture/parent-parameters.json")
   while ((SECONDS < deadline)); do
     ready=true
     for name in perfeng-local-current "receipt.${digest:7:32}.${digest:39}"; do
-      if answer=$(k --as system:serviceaccount:argo-workflows:release-schema-migration --as-group system:serviceaccounts --as-group system:serviceaccounts:argo-workflows --as-group system:authenticated auth can-i get "configmaps/$name" -n perfeng-release-ledger --request-timeout=10s 2> "$fixture/schema-parent.ledger-auth.private"); then rc=0; else rc=$?; fi
-      if [[ -s $fixture/schema-parent.ledger-auth.private || ! ( ( $rc == 0 && $answer == yes ) || ( $rc == 1 && $answer == no ) ) ]]; then
-        printf '%s\n' 'Schema migration ledger permission inspection failed; inspect the private fixture diagnostic; no v2 operation attempted' >&2
+      if answer=$(k --as "system:serviceaccount:argo-workflows:$identity" --as-group system:serviceaccounts --as-group system:serviceaccounts:argo-workflows --as-group system:authenticated auth can-i get "configmaps/$name" -n perfeng-release-ledger --request-timeout=10s 2> "$fixture/$identity.ledger-auth.private"); then rc=0; else rc=$?; fi
+      if [[ -s $fixture/$identity.ledger-auth.private || ! ( ( $rc == 0 && $answer == yes ) || ( $rc == 1 && $answer == no ) ) ]]; then
+        printf '%s\n' "Release ledger permission inspection failed for $identity; inspect the private fixture diagnostic; no next operation attempted" >&2
         return 1
       fi
       if [[ $answer != yes ]]; then ready=false; fi
@@ -114,7 +115,7 @@ schema_parent_ledger_access() {
     if [[ $ready == true ]]; then return 0; fi
     sleep 1
   done
-  printf '%s\n' 'Schema migration ledger get authority is not ready; no v2 operation attempted' >&2
+  printf '%s\n' "Release ledger get authority is not ready for $identity; verify the installed get Role/Binding; no next operation attempted" >&2
   return 1
 }
 

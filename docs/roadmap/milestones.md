@@ -734,8 +734,11 @@ the existing two paused repeat executions, with exact native gate/retention
 proof before grants/recovery ([ADR 0063](../decisions/0063-exercise-retained-schema-admission.md)).
 Live schema-v2 proof remains post-merge. Staged runtime-grants v2 now reuses the
 same published admission leaves with explicit read-only ledger authority
-([ADR 0064](../decisions/0064-stage-retained-runtime-grant-admission.md)); v1 remains
-the bootstrap/CI path and complete-parent grants-v2 live acceptance stays separate.
+([ADR 0064](../decisions/0064-stage-retained-runtime-grant-admission.md)). V1 remains
+the bootstrap/fault path. The initial adopted window now wires v2 null-current
+refusal and the existing grant Job/runtime probe, with fresh native/authority
+retention before recovery/final publication ([ADR 0065](../decisions/0065-exercise-adopted-runtime-grant-admission.md)).
+Full grants-v2 live proof remains post-merge main-only.
 Ambiguous commits, general upgrades and
 operational cutover/host migration-grant retirement remain open.
 

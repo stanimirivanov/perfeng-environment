@@ -232,13 +232,15 @@ def admission_nodes(workflow: dict[str, Any], raw: bytes, state: dict[str, Any])
     }
 
 
-def ledger_authority(value: dict[str, Any]) -> dict[str, Any]:
+def ledger_authority(
+    value: dict[str, Any], identity: str = "release-schema-migration"
+) -> dict[str, Any]:
     """Require exactly the reviewed installed get-only grant, including stable UIDs."""
+    assert identity in {"release-schema-migration", "release-runtime-grants"}
+    filename = "schema-migration" if identity == "release-schema-migration" else "runtime-grants"
     expected = list(
         yaml.safe_load_all(
-            Path(
-                "gitops/release-workflows-bootstrap/schema-migration-ledger-access.yaml"
-            ).read_text()
+            Path(f"gitops/release-workflows-bootstrap/{filename}-ledger-access.yaml").read_text()
         )
     )
     actual = {o["kind"]: o for o in value["items"]}

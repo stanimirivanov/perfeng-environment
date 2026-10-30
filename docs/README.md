@@ -61,7 +61,9 @@ bootstrap v1; ledger get installation and live acceptance remain explicit.
 bounded initial-job null-current/refusal and repeat acceptance, with live proof post-merge.
 The [grants-v2 guide](release-runtime-grants.md#retained-baseline-admission-in-v2)
 and [ADR 0064](decisions/0064-stage-retained-runtime-grant-admission.md) cover reuse
-of the same admission leaves for staged owner grants; live grant-v2 proof remains separate.
+of the same admission leaves for staged owner grants. [ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md)
+wires bounded adopted v2/refusal acceptance while preserving v1 bootstrap/fault
+cases; full live proof remains post-merge main-only.
 
 ## Canonical collections
 
