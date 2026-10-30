@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -30,8 +31,20 @@ with patch.dict(
     spec.loader.exec_module(MODULE)
 
 
-def evidence(label):
+def evidence(label, *, retained_admission=False):
+    if label == "current-null":
+        return admitted(evidence("first"), null_current=True)
     original, _, parameters, preflight, accepted_raw, _, before, after = pause.evidence()
+    image = json.loads((pause.ROOT / "deployments/local-control-plane.json").read_text())[
+        "controlPlane"
+    ]["image"]
+    for state in (before, after):
+        for spec in (
+            state["deployment"]["spec"],
+            state["server"][0]["spec"],
+            state["workloads"][0]["spec"],
+        ):
+            spec["template"] = {"spec": {"containers": [{"name": "control-plane", "image": image}]}}
     request = json.loads(accepted_raw)
     request["promotion"] = {
         **request["promotion"],
@@ -189,7 +202,101 @@ def evidence(label):
         nodes["migrate"]["phase"] = "Failed"
         next(w for w in workers if w["nodeID"] == "migrate")["exitCode"] = 1
         job, pods = None, {"items": []}
-    return label, workflow, workers, parameters, raw, accepted_raw, before, after, job, pods
+    result = label, workflow, workers, parameters, raw, accepted_raw, before, after, job, pods
+    return admitted(result) if retained_admission else result
+
+
+def admitted(args, *, null_current=False):
+    label, workflow, _, parameters, raw, accepted, before, after, job, pods = deepcopy(args)
+    nodes = workflow["status"]["nodes"]
+    if null_current:
+        label = "current-null"
+        old_name = workflow["metadata"]["name"]
+        name = "schema-parent-" + label
+        workflow["metadata"].update(name=name, uid="00000000-0000-0000-0000-000000000099")
+        nodes[name] = nodes.pop(old_name)
+        nodes[name].update(id=name, displayName=name, phase="Failed")
+        nodes[name].pop("outputs")
+        workflow["status"]["phase"] = "Failed"
+        parameters = pause.evidence()[2]
+        raw = accepted
+        workflow["spec"]["arguments"]["parameters"] = [
+            {"name": k, "value": v} for k, v in parameters.items()
+        ]
+        result = pause.READINESS.outputs(nodes["preflight"])["result"]
+        result.update(
+            requestDigest=parameters["request-sha256"], requestPath=parameters["request-path"]
+        )
+        nodes["preflight"]["outputs"]["parameters"][0]["value"] = json.dumps(result)
+        nodes.pop("quiescence")
+        nodes.pop("migrate")
+        job, pods = None, {"items": []}
+    workflow["spec"]["workflowTemplateRef"]["name"] = "perfeng-release-schema-migration-v2"
+    nodes["migration-intent"]["templateRef"] = {
+        "name": "perfeng-release-schema-migration-v1",
+        "template": "migration-intent",
+    }
+    base = datetime(2026, 10, 28, tzinfo=UTC)
+
+    def when(seconds):
+        return (base + timedelta(seconds=seconds)).isoformat()
+
+    names = (
+        ("candidate",)
+        if null_current
+        else (
+            "candidate",
+            "pointer",
+            "receipt",
+            "accepted-bytes",
+            "quiescence",
+            "receipt-stable",
+            "admission",
+            "migrate",
+        )
+    )
+    for index, name in enumerate(names):
+        node = nodes.setdefault(
+            name, {"id": name, "displayName": name, "type": "Pod", "templateName": name}
+        )
+        node.update(
+            phase="Failed" if null_current else "Succeeded",
+            startedAt=when(13 + index * 2),
+            finishedAt=when(14 + index * 2),
+        )
+    if not null_current:
+        assert job is not None
+        job["metadata"]["creationTimestamp"] = when(28)
+        nodes["migrate"]["finishedAt"] = when(30)
+        nodes["candidate"]["outputs"] = {
+            "parameters": [{"name": "request", "value": raw.decode().removesuffix("\n")}]
+        }
+        pointer = next(
+            o for o in after["records"] if o["metadata"]["name"] == "perfeng-local-current"
+        )
+        receipt = next(
+            o for o in after["records"] if o["metadata"]["name"] == pointer["data"]["receiptName"]
+        )
+        for name, value in (
+            ("pointer", pointer),
+            ("receipt", receipt),
+            ("receipt-stable", receipt),
+            ("admission", {"status": "retained-baseline-verified"}),
+        ):
+            nodes[name]["outputs"] = {
+                "parameters": [{"name": "observation", "value": json.dumps(value)}]
+            }
+    workers = [
+        {
+            "uid": "worker-" + n["id"],
+            "nodeID": n["id"],
+            "account": "release-schema-migration",
+            "exitCode": 2 if null_current and n["displayName"] == "candidate" else 0,
+        }
+        for n in nodes.values()
+        if n["type"] == "Pod"
+    ]
+    return label, workflow, workers, parameters, raw, accepted, before, after, job, pods
 
 
 def denied_log(workflow):
@@ -215,7 +322,9 @@ def populate(directory, results):
     save("schema-parent-baseline.roles.json", {"roles": "unchanged"})
     (directory / "schema-parent-baseline.data.txt").write_text("private SQL rows")
     for label in MODULE.LABELS:
-        _, workflow, workers, parameters, raw, accepted, before, after, job, pods = evidence(label)
+        _, workflow, workers, parameters, raw, accepted, before, after, job, pods = evidence(
+            label, retained_admission=label in {"current-null", "first", "repeat"}
+        )
         prefix = "schema-parent-" + label
         if label == "denied":
             (directory / (prefix + ".denied.log")).write_text(denied_log(workflow))
@@ -240,7 +349,16 @@ def populate(directory, results):
         ):
             save(prefix + "." + suffix + ".json", obj)
         (directory / (prefix + ".data.txt")).write_text("private SQL rows")
-        key = "migration-none" if label == "none" else "upgrade-request"
+        for suffix in MODULE.PERSISTENT:
+            for stem in (prefix, "schema-parent-baseline"):
+                (directory / f"{stem}.{suffix}").write_text("private persistent state")
+        key = (
+            "migration-none"
+            if label == "none"
+            else "parent"
+            if label == "current-null"
+            else "upgrade-request"
+        )
         save(key + "-parameters.json", parameters)
         (directory / (key + "-request.json")).write_bytes(raw)
         (directory / "parent-request.json").write_bytes(accepted)
@@ -248,9 +366,342 @@ def populate(directory, results):
         workflows.append(workflow)
     save("schema-parent.retained-jobs.json", {"items": jobs})
     save("schema-parent.retained-workflows.json", {"items": workflows})
+    for label in ("before", "after"):
+        objects = [
+            yaml.safe_load((MODULE.DIRECTORY / name).read_text())
+            for name in (*MODULE.SOURCES, "release-schema-migration-v2.yaml")
+        ]
+        for obj in objects:
+            obj["metadata"]["uid"] = obj["metadata"]["name"]
+        save(f"schema-parent.templates-{label}.json", {"items": objects})
+        intent = yaml.safe_load((MODULE.DIRECTORY / "schema-migration-intent-v1.yaml").read_text())
+        intent["metadata"]["uid"] = "intent-policy"
+        save(f"schema-parent.intent-{label}.json", intent)
+        authority = list(
+            yaml.safe_load_all(
+                (
+                    pause.ROOT
+                    / "gitops/release-workflows-bootstrap/schema-migration-ledger-access.yaml"
+                ).read_text()
+            )
+        )
+        for obj in authority:
+            obj["metadata"]["uid"] = "ledger-" + obj["kind"]
+        save(f"schema-parent.ledger-{label}.json", {"items": authority})
 
 
 class SchemaMigrationParentTests(unittest.TestCase):
+    @unittest.skipUnless(BASH and shutil.which("jq"), "Bash/jq required for actual shell replay")
+    def test_actual_case_selects_v2_and_null_current_never_starts_job_watch(self):
+        assert BASH
+        text = (pause.FIXTURE / "schema-migration-parent.sh").read_text()
+        library = text[
+            text.index("schema_parent_case() {") : text.index("schema_parent_access() {")
+        ]
+        setup = r"""#!/usr/bin/env bash
+set -euo pipefail
+fixture=$1; results=$1; source_dir=$1; label=$3; failure=$4
+KUBECONFIG="$fixture/kubeconfig"
+step() { echo "$1" >> "$fixture/trace"; [[ $failure != "$1" ]]; }
+start_stage() { :; }; complete_stage() { :; }
+a() { if [[ $1 == submit ]]; then step "submit $*" >&2; fi; echo '{"metadata":{"name":"ci-case","uid":"case-uid"}}'; }
+k() { if [[ $* != *'get job '* ]]; then echo '{"items":[]}'; fi; }
+timeout() { if [[ $1 == --kill-after=5s ]]; then step "watch-$3"; else shift; "$@"; fi; }
+argo() { step wait; if [[ $label == current-null && $failure != unexpected-success ]]; then return 1; fi; }
+schema_parent_snapshot() { step snapshot; }
+uv() { step "verify-$6"; }
+source "$2"
+schema_parent_case "$label"
+echo grants-and-recovery >> "$fixture/trace"
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "case.sh").write_text(library, newline="\n")
+            (root / "run.sh").write_text(setup, newline="\n")
+            cases = (
+                ("first", "pass"),
+                ("repeat", "pass"),
+                ("current-null", "pass"),
+                ("current-null", "verify-current-null"),
+                ("current-null", "unexpected-success"),
+            )
+            for index, (label, failure) in enumerate(cases):
+                fixture = root / str(index)
+                fixture.mkdir()
+                process = subprocess.run(
+                    [
+                        BASH,
+                        (root / "run.sh").as_posix(),
+                        fixture.as_posix(),
+                        (root / "case.sh").as_posix(),
+                        label,
+                        failure,
+                    ],
+                    env={**os.environ, "BASH_ENV": ""},
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                trace = (fixture / "trace").read_text().splitlines()
+                with self.subTest(label=label, failure=failure):
+                    self.assertEqual(
+                        process.returncode, 0 if failure == "pass" else 1, process.stderr
+                    )
+                    submitted = next(line for line in trace if line.startswith("submit "))
+                    self.assertIn("workflowtemplate/perfeng-release-schema-migration-v2", submitted)
+                    self.assertIn(
+                        "parent-parameters.json"
+                        if label == "current-null"
+                        else "upgrade-request-parameters.json",
+                        submitted,
+                    )
+                    self.assertEqual(
+                        any(line.startswith("watch-") for line in trace), label != "current-null"
+                    )
+                    self.assertEqual("grants-and-recovery" in trace, failure == "pass")
+
+    @unittest.skipUnless(BASH and shutil.which("jq"), "Bash/jq required for actual shell replay")
+    def test_ledger_access_checks_exact_identity_and_rejects_inspection_errors(self):
+        assert BASH
+        text = (pause.FIXTURE / "schema-migration-parent.sh").read_text()
+        library = text[
+            text.index("schema_parent_ledger_access() {") : text.index("schema_parent_denial() {")
+        ]
+        setup = r"""#!/usr/bin/env bash
+set -euo pipefail
+fixture=$1; result=$3
+k() { echo "$*" >> "$fixture/trace"; if [[ $result == error ]]; then echo 'private vendor output' >&2; return 1; else echo "$result"; if [[ $result == no ]]; then return 1; fi; fi; }
+sleep() { SECONDS=$((SECONDS + 31)); }
+source "$2"
+schema_parent_ledger_access
+echo ready >> "$fixture/trace"
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "access.sh").write_text(library, newline="\n")
+            (root / "run.sh").write_text(setup, newline="\n")
+            for answer in ("yes", "no", "error", "unexpected"):
+                fixture = root / answer
+                fixture.mkdir()
+                (fixture / "parent-parameters.json").write_text(
+                    json.dumps({"request-sha256": "sha256:" + "a" * 64})
+                )
+                process = subprocess.run(
+                    [
+                        BASH,
+                        (root / "run.sh").as_posix(),
+                        fixture.as_posix(),
+                        (root / "access.sh").as_posix(),
+                        answer,
+                    ],
+                    env={**os.environ, "BASH_ENV": ""},
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                trace = (fixture / "trace").read_text()
+                self.assertEqual(process.returncode, 0 if answer == "yes" else 1)
+                self.assertIn(
+                    "--as system:serviceaccount:argo-workflows:release-schema-migration", trace
+                )
+                self.assertIn("--as-group system:authenticated", trace)
+                self.assertIn(
+                    "auth can-i get configmaps/perfeng-local-current -n perfeng-release-ledger",
+                    trace,
+                )
+                if answer == "yes":
+                    self.assertIn(
+                        "auth can-i get configmaps/receipt." + "a" * 32 + "." + "a" * 32, trace
+                    )
+                self.assertNotIn("private vendor output", process.stdout + process.stderr)
+
+    def test_v2_repeats_require_actual_admission_outputs_and_order(self):
+        for label in ("first", "repeat"):
+            args = evidence(label, retained_admission=True)
+            MODULE.verify(*args, retained_admission=True)
+        for change in (
+            lambda a: a[1]["spec"]["workflowTemplateRef"].update(
+                name="perfeng-release-schema-migration-v1"
+            ),
+            lambda a: a[1]["status"]["nodes"].pop("accepted-bytes"),
+            lambda a: a[1]["status"]["nodes"]["pointer"].update(phase="Skipped"),
+            lambda a: a[1]["status"]["nodes"]["receipt-stable"].update(
+                startedAt="2026-10-28T00:00:10+00:00"
+            ),
+            lambda a: a[1]["status"]["nodes"]["admission"]["outputs"]["parameters"][0].update(
+                value='{"status":"other"}'
+            ),
+            lambda a: a[1]["status"]["nodes"]["candidate"]["outputs"]["parameters"][0].update(
+                value="{}"
+            ),
+            lambda a: a[1]["status"]["nodes"]["receipt"]["outputs"]["parameters"][0].update(
+                value='{"metadata":{"name":"missing"}}'
+            ),
+        ):
+            args = list(evidence("first", retained_admission=True))
+            change(args)
+            with self.assertRaises((AssertionError, KeyError)):
+                MODULE.verify(*args, retained_admission=True)
+
+    def test_null_current_refuses_at_candidate_before_any_ledger_or_job_node(self):
+        args = evidence("current-null")
+        MODULE.verify(*args, retained_admission=True)
+        output_error = deepcopy(args)
+        output_error[1]["status"]["nodes"]["candidate"]["phase"] = "Error"
+        MODULE.verify(*output_error, retained_admission=True)
+        for code in (None, 0, 1, 64):
+            bad = deepcopy(args)
+            next(w for w in bad[2] if w["nodeID"] == "candidate")["exitCode"] = code
+            with self.assertRaises(AssertionError):
+                MODULE.verify(*bad, retained_admission=True)
+        for name in ("pointer", "receipt", "quiescence", "migrate"):
+            bad = deepcopy(args)
+            bad[1]["status"]["nodes"][name] = {
+                "id": name,
+                "displayName": name,
+                "type": "Pod",
+                "phase": "Succeeded",
+            }
+            with self.assertRaises(AssertionError):
+                MODULE.verify(*bad, retained_admission=True)
+        bad = deepcopy(args)
+        bad[1]["status"]["nodes"][bad[1]["metadata"]["name"]]["outputs"] = {
+            "parameters": [{"name": "job-name", "value": "unexpected"}]
+        }
+        with self.assertRaises(AssertionError):
+            MODULE.verify(*bad, retained_admission=True)
+
+    def test_v2_retention_requires_sources_authority_and_persistent_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            results = root / "results"
+            results.mkdir()
+            populate(root, results)
+            cases = (
+                ("schema-parent.templates-after.json", lambda x: x["items"].pop()),
+                (
+                    "schema-parent.ledger-after.json",
+                    lambda x: x["items"][0]["rules"][0]["verbs"].append("create"),
+                ),
+                (
+                    "schema-parent.ledger-after.json",
+                    lambda x: x["items"][1]["metadata"].update(uid="replacement"),
+                ),
+                ("schema-parent.retained-workflows.json", lambda x: x["items"].pop(2)),
+                ("schema-parent.retained-jobs.json", lambda x: x["items"].pop()),
+            )
+            report = results / "schema-parent-complete.outcome.json"
+            for name, mutate in cases:
+                path = root / name
+                original = path.read_bytes()
+                value = json.loads(original)
+                mutate(value)
+                path.write_text(json.dumps(value))
+                with (
+                    patch("sys.argv", ["evidence", "complete", str(root), str(results)]),
+                    self.assertRaises((AssertionError, KeyError)),
+                ):
+                    MODULE.main()
+                self.assertFalse(report.exists())
+                path.write_bytes(original)
+            for suffix in ("postgres.acl.json", "seaweedfs.bytes", "postgres.storage.json"):
+                path = root / ("schema-parent-repeat." + suffix)
+                original = path.read_bytes()
+                path.write_bytes(b"drift")
+                with (
+                    patch("sys.argv", ["evidence", "complete", str(root), str(results)]),
+                    self.assertRaises(AssertionError),
+                ):
+                    MODULE.main()
+                self.assertFalse(report.exists())
+                path.write_bytes(original)
+            with patch("sys.argv", ["evidence", "complete", str(root), str(results)]):
+                MODULE.main()
+            original_report = report.read_bytes()
+            retained = root / "schema-parent.retained-workflows.json"
+            value = json.loads(retained.read_text())
+            first = next(
+                w for w in value["items"] if w["metadata"]["name"] == "schema-parent-first"
+            )
+            first["status"]["nodes"].pop("admission")
+            retained.write_text(json.dumps(value))
+            with (
+                patch("sys.argv", ["evidence", "final", str(root), str(results)]),
+                self.assertRaises(AssertionError),
+            ):
+                MODULE.main()
+            self.assertFalse((results / "schema-parent-final.outcome.json").exists())
+            self.assertEqual(report.read_bytes(), original_report)
+
+    @unittest.skipUnless(BASH, "Bash required")
+    def test_suite_stops_before_grants_and_recovery_at_each_unverified_boundary(self):
+        assert BASH
+        text = (pause.FIXTURE / "schema-migration-parent.sh").read_text()
+        library = text[
+            text.index("schema_parent_suite() {") : text.index("schema_parent_retention() {")
+        ]
+        setup = r"""#!/usr/bin/env bash
+set -euo pipefail
+fixture=$1; results=$1; source_dir=$1; failure=$3; current_stage=paused
+step() { echo "$1" >> "$fixture/trace"; [[ $failure != "$1" ]]; }
+start_stage() { :; }; complete_stage() { :; }
+k() { if [[ $1 == apply ]]; then step "install-${*: -1}"; else echo '{"items":[]}'; fi; }
+schema_parent_snapshot() { step snapshot; }
+schema_parent_sources() { step sources-and-authority; }
+schema_parent_denial() { step denied; }
+schema_parent_case() { step "case-$1"; }
+schema_parent_retention() { step retained; }
+uv() { step "verify-$6"; }
+source "$2"
+schema_parent_suite
+echo grants-and-recovery >> "$fixture/trace"
+"""
+        failures = (
+            "pass",
+            "install-gitops/release-workflows-bootstrap/schema-migration-ledger-access.yaml",
+            "snapshot",
+            "sources-and-authority",
+            "verify-baseline",
+            "case-none",
+            "denied",
+            "case-current-null",
+            "case-first",
+            "case-repeat",
+            "retained",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "suite.sh").write_text(library, newline="\n")
+            (root / "run.sh").write_text(setup, newline="\n")
+            for index, failure in enumerate(failures):
+                fixture = root / str(index)
+                fixture.mkdir()
+                process = subprocess.run(
+                    [
+                        BASH,
+                        (root / "run.sh").as_posix(),
+                        fixture.as_posix(),
+                        (root / "suite.sh").as_posix(),
+                        failure,
+                    ],
+                    env={**os.environ, "BASH_ENV": ""},
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                trace = (fixture / "trace").read_text().splitlines()
+                with self.subTest(failure=failure):
+                    self.assertEqual(
+                        process.returncode, 0 if failure == "pass" else 1, process.stderr
+                    )
+                    if failure == "pass":
+                        self.assertEqual(trace[-1], "grants-and-recovery")
+                        self.assertLess(trace.index("case-current-null"), trace.index("case-first"))
+                        self.assertLess(trace.index("case-repeat"), trace.index("retained"))
+                    else:
+                        self.assertNotIn("grants-and-recovery", trace)
+                        self.assertEqual(trace[-1], failure)
+
     def test_refusals_and_repeats_preserve_install_and_both_failed_jobs(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -394,13 +845,19 @@ class SchemaMigrationParentTests(unittest.TestCase):
     def test_real_shapes_accept_refusal_and_both_repeat_runs_with_pod_defaults(self):
         for label in MODULE.LABELS:
             args = evidence(label)
-            report = MODULE.verify(*args, denied_log(args[1]) if label == "denied" else "")
+            report = MODULE.verify(
+                *args,
+                denied_log(args[1]) if label == "denied" else "",
+                retained_admission=label == "current-null",
+            )
             self.assertEqual(
                 report["decision"],
                 "schema-parent-intent-refused"
                 if label == "none"
                 else "schema-parent-job-create-refused"
                 if label == "denied"
+                else "schema-parent-null-current-refused"
+                if label == "current-null"
                 else "schema-parent-repeat-verified",
             )
 

@@ -1975,15 +1975,23 @@ verified happy maintenance pause and before its approved manual recovery
 Preflight/request/selection inputs, published definitions and the immutable intent
 policy are checked. The schema must already contain all 18 released migrations
 before any parent executes. None-intent must fail only its actual validator with
-semantic exit 2 before quiescence/Job creation. Two unchanged valid parents must
-then pass fresh quiescence and create distinct fixed native Jobs, with successful
-migration Pods and ordered migration-identity workers.
+semantic exit 2 before quiescence/Job creation. The two valid current-schema
+repeat runs now use unchanged v2 ([ADR 0063](decisions/0063-exercise-retained-schema-admission.md)).
+Install its existing standalone ledger-get grant explicitly and verify source/
+authority identity plus bounded effective named-read rights. Preserve v1 for
+bootstrap, none-intent and Job-create denial. Before either v2 success, submit
+the existing initial request to v2: require successful preflight/selection/intent,
+candidate exit 2 for null expectedCurrent, and no ledger-read/quiescence/Job worker
+or successful parent output. Both successful runs must prove the real ordered
+candidate/ledger/byte/quiescence/fresh-identity gates and distinct fixed native
+Jobs, with successful migration Pods and ordered migration-identity workers.
 
-The existing upgrade-request is the valid forward-only/0018 input. Exactly one
-new migration-none request, identical apart from migration intent, is published
-only in the initial leg's existing commit/ref. The other three fixtures and
+The existing upgrade-request is the valid forward-only/0018 input. Its existing
+migration-none companion, identical apart from intent, remains in the initial
+leg's same owned commit/ref; this acceptance adds no request file. The other
 five scenarios are unchanged. No new CI jobs, scenarios, refs, credentials,
-rights or budget are introduced. Both new Jobs and all four paused-suite Workflows remain
+permission definitions or budget are introduced; the reviewed ledger-get
+grant is explicitly installed in the initial leg. Both Jobs and all five paused-suite Workflows remain
 retained, alongside the initial installation Job/Workflow; installed source/policy identities must remain unchanged.
 
 While still paused, require original receipt/pointer provenance, Secret/config
@@ -1995,13 +2003,20 @@ baseline advancement occurs inside this phase.
 
 Inspect `schema-parent-setup`, `schema-parent-none`,
 `schema-parent-denied-authority`, `schema-parent-denied`,
-`schema-parent-denied-restoration`, `schema-parent-first`, `schema-parent-repeat` and
-`schema-parent-retention`, their bounded outcomes and
+`schema-parent-denied-restoration`, `schema-parent-current-null`, `schema-parent-first`, `schema-parent-repeat`,
+`schema-parent-retention` and `schema-parent-final-retention`, their bounded outcomes and
 startup projections. Native failure/timeout first retains safe stage/Pod signals;
 raw Workflow/Job/Pod/watch/SQL/Secret evidence stays private. Heavy checks run
 on PR CI; full live proof remains post-merge. These runs operate on a current
-schema and do not prove fresh-schema installation, upgrade admission,
+schema and prove only the fixed selection's retained-baseline admission, not general upgrades,
 partial/ambiguous SQL recovery, local deployment or script retirement.
+The final gate re-reads Workflows/Jobs, sources and ledger authority and replays
+required native nodes/outputs against retained execution snapshots. It publishes
+`schema-parent-final.outcome.json` separately from the pre-recovery complete
+outcome. Raw observations remain private, and later approved ledger faults do
+not change the historical admission inputs. V2 wait/watch wrappers are bounded
+to 1,830/1,840 seconds around its published 1,800-second parent deadline; v1 and
+the existing 60-minute CI job budget are unchanged.
 
 The [Job-create denial case](decisions/0051-exercise-schema-job-create-denial.md)
 runs after none-intent and before either repeat. Capture the published migration
@@ -2049,7 +2064,7 @@ both failed Jobs before its own cases. No-create refusals retain all three;
 repeats add exactly two fresh Jobs.
 Recheck install Job spec/UID/provenance, original Workflow identity/spec/outputs
 and immutable pull-Secret identity/data before the complete suite outcome and
-existing recovery. All five Jobs and seven parent Workflows stay retained.
+existing recovery. All five Jobs and eight parent Workflows stay retained.
 No new CI job/scenario/ref/request, token/right, budget, local action, SQL repair or
 recovery path is added. Heavy checks stay on PR CI; live proof is post-merge.
 
@@ -2084,7 +2099,7 @@ Schema absence must still hold before fresh installation.
 No role/credential/ledger edit, backend termination, EXIT repair, new CI
 job/scenario/ref/right/budget or local execution is added. Retain the failed
 Job/Workflow through the later paused suite, distinguishing its failure from
-successful install/repeat Jobs. Final recovery needs five Jobs and seven parent
+successful install/repeat Jobs. Final recovery needs five Jobs and eight parent
 Workflows plus all existing data/identity retention. Linux PR CI exercises the
 real FIFO with an inert transport; Windows covers typed evidence and shell gates.
 Live database proof remains post-merge. Partial writes and ambiguous commit
@@ -2119,7 +2134,7 @@ dependency or sentinel aborts; no CASCADE, IF EXISTS or EXIT repair is allowed.
 Independently require an absent schema/empty relations/columns with the same
 database OID and retained state before first installation. The paused baseline
 now contains both failed Jobs plus the successful installation Job; refusals add
-zero and repeats add one each. Retain five schema-parent Jobs and seven parent
+zero and repeats add one each. Retain five schema-parent Jobs and eight parent
 Workflows before existing checked recovery. No new CI job/scenario/ref/right/
 budget, production change, role/credential/release-ledger edit, database reset
 or local action is added. Heavy checks remain on CI; live SQL proof is post-merge.
