@@ -1565,6 +1565,17 @@ cleanup owns teardown. No local action is authorized. See
 ### Staged schema migration is refused or incomplete
 
 `perfeng-release-schema-migration-v1` remains staged with live acceptance pending.
+The separately staged v2 adds retained-baseline admission ([ADR 0062](decisions/0062-stage-retained-schema-admission.md)).
+For `retained-baseline admission refused` or `[RELEASE_ADMISSION]` failures,
+inspect the failed candidate/pointer/receipt/byte/identity stage before any Job.
+Confirm non-null expectedCurrent, the exact accepted request bytes, owned pointer
+and immutable receipt UID/provenance, unchanged selection and fresh checkpoint
+cluster/root/child identities. Missing ConfigMap get rights require explicit
+installation of `gitops/release-workflows-bootstrap/schema-migration-ledger-access.yaml`
+under separately authorized execution; it is not selected by bootstrap by default.
+Do not overwrite records, switch to v1 as a bypass, retry nodes or resume service
+to repair admission. Retain private evidence and leave maintenance in place.
+V2 live acceptance is deferred; see the [v2 guide](release-schema-migration.md#retained-baseline-admission-in-v2).
 Wrong deployment lock, changed request bytes, migration mode none, automated
 activation or migration ID other than 0018 must stop before the Job, as must
 failed fresh quiescence. Verify the pinned request, immutable intent ConfigMap

@@ -53,6 +53,11 @@
 | Milestones or cross-repository sequencing | [Milestones](roadmap/milestones.md) | Relevant ADRs and component repositories |
 | Operational failure or live recovery | [Troubleshooting](troubleshooting.md) | The focused operating guide; live commands require explicit authorization |
 
+Staged retained-baseline schema admission is documented in the
+[v2 migration guide](release-schema-migration.md#retained-baseline-admission-in-v2)
+and [ADR 0062](decisions/0062-stage-retained-schema-admission.md). It preserves
+bootstrap v1; ledger get installation and live acceptance remain explicit.
+
 ## Canonical collections
 
 For controlled target image builds/publication and qualification blockers, read
