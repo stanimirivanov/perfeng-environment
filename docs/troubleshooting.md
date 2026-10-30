@@ -1575,7 +1575,18 @@ installation of `gitops/release-workflows-bootstrap/schema-migration-ledger-acce
 under separately authorized execution; it is not selected by bootstrap by default.
 Do not overwrite records, switch to v1 as a bypass, retry nodes or resume service
 to repair admission. Retain private evidence and leave maintenance in place.
-V2 live acceptance is deferred; see the [v2 guide](release-schema-migration.md#retained-baseline-admission-in-v2).
+V2 acceptance is wired in the existing trusted-main initial job; live proof is
+post-merge ([ADR 0063](decisions/0063-exercise-retained-schema-admission.md)).
+Inspect `schema-parent-current-null` for candidate exit 2 after successful
+preflight/selection/intent, with no later ledger or migration worker. A hash,
+startup, permission or timeout error cannot satisfy that refusal. First/repeat
+must select unchanged v2 and complete every ordered admission gate. Ledger-read
+prerequisites are checked through the existing impersonation identity before
+submission; failed inspection or unready permission stops without a native Job.
+Missing/changed Workflow nodes, source/authority identities, Jobs, ACL/data or
+receipt observations must block grant acceptance/recovery or final retention.
+Only `schema-parent-final.outcome.json` proves the final retained gate; an earlier
+complete outcome is historical evidence. See the [v2 guide](release-schema-migration.md#retained-baseline-admission-in-v2).
 Wrong deployment lock, changed request bytes, migration mode none, automated
 activation or migration ID other than 0018 must stop before the Job, as must
 failed fresh quiescence. Verify the pinned request, immutable intent ConfigMap

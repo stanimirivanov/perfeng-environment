@@ -107,8 +107,9 @@ Before separately authorized use, explicitly install
 addition to the existing Application-read bootstrap. It grants only ConfigMap
 get in the ledger namespace, including dynamic receipt names; no list or writes.
 It is deliberately absent from the bootstrap Kustomization and active local root.
-V2 is selected only by the staged release-workflows Kustomization. No local/live
-execution or migration of existing CI scenarios is part of this slice.
+V2 is selected only by the staged release-workflows Kustomization. Its approved
+disposable acceptance below explicitly installs the grant; local execution stays
+outside that scope.
 
 Native read predicates enforce exact ownership and refuse missing, replaced,
 deleting, malformed or conflicting records. The accepted bytes are bounded and
@@ -121,8 +122,20 @@ deadline is 1,800 seconds; API reads have ten-second request timeouts and
 This is observation-based trusted-operator admission, not an atomic ledger/SQL
 lease or a multi-user boundary. Keep backup/drain/operator exclusion prerequisites.
 It does not revoke v1 authority, add admission to runtime grants, prove schema
-checksums or handle ambiguous SQL commits. Live v2 acceptance and host cutover
-remain separate approved work; heavy checks run on existing PR CI.
+checksums or handle ambiguous SQL commits. Host cutover remains separate;
+heavy checks run on existing PR CI.
+
+[ADR 0063](decisions/0063-exercise-retained-schema-admission.md) now wires v2 into
+the existing trusted-main initial job after verified adoption/pause. Preserve v1
+none-intent and Job-create denial, then submit the existing initial request to
+v2 and require its exact null-expectedCurrent candidate refusal before ledger
+reads or any Job. The two existing current-schema repeat runs use v2 and the same
+pinned upgrade request; they still create only two native Jobs. Require actual
+ordered admission workers/outputs, source/authority identity and unchanged schema,
+ACLs, roles, SQL/S3 data, Secrets and workload/storage identities before grants
+and existing recovery. Re-read retained native proof at the final aggregate gate;
+its separate final outcome cannot reuse an earlier success. Full live proof is
+post-merge main-only, not a local or general-upgrade authorization.
 
 ## Failure, retry and rollback
 
@@ -194,7 +207,7 @@ parent, and require the successful real prefix/quiescence followed only by the
 native create worker's exact Forbidden. No Job/Pod, successful parent output or
 SQL/retained-state change may occur. Only proved refusal and retention permit
 UID/resourceVersion/rules-guarded restoration of the captured rules and verified
-restored access. All four Workflows remain retained. Failure stops without Role
+restored access. The suite now retains five Workflows including v2 null-current refusal. Failure stops without Role
 repair or recovery; production authority and local infrastructure are unchanged.
 Heavy checks stay on CI and live proof remains post-merge. This adds no script
 retirement credit or SQL failure/recovery claim.
@@ -219,7 +232,7 @@ foundation Pods, PV/claim bindings and cluster identity through installation.
 
 The later paused suite requires the retained install and both failed Jobs
 at baseline; refusal cases add zero, and successful repeats add one each.
-Require all five Jobs, four later Workflows plus the installation and two failed Workflows, and
+Require all five Jobs, five later Workflows plus the installation and two failed Workflows, and
 the original pull Secret before publishing complete acceptance or allowing
 existing recovery.
 No production templates, credentials/rights, CI jobs/scenarios/refs/budgets,

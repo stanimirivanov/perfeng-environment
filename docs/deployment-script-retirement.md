@@ -265,5 +265,9 @@ The [v2 schema admission slice](decisions/0062-stage-retained-schema-admission.m
 adds native ledger predicates and bounded byte checks, with no production Python.
 It preserves bootstrap v1 and does not retire a host command. Live v2 acceptance,
 general upgrades, grant-parent admission and operational cutover remain separate.
+The [v2 acceptance slice](decisions/0063-exercise-retained-schema-admission.md)
+reuses the existing two repeat Jobs and adds only CI evidence/null-current
+refusal. It changes no production source or supported command and claims no
+retirement credit; live proof remains post-merge main-only.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

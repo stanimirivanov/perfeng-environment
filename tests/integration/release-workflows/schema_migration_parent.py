@@ -1,5 +1,6 @@
 """Evidence for repeat execution of the unchanged parent on the paused CI baseline."""
 
+import base64
 import hashlib
 import json
 import re
@@ -15,13 +16,37 @@ import yaml
 from jsonschema import Draft202012Validator
 
 DIRECTORY = Path("gitops/release-workflows")
-LABELS = ("none", "denied", "first", "repeat")
+LABELS = ("none", "denied", "current-null", "first", "repeat")
 SOURCES = (
     "release-schema-migration-v1.yaml",
     "schema-migration-job-v1.yaml",
     "release-preflight-v3.yaml",
     "release-task-selection-v3.yaml",
     "verify-release-quiescence-v3.yaml",
+)
+PERSISTENT = (
+    *(
+        f"postgres.{key}.json"
+        for key in (
+            "storage",
+            "pv",
+            "service",
+            "statefulset",
+            "external",
+            "server",
+            "repository",
+            "roles",
+            "acl",
+            "schema",
+        )
+    ),
+    "postgres.canary.txt",
+    "postgres.sentinel.txt",
+    *(
+        f"seaweedfs.{key}.json"
+        for key in ("storage", "pv", "service", "proxy", "statefulset", "credentials", "object")
+    ),
+    "seaweedfs.bytes",
 )
 
 
@@ -39,8 +64,11 @@ def subset(expected: Any, actual: Any) -> None:
         assert expected == actual
 
 
-def installed(templates: dict[str, Any], intent: dict[str, Any]) -> dict[str, str]:
-    expected = [yaml.safe_load((DIRECTORY / name).read_text()) for name in SOURCES]
+def installed(
+    templates: dict[str, Any], intent: dict[str, Any], *, retained_admission: bool = False
+) -> dict[str, str]:
+    sources = (*SOURCES, "release-schema-migration-v2.yaml") if retained_admission else SOURCES
+    expected = [yaml.safe_load((DIRECTORY / name).read_text()) for name in sources]
     actual = {obj["metadata"]["name"]: obj for obj in templates["items"]}
     assert set(actual) == {obj["metadata"]["name"] for obj in expected}
     identities = {}
@@ -70,6 +98,8 @@ def verify(
     job: Any,
     pods: dict[str, Any],
     diagnostic: str = "",
+    *,
+    retained_admission: bool = False,
 ) -> dict[str, Any]:
     assert label in LABELS
     maintenance.retained(before, after, paused=True)
@@ -93,18 +123,26 @@ def verify(
     assert Draft202012Validator(intent).is_valid(request) == (label != "none")
     digest = "sha256:" + hashlib.sha256(accepted_raw).hexdigest()
     pointer = next(o for o in before["records"] if o["metadata"]["name"] == "perfeng-local-current")
-    assert request["promotion"]["expectedCurrent"] == pointer["data"]["requestDigest"] == digest
+    assert pointer["data"]["requestDigest"] == digest
+    assert request["promotion"]["expectedCurrent"] == (None if label == "current-null" else digest)
     accepted = json.loads(accepted_raw)
     assert request == {
         **accepted,
         "promotion": {
             **accepted["promotion"],
-            "expectedCurrent": digest,
+            "expectedCurrent": None if label == "current-null" else digest,
             "migration": {"mode": "none"}
             if label == "none"
             else {"mode": "forward-only", "id": "0018"},
         },
     }
+    if label == "current-null":
+        assert retained_admission and raw == accepted_raw
+    if retained_admission:
+        assert label in {"current-null", "first", "repeat"}
+        admission_records(accepted_raw, request, after)
+        if label != "current-null":
+            admission_nodes(workflow, raw, after)
     return execution(
         label,
         workflow,
@@ -116,7 +154,107 @@ def verify(
         job,
         pods,
         diagnostic,
+        retained_admission=retained_admission,
     )
+
+
+def stable_record(value: dict[str, Any]) -> dict[str, Any]:
+    """Ignore API bookkeeping while retaining all ledger identity/content/provenance."""
+    result = deepcopy(value)
+    for key in ("resourceVersion", "managedFields"):
+        result["metadata"].pop(key, None)
+    return result
+
+
+def admission_records(raw: bytes, request: dict[str, Any], state: dict[str, Any]) -> None:
+    """Independently bind the accepted bytes/record to actual adopted paused resources."""
+    policy = maintenance.policy
+    digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+    name = "receipt." + digest[7:39] + "." + digest[39:]
+    records = {o["metadata"]["name"]: o for o in state["records"]}
+    assert len(records) == len(state["records"]) == 2
+    pointer, receipt = records[policy.POINTER], records[name]
+    policy.owned(pointer, policy.POINTER, "current-release")
+    policy.owned(receipt, name, "release-adoption")
+    assert pointer["data"] == {
+        "requestDigest": digest,
+        "clusterUID": request["environment"]["clusterUID"],
+        "receiptName": name,
+        "receiptUID": receipt["metadata"]["uid"],
+    }
+    assert pointer.get("immutable", False) is False and not pointer.get("binaryData")
+    assert receipt["immutable"] is True and not receipt.get("data")
+    annotations = receipt["metadata"]["annotations"]
+    assert re.fullmatch(
+        r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", annotations["perfeng.io/first-workflow-uid"]
+    )
+    assert re.fullmatch(r"[0-9a-f]{40}", annotations["perfeng.io/first-request-revision"])
+    assert set(receipt["binaryData"]) == {"request.json", "receipt.json"}
+    assert base64.b64decode(receipt["binaryData"]["request.json"], validate=True) == raw
+    record = json.loads(
+        base64.b64decode(receipt["binaryData"]["receipt.json"], validate=True),
+        object_pairs_hook=policy.unique,
+    )
+    applications = {o["metadata"]["name"]: o for o in state["applications"]["items"]}
+    lock = json.loads(Path("deployments/local-control-plane.json").read_text())
+    assert record == {
+        "schemaVersion": 1,
+        "kind": "PerfengReleaseAdoptionReceipt",
+        "status": "adopted-baseline",
+        "environment": request["environment"],
+        "requestDigest": digest,
+        "selectionRevision": request["selection"]["revision"],
+        "rootUID": applications[policy.NAMES[0]]["metadata"]["uid"],
+        "controlPlaneApplicationUID": applications[policy.NAMES[1]]["metadata"]["uid"],
+        "deploymentRevision": lock["deployment"]["revision"],
+        "image": lock["controlPlane"]["image"],
+    }
+    assert (
+        state["deployment"]["spec"]["template"]["spec"]["containers"][0]["image"] == record["image"]
+    )
+
+
+def admission_nodes(workflow: dict[str, Any], raw: bytes, state: dict[str, Any]) -> None:
+    """Inspect actual v2 outputs; no projection of a v2 execution into legacy v1."""
+    named, outputs = maintenance.readiness.named, maintenance.readiness.outputs
+    candidate = named(workflow, "candidate")
+    values = [p["value"] for p in candidate["outputs"]["parameters"] if p["name"] == "request"]
+    assert len(values) == 1 and values[0] in {raw.decode(), raw.decode().removesuffix("\n")}
+    records = {o["metadata"]["name"]: o for o in state["records"]}
+    pointer = outputs(named(workflow, "pointer"))["observation"]
+    receipt = outputs(named(workflow, "receipt"))["observation"]
+    stable = outputs(named(workflow, "receipt-stable"))["observation"]
+    for obj in (pointer, receipt, stable):
+        assert stable_record(obj) == stable_record(records[obj["metadata"]["name"]])
+    assert receipt["metadata"]["uid"] == pointer["data"]["receiptUID"]
+    assert outputs(named(workflow, "admission"))["observation"] == {
+        "status": "retained-baseline-verified"
+    }
+
+
+def ledger_authority(value: dict[str, Any]) -> dict[str, Any]:
+    """Require exactly the reviewed installed get-only grant, including stable UIDs."""
+    expected = list(
+        yaml.safe_load_all(
+            Path(
+                "gitops/release-workflows-bootstrap/schema-migration-ledger-access.yaml"
+            ).read_text()
+        )
+    )
+    actual = {o["kind"]: o for o in value["items"]}
+    assert len(actual) == len(value["items"]) == 2
+    for obj in expected:
+        current = actual[obj["kind"]]
+        subset(obj, current)
+        metadata = current["metadata"]
+        assert (
+            metadata["uid"]
+            and not metadata.get("deletionTimestamp")
+            and not metadata.get("ownerReferences")
+        )
+        for key in ("rules", "subjects", "roleRef"):
+            assert current.get(key) == obj.get(key)
+    return {kind: stable_record(obj) for kind, obj in actual.items()}
 
 
 def execution(
@@ -130,12 +268,18 @@ def execution(
     job: Any,
     pods: dict[str, Any],
     diagnostic: str = "",
+    *,
+    retained_admission: bool = False,
 ) -> dict[str, Any]:
     """Validate the unchanged native parent independently of adopted/empty baseline."""
     assert label in {*LABELS, "install", "contention", "rollback"}
+    if retained_admission:
+        assert label in {"current-null", "first", "repeat"}
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     assert workflow["spec"]["workflowTemplateRef"] == {
-        "name": "perfeng-release-schema-migration-v1"
+        "name": "perfeng-release-schema-migration-v2"
+        if retained_admission
+        else "perfeng-release-schema-migration-v1"
     }
     assert not workflow["spec"].get("shutdown")
     arguments = workflow["spec"]["arguments"]["parameters"]
@@ -169,7 +313,14 @@ def execution(
         "name": "perfeng-release-task-selection-v3",
         "template": "run",
     }
-    assert intent_node["templateName"] == "migration-intent"
+    if retained_admission:
+        assert intent_node["templateRef"] == {
+            "name": "perfeng-release-schema-migration-v1",
+            "template": "migration-intent",
+        }
+    else:
+        assert label != "current-null"
+        assert intent_node["templateName"] == "migration-intent"
     assert intent_node["phase"] == ("Failed" if label == "none" else "Succeeded")
     nodes = workflow["status"]["nodes"]
     expected_pods = {
@@ -179,8 +330,12 @@ def execution(
         "task-selection",
         "migration-intent",
     }
-    if label != "none":
+    if label not in {"none", "current-null"}:
         expected_pods |= {"quiescence", "migrate"}
+    if retained_admission:
+        expected_pods |= {"candidate"}
+        if label != "current-null":
+            expected_pods |= {"pointer", "receipt", "accepted-bytes", "receipt-stable", "admission"}
     pod_nodes = [n for n in nodes.values() if n["type"] == "Pod"]
     assert {n["displayName"] for n in pod_nodes} == expected_pods and len(pod_nodes) == len(
         expected_pods
@@ -192,13 +347,29 @@ def execution(
     for node in pod_nodes:
         worker = next(w for w in workers if w["nodeID"] == node["id"])
         assert worker["uid"] and worker["account"] == "release-schema-migration"
-        refused = label == "none" and node["displayName"] == "migration-intent"
+        refused = (label == "none" and node["displayName"] == "migration-intent") or (
+            label == "current-null" and node["displayName"] == "candidate"
+        )
         denied = label in {"denied", "contention", "rollback"} and node["displayName"] == "migrate"
         assert worker["exitCode"] == (2 if refused else 1 if denied else 0)
+        # A rejected candidate never creates its declared output file. Argo may
+        # therefore report output collection Error after the exact main exit 2.
+        candidate_refusal = label == "current-null" and node["displayName"] == "candidate"
         assert node["phase"] in (
-            {"Failed", "Error"} if denied else {"Failed" if refused else "Succeeded"}
+            {"Failed", "Error"}
+            if denied or candidate_refusal
+            else {"Failed" if refused else "Succeeded"}
         )
     sequence = [preflight, selection, intent_node]
+    if retained_admission:
+        for name in (
+            ("candidate",)
+            if label == "current-null"
+            else ("candidate", "pointer", "receipt", "accepted-bytes")
+        ):
+            node = named(workflow, name)
+            assert node["templateName"] == name and not node.get("templateRef")
+            sequence.append(node)
     parent = nodes[workflow["metadata"]["name"]]
     values = {
         p["name"]: p["value"]
@@ -208,6 +379,8 @@ def execution(
     report = {
         "decision": "schema-parent-intent-refused"
         if label == "none"
+        else "schema-parent-null-current-refused"
+        if label == "current-null"
         else "schema-parent-job-create-refused"
         if label == "denied"
         else "schema-parent-rollback-refused"
@@ -218,14 +391,23 @@ def execution(
         if label == "install"
         else "schema-parent-repeat-verified",
         "workflowUID": workflow["metadata"]["uid"],
+        "parentTemplate": workflow["spec"]["workflowTemplateRef"]["name"],
         "requestDigest": parameters["request-sha256"],
     }
-    if label == "none":
+    if label in {"none", "current-null"}:
         assert workflow["status"]["phase"] in {"Failed", "Error"}
         assert job is None and pods["items"] == []
         assert not values.get("job-name") and not values.get("checkpoint")
         for node in nodes.values():
-            if node["displayName"] in {"quiescence", "migrate"}:
+            if node["displayName"] in {
+                "pointer",
+                "receipt",
+                "accepted-bytes",
+                "quiescence",
+                "receipt-stable",
+                "admission",
+                "migrate",
+            }:
                 assert node["type"] != "Pod" and node["phase"] in {"Skipped", "Omitted"}
     else:
         assert workflow["status"]["phase"] in (
@@ -241,6 +423,12 @@ def execution(
             "template": "run",
         }
         checkpoint = outputs(checkpoint_node)["result"]
+        if retained_admission:
+            sequence.append(checkpoint_node)
+            for name in ("receipt-stable", "admission"):
+                node = named(workflow, name)
+                assert node["templateName"] == name and not node.get("templateRef")
+                sequence.append(node)
         Draft202012Validator(
             json.loads(Path("deployments/maintenance-checkpoint-v1.schema.json").read_text())
         ).validate(checkpoint)
@@ -392,7 +580,7 @@ def execution(
         assert pod["status"]["containerStatuses"][0]["state"]["terminated"]["exitCode"] == (
             1 if label in {"contention", "rollback"} else 0
         )
-        sequence += [checkpoint_node, migrate]
+        sequence += [migrate] if retained_admission else [checkpoint_node, migrate]
         report["jobUID"] = job["metadata"]["uid"]
     ordered(sequence)
     return report
@@ -471,19 +659,23 @@ def main() -> None:
         current = installed(
             load(f"schema-parent.templates-{label}.json"),
             load(f"schema-parent.intent-{label}.json"),
+            retained_admission=True,
         )
+        authority = ledger_authority(load(f"schema-parent.ledger-{label}.json"))
         if label == "after":
             assert current == installed(
                 load("schema-parent.templates-before.json"),
                 load("schema-parent.intent-before.json"),
+                retained_admission=True,
             )
+            assert authority == ledger_authority(load("schema-parent.ledger-before.json"))
         return
     if mode.startswith("diagnose-"):
         label = mode.removeprefix("diagnose-")
         assert label in LABELS
         job = load(f"schema-parent-{label}.job.json")
         report: dict[str, Any]
-        if job and label != "none":
+        if job and label not in {"none", "current-null"}:
             report = migration.startup(
                 (fixture / f"schema-parent-{label}.watch.json").read_text(),
                 job,
@@ -528,13 +720,25 @@ def main() -> None:
                 in {"Pending", "Running", "Succeeded", "Failed", "Error", "Skipped", "Omitted"}
                 else "Unknown",
             }
-            for name in ("preflight", "task-selection", "migration-intent", "quiescence", "migrate")
+            for name in (
+                "preflight",
+                "task-selection",
+                "migration-intent",
+                "candidate",
+                "pointer",
+                "receipt",
+                "accepted-bytes",
+                "quiescence",
+                "receipt-stable",
+                "admission",
+                "migrate",
+            )
             for n in workflow.get("status", {}).get("nodes", {}).values()
             if n.get("displayName") == name
         ]
         (results / f"schema-parent-{label}.startup.json").write_text(json.dumps(report) + "\n")
         return
-    assert mode in {*LABELS, "complete", "baseline"}
+    assert mode in {*LABELS, "complete", "final", "baseline"}
     maintenance.retained(state("maintenance-before"), state("schema-parent-baseline"), paused=True)
     contract = json.loads(
         Path("tests/integration/release-workflows/migration-image.json").read_text()
@@ -558,12 +762,22 @@ def main() -> None:
                 return
         retained_job(original, current)
 
-    def check(label: str) -> dict[str, Any]:
+    def check(label: str, workflow: dict[str, Any] | None = None) -> dict[str, Any]:
         prefix = "schema-parent-" + label
-        key = "migration-none" if label == "none" else "upgrade-request"
+        key = (
+            "migration-none"
+            if label == "none"
+            else "parent"
+            if label == "current-null"
+            else "upgrade-request"
+        )
         parameters = load(key + "-parameters.json")
         accepted = (fixture / "parent-request.json").read_bytes()
-        raw = (fixture / (key + "-request.json")).read_bytes()
+        raw = (
+            accepted
+            if label == "current-null"
+            else (fixture / (key + "-request.json")).read_bytes()
+        )
         base = load("parent-parameters.json")
         assert (
             parameters["request-revision"]
@@ -573,7 +787,7 @@ def main() -> None:
         assert parameters["selection-revision"] == base["selection-revision"]
         report = verify(
             label,
-            load(prefix + ".workflow.json"),
+            workflow if workflow is not None else load(prefix + ".workflow.json"),
             load(prefix + ".workers.json"),
             parameters,
             raw,
@@ -583,12 +797,17 @@ def main() -> None:
             load(prefix + ".job.json"),
             load(prefix + ".job-pods.json"),
             (fixture / (prefix + ".denied.log")).read_text() if label == "denied" else "",
+            retained_admission=label in {"current-null", "first", "repeat"},
         )
         for suffix in ("schema.json", "roles.json"):
             assert load(prefix + "." + suffix) == load("schema-parent-baseline." + suffix)
         assert (fixture / f"{prefix}.data.txt").read_bytes() == (
             fixture / "schema-parent-baseline.data.txt"
         ).read_bytes()
+        for suffix in PERSISTENT:
+            assert (fixture / f"{prefix}.{suffix}").read_bytes() == (
+                fixture / f"schema-parent-baseline.{suffix}"
+            ).read_bytes()
         migration.validate_schema(
             load(prefix + ".schema.json"),
             json.loads(
@@ -600,7 +819,7 @@ def main() -> None:
         baseline_jobs = load("schema-parent-baseline.jobs.json")["items"]
         assert len(previous_jobs) == len(baseline_jobs) + (1 if label == "repeat" else 0)
         assert len(current_jobs) == len(baseline_jobs) + (
-            0 if label in {"none", "denied"} else 1 if label == "first" else 2
+            0 if label in {"none", "denied", "current-null"} else 1 if label == "first" else 2
         )
         for original in baseline_jobs:
             current = next(
@@ -612,9 +831,21 @@ def main() -> None:
         }
         return report
 
-    if mode != "complete":
+    if mode in LABELS:
         (results / f"schema-parent-{mode}.outcome.json").write_text(json.dumps(check(mode)) + "\n")
         return
+    assert installed(
+        load("schema-parent.templates-before.json"),
+        load("schema-parent.intent-before.json"),
+        retained_admission=True,
+    ) == installed(
+        load("schema-parent.templates-after.json"),
+        load("schema-parent.intent-after.json"),
+        retained_admission=True,
+    )
+    assert ledger_authority(load("schema-parent.ledger-before.json")) == ledger_authority(
+        load("schema-parent.ledger-after.json")
+    )
     reports = [check(label) for label in LABELS]
     assert len({r["workflowUID"] for r in reports}) == len(LABELS)
     jobs = load("schema-parent.retained-jobs.json")["items"]
@@ -641,8 +872,19 @@ def main() -> None:
             current["spec"] == original["spec"]
             and current["status"]["phase"] == original["status"]["phase"]
         )
-    (results / "schema-parent-complete.outcome.json").write_text(
-        json.dumps({"decision": "schema-parent-repeat-suite-verified", "cases": reports}) + "\n"
+        assert check(label, current) == next(
+            r for r in reports if r["workflowUID"] == current["metadata"]["uid"]
+        )
+    (results / f"schema-parent-{mode}.outcome.json").write_text(
+        json.dumps(
+            {
+                "decision": "schema-parent-final-retained"
+                if mode == "final"
+                else "schema-parent-repeat-suite-verified",
+                "cases": reports,
+            }
+        )
+        + "\n"
     )
 
 

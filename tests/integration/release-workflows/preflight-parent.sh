@@ -70,4 +70,7 @@ postgres_application_acceptance
 seaweedfs_application_acceptance
 source "$source_dir/root.sh"
 source "$source_dir/adoption-parent.sh"
-if [[ ${scenario:-} == initial ]]; then runtime_grant_retention complete; fi
+if [[ ${scenario:-} == initial ]]; then
+  schema_parent_retention final
+  runtime_grant_retention complete
+fi

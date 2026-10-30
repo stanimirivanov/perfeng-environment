@@ -729,7 +729,10 @@ The staged schema-migration v2 now adds retained-baseline admission against the
 owned pointer/immutable receipt, exact accepted request byte hash and fresh
 quiescence root/child identities ([ADR 0062](../decisions/0062-stage-retained-schema-admission.md)).
 Bootstrap v1 remains unchanged; this supports only the fixed current selection.
-Live v2 proof, grant-parent admission, ambiguous commits, general upgrades and
+The initial trusted-main leg now wires v2 null-current refusal and replaces only
+the existing two paused repeat executions, with exact native gate/retention
+proof before grants/recovery ([ADR 0063](../decisions/0063-exercise-retained-schema-admission.md)).
+Live v2 proof remains post-merge. Grant-parent admission, ambiguous commits, general upgrades and
 operational cutover/host migration-grant retirement remain open.
 
 Cloud deployment is included only when it becomes an explicit requirement.

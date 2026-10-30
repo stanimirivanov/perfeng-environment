@@ -57,6 +57,8 @@ Staged retained-baseline schema admission is documented in the
 [v2 migration guide](release-schema-migration.md#retained-baseline-admission-in-v2)
 and [ADR 0062](decisions/0062-stage-retained-schema-admission.md). It preserves
 bootstrap v1; ledger get installation and live acceptance remain explicit.
+[ADR 0063](decisions/0063-exercise-retained-schema-admission.md) defines the
+bounded initial-job null-current/refusal and repeat acceptance, with live proof post-merge.
 
 ## Canonical collections
 
