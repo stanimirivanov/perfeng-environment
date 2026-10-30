@@ -306,7 +306,7 @@ qualification_retention() { log retained; [[ $FAIL != retained ]]; }
         )
         pause = (FIXTURE / "maintenance-pause.sh").read_text()
         self.assertLess(
-            pause.index("\nqualification_retention\n"),
+            pause.index("qualification_retention retained preparation"),
             pause.index("start_stage maintenance-recovery"),
         )
         final = (FIXTURE / "preflight-parent.sh").read_text()

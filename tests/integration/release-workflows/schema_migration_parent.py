@@ -272,8 +272,11 @@ def execution(
     diagnostic: str = "",
     *,
     retained_admission: bool = False,
+    account: str = "release-schema-migration",
 ) -> dict[str, Any]:
     """Validate the unchanged native parent independently of adopted/empty baseline."""
+    assert account in {"release-schema-migration", "release-runtime-grants"}
+    assert account == "release-schema-migration" or retained_admission
     assert label in {*LABELS, "install", "contention", "rollback"}
     if retained_admission:
         assert label in {"current-null", "first", "repeat"}
@@ -348,7 +351,7 @@ def execution(
     assert len({w["uid"] for w in workers}) == len(workers)
     for node in pod_nodes:
         worker = next(w for w in workers if w["nodeID"] == node["id"])
-        assert worker["uid"] and worker["account"] == "release-schema-migration"
+        assert worker["uid"] and worker["account"] == account
         refused = (label == "none" and node["displayName"] == "migration-intent") or (
             label == "current-null" and node["displayName"] == "candidate"
         )

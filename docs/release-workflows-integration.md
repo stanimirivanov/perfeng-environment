@@ -2173,3 +2173,32 @@ public after verification. No new CI job/scenario, request/ref, credential, righ
 or budget; the other five legs remain unchanged. Heavy PR CI verifies offline
 contracts; live proof remains post-merge main-only. SQL refusal fault injection,
 preparation composition and host cutover remain deferred. See [ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md).
+
+
+### Complete database-preparation parent
+
+The initial trusted-main leg installs the unchanged staged parent after standalone
+schema/qualification and adopted grant execution. `database-preparation.sh` first
+submits the existing initial request: require real migration preflight/selection/
+intent and candidate main exit 2 for null expectedCurrent, with no ledger/SQL or
+later-phase workers, Jobs or successful outputs. Two fresh complete parents then
+use the existing pinned upgrade request and create six distinct retained Jobs.
+
+Validate actual nested phase boundaries/order, stored outer caller/mutex/deadline,
+all native workers, fixed Jobs/Pods, outputs and unchanged source/authority/SQL/
+ledger/ACL/data/credential/workload/storage identities. Reuse the existing adopted
+runtime TCP probe after composition, adding no probe Job. Before recovery/final
+success, reread the raw parents, workers, six Jobs/Pods, sources/authority, probe,
+state and full native inventory. Raw data remains private; publish only bounded
+`database-preparation-{retained,final}.outcome.json` after all gates pass.
+
+Standalone suites retain their strict checks. Partition only two exact, fully
+revalidated cohort Job identities per kind, saving the full `.all.json` inventory
+first; unknown Jobs remain and fail legacy accounting. No optional presence or
+wildcard exclusion. Every failure stops without retry, repair or recovery.
+
+This stays within the existing initial job and 60-minute budget, with unchanged
+other five legs, requests/refs, credentials and permissions. Heavy checks stay on
+PR CI; live proof is post-merge main-only. See [ADR 0069](decisions/0069-exercise-complete-database-preparation.md).
+Failure/partial-state injection, general upgrades and operational cutover remain
+separate; existing standalone passes do not establish the new complete parent.

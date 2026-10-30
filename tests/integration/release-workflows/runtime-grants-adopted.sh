@@ -41,6 +41,7 @@ adopted_grant_suite() {
   source "$source_dir/schema-qualification-parent.sh"
   runtime_grant_parent adopted-null
   runtime_grant_parent adopted
+  source "$source_dir/database-preparation.sh"
   start_stage grant-adopted-runtime
   runtime_probe adopted success
   cp "$fixture/runtime-probe.log" "$fixture/grant-adopted.probe.private"

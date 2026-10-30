@@ -41,7 +41,8 @@ complete_stage
 source "$source_dir/schema-migration-parent.sh"
 source "$source_dir/runtime-grants-adopted.sh"
 
-qualification_retention
+preparation_retention
+qualification_retention retained preparation
 
 # Only a proved successful pause may reach this independently authorized CI recovery.
 start_stage maintenance-recovery

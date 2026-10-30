@@ -764,6 +764,14 @@ each phase retains its own admission and fresh quiescence. Complete-parent live
 composition/failure/retention proof remains separately approved work. No host
 task, active root, CI execution selection or retirement count changes.
 
+[ADR 0069](../decisions/0069-exercise-complete-database-preparation.md) wires
+complete preparation null-current refusal and first/repeat in the initial
+adopted/paused window, preserving standalone coverage. Six additional native Jobs,
+nested boundary/order/output proof, existing runtime TCP success and unchanged
+state must pass fresh retention before recovery/final publication. The existing
+job budget, inputs, credentials and authority remain unchanged. Live proof is
+post-merge main-only; failure/partial-state injection and host cutover stay open.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

@@ -493,6 +493,7 @@ adopted_grant_retention() { step retained; }
                 "setup",
                 "access",
                 "qualification",
+                "preparation",
                 "null-parent",
                 "parent",
                 "probe",
@@ -505,6 +506,7 @@ adopted_grant_retention() { step retained; }
                 (case / "schema-qualification-parent.sh").write_text(
                     "step qualification\n", newline="\n"
                 )
+                (case / "database-preparation.sh").write_text("step preparation\n", newline="\n")
                 (case / "runtime-probe.log").write_text("runtime privilege policy verified\n")
                 script = case / "case.sh"
                 script.write_text(
@@ -540,6 +542,7 @@ adopted_grant_snapshot() { step "snapshot-$1"; }
 grant_snapshot() { step wrong-bootstrap; return 1; }
 a() { echo "a $*" >> trace; echo '{}'; }; k() { echo '{}'; }; jq() { echo native-id; }
 uv() { step "${5##*/}-$6"; }; timeout() { step wait || return 1; return "${WAIT_EXIT:-0}"; }
+preparation_inventory() { step inventory; }
 grant_sources() { :; }; runtime_grant_access() { :; }
 runtime_grant_contention_retention() { :; }; runtime_grant_rollback_retention() { :; }
 adopted_grant_retention() { step probe-retained; }
@@ -579,6 +582,7 @@ adopted_grant_retention() { step probe-retained; }
                 ),
                 ("bootstrap", retained, "runtime_grant_retention bootstrap", "pass", 0),
                 ("complete", retained, "runtime_grant_retention complete", "pass", 0),
+                ("inventory-failed", retained, "runtime_grant_retention complete", "inventory", 1),
                 ("probe-failed", retained, "runtime_grant_retention complete", "probe-retained", 1),
                 ("unknown", retained, "runtime_grant_retention unknown", "pass", 2),
             ]
