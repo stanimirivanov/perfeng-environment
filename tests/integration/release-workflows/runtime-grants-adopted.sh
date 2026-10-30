@@ -38,6 +38,7 @@ adopted_grant_suite() {
   k apply -f gitops/release-workflows/release-runtime-grants-v2.yaml
   schema_parent_ledger_access release-runtime-grants
   complete_stage
+  source "$source_dir/schema-qualification-parent.sh"
   runtime_grant_parent adopted-null
   runtime_grant_parent adopted
   start_stage grant-adopted-runtime

@@ -742,11 +742,19 @@ Full grants-v2 live proof remains post-merge main-only.
 The [staged schema qualification parent](../release-schema-qualification.md)
 now reuses that admission chain and authority for a fixed read-only native Job,
 with eighteen expected ledger hashes derived from selected upstream Git bytes
-([ADR 0066](../decisions/0066-stage-read-only-schema-qualification.md)). Actual SQL/
-complete-parent acceptance and migration/grant composition remain separate;
+([ADR 0066](../decisions/0066-stage-read-only-schema-qualification.md)). Bounded
+complete-parent first/repeat acceptance is wired under ADR 0067 for post-merge CI;
+migration/grant composition and live SQL refusal faults remain separate;
 ledger/ownership qualification does not establish full DDL equivalence or cutover.
 Ambiguous commits, general upgrades and
 operational cutover/host migration-grant retirement remain open.
+
+[ADR 0067](../decisions/0067-exercise-read-only-schema-qualification.md) wires
+complete-parent read-only qualification first/repeat acceptance in the existing
+trusted-main initial adopted/paused window. Two retained native Jobs/Workflows,
+source/authority identity and unchanged SQL/data state must pass before recovery
+and final success. Live proof is post-merge main-only; no host retirement,
+preparation composition, general upgrade or SQL-fault acceptance credit.
 
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the

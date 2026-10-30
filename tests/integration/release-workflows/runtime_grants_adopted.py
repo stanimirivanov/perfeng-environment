@@ -126,8 +126,8 @@ def request(root: Path, before: dict[str, Any]) -> tuple[dict[str, str], dict[st
     return parameters, candidate
 
 
-def paused(root: Path, label: str) -> dict[str, Any]:
-    prefix = "grant-adopted-" + label
+def paused(root: Path, label: str, *, prefix: str = "grant-adopted-") -> dict[str, Any]:
+    prefix += label
     observed = state(root, prefix)
     grants.parent.maintenance.retained(state(root, "maintenance-before"), observed, paused=True)
     deployment = observed["deployment"]

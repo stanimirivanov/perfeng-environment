@@ -73,4 +73,5 @@ source "$source_dir/adoption-parent.sh"
 if [[ ${scenario:-} == initial ]]; then
   schema_parent_retention final
   runtime_grant_retention complete
+  qualification_retention final
 fi

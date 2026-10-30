@@ -66,14 +66,21 @@ def execution(
     rollback: bool = False,
     diagnostic: str = "",
     retained_admission: bool = False,
+    qualification: bool = False,
 ) -> dict[str, Any]:
     """Require actual native stages, authority, provenance and fixed owner Job."""
-    assert workflow["metadata"]["namespace"] == "argo-workflows"
-    assert workflow["spec"]["workflowTemplateRef"] == {
-        "name": "perfeng-release-runtime-grants-v2"
+    assert not qualification or (retained_admission and not any((denied, contention, rollback)))
+    operation = "qualify" if qualification else "grant"
+    leaf = "schema-qualification" if qualification else "runtime-grants"
+    parent_template = (
+        "perfeng-release-schema-qualification-v1"
+        if qualification
+        else "perfeng-release-runtime-grants-v2"
         if retained_admission
         else "perfeng-release-runtime-grants-v1"
-    }
+    )
+    assert workflow["metadata"]["namespace"] == "argo-workflows"
+    assert workflow["spec"]["workflowTemplateRef"] == {"name": parent_template}
     assert not workflow["spec"].get("shutdown")
     assert sum((denied, contention, rollback)) <= 1
     sql_failure = contention or rollback
@@ -85,7 +92,7 @@ def execution(
     named, outputs = parent.maintenance.readiness.named, parent.maintenance.readiness.outputs
     sequence = [
         named(workflow, name, "Steps") if name == "preflight" else named(workflow, name)
-        for name in ("preflight", "task-selection", "migration-intent", "quiescence", "grant")
+        for name in ("preflight", "task-selection", "migration-intent", "quiescence", operation)
     ]
     for node, reference, template in zip(
         sequence,
@@ -94,7 +101,7 @@ def execution(
             "perfeng-release-task-selection-v3",
             "perfeng-release-schema-migration-v1",
             "perfeng-verify-release-quiescence-v3",
-            "perfeng-runtime-grants-job-v1",
+            "perfeng-" + leaf + "-job-v1",
         ),
         ("preflight", "run", "migration-intent", "run", "run"),
         strict=True,
@@ -157,7 +164,7 @@ def execution(
         "task-selection",
         "migration-intent",
         "quiescence",
-        "grant",
+        operation,
     }
     if retained_admission:
         expected_nodes |= {
@@ -179,7 +186,9 @@ def execution(
         assert node["phase"] in ({"Failed", "Error"} if failed else {"Succeeded"})
     uid = workflow["metadata"]["uid"]
     assert uid and not workflow["metadata"].get("deletionTimestamp")
-    expected_name = "perfeng-runtime-grants-" + uid
+    expected_name = (
+        "perfeng-schema-qualify-" if qualification else "perfeng-runtime-grants-"
+    ) + uid
     if denied:
         assert job is None and pods["items"] == []
         values = {
@@ -203,9 +212,9 @@ def execution(
             "requestDigest": parameters["request-sha256"],
         }
     assert isinstance(job, dict)
-    manifest = yaml.safe_load((parent.DIRECTORY / "runtime-grants-job-v1.yaml").read_text())[
-        "spec"
-    ]["templates"][0]["resource"]["manifest"]
+    manifest = yaml.safe_load((parent.DIRECTORY / (leaf + "-job-v1.yaml")).read_text())["spec"][
+        "templates"
+    ][0]["resource"]["manifest"]
     for key, value in {"uid": uid, **{"parameters." + k: v for k, v in parameters.items()}}.items():
         manifest = manifest.replace("{{workflow." + key + "}}", value)
     expected = yaml.safe_load(manifest)
@@ -289,7 +298,7 @@ def execution(
         assert security.get("procMount", "Default") == "Default"
     assert pod["status"]["phase"] == ("Failed" if sql_failure else "Succeeded")
     statuses = pod["status"]["containerStatuses"]
-    assert len(statuses) == 1 and statuses[0]["name"] == "grant"
+    assert len(statuses) == 1 and statuses[0]["name"] == operation
     assert (
         statuses[0]["state"]["terminated"]["exitCode"] == (1 if sql_failure else 0)
         and statuses[0].get("restartCount", 0) == 0
@@ -309,7 +318,9 @@ def execution(
             json.loads(values["checkpoint"]) == checkpoint and values["job-name"] == expected_name
         )
     return {
-        "decision": "owner-grant-rollback-refused"
+        "decision": "schema-qualification-parent-verified"
+        if qualification
+        else "owner-grant-rollback-refused"
         if rollback
         else "owner-grant-contention-refused"
         if contention
@@ -317,7 +328,7 @@ def execution(
         "workflowUID": uid,
         "jobUID": job["metadata"]["uid"],
         "requestDigest": parameters["request-sha256"],
-        **({"parentTemplate": "perfeng-release-runtime-grants-v2"} if retained_admission else {}),
+        **({"parentTemplate": parent_template} if retained_admission else {}),
     }
 
 
