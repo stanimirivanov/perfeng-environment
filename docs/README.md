@@ -59,6 +59,9 @@ and [ADR 0062](decisions/0062-stage-retained-schema-admission.md). It preserves
 bootstrap v1; ledger get installation and live acceptance remain explicit.
 [ADR 0063](decisions/0063-exercise-retained-schema-admission.md) defines the
 bounded initial-job null-current/refusal and repeat acceptance, with live proof post-merge.
+The [grants-v2 guide](release-runtime-grants.md#retained-baseline-admission-in-v2)
+and [ADR 0064](decisions/0064-stage-retained-runtime-grant-admission.md) cover reuse
+of the same admission leaves for staged owner grants; live grant-v2 proof remains separate.
 
 ## Canonical collections
 

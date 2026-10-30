@@ -1731,6 +1731,18 @@ This does not establish ambiguous-commit recovery or authorize local execution.
 
 ### Staged runtime grant worker refuses input or authority
 
+Staged runtime-grants v2 shares schema-v2 admission leaves but does not migrate
+the schema ([ADR 0064](decisions/0064-stage-retained-runtime-grant-admission.md)).
+For a grants-v2 admission failure, inspect candidate, pointer, receipt, accepted
+bytes, quiescence, receipt-stable and admission before the grant node. Confirm the
+existing grants identity has the explicitly installed standalone
+`gitops/release-workflows-bootstrap/runtime-grants-ledger-access.yaml`; its absence
+must fail ledger reads. Do not substitute the migration ServiceAccount, add ledger
+writes, overwrite records, fall back to v1, retry nodes or resume service as repair.
+Schema/role qualification remains independent. V2 is staged only; existing CI
+grant cases remain v1 and do not prove its complete parent. See the
+[v2 grants guide](release-runtime-grants.md#retained-baseline-admission-in-v2).
+
 For `grant-parent-adopted` or `grant-adopted-runtime`, inspect the private
 `grant-adopted-*` snapshots, owner Job and `runtime-grants-adopted` probe. The
 upgrade request must name the accepted receipt/pointer digest as expectedCurrent;
