@@ -20,9 +20,20 @@ SOURCES = (
 )
 
 
-def sources(templates: dict[str, Any], sql: dict[str, Any], intent: dict[str, Any]) -> Any:
+def sources(
+    templates: dict[str, Any],
+    sql: dict[str, Any],
+    intent: dict[str, Any],
+    *,
+    retained_admission: bool = False,
+) -> Any:
     """Validate unchanged published declarations and retain their exact identities."""
-    expected = [yaml.safe_load((parent.DIRECTORY / name).read_text()) for name in SOURCES]
+    paths = (
+        (*SOURCES, "release-runtime-grants-v2.yaml", "release-schema-migration-v2.yaml")
+        if retained_admission
+        else SOURCES
+    )
+    expected = [yaml.safe_load((parent.DIRECTORY / name).read_text()) for name in paths]
     actual = {obj["metadata"]["name"]: obj for obj in templates["items"]}
     assert len(actual) == len(templates["items"]) == len(expected)
     assert set(actual) == {obj["metadata"]["name"] for obj in expected}
@@ -54,14 +65,20 @@ def execution(
     contention: bool = False,
     rollback: bool = False,
     diagnostic: str = "",
+    retained_admission: bool = False,
 ) -> dict[str, Any]:
     """Require actual native stages, authority, provenance and fixed owner Job."""
     assert workflow["metadata"]["namespace"] == "argo-workflows"
-    assert workflow["spec"]["workflowTemplateRef"] == {"name": "perfeng-release-runtime-grants-v1"}
+    assert workflow["spec"]["workflowTemplateRef"] == {
+        "name": "perfeng-release-runtime-grants-v2"
+        if retained_admission
+        else "perfeng-release-runtime-grants-v1"
+    }
     assert not workflow["spec"].get("shutdown")
     assert sum((denied, contention, rollback)) <= 1
     sql_failure = contention or rollback
     failed_job = denied or sql_failure
+    assert not retained_admission or not failed_job
     assert workflow["status"]["phase"] in ({"Failed", "Error"} if failed_job else {"Succeeded"})
     args = workflow["spec"]["arguments"]["parameters"]
     assert len(args) == 4 and {p["name"]: p["value"] for p in args} == parameters
@@ -86,7 +103,28 @@ def execution(
             {"Failed", "Error"} if failed_job and node is sequence[-1] else {"Succeeded"}
         )
         assert node["templateRef"] == {"name": reference, "template": template}
-    parent.ordered(sequence)
+    if retained_admission:
+        ordered = [*sequence[:3]]
+        for name in (
+            "candidate",
+            "pointer",
+            "receipt",
+            "accepted-bytes",
+            "quiescence",
+            "receipt-stable",
+            "admission",
+        ):
+            node = named(workflow, name)
+            if name != "quiescence":
+                assert node["templateRef"] == {
+                    "name": "perfeng-release-schema-migration-v2",
+                    "template": name,
+                }
+            assert node["phase"] == "Succeeded"
+            ordered.append(node)
+        parent.ordered([*ordered, sequence[-1]])
+    else:
+        parent.ordered(sequence)
     result = outputs(sequence[0])["result"]
     checkpoint = outputs(sequence[3])["result"]
     for value, schema in (
@@ -112,7 +150,7 @@ def execution(
         (o["kind"], o["metadata"]["name"], o["metadata"]["uid"]) for o in resources
     }
     nodes = [n for n in workflow["status"]["nodes"].values() if n["type"] == "Pod"]
-    assert len(nodes) == 7 and {n["displayName"] for n in nodes} == {
+    expected_nodes = {
         "validate-schema",
         "cluster-uid",
         "verify-identities",
@@ -121,6 +159,16 @@ def execution(
         "quiescence",
         "grant",
     }
+    if retained_admission:
+        expected_nodes |= {
+            "candidate",
+            "pointer",
+            "receipt",
+            "accepted-bytes",
+            "receipt-stable",
+            "admission",
+        }
+    assert len(nodes) == len(expected_nodes) and {n["displayName"] for n in nodes} == expected_nodes
     assert len(workers) == len(nodes) and len({w["uid"] for w in workers}) == len(workers)
     assert {w["nodeID"] for w in workers} == {n["id"] for n in nodes}
     for node in nodes:
@@ -269,6 +317,7 @@ def execution(
         "workflowUID": uid,
         "jobUID": job["metadata"]["uid"],
         "requestDigest": parameters["request-sha256"],
+        **({"parentTemplate": "perfeng-release-runtime-grants-v2"} if retained_admission else {}),
     }
 
 
@@ -396,6 +445,7 @@ def main() -> None:
             load(f"grant-{label}.templates.json"),
             load(f"grant-{label}.sql.json"),
             load(f"grant-{label}.intent.json"),
+            retained_admission=label.startswith("adopted") or label == "retained-v2",
         )
 
     if mode in {"retained", "retained-adopted"}:
@@ -404,7 +454,7 @@ def main() -> None:
         labels = ["denied", *job_labels]
         if adopted:
             job_labels.append("adopted")
-            labels.append("adopted")
+            labels.extend(("adopted-null", "adopted"))
         jobs = load("grant-retained.jobs.json")["items"]
         originals = [load(f"grant-{label}.job.json") for label in job_labels]
         assert (
@@ -421,7 +471,7 @@ def main() -> None:
                 failed=job["metadata"]["uid"] in {j["metadata"]["uid"] for j in originals[:2]},
             )
         workflows = [load(f"grant-{label}.workflow.json") for label in labels]
-        assert len({w["metadata"]["uid"] for w in workflows}) == (7 if adopted else 6)
+        assert len({w["metadata"]["uid"] for w in workflows}) == (8 if adopted else 6)
         for label, workflow in zip(labels, workflows, strict=True):
             current = load(f"grant-{label}.retained-workflow.json")
             assert install.inventory({"items": [workflow]}) == install.inventory(
@@ -430,11 +480,13 @@ def main() -> None:
             assert current["status"]["phase"] == workflow["status"]["phase"]
             assert current["status"]["phase"] in (
                 {"Failed", "Error"}
-                if label in {"denied", "contention", "rollback"}
+                if label in {"denied", "contention", "rollback", "adopted-null"}
                 else {"Succeeded"}
             )
             assert (
-                installed(label + "-before") == installed(label + "-after") == installed("retained")
+                installed(label + "-before")
+                == installed(label + "-after")
+                == installed("retained-v2" if label.startswith("adopted") else "retained")
             )
         assert (
             (root / "grant-first-after.acl.json").read_bytes()

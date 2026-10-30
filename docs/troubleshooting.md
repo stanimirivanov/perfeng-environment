@@ -1739,8 +1739,18 @@ existing grants identity has the explicitly installed standalone
 `gitops/release-workflows-bootstrap/runtime-grants-ledger-access.yaml`; its absence
 must fail ledger reads. Do not substitute the migration ServiceAccount, add ledger
 writes, overwrite records, fall back to v1, retry nodes or resume service as repair.
-Schema/role qualification remains independent. V2 is staged only; existing CI
-grant cases remain v1 and do not prove its complete parent. See the
+Schema/role qualification remains independent. Bootstrap/fault/correction CI
+cases remain v1; only the adopted initial window now uses v2 ([ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md)).
+Inspect `grant-adopted-v2-setup`, `grant-parent-adopted-null`,
+`grant-parent-adopted` and `grant-adopted-runtime`. Null-current refusal requires
+candidate main exit 2 after successful input/intent gates, no later worker/Job
+or successful parent output, unchanged Job inventory and retained state. Failed
+or Error candidate phase alone is insufficient. Permission, startup, hash and
+timeout errors must stop acceptance. Fresh retained Workflows must still contain
+their exact ordered admission proof, with unchanged source/authority identities,
+ACL/data and runtime probe success before recovery/final publication. Complete
+retention requires six Jobs/eight Workflows; bootstrap stays five/six. No v1
+fallback or implicit repair is allowed. Full live proof is post-merge main-only. See the
 [v2 grants guide](release-runtime-grants.md#retained-baseline-admission-in-v2).
 
 For `grant-parent-adopted` or `grant-adopted-runtime`, inspect the private

@@ -7,9 +7,16 @@ set -euo pipefail
 declare -F k a sql schema_install_snapshot runtime_data_snapshot runtime_acl_snapshot > /dev/null || exit 2
 
 grant_sources() {
-  k -n argo-workflows get workflowtemplates perfeng-release-runtime-grants-v1 perfeng-runtime-grants-job-v1 perfeng-release-schema-migration-v1 perfeng-schema-migration-job-v1 perfeng-release-preflight-v3 perfeng-release-task-selection-v3 perfeng-verify-release-quiescence-v3 -o json > "$fixture/grant-$1.templates.json"
+  local label=$1 scope=${2:-bootstrap}
+  local -a templates=(perfeng-release-runtime-grants-v1 perfeng-runtime-grants-job-v1 perfeng-release-schema-migration-v1 perfeng-schema-migration-job-v1 perfeng-release-preflight-v3 perfeng-release-task-selection-v3 perfeng-verify-release-quiescence-v3)
+  [[ $scope == bootstrap || $scope == adopted ]] || return 2
+  if [[ $scope == adopted ]]; then templates+=(perfeng-release-runtime-grants-v2 perfeng-release-schema-migration-v2); fi
+  k -n argo-workflows get workflowtemplates "${templates[@]}" -o json > "$fixture/grant-$label.templates.json"
   k -n perf-platform get configmap perfeng-runtime-grants-sql-v1 -o json > "$fixture/grant-$1.sql.json"
   k -n argo-workflows get configmap perfeng-schema-migration-intent-v1 -o json > "$fixture/grant-$1.intent.json"
+  if [[ $scope == adopted ]]; then
+    k -n perfeng-release-ledger get role/release-runtime-grants rolebinding/release-runtime-grants -o json > "$fixture/grant-$label.ledger.json"
+  fi
 }
 grant_snapshot() {
   local label=$1
@@ -24,25 +31,34 @@ grant_snapshot() {
 
 runtime_grant_parent() {
   local label=$1 previous=$current_stage name uid rc parameters="$fixture/parent-parameters.json"
-  [[ $label == denied || $label == contention || $label == rollback || $label == first || $label == repeat || $label == corrected || $label == adopted ]] || return 2
+  local template=perfeng-release-runtime-grants-v1 wait_limit=1230s
+  [[ $label == denied || $label == contention || $label == rollback || $label == first || $label == repeat || $label == corrected || $label == adopted-null || $label == adopted ]] || return 2
   start_stage "grant-parent-$label"
-  if [[ $label == adopted ]]; then
-    parameters="$fixture/upgrade-request-parameters.json"
-    adopted_grant_snapshot before
-    PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_adopted.py" before "$fixture" "$results"
+  if [[ $label == adopted || $label == adopted-null ]]; then
+    template=perfeng-release-runtime-grants-v2; wait_limit=1830s
+    if [[ $label == adopted ]]; then
+      parameters="$fixture/upgrade-request-parameters.json"
+      adopted_grant_snapshot before
+      PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_adopted.py" before "$fixture" "$results"
+    else
+      adopted_grant_snapshot null-before
+      PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_adopted.py" before-null "$fixture" "$results"
+    fi
   else
     grant_snapshot "$label-before"
     PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_parent.py" "before-$label" "$fixture" "$results"
   fi
-  name=$(a submit --from workflowtemplate/perfeng-release-runtime-grants-v1 --parameter-file "$parameters" -o json | jq -er .metadata.name)
-  if timeout 1230s argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$name" > "$fixture/grant-$label.wait.private" 2>&1; then rc=0; else rc=$?; fi
+  name=$(a submit --from "workflowtemplate/$template" --parameter-file "$parameters" -o json | jq -er .metadata.name)
+  if timeout "$wait_limit" argo --kubeconfig "$KUBECONFIG" --context kind-perfeng-local --namespace argo-workflows wait "$name" > "$fixture/grant-$label.wait.private" 2>&1; then rc=0; else rc=$?; fi
   a get "$name" -o json > "$fixture/grant-$label.workflow.json"
   uid=$(jq -er .metadata.uid "$fixture/grant-$label.workflow.json")
   k -n argo-workflows get pods -l "workflows.argoproj.io/workflow=$name" -o json > "$fixture/grant-$label.workflow-pods.json"
   jq '[.items[]|{uid:.metadata.uid,nodeID:.metadata.annotations["workflows.argoproj.io/node-id"],account:.spec.serviceAccountName,exitCode:([.status.containerStatuses[]?|select(.name=="main")|.state.terminated.exitCode][0])}]' "$fixture/grant-$label.workflow-pods.json" > "$fixture/grant-$label.workers.json"
   k -n perf-platform get job "perfeng-runtime-grants-$uid" --ignore-not-found -o json | jq -s '.[0] // null' > "$fixture/grant-$label.job.json"
   k -n perf-platform get pods -l "batch.kubernetes.io/job-name=perfeng-runtime-grants-$uid" -o json > "$fixture/grant-$label.pods.json"
-  if [[ $label == denied ]]; then
+  if [[ $label == adopted-null ]]; then
+    [[ $rc != 0 && $rc != 124 && $rc != 137 ]]
+  elif [[ $label == denied ]]; then
     [[ $rc != 0 && $rc != 124 && $rc != 137 ]]
     local node pod
     node=$(jq -er '[.status.nodes[]|select(.displayName=="grant" and .type=="Pod" and (.phase=="Failed" or .phase=="Error"))]|if length==1 then .[0].id else error("expected one denied create") end' "$fixture/grant-denied.workflow.json")
@@ -64,7 +80,10 @@ runtime_grant_parent() {
     printf '%s\n' '[RUNTIME-GRANT-PARENT] Parent did not succeed. Inspect private grant case evidence and stage reports; no retry, correction or activation was performed.' >&2
     return 1
   fi
-  if [[ $label == adopted ]]; then
+  if [[ $label == adopted-null ]]; then
+    adopted_grant_snapshot null-after
+    PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_adopted.py" verify-null "$fixture" "$results"
+  elif [[ $label == adopted ]]; then
     adopted_grant_snapshot after
     PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_adopted.py" verify "$fixture" "$results"
   else
@@ -79,13 +98,14 @@ runtime_grant_retention() {
   local label name scope=$1 verification=retained
   local -a labels=(denied contention rollback first repeat corrected)
   [[ $scope == bootstrap || $scope == complete ]] || return 2
-  if [[ $scope == complete ]]; then labels+=(adopted); verification=retained-adopted; fi
+  if [[ $scope == complete ]]; then labels+=(adopted-null adopted); verification=retained-adopted; fi
   k -n perf-platform get jobs -l app.kubernetes.io/name=perfeng-runtime-grants -o json > "$fixture/grant-retained.jobs.json"
   for label in "${labels[@]}"; do
     name=$(jq -er .metadata.name "$fixture/grant-$label.workflow.json")
     a get "$name" -o json > "$fixture/grant-$label.retained-workflow.json"
   done
   grant_sources retained
+  if [[ $scope == complete ]]; then grant_sources retained-v2 adopted; fi
   k -n perf-platform get role/release-runtime-grants -o json > "$fixture/grant-denied.role-final.json"
   runtime_grant_access false
   PYTHONPATH=. uv run --locked --offline python "$source_dir/runtime_grants_denial.py" final "$fixture"

@@ -117,11 +117,23 @@ Installation also extends v1's identity, and existing Job-create authority remai
 trusted-operator authority. The gate is not an atomic lease or multi-user boundary;
 independent schema qualification, backup/drain/operator exclusion still apply.
 
-Existing CI scenarios continue using v1. Complete-parent v2 live acceptance is a
-separate approved slice; this change performs no local/live execution or CI
-selection/authorization/budget change. Focused shared-policy/wiring/authority
-tests, staged rendering and pinned Argo lint cover composition. Heavy full checks
-stay on PR CI. Operational cutover and measured host-script retirement remain open.
+V1 remains the bootstrap/fault/correction CI path. [ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md)
+now wires unchanged v2 into only the existing adopted/paused initial window,
+after schema acceptance and before existing recovery. Explicitly install the
+reviewed ledger-get grant and v2 definition and check effective named reads using
+the grants identity and existing impersonation groups. First submit the existing
+initial request: require successful preflight/selection/intent and candidate main
+exit 2 for null expectedCurrent, no later workers/native Job/output, unchanged
+Job inventory and state. Then reuse the existing upgrade request, adopted grant
+Job and runtime TCP probe, requiring all ordered v2 gates and unchanged ACLs/data.
+
+Before recovery and final publication, re-read both parent Workflows, the native
+Job/probe and installed source/authority identities and revalidate their actual
+native proof. Bootstrap retention stays five Jobs/six Workflows; complete
+retention is six Jobs/eight Workflows. No extra SQL Job, fault, recovery or Pod
+replacement is introduced. The v2 wait matches its published deadline; the CI job
+budget remains unchanged. Heavy full checks stay on PR CI and full live proof
+is post-merge main-only. No local execution or host cutover is authorized.
 
 ## Failure, inspection and acceptance status
 
@@ -182,7 +194,8 @@ CI binds the pinned upgrade request's expectedCurrent to the original receipt/
 pointer, requires real ordered gates and a fresh native Job/runtime TCP probe,
 and preserves ACLs, SQL/S3 data, ledger and workload/storage identities. Recovery
 stays blocked until all gates pass. Final retention explicitly requires six
-native Jobs/seven parent Workflows and the additional probe; bootstrap retention
+native Jobs/eight parent Workflows (including v2 null-current refusal) and the additional probe; bootstrap retention
 remains five/six. There is no new fault, recovery or production admission.
-This establishes v1 bootstrap and adopted/paused grant acceptance, not v2 live admission, production cutover or ambiguous-commit recovery. Supported host
+ADR 0065 changes only the adopted run to v2 and adds the no-Job refusal described
+above. Full v2 live proof remains post-merge; this is not production cutover or ambiguous-commit recovery. Supported host
 commands and retirement counts remain unchanged.

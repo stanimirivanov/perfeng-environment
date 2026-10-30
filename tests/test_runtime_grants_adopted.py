@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from copy import deepcopy
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -52,7 +53,7 @@ def populate(root, results):
         for key, value in observed.items():
             save(prefix + "." + ("server-pods" if key == "serverPod" else key) + ".json", value)
     baseline = MODULE.state(root, "schema-parent-baseline")
-    for label in ("before", "after", "observed"):
+    for label in ("before", "after", "observed", "null-before", "null-after"):
         for key, value in baseline.items():
             save(
                 f"grant-adopted-{label}."
@@ -69,12 +70,15 @@ def populate(root, results):
         )
         for suffix in ("templates", "sql", "intent"):
             save(f"grant-adopted-{label}.{suffix}.json", load(f"grant-first-before.{suffix}.json"))
+        save(f"grant-adopted-{label}.jobs.json", load("grant-retained.jobs.json"))
     for suffix in MODULE.PERSISTENT:
         for prefix in (
             "schema-parent-baseline",
             "grant-adopted-before",
             "grant-adopted-after",
             "grant-adopted-observed",
+            "grant-adopted-null-before",
+            "grant-adopted-null-after",
         ):
             (root / f"{prefix}.{suffix}").write_text("stable SQL/S3 fixture " + suffix)
 
@@ -85,6 +89,29 @@ def populate(root, results):
     workflow["spec"]["arguments"]["parameters"] = [
         {"name": k, "value": v} for k, v in parameters.items()
     ]
+    workflow["spec"]["workflowTemplateRef"]["name"] = "perfeng-release-runtime-grants-v2"
+    schema_nodes = schema.evidence("first", retained_admission=True)[1]["status"]["nodes"]
+    for stage in (
+        "candidate",
+        "pointer",
+        "receipt",
+        "accepted-bytes",
+        "receipt-stable",
+        "admission",
+    ):
+        workflow["status"]["nodes"][stage] = deepcopy(schema_nodes[stage])
+        workflow["status"]["nodes"][stage]["templateRef"] = {
+            "name": "perfeng-release-schema-migration-v2",
+            "template": stage,
+        }
+    workflow["status"]["nodes"]["quiescence"].update(
+        startedAt=schema_nodes["quiescence"]["startedAt"],
+        finishedAt=schema_nodes["quiescence"]["finishedAt"],
+    )
+    workflow["status"]["nodes"]["grant"].update(
+        startedAt=schema_nodes["migrate"]["startedAt"],
+        finishedAt=schema_nodes["migrate"]["finishedAt"],
+    )
     for name in ("preflight", "quiescence"):
         value = workflow["status"]["nodes"][name]["outputs"]["parameters"][0]
         record = json.loads(value["value"])
@@ -113,7 +140,9 @@ def populate(root, results):
     job = yaml.safe_load(manifest)
     job["metadata"].update(
         uid="adopted-job",
-        creationTimestamp=load("grant-repeat.job.json")["metadata"]["creationTimestamp"],
+        creationTimestamp=(
+            datetime.fromisoformat(schema_nodes["migrate"]["startedAt"]) + timedelta(seconds=1)
+        ).isoformat(),
     )
     job["status"] = {"succeeded": 1, "conditions": [{"type": "Complete", "status": "True"}]}
     pods = load("grant-repeat.pods.json")
@@ -125,7 +154,19 @@ def populate(root, results):
         ("workflow", workflow),
         ("current-workflow", workflow),
         ("retained-workflow", workflow),
-        ("workers", load("grant-repeat.workers.json")),
+        (
+            "workers",
+            [
+                {
+                    "uid": "worker-" + n["id"],
+                    "nodeID": n["id"],
+                    "account": "release-runtime-grants",
+                    "exitCode": 0,
+                }
+                for n in workflow["status"]["nodes"].values()
+                if n["type"] == "Pod"
+            ],
+        ),
         ("job", job),
         ("current-job", job),
         ("pods", pods),
@@ -158,6 +199,55 @@ def populate(root, results):
     save("grant-adopted.probe-retained-workflow.json", probe)
     save("grant-adopted.probe-retained-job.json", probe_job)
     (root / "grant-adopted.probe.private").write_text("runtime privilege policy verified\n")
+    null = schema.evidence("current-null")
+    null_workflow = null[1]
+    null_workflow["kind"] = "Workflow"
+    old_name = null_workflow["metadata"]["name"]
+    null_workflow["metadata"].update(
+        name="grant-adopted-null-ci", uid="00000000-0000-0000-0000-000000000098"
+    )
+    null_workflow["spec"]["workflowTemplateRef"]["name"] = "perfeng-release-runtime-grants-v2"
+    null_nodes = null_workflow["status"]["nodes"]
+    null_nodes["grant-adopted-null-ci"] = null_nodes.pop(old_name)
+    null_nodes["candidate"]["templateRef"] = {
+        "name": "perfeng-release-schema-migration-v2",
+        "template": "candidate",
+    }
+    for worker in null[2]:
+        worker["account"] = "release-runtime-grants"
+    for suffix, value in (
+        ("workflow", null_workflow),
+        ("current-workflow", null_workflow),
+        ("retained-workflow", null_workflow),
+        ("workers", null[2]),
+        ("job", None),
+        ("pods", {"items": []}),
+    ):
+        save(f"grant-adopted-null.{suffix}.json", value)
+    for label in ("before", "after", "observed", "retained", "null-before", "null-after"):
+        templates = load("grant-first-before.templates.json")
+        for filename in ("release-runtime-grants-v2.yaml", "release-schema-migration-v2.yaml"):
+            obj = yaml.safe_load((grants.MODULE.parent.DIRECTORY / filename).read_text())
+            obj["metadata"]["uid"] = obj["metadata"]["name"]
+            templates["items"].append(obj)
+        save(f"grant-adopted-{label}.templates.json", templates)
+        for suffix in ("sql", "intent"):
+            save(f"grant-adopted-{label}.{suffix}.json", load(f"grant-first-before.{suffix}.json"))
+        authority = list(
+            yaml.safe_load_all(
+                (
+                    schema.pause.ROOT
+                    / "gitops/release-workflows-bootstrap/runtime-grants-ledger-access.yaml"
+                ).read_text()
+            )
+        )
+        for obj in authority:
+            obj["metadata"]["uid"] = "grants-ledger-" + obj["kind"]
+        save(f"grant-adopted-{label}.ledger.json", {"items": authority})
+    for suffix in ("templates", "sql", "intent"):
+        save(f"grant-retained-v2.{suffix}.json", load(f"grant-adopted-retained.{suffix}.json"))
+    # The successful adopted fixture starts only after the real refusal checker.
+    run("verify-null", root, results)
 
 
 def run(mode, root, results):
@@ -166,6 +256,110 @@ def run(mode, root, results):
 
 
 class RuntimeGrantsAdoptedTests(unittest.TestCase):
+    def test_null_refusal_requires_exact_native_failure_no_later_work_and_unchanged_state(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            results = root / "results"
+            results.mkdir()
+            populate(root, results)
+            run("before-null", root, results)
+            for code in (None, 0, 1, 64):
+                path = root / "grant-adopted-null.workers.json"
+                raw = path.read_bytes()
+                value = json.loads(raw)
+                next(w for w in value if w["nodeID"] == "candidate")["exitCode"] = code
+                path.write_text(json.dumps(value))
+                with self.subTest(code=code), self.assertRaises(AssertionError):
+                    run("verify-null", root, results)
+                path.write_bytes(raw)
+            path = root / "grant-adopted-null.workflow.json"
+            raw = path.read_bytes()
+            value = json.loads(raw)
+            value["status"]["nodes"]["candidate"]["phase"] = "Error"
+            path.write_text(json.dumps(value))
+            run("verify-null", root, results)
+            path.write_bytes(raw)
+            for stage in ("pointer", "quiescence", "grant"):
+                value = json.loads(raw)
+                value["status"]["nodes"][stage] = {
+                    "id": stage,
+                    "displayName": stage,
+                    "type": "Pod",
+                    "phase": "Succeeded",
+                }
+                path.write_text(json.dumps(value))
+                with self.assertRaises(AssertionError):
+                    run("verify-null", root, results)
+                path.write_bytes(raw)
+            cases = (
+                ("grant-adopted-null.job.json", {"metadata": {"uid": "unexpected"}}),
+                ("grant-adopted-null.pods.json", {"items": [{"metadata": {"uid": "unexpected"}}]}),
+                ("grant-adopted-null-after.roles.json", {"roles": "changed-password"}),
+                ("grant-adopted-null-after.jobs.json", {"items": []}),
+            )
+            for name, value in cases:
+                path = root / name
+                raw = path.read_bytes()
+                path.write_text(json.dumps(value))
+                with self.subTest(name=name), self.assertRaises(AssertionError):
+                    run("verify-null", root, results)
+                path.write_bytes(raw)
+
+    def test_v2_execution_and_fresh_retention_cannot_reuse_missing_admission_proof(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            results = root / "results"
+            results.mkdir()
+            populate(root, results)
+            proof = root / "grant-adopted-null.verified.json"
+            raw_proof = proof.read_bytes()
+            proof.unlink()
+            with self.assertRaises(FileNotFoundError):
+                run("before", root, results)
+            proof.write_bytes(raw_proof)
+            path = root / "grant-adopted.workflow.json"
+            raw = path.read_bytes()
+            for mutate in (
+                lambda w: w["spec"]["workflowTemplateRef"].update(
+                    name="perfeng-release-runtime-grants-v1"
+                ),
+                lambda w: w["status"]["nodes"].pop("accepted-bytes"),
+                lambda w: w["status"]["nodes"]["admission"].update(
+                    startedAt=w["status"]["nodes"]["preflight"]["startedAt"]
+                ),
+            ):
+                value = json.loads(raw)
+                mutate(value)
+                path.write_text(json.dumps(value))
+                with self.assertRaises(AssertionError):
+                    run("verify", root, results)
+            path.write_bytes(raw)
+            run("verify", root, results)
+            run("complete", root, results)
+            cases = (
+                (
+                    "grant-adopted.current-workflow.json",
+                    lambda w: w["status"]["nodes"].pop("admission"),
+                ),
+                (
+                    "grant-adopted-null.current-workflow.json",
+                    lambda w: w["status"]["nodes"].pop("candidate"),
+                ),
+                (
+                    "grant-adopted-retained.ledger.json",
+                    lambda w: w["items"][0]["rules"][0]["verbs"].append("patch"),
+                ),
+            )
+            for name, mutate in cases:
+                path = root / name
+                raw = path.read_bytes()
+                value = json.loads(raw)
+                mutate(value)
+                path.write_text(json.dumps(value))
+                with self.subTest(name=name), self.assertRaises(AssertionError):
+                    run("retained", root, results)
+                path.write_bytes(raw)
+
     def test_final_retention_requires_adopted_execution_and_bootstrap_stays_strict(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -185,7 +379,7 @@ class RuntimeGrantsAdoptedTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 grants.run("retained", root, results)
             grants.run("retained-adopted", root, results)
-            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 7)
+            self.assertEqual(len(list(results.glob("grant-parent-*.outcome.json"))), 8)
 
     def test_candidate_must_name_the_accepted_current_release_before_submission(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -287,13 +481,24 @@ class RuntimeGrantsAdoptedTests(unittest.TestCase):
 fixture=$PWD; results=$PWD; source_dir=$PWD; current_stage=outer
 step() { echo "$1" >> trace; [[ $FAIL != "$1" ]]; }
 start_stage() { :; }; complete_stage() { step complete; }
-runtime_grant_parent() { step parent; }; runtime_probe() { step probe; }
+runtime_grant_parent() { if [[ $1 == adopted-null ]]; then step null-parent; else step parent; fi; }; runtime_probe() { step probe; }
+k() { step setup; }; schema_parent_ledger_access() { step access; }
 adopted_grant_snapshot() { step snapshot; }; uv() { step verified; }
 adopted_grant_retention() { step retained; }
 """
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for failure in ("pass", "parent", "probe", "snapshot", "verified", "retained"):
+            for failure in (
+                "pass",
+                "setup",
+                "access",
+                "null-parent",
+                "parent",
+                "probe",
+                "snapshot",
+                "verified",
+                "retained",
+            ):
                 case = root / failure
                 case.mkdir()
                 (case / "runtime-probe.log").write_text("runtime privilege policy verified\n")
@@ -330,7 +535,7 @@ start_stage() { :; }; complete_stage() { step complete; }
 adopted_grant_snapshot() { step "snapshot-$1"; }
 grant_snapshot() { step wrong-bootstrap; return 1; }
 a() { echo "a $*" >> trace; echo '{}'; }; k() { echo '{}'; }; jq() { echo native-id; }
-uv() { step "${5##*/}-$6"; }; timeout() { step wait; }
+uv() { step "${5##*/}-$6"; }; timeout() { step wait || return 1; return "${WAIT_EXIT:-0}"; }
 grant_sources() { :; }; runtime_grant_access() { :; }
 runtime_grant_contention_retention() { :; }; runtime_grant_rollback_retention() { :; }
 adopted_grant_retention() { step probe-retained; }
@@ -353,6 +558,21 @@ adopted_grant_retention() { step probe-retained; }
                 )
             ]
             cases += [
+                ("null-pass", native, "runtime_grant_parent adopted-null", "pass", 0),
+                (
+                    "null-before",
+                    native,
+                    "runtime_grant_parent adopted-null",
+                    "runtime_grants_adopted.py-before-null",
+                    1,
+                ),
+                (
+                    "null-unverified",
+                    native,
+                    "runtime_grant_parent adopted-null",
+                    "runtime_grants_adopted.py-verify-null",
+                    1,
+                ),
                 ("bootstrap", retained, "runtime_grant_retention bootstrap", "pass", 0),
                 ("complete", retained, "runtime_grant_retention complete", "pass", 0),
                 ("probe-failed", retained, "runtime_grant_retention complete", "probe-retained", 1),
@@ -366,7 +586,12 @@ adopted_grant_retention() { step probe-retained; }
                 result = subprocess.run(
                     [str(BASH), str(script)],
                     cwd=case,
-                    env={**os.environ, "FAIL": failure, "BASH_ENV": ""},
+                    env={
+                        **os.environ,
+                        "FAIL": failure,
+                        "BASH_ENV": "",
+                        "WAIT_EXIT": "1" if label.startswith("null-") else "0",
+                    },
                     capture_output=True,
                     text=True,
                     timeout=15,
@@ -377,7 +602,12 @@ adopted_grant_retention() { step probe-retained; }
                     self.assertEqual("returned" in trace, code == 0)
                     if label == "native-pass":
                         self.assertIn("upgrade-request-parameters.json", trace)
+                        self.assertIn("workflowtemplate/perfeng-release-runtime-grants-v2", trace)
                         self.assertNotIn("wrong-bootstrap", trace)
+                    if label == "null-pass":
+                        self.assertIn("parent-parameters.json", trace)
+                        self.assertIn("workflowtemplate/perfeng-release-runtime-grants-v2", trace)
+                        self.assertNotIn("upgrade-request-parameters.json", trace)
                     if label == "native-runtime_grants_adopted.py-before":
                         self.assertNotIn("a submit", trace)
                     if label == "complete":

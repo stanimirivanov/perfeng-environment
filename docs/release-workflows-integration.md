@@ -446,8 +446,17 @@ remains post-merge, with no new fault or production change.
 The same initial job later exercises the unchanged grant parent against the real
 adopted/paused application, after schema-parent acceptance and before existing
 checked recovery ([ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)).
+Only that invocation now uses unchanged v2 ([ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md));
+v1 bootstrap/fault/correction runs remain unchanged. Explicitly install the existing
+grants ledger-get grant/v2 definition and require bounded named-read prerequisites
+under the grants identity. First submit the existing initial request to v2 and
+require successful preflight/selection/intent then candidate main exit 2 for null
+expectedCurrent. No later ledger/quiescence/grant worker, native Job/Pod or
+successful parent output is allowed; native Job inventory and paused state must
+remain unchanged. Candidate Failed/Error alone cannot qualify.
 Reuse upgrade-request parameters, checking expectedCurrent and receipt/pointer
-identity in CI before submission. Real ordered gates, a distinct owner Job,
+identity in CI before submission. The successful parent must prove actual ordered
+v2 admission references and outputs, a distinct owner Job,
 runtime TCP success and byte-identical ACLs must preserve schema/ledger/roles/
 credentials, SQL/S3 bytes and paused workload/storage identities. The accepted
 ledger is unchanged; this does not promote the candidate.
@@ -455,11 +464,16 @@ ledger is unchanged; this does not promote the candidate.
 Private `grant-adopted-*` snapshots and native/probe evidence are validated before
 recovery. The sixth runtime probe uses its existing runtime-only wrapper; its
 declaration, SQL-policy marker and identities remain checked through final gates.
-Parent/Job and probe identities are re-read before recovery as well as at final retention.
+Both parent Workflows, Job/probe identities and installed v2 source/ledger authority
+are re-read before recovery as well as at final retention. Required native nodes/
+outputs are revalidated from those fresh Workflow reads. The bootstrap source
+inventory remains strict; the adopted inventory additionally requires both v2
+parents and the explicit read-only ledger grant. The adopted wait matches v2's
+published 1,800-second deadline with a bounded 1,830-second wrapper.
 Bootstrap grant retention explicitly expects five Jobs/six parent Workflows;
-final retention requires six/seven and adopted evidence. Neither missing files
+final retention requires six/eight and adopted/null-refusal evidence. Neither missing files
 nor a failed probe may silently skip that requirement. Only final acceptance
-publishes `grant-parent-adopted.outcome.json`. The existing recovery/baseline
+publishes `grant-parent-adopted.outcome.json` and `grant-parent-adopted-null.outcome.json`. The existing recovery/baseline
 advance and Pod-replacement rules, other scenarios and CI budgets stay unchanged.
 
 Run offline checks with `make validate` and lint the CI wrapper alongside the
