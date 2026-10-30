@@ -1729,6 +1729,32 @@ Workflows remain retained; live proof is post-merge and heavy checks stay on CI.
 This does not establish ambiguous-commit recovery or authorize local execution.
 
 
+### Staged read-only schema qualification fails
+
+`perfeng-release-schema-qualification-v1` is staged only. Verify exact pinned
+inputs, retained-baseline admission and fresh quiescence before diagnosing its
+native Job. Use the existing grants identity and explicit Application/ledger-read
+bootstrap; do not add new authority or rotate credentials as repair. The Job uses
+only the fixed migration-owner URL, not the PostgreSQL administrator Secret.
+
+`[DATABASE_INPUT]` exits before psql when that connection contract differs.
+`[SCHEMA-QUALIFICATION]` means read-only SQL did not qualify the selected ledger
+or ownership. Missing/unknown/duplicate versions, wrong checksums, null/infinite
+timestamps, missing/foreign tables or owner authority must refuse. Permission,
+connection, SQL parsing or timeout errors also fail; they are not proof of any
+specific ledger defect. Inspect retained Job/Pod identities and private
+`/tmp/qualification.private` only with explicit authority; never expose raw
+credential/vendor output. Do not mutate the ledger, grant privileges, retry nodes,
+delete evidence or resume workloads to repair a failed check.
+
+Expected hashes come from raw selected upstream Git bytes. A source/inventory
+test failure requires inspecting the selected commit and immutable policy, not
+copying the CI fixture or updating published v1 in place. Success establishes
+only ledger/ownership observation, not complete DDL equivalence, a backup or a
+future mutation lease. Full PostgreSQL/controller/live refusal and retention
+proof remains separately approved work. See [schema qualification](release-schema-qualification.md)
+and [ADR 0066](decisions/0066-stage-read-only-schema-qualification.md).
+
 ### Staged runtime grant worker refuses input or authority
 
 Staged runtime-grants v2 shares schema-v2 admission leaves but does not migrate

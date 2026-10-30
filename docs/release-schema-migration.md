@@ -84,6 +84,12 @@ adoption or promotion. The selected binary executes all bundled migrations
 through 0018, not a caller-supplied single SQL file. The existing CI image-parity
 phase remains separate and has not exercised this complete parent.
 
+The separate [staged read-only qualification parent](release-schema-qualification.md)
+checks selected ledger hashes and ownership using upstream-byte-derived inputs
+([ADR 0066](decisions/0066-stage-read-only-schema-qualification.md)). It does not run
+automatically after migration, and its live proof is still required before use
+as an independently qualified preparation step. It does not prove full DDL equivalence.
+
 ## Retained-baseline admission in v2
 
 [ADR 0062](decisions/0062-stage-retained-schema-admission.md) adds

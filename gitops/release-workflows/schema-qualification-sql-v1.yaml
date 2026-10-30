@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: perfeng-schema-qualification-sql-v1
+  namespace: perf-platform
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '-2'
+    perfeng.io/source-revision: 2a74a20f69773fd9d43072e41668087612cdbf9e
+    perfeng.io/selected-image: ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3
+immutable: true
+data:
+  schema-qualification.sql: |
+    -- Expected ledger hashes come from the exact selected embedded migration bytes.
+    BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+    SET LOCAL lock_timeout = '5s';
+    SET LOCAL statement_timeout = '15s';
+    SET LOCAL idle_in_transaction_session_timeout = '15s';
+    SET LOCAL search_path = pg_catalog;
+    DO $qualification$
+    DECLARE
+      ledger_matches boolean;
+    BEGIN
+      IF current_setting('transaction_read_only') <> 'on'
+         OR current_setting('transaction_isolation') <> 'repeatable read' THEN
+        RAISE EXCEPTION 'Read-only repeatable qualification transaction required';
+      END IF;
+      IF current_user <> 'perfeng_migration' OR session_user <> 'perfeng_migration' THEN
+        RAISE EXCEPTION 'Qualification requires the migration owner connection';
+      END IF;
+      IF EXISTS (SELECT FROM pg_roles WHERE rolname=current_user
+                 AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)) THEN
+        RAISE EXCEPTION 'Migration owner has unexpected authority';
+      END IF;
+      IF NOT EXISTS (SELECT FROM pg_namespace WHERE nspname='perfeng_control'
+                     AND pg_get_userbyid(nspowner)=current_user) THEN
+        RAISE EXCEPTION 'Reviewed schema owner is missing';
+      END IF;
+      IF EXISTS (SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                 WHERE n.nspname='perfeng_control' AND pg_get_userbyid(c.relowner)<>current_user) THEN
+        RAISE EXCEPTION 'Schema contains an object owned by another identity';
+      END IF;
+      IF EXISTS (
+        SELECT FROM (VALUES ('runs'),('create_bindings'),('baselines'),('artifacts'),
+                     ('kubernetes_executions'),('reconciliation_leases'),
+                     ('benchmark_target_reservations'),('schema_migrations')) required(name)
+        LEFT JOIN pg_namespace n ON n.nspname='perfeng_control'
+        LEFT JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=required.name
+        WHERE c.oid IS NULL OR c.relkind<>'r' OR pg_get_userbyid(c.relowner)<>current_user
+      ) THEN
+        RAISE EXCEPTION 'Required migration-owned tables are missing';
+      END IF;
+      IF EXISTS (SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                 WHERE n.nspname='perfeng_control' AND c.relname='schema_migrations'
+                   AND (c.relrowsecurity OR c.relforcerowsecurity)) THEN
+        RAISE EXCEPTION 'Migration ledger row security can hide qualification inputs';
+      END IF;
+      WITH expected(version, sha256) AS (VALUES
+          ('0001_initial.sql', '8ee219d9d3a51f8c2fa35b783b6e80ca2ae28bd702a44195df095b8724e21e13'),
+          ('0002_reconciliation_leases.sql', 'b7f4e67072986bbd7e4d8cec9687640dfa485cfb82e01c383cda8dcb162c201c'),
+          ('0003_kubernetes_executions.sql', '4ea1ef03af7c3264b7ac6a6e42329ad9c91b0009e2994ca6458b7399e28dd0dc'),
+          ('0004_baselines.sql', 'a1abbb94ba85fc1bcd04845f753ec3dbc73d868f4f5bec81a8c08a7fee892329'),
+          ('0005_native_worker_presence.sql', 'a245aa670c36a6a28b4d6b9cef2b6bf33e37e6066c02aa888286354d3098cedc'),
+          ('0006_run_execution_targets.sql', '4580897fef0ddda42ac461c20720cb48e8090db461d9414d97b2e472d74e8b7f'),
+          ('0007_native_execution_leases.sql', '6e12e46e7156aa75e20216d58ef3c78f2e12fe0d5b9d0ce49b421000e530789d'),
+          ('0008_native_lease_releases.sql', '4e4844a398ebcd960a075e6cc2dc8fd027c7e89063bc89bbef08eba9ff1fdd76'),
+          ('0009_native_upload_grants.sql', 'b78df3f9cd52a9748c1252d72837635d00de7102abab9df56efe0cf5d6e0bc9b'),
+          ('0010_native_artifacts.sql', '693e2952336b1265243e7be853580d814ff079daecc43979e99212785c624407'),
+          ('0011_native_terminal_reports.sql', '6582c0cef8005e3e491e295153a8694fd133929de6fa540bb44ac24c99eb2e76'),
+          ('0012_native_artifact_formats.sql', 'b27d99abbecd0a9b76e03928fea8562dc1d9f11edf38bc48af9600f44a6f4d16'),
+          ('0013_native_worker_v2_presence.sql', '3d52f33f98aa325258be8c2d0d1a3b13df3bdb08454591e88ed2a24a1dc277be'),
+          ('0014_native_lease_protocol_version.sql', 'e9d0705426bca64ee37ad331f9b4e2a5706a7c7f877c750dc1fdefae25fd65df'),
+          ('0015_native_terminal_protocol_version.sql', 'cbd1c5c24cb84f1e798e005cf05301ead6b55d31bfa7374205b7e487a28dcd01'),
+          ('0016_native_worker_v2_acquisition.sql', 'd7040860e57078b706a71a25286371a27ada4141d6513782b78073c4b6f00f95'),
+          ('0017_benchmark_target_reservations.sql', 'e692c6732afb259ca8318cc095a9e73d349db6b4770c2a0a6827bd5fb594428f'),
+          ('0018_benchmark_cleanup.sql', '9dfbd2dcf4aefa2f3b312712eab950f384ff05d69eea18450916d2e9c2b650a7')
+      ), actual AS (
+        SELECT version, sha256, applied_at FROM perfeng_control.schema_migrations
+      )
+      SELECT (SELECT count(*) FROM actual)=18
+         AND (SELECT count(DISTINCT version COLLATE "C") FROM actual)=18
+         AND NOT EXISTS (
+           SELECT FROM expected e FULL OUTER JOIN actual a ON a.version COLLATE "C"=e.version COLLATE "C"
+           WHERE e.version IS NULL OR a.version IS NULL
+              OR a.sha256 COLLATE "C" IS DISTINCT FROM e.sha256 COLLATE "C"
+              OR a.applied_at IS NULL OR NOT isfinite(a.applied_at)
+         ) INTO ledger_matches;
+      IF ledger_matches IS DISTINCT FROM true THEN
+        RAISE EXCEPTION 'Selected migration ledger differs or has invalid application timestamps';
+      END IF;
+    END;
+    $qualification$;
+    COMMIT;
+  migration-inventory.json: |
+    {
+      "schemaVersion": 1,
+      "sourceRepository": "https://github.com/stanimirivanov/perfeng-control-plane.git",
+      "sourceRevision": "2a74a20f69773fd9d43072e41668087612cdbf9e",
+      "image": "ghcr.io/stanimirivanov/perfeng-control-plane@sha256:e251a378be0915c68f30c7c1e5fa523ecd6d3efaae996b430933718c19e9c3b3",
+      "migrations": {
+        "0001_initial.sql": "8ee219d9d3a51f8c2fa35b783b6e80ca2ae28bd702a44195df095b8724e21e13",
+        "0002_reconciliation_leases.sql": "b7f4e67072986bbd7e4d8cec9687640dfa485cfb82e01c383cda8dcb162c201c",
+        "0003_kubernetes_executions.sql": "4ea1ef03af7c3264b7ac6a6e42329ad9c91b0009e2994ca6458b7399e28dd0dc",
+        "0004_baselines.sql": "a1abbb94ba85fc1bcd04845f753ec3dbc73d868f4f5bec81a8c08a7fee892329",
+        "0005_native_worker_presence.sql": "a245aa670c36a6a28b4d6b9cef2b6bf33e37e6066c02aa888286354d3098cedc",
+        "0006_run_execution_targets.sql": "4580897fef0ddda42ac461c20720cb48e8090db461d9414d97b2e472d74e8b7f",
+        "0007_native_execution_leases.sql": "6e12e46e7156aa75e20216d58ef3c78f2e12fe0d5b9d0ce49b421000e530789d",
+        "0008_native_lease_releases.sql": "4e4844a398ebcd960a075e6cc2dc8fd027c7e89063bc89bbef08eba9ff1fdd76",
+        "0009_native_upload_grants.sql": "b78df3f9cd52a9748c1252d72837635d00de7102abab9df56efe0cf5d6e0bc9b",
+        "0010_native_artifacts.sql": "693e2952336b1265243e7be853580d814ff079daecc43979e99212785c624407",
+        "0011_native_terminal_reports.sql": "6582c0cef8005e3e491e295153a8694fd133929de6fa540bb44ac24c99eb2e76",
+        "0012_native_artifact_formats.sql": "b27d99abbecd0a9b76e03928fea8562dc1d9f11edf38bc48af9600f44a6f4d16",
+        "0013_native_worker_v2_presence.sql": "3d52f33f98aa325258be8c2d0d1a3b13df3bdb08454591e88ed2a24a1dc277be",
+        "0014_native_lease_protocol_version.sql": "e9d0705426bca64ee37ad331f9b4e2a5706a7c7f877c750dc1fdefae25fd65df",
+        "0015_native_terminal_protocol_version.sql": "cbd1c5c24cb84f1e798e005cf05301ead6b55d31bfa7374205b7e487a28dcd01",
+        "0016_native_worker_v2_acquisition.sql": "d7040860e57078b706a71a25286371a27ada4141d6513782b78073c4b6f00f95",
+        "0017_benchmark_target_reservations.sql": "e692c6732afb259ca8318cc095a9e73d349db6b4770c2a0a6827bd5fb594428f",
+        "0018_benchmark_cleanup.sql": "9dfbd2dcf4aefa2f3b312712eab950f384ff05d69eea18450916d2e9c2b650a7"
+      }
+    }

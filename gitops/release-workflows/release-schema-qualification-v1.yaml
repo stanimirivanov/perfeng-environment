@@ -1,0 +1,123 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-release-schema-qualification-v1
+  namespace: argo-workflows
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+spec:
+  serviceAccountName: release-runtime-grants
+  entrypoint: qualify
+  activeDeadlineSeconds: 1800
+  synchronization:
+    mutexes:
+    - name: perfeng-local-external-state
+  arguments:
+    parameters:
+    - name: request-revision
+    - name: request-path
+    - name: request-sha256
+    - name: selection-revision
+  templates:
+  - name: qualify
+    steps:
+    - - name: preflight
+        templateRef:
+          name: perfeng-release-preflight-v3
+          template: preflight
+    - - name: task-selection
+        templateRef:
+          name: perfeng-release-task-selection-v3
+          template: run
+        arguments:
+          parameters:
+          - name: preflight-result
+            value: '{{steps.preflight.outputs.parameters.result}}'
+          - name: expected-environment
+            value: perfeng-local
+          - name: expected-lock-path
+            value: deployments/local-control-plane.json
+          - name: expected-lock-digest
+            value: sha256:a0d206a41e14c06d2d019dbb0dda7c50e07f93a72d52e0cd6a0b76e7ec9601ec
+    - - name: migration-intent
+        templateRef:
+          name: perfeng-release-schema-migration-v1
+          template: migration-intent
+    - - name: candidate
+        templateRef:
+          name: perfeng-release-schema-migration-v2
+          template: candidate
+    - - name: pointer
+        templateRef:
+          name: perfeng-release-schema-migration-v2
+          template: pointer
+        arguments:
+          parameters:
+          - name: request
+            value: '{{steps.candidate.outputs.parameters.request}}'
+    - - name: receipt
+        templateRef:
+          name: perfeng-release-schema-migration-v2
+          template: receipt
+        arguments:
+          parameters:
+          - name: request
+            value: '{{steps.candidate.outputs.parameters.request}}'
+          - name: pointer
+            value: '{{steps.pointer.outputs.parameters.observation}}'
+    - - name: accepted-bytes
+        templateRef:
+          name: perfeng-release-schema-migration-v2
+          template: accepted-bytes
+        arguments:
+          parameters:
+          - name: request
+            value: '{{steps.candidate.outputs.parameters.request}}'
+          - name: receipt
+            value: '{{steps.receipt.outputs.parameters.observation}}'
+    - - name: quiescence
+        templateRef:
+          name: perfeng-verify-release-quiescence-v3
+          template: run
+        arguments:
+          parameters:
+          - name: preflight-result
+            value: '{{steps.preflight.outputs.parameters.result}}'
+    - - name: receipt-stable
+        templateRef:
+          name: perfeng-release-schema-migration-v2
+          template: receipt-stable
+        arguments:
+          parameters:
+          - name: pointer
+            value: '{{steps.pointer.outputs.parameters.observation}}'
+          - name: receipt
+            value: '{{steps.receipt.outputs.parameters.observation}}'
+    - - name: admission
+        templateRef:
+          name: perfeng-release-schema-migration-v2
+          template: admission
+        arguments:
+          parameters:
+          - name: request
+            value: '{{steps.candidate.outputs.parameters.request}}'
+          - name: pointer
+            value: '{{steps.pointer.outputs.parameters.observation}}'
+          - name: receipt
+            value: '{{steps.receipt.outputs.parameters.observation}}'
+          - name: checkpoint
+            value: '{{steps.quiescence.outputs.parameters.result}}'
+    - - name: qualify
+        templateRef:
+          name: perfeng-schema-qualification-job-v1
+          template: run
+    outputs:
+      parameters:
+      - name: checkpoint
+        valueFrom:
+          parameter: '{{steps.quiescence.outputs.parameters.result}}'
+      - name: job-name
+        valueFrom:
+          parameter: '{{steps.qualify.outputs.parameters.job-name}}'

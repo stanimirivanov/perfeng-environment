@@ -277,5 +277,9 @@ The [adopted grants-v2 acceptance slice](decisions/0065-exercise-adopted-runtime
 replaces only the existing adopted parent invocation and adds one no-Job refusal,
 with CI-only evidence/authority checks. No production definition or host command
 is added or retired; live proof stays post-merge and cutover remains separate.
+The [staged read-only qualification slice](decisions/0066-stage-read-only-schema-qualification.md)
+adds only native composition and immutable reviewed SQL/inventory, with no
+production Python or host command. Live proof and preparation composition remain
+separate; no retirement credit is claimed.
 All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.

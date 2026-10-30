@@ -37,8 +37,11 @@ activates workloads, repairs state or grants Kubernetes runtime authority.
 Complete the selected schema migration and its independent ledger/checksum
 qualification first. The Job checks required tables and ownership but does not
 replace schema qualification. V1 does not implement expectedCurrent admission;
-v2 uses the separately described retained-baseline gate. Externally prepared
-database roles, migration-url and release-git-read must already be verified.
+v2 uses the separately described retained-baseline gate.
+The [staged read-only qualification parent](release-schema-qualification.md)
+provides that bounded ledger/ownership capability separately; its live acceptance
+is still required and grants do not invoke it automatically.
+Externally prepared database roles, migration-url and release-git-read must already be verified.
 Schedule downtime, drain Runs, retain an appropriate backup and exclude competing
 operators/manual syncs; quiescence alone does not prove these prerequisites.
 
