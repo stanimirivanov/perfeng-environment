@@ -161,3 +161,4 @@ How will the assumptions and consequences be verified?
 | [0063](0063-exercise-retained-schema-admission.md) | Proposed | Exercise unchanged v2 null-current refusal and the existing two paused repeat Jobs with exact native admission/retention proof before grants/recovery. |
 | [0064](0064-stage-retained-runtime-grant-admission.md) | Proposed | Stage runtime-grants v2 using published schema-v2 admission leaves and explicit ledger-get authority, preserving v1 and deferring live acceptance/cutover. |
 | [0065](0065-exercise-adopted-runtime-grant-admission.md) | Proposed | Prove grants-v2 null-current refusal and the existing adopted native Job/runtime probe with fresh native/authority retention, preserving v1 bootstrap/fault cases. |
+| [0066](0066-stage-read-only-schema-qualification.md) | Proposed | Stage a fixed native read-only selected ledger/ownership qualification Job behind shared admission, with upstream-byte-derived inventory and no new authority. |

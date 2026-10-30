@@ -1,0 +1,131 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: perfeng-schema-qualification-job-v1
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: perfeng-environment
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  templates:
+  - name: run
+    activeDeadlineSeconds: 240
+    resource:
+      action: create
+      successCondition: status.succeeded > 0
+      failureCondition: status.failed > 0
+      flags:
+      - --request-timeout=10s
+      manifest: |
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: perfeng-schema-qualify-{{workflow.uid}}
+          namespace: perf-platform
+          labels:
+            app.kubernetes.io/managed-by: perfeng-environment
+            app.kubernetes.io/name: perfeng-schema-qualification
+            perfeng.io/workflow-uid: '{{workflow.uid}}'
+          annotations:
+            perfeng.io/request-revision: '{{workflow.parameters.request-revision}}'
+            perfeng.io/request-sha256: '{{workflow.parameters.request-sha256}}'
+            perfeng.io/selection-revision: '{{workflow.parameters.selection-revision}}'
+        spec:
+          backoffLimit: 0
+          activeDeadlineSeconds: 180
+          template:
+            spec:
+              serviceAccountName: default
+              automountServiceAccountToken: false
+              restartPolicy: Never
+              nodeSelector:
+                workload: control-plane
+              tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 999
+                runAsGroup: 999
+                fsGroup: 999
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+              - name: qualify
+                image: postgres:17.11-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+                imagePullPolicy: IfNotPresent
+                command:
+                - /bin/sh
+                - -eu
+                - -c
+                args:
+                - |
+                  set +x
+                  umask 077
+                  prefix='postgresql://perfeng_migration:'
+                  suffix='@postgres.perf-platform.svc.cluster.local:5432/perfeng?sslmode=disable'
+                  refuse() { echo '[DATABASE_INPUT] Migration URL differs from the reviewed local owner connection contract; inspect migration-url without rotating credentials.' >&2; exit 64; }
+                  case "${MIGRATION_URL:-}" in "$prefix"*"$suffix") ;; *) refuse ;; esac
+                  password=${MIGRATION_URL#"$prefix"}
+                  password=${password%"$suffix"}
+                  [ "${#password}" -eq 43 ] || refuse
+                  case "$password" in *[!A-Za-z0-9_-]*) refuse ;; esac
+                  unset PGHOSTADDR PGSERVICE PGSERVICEFILE PGOPTIONS PGPASSFILE
+                  export PGHOST=postgres.perf-platform.svc.cluster.local PGPORT=5432
+                  export PGDATABASE=perfeng PGUSER=perfeng_migration PGSSLMODE=disable
+                  export PGPASSWORD="$password"
+                  unset MIGRATION_URL password
+                  export PGOPTIONS='-c default_transaction_read_only=on'
+                  if psql -X -w -qAt -v ON_ERROR_STOP=1 -f /sql/schema-qualification.sql > /tmp/qualification.private 2>&1; then
+                    echo 'Selected migration ledger and ownership qualified.'
+                  else
+                    echo '[SCHEMA-QUALIFICATION] Read-only qualification failed; inspect retained Job state and private SQL diagnostics. No migration, grant, recovery or activation was performed.' >&2
+                    exit 1
+                  fi
+                env:
+                - name: MIGRATION_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: perfeng-control-plane-database
+                      key: migration-url
+                - name: PGCONNECT_TIMEOUT
+                  value: '10'
+                - name: PGAPPNAME
+                  value: perfeng-schema-qualification-v1
+                resources:
+                  requests:
+                    cpu: 25m
+                    memory: 32Mi
+                  limits:
+                    cpu: 250m
+                    memory: 128Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                    - ALL
+                volumeMounts:
+                - name: sql
+                  mountPath: /sql
+                  readOnly: true
+                - name: scratch
+                  mountPath: /tmp
+              volumes:
+              - name: sql
+                configMap:
+                  name: perfeng-schema-qualification-sql-v1
+                  items:
+                  - key: schema-qualification.sql
+                    path: schema-qualification.sql
+              - name: scratch
+                emptyDir:
+                  sizeLimit: 16Mi
+      setOwnerReference: false
+    outputs:
+      parameters:
+      - name: job-name
+        valueFrom:
+          jsonPath: '{.metadata.name}'

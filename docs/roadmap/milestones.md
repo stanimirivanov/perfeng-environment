@@ -739,6 +739,12 @@ the bootstrap/fault path. The initial adopted window now wires v2 null-current
 refusal and the existing grant Job/runtime probe, with fresh native/authority
 retention before recovery/final publication ([ADR 0065](../decisions/0065-exercise-adopted-runtime-grant-admission.md)).
 Full grants-v2 live proof remains post-merge main-only.
+The [staged schema qualification parent](../release-schema-qualification.md)
+now reuses that admission chain and authority for a fixed read-only native Job,
+with eighteen expected ledger hashes derived from selected upstream Git bytes
+([ADR 0066](../decisions/0066-stage-read-only-schema-qualification.md)). Actual SQL/
+complete-parent acceptance and migration/grant composition remain separate;
+ledger/ownership qualification does not establish full DDL equivalence or cutover.
 Ambiguous commits, general upgrades and
 operational cutover/host migration-grant retirement remain open.
 
