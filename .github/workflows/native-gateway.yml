@@ -18,21 +18,33 @@ jobs:
   linux-serving:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: perfeng-environment
     steps:
       - uses: actions/checkout@v7
         with:
+          path: perfeng-environment
           fetch-depth: 0
+          persist-credentials: false
+      - name: Check out pinned control-plane source for schema qualification
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/perfeng-control-plane
+          ref: 2a74a20f69773fd9d43072e41668087612cdbf9e
+          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
+          path: perfeng-control-plane
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version-file: .python-version
+          python-version-file: perfeng-environment/.python-version
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - uses: actions/setup-go@v7
         with:
-          go-version-file: native-gateway/build/go.mod
+          go-version-file: perfeng-environment/native-gateway/build/go.mod
           cache-dependency-path: |
-            native-gateway/build/go.sum
-            native-gateway/audit/go.sum
+            perfeng-environment/native-gateway/build/go.sum
+            perfeng-environment/native-gateway/audit/go.sum
       - run: uv sync --locked
       - name: Verify repository and real child ownership
         shell: bash
@@ -52,7 +64,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: verified-linux-gateway
-          path: .local/gateway-package/
+          path: perfeng-environment/.local/gateway-package/
           retention-days: 7
 
   publish:

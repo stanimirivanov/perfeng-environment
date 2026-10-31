@@ -273,7 +273,7 @@ class GatewayToolTests(unittest.TestCase):
                 self.assertNotIn("credential=", str(raised.exception))
                 self.assertEqual(build.return_value.open.call_count, 1)
 
-    def test_build_and_publisher_use_real_locked_windows_checks(self):
+    def test_build_and_publisher_use_real_locked_linux_checks(self):
         import yaml
 
         workflow = yaml.safe_load((tool.ROOT / ".github/workflows/native-gateway.yml").read_text())
@@ -284,7 +284,19 @@ class GatewayToolTests(unittest.TestCase):
         setup_go = next(
             step for step in build["steps"] if step.get("uses", "").startswith("actions/setup-go@")
         )
-        self.assertEqual(setup_go["with"]["go-version-file"], "native-gateway/build/go.mod")
+        self.assertEqual(
+            setup_go["with"]["go-version-file"], "perfeng-environment/native-gateway/build/go.mod"
+        )
+        self.assertEqual(build["defaults"]["run"]["working-directory"], "perfeng-environment")
+        checkout = next(
+            step
+            for step in build["steps"]
+            if step.get("with", {}).get("repository") == "stanimirivanov/perfeng-control-plane"
+        )
+        selected = json.loads((tool.ROOT / "deployments/local-control-plane.json").read_text())
+        self.assertEqual(checkout["with"]["ref"], selected["controlPlane"]["sourceRevision"])
+        self.assertEqual(checkout["with"]["path"], "perfeng-control-plane")
+        self.assertFalse(checkout["with"]["persist-credentials"])
         for package in ("build", "audit"):
             self.assertIn(
                 "go " + tool.GO_VERSION.removeprefix("go"),
