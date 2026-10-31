@@ -148,7 +148,7 @@ class PreparationJobDenialTests(unittest.TestCase):
                 path.write_bytes(raw)
             MODULE.verify(root, results, "final")
             reports = MODULE.load(results, "database-preparation-final.outcome.json")
-            self.assertEqual(len(reports), 4)
+            self.assertEqual(len(reports), 5)
             self.assertEqual(reports[1]["decision"], "database-preparation-job-create-refused")
             self.assertEqual(reports[1]["jobUIDs"], [])
 

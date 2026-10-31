@@ -779,6 +779,17 @@ refusal, unchanged state and failed-parent/restored-authority retention gate
 fresh runs and recovery. No additional SQL Job or CI budget; live proof remains
 post-merge main-only. Partial SQL/ambiguous commits and cutover stay separate.
 
+
+[ADR 0071](../decisions/0071-refuse-preparation-qualification-job-create.md) adds
+qualification-create denial after a completed current-schema migration in a
+reversible CI-only suspended parent. Proved migration/state precede create-only
+Role narrowing; exact qualification refusal and retention gate guarded restoration
+and fresh complete runs. One additional retained migration brings the cohort to
+seven Jobs; final proof and strict inventory accounting preserve all earlier
+coverage. No new CI jobs/scenarios/inputs/rights/budget or production changes.
+Heavy checks stay on PR CI; live proof remains post-merge main-only. Partial SQL
+writes, ambiguous commits and operational cutover remain separate.
+
 Cloud deployment is included only when it becomes an explicit requirement.
 The [cloud Kubernetes evaluation](../cloud-kubernetes-options.md) records the
 current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is

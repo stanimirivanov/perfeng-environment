@@ -118,7 +118,7 @@ runtime_grant_retention() {
 
 runtime_grant_access() {
   local denied=$1 prefix=${2:-grant-denied} verb expected answer rc ready deadline=$((SECONDS + 30))
-  [[ $prefix == grant-denied || $prefix == preparation-denied ]] || return 2
+  [[ $prefix == grant-denied || $prefix == preparation-denied || $prefix == preparation-qualify-denied ]] || return 2
   while ((SECONDS < deadline)); do
     ready=true
     for verb in create get watch; do

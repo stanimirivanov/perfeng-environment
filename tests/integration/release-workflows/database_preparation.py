@@ -100,11 +100,16 @@ def installed(root: Path, label: str) -> Any:
         obj = actual_authority[
             (wanted["kind"], wanted["metadata"].get("namespace"), wanted["metadata"]["name"])
         ]
-        if label == "denied" and (wanted["kind"], wanted["metadata"].get("namespace")) == (
+        if label in {"denied", "qualify-denied"} and (
+            wanted["kind"],
+            wanted["metadata"].get("namespace"),
+        ) == (
             "Role",
             "perf-platform",
         ):
-            denial.validate(load(root, "preparation-denied.role-original.json"), obj, True, wanted)
+            denial.validate(
+                load(root, f"preparation-{label}.role-original.json"), obj, True, wanted
+            )
             # Normalize only the exactly validated create-only fault for identity comparison.
             obj["rules"] = deepcopy(wanted["rules"])
         parent.subset(wanted, obj)
@@ -128,7 +133,9 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     parameters, candidate = adopted.request(root, before)
     refused = label == "null"
     denied = label == "denied"
-    failed = refused or denied
+    qualification_denied = label == "qualify-denied"
+    barrier = label == "qualify-barrier"
+    failed = refused or denied or qualification_denied or barrier
     raw = (root / "upgrade-request-request.json").read_bytes()
     accepted = (root / "parent-request.json").read_bytes()
     if refused:
@@ -149,7 +156,19 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     workflow = load(root, f"preparation-{label}.{suffix}workflow.json")
     workers = load(root, f"preparation-{label}.{suffix}workers.json")
     wanted = yaml.safe_load((parent.DIRECTORY / SOURCES[0]).read_text())["spec"]
-    views = scope.scopes(workflow, wanted, parameters, migration_failed=failed)
+    projected = (
+        scope.barrier_view(workflow, wanted, running=barrier)
+        if qualification_denied or barrier
+        else workflow
+    )
+    views = scope.scopes(
+        projected,
+        wanted,
+        parameters,
+        migration_failed=refused or denied,
+        qualification_denied=qualification_denied,
+        barrier=barrier,
+    )
     pods = [n for n in workflow["status"]["nodes"].values() if n["type"] == "Pod"]
     assert len(workers) == len(pods) == len({w["uid"] for w in workers})
     assert {w["nodeID"] for w in workers} == {n["id"] for n in pods}
@@ -158,15 +177,20 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     for phase, view in views.items():
         node_ids = {n["id"] for n in view["status"]["nodes"].values()}
         phase_workers = [w for w in workers if w["nodeID"] in node_ids]
-        job = None if failed else load(root, f"preparation-{label}.{phase}.{suffix}job.json")
+        phase_failed = (refused or denied) or (qualification_denied and phase == "qualify")
+        job = None if phase_failed else load(root, f"preparation-{label}.{phase}.{suffix}job.json")
         job_pods = (
             {"items": []}
-            if failed
+            if phase_failed
             else load(root, f"preparation-{label}.{phase}.{suffix}pods.json")
         )
         if phase == "migrate":
             parent.execution(
-                "current-null" if refused else label,
+                "current-null"
+                if refused
+                else "first"
+                if qualification_denied or barrier
+                else label,
                 view,
                 phase_workers,
                 parameters,
@@ -190,10 +214,14 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
                 job_pods,
                 retained_admission=True,
                 qualification=phase == "qualify",
+                denied=qualification_denied,
+                diagnostic=denied_log(root, view, phase_workers, label=label, operation="qualify")
+                if qualification_denied
+                else "",
             )
         if not refused:
             parent.admission_nodes(view, raw, after)
-        if not failed:
+        if not phase_failed:
             assert job is not None
             jobs.append(job)
             if retained:
@@ -208,6 +236,8 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
     values = {p["name"]: p.get("value") for p in outputs}
     if failed:
         for phase in scope.PHASES:
+            if (qualification_denied or barrier) and phase == "migrate":
+                continue
             assert load(root, f"preparation-{label}.{phase}.{suffix}job.json") is None
             assert load(root, f"preparation-{label}.{phase}.{suffix}pods.json")["items"] == []
         assert not any(values.values())
@@ -237,6 +267,10 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
             root / f"preparation-{label}.qualify.worker.private"
         ).read_text().strip() == "Selected migration ledger and ownership qualified."
     if retained:
+        if qualification_denied:
+            assert sorted(workers, key=lambda w: w["nodeID"]) == sorted(
+                load(root, f"preparation-{label}.workers.json"), key=lambda w: w["nodeID"]
+            )
         assert grants.install.inventory(
             {"items": [load(root, f"preparation-{label}.workflow.json")]}
         ) == grants.install.inventory({"items": [workflow]})
@@ -245,11 +279,41 @@ def execution(root: Path, label: str, *, retained: bool = False) -> dict[str, An
         if refused
         else "database-preparation-job-create-refused"
         if denied
+        else "database-preparation-qualification-create-refused"
+        if qualification_denied
+        else "database-preparation-barrier-verified"
+        if barrier
         else "database-preparation-verified",
         "workflowUID": workflow["metadata"]["uid"],
         "requestDigest": parameters["request-sha256"],
         "jobUIDs": [j["metadata"]["uid"] for j in jobs],
     }
+
+
+def barrier_proof(root: Path) -> list[dict[str, Any]]:
+    original = load(root, "preparation-qualify-denied.installed.json")
+    assert original["kind"] == "WorkflowTemplate" and original["metadata"]["name"] == scope.CI_NAME
+    assert original["metadata"]["namespace"] == "argo-workflows" and original["metadata"]["uid"]
+    assert not original["metadata"].get("ownerReferences") and not original["metadata"].get(
+        "deletionTimestamp"
+    )
+    wanted = yaml.safe_load((parent.DIRECTORY / SOURCES[0]).read_text())["spec"]
+    assert original["spec"] == scope.ci_spec(wanted)
+    report = execution(root, "qualify-barrier")
+    before = load(root, "preparation-before.jobs.json")["items"]
+    actual = load(root, "preparation-qualify-barrier.jobs.json")["items"]
+    job = load(root, "preparation-qualify-barrier.migrate.job.json")
+    assert grants.install.inventory({"items": actual}) == grants.install.inventory(
+        {"items": [*before, job]}
+    )
+    # The previous denied case creates no Job. Preserve every earlier Job exactly.
+    for original in before:
+        parent.retained_job(
+            original,
+            next(j for j in actual if j["metadata"]["uid"] == original["metadata"]["uid"]),
+            failed=original["status"].get("failed", 0) > 0,
+        )
+    return [report]
 
 
 def role_source() -> Any:
@@ -262,18 +326,20 @@ def role_source() -> Any:
     )
 
 
-def denied_log(root: Path, view: Any, workers: Any) -> str:
+def denied_log(
+    root: Path, view: Any, workers: Any, *, label: str = "denied", operation: str = "migrate"
+) -> str:
     """Bind the supplied Forbidden diagnostic to the exact failed native worker."""
-    node = parent.maintenance.readiness.named(view, "migrate")
+    node = parent.maintenance.readiness.named(view, operation)
     worker = next(w for w in workers if w["nodeID"] == node["id"])
-    pod = load(root, "preparation-denied.diagnostic-pod.json")
+    pod = load(root, f"preparation-{label}.diagnostic-pod.json")
     assert pod["metadata"]["namespace"] == "argo-workflows"
     assert pod["metadata"]["uid"] == worker["uid"]
     assert pod["metadata"]["annotations"]["workflows.argoproj.io/node-id"] == node["id"]
     assert pod["spec"]["serviceAccountName"] == worker["account"] == "release-runtime-grants"
     main = [s for s in pod["status"]["containerStatuses"] if s["name"] == "main"]
     assert len(main) == 1 and main[0]["state"]["terminated"]["exitCode"] == worker["exitCode"] == 1
-    return (root / "preparation-denied.worker.private").read_text()
+    return (root / f"preparation-{label}.worker.private").read_text()
 
 
 def probe(root: Path, results: Path) -> None:
@@ -295,19 +361,34 @@ def probe(root: Path, results: Path) -> None:
 
 
 def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
-    assert mode in {"before", "null", "denied", "first", "repeat", "complete", "retained", "final"}
+    assert mode in {
+        "before",
+        "null",
+        "denied",
+        "qualify-barrier",
+        "qualify-denied",
+        "first",
+        "repeat",
+        "complete",
+        "retained",
+        "final",
+    }
     adopted.request(root, stable(root, "before"))
     installed(root, "before")
     if mode == "before":
         return []
+    if mode == "qualify-barrier":
+        return barrier_proof(root)
     labels = (
         ("null",)
         if mode == "null"
         else ("null", "denied")
         if mode == "denied"
-        else ("null", "denied", "first")
+        else ("null", "denied", "qualify-denied")
+        if mode == "qualify-denied"
+        else ("null", "denied", "qualify-denied", "first")
         if mode == "first"
-        else ("null", "denied", "first", "repeat")
+        else ("null", "denied", "qualify-denied", "first", "repeat")
     )
     retained = mode in {"retained", "final"}
     reports = [execution(root, label, retained=retained) for label in labels]
@@ -316,16 +397,71 @@ def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
     assert (
         len(identities)
         == len(set(identities))
-        == (0 if mode in {"null", "denied"} else 3 if mode == "first" else 6)
+        == (
+            0
+            if mode in {"null", "denied"}
+            else 1
+            if mode == "qualify-denied"
+            else 4
+            if mode == "first"
+            else 7
+        )
     )
     if mode not in {"null", "denied"}:
         denial.execute(
             "final" if retained else "restored", root, "preparation-denied", role_source()
         )
+    if mode not in {"null", "denied", "qualify-denied"}:
+        denial.execute(
+            "final" if retained else "restored", root, "preparation-qualify-denied", role_source()
+        )
+    if "qualify-denied" in labels:
+        barrier_proof(root)
+        original = load(root, "preparation-qualify-barrier.workflow.json")
+        current = load(root, "preparation-qualify-denied.workflow.json")
+        for key in ("uid", "name", "namespace"):
+            assert original["metadata"][key] == current["metadata"][key]
+        assert original["spec"] == current["spec"]
+        before_view = scope.barrier_view(
+            original,
+            yaml.safe_load((parent.DIRECTORY / SOURCES[0]).read_text())["spec"],
+            running=True,
+        )
+        after_view = scope.barrier_view(
+            current,
+            yaml.safe_load((parent.DIRECTORY / SOURCES[0]).read_text())["spec"],
+            running=False,
+        )
+        for identity, node in before_view["status"]["nodes"].items():
+            if node["type"] == "Pod" or (
+                node["type"] == "Steps" and identity != original["metadata"]["name"]
+            ):
+                # Argo may append cross-phase graph edges after the suspended step.
+                ignored = {"children", "outboundNodes"}
+                assert {k: v for k, v in node.items() if k not in ignored} == {
+                    k: v
+                    for k, v in after_view["status"]["nodes"][identity].items()
+                    if k not in ignored
+                }
+        migration_workers = load(root, "preparation-qualify-barrier.workers.json")
+        later_workers = load(root, "preparation-qualify-denied.workers.json")
+        assert all(w in later_workers for w in migration_workers)
+        parent.retained_job(
+            load(root, "preparation-qualify-barrier.migrate.job.json"),
+            load(root, "preparation-qualify-denied.migrate.job.json"),
+        )
+        assert grants.install.inventory(
+            load(root, "preparation-qualify-barrier.migrate.pods.json")
+        ) == grants.install.inventory(load(root, "preparation-qualify-denied.migrate.pods.json"))
     sample = mode if retained else labels[-1]
     if retained:
         stable(root, mode, final=mode == "final")
         assert installed(root, mode) == installed(root, "before")
+        ci_original = load(root, "preparation-qualify-denied.installed.json")
+        ci_current = load(root, "preparation-qualify-denied.current-template.json")
+        assert grants.install.inventory({"items": [ci_original]}) == grants.install.inventory(
+            {"items": [ci_current]}
+        )
         probe(root, results)
         assert reports == load(root, "preparation-complete.verified.json")
     before_jobs = load(root, "preparation-before.jobs.json")["items"]
@@ -335,6 +471,7 @@ def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
         for label in labels
         if label not in {"null", "denied"}
         for phase in scope.PHASES
+        if label != "qualify-denied" or phase == "migrate"
     ]
     assert grants.install.inventory({"items": actual}) == grants.install.inventory(
         {"items": [*before_jobs, *new_jobs]}
@@ -354,15 +491,18 @@ def verify(root: Path, results: Path, mode: str) -> list[dict[str, Any]]:
 
 
 def partition(root: Path, results: Path, phase: str, kind: str, path: Path) -> None:
-    """Remove only the exact two revalidated cohort Jobs for a strict legacy suite."""
+    """Remove only the fully revalidated cohort Jobs for a strict legacy suite."""
     assert phase in {"retained", "final"} and kind in scope.PHASES
     verify(root, results, phase)
     value = json.loads(path.read_text())
     originals = [
-        load(root, f"preparation-{label}.{kind}.job.json") for label in ("first", "repeat")
+        load(root, f"preparation-{label}.{kind}.job.json")
+        for label in (
+            ("qualify-denied", "first", "repeat") if kind == "migrate" else ("first", "repeat")
+        )
     ]
     uids = {job["metadata"]["uid"] for job in originals}
-    assert len(uids) == 2
+    assert len(uids) == (3 if kind == "migrate" else 2)
     assert len({j["metadata"]["uid"] for j in value["items"]}) == len(value["items"])
     for original in originals:
         matches = [
@@ -385,7 +525,20 @@ def partition(root: Path, results: Path, phase: str, kind: str, path: Path) -> N
 def main() -> None:
     mode, directory, output, *extra = sys.argv[1:]
     root, results = Path(directory), Path(output)
-    if mode.startswith("role-"):
+    if mode == "ci-template":
+        wanted = yaml.safe_load((parent.DIRECTORY / SOURCES[0]).read_text())
+        wanted["metadata"] = {"name": scope.CI_NAME, "namespace": "argo-workflows"}
+        wanted["spec"] = scope.ci_spec(wanted["spec"])
+        (root / "preparation-qualify-denied.template.json").write_text(json.dumps(wanted) + "\n")
+    elif mode.startswith("qualify-role-"):
+        action = mode.removeprefix("qualify-role-")
+        assert not extra
+        if action == "prepare":
+            verify(root, results, "qualify-barrier")
+        if action == "restore":
+            verify(root, results, "qualify-denied")
+        denial.execute(action, root, "preparation-qualify-denied", role_source())
+    elif mode.startswith("role-"):
         action = mode.removeprefix("role-")
         assert not extra
         if action == "restore":

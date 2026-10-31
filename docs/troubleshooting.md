@@ -1968,3 +1968,26 @@ restored authority again. No new SQL Jobs are expected from this case. No local
 execution or production authority change is authorized. [ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md)
 limits this to disposable trusted-main acceptance; partial/ambiguous SQL outcomes
 need independent diagnosis and separately reviewed recovery.
+
+## Preparation qualification-create denial does not qualify
+
+The trusted-main initial case in [ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md)
+requires a completed migration before its CI suspension. If the barrier is absent,
+terminal or times out, inspect the private preparation-qualify-barrier Workflow,
+workers and Job observations; authority must not be narrowed or the parent resumed.
+
+After resume, require the exact qualify native-worker Job-create Forbidden and
+all real input/admission/quiescence gates. A generic failure, timeout, image error,
+wrong worker or missing successful migration is insufficient. Inspect the separate
+preparation-qualify-denied worker diagnostic and state/source/Role snapshots.
+No qualification Job/Pod or grants execution/output may exist. A missing or changed
+migration Job, schema/ACL/data/credential/workload identity, or unproven refusal
+blocks restoration planning, fresh parents, probes and recovery. Do not repair
+permissions in an EXIT trap or rerun a failed node to pass the gate.
+
+Only a verified refusal/state permits a fresh UID/resourceVersion/rules-guarded
+restore and effective create/get/watch checks. Later retention requires the same
+failed parent, migration and restored authority again. The seven-Job cohort has
+three migration Jobs and two each of qualification/grants; preserve full private
+inventories rather than broadening ignores. This is disposable CI acceptance,
+not local recovery authorization or partial/ambiguous SQL commit proof.

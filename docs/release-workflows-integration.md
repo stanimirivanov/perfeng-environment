@@ -2223,3 +2223,21 @@ overwrite. Nothing repairs on EXIT. No new GitHub job/scenario/ref/credential/
 right/budget, production change or local action. Heavy checks remain on PR CI;
 full-parent live proof stays post-merge. See [ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md).
 Partial SQL and ambiguous-commit outcomes remain outside this refusal case.
+
+## Complete preparation qualification-create denial
+
+[ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md) adds one
+initial-job CI copy with a reversible post-migration suspend barrier. Actual
+successful migration, complete admission and unchanged state must qualify before
+the existing grants Role loses only Jobs create. Effective denial/get-watch checks
+precede resume. Require actual qualification admission/quiescence, a worker-bound
+exact Forbidden and no qualification Job or grants execution. Only retained-state
+proof permits guarded Role restoration, rights verification and fresh first/repeat.
+
+Keep preparation-qualify-barrier and preparation-qualify-denied evidence separate
+from earlier refusals. Final retention rereads the failed complete Workflow,
+workers, successful migration Job/Pod, absent later Jobs/Pods, installed CI template
+and restored authority. The strict cohort has seven Jobs (three migration, two
+qualification, two grants); unknown Jobs are never ignored. All earlier standalone
+acceptance remains. No new GitHub jobs/scenarios/refs/inputs/rights/budget or local
+execution. Live proof is post-merge main-only; heavy checks remain on PR CI.

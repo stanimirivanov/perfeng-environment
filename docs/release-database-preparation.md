@@ -109,8 +109,9 @@ before recovery and final success. Safe summaries are
 `database-preparation-{retained,final}.outcome.json`.
 
 Legacy suites account for the cohort only after its complete retention proof:
-keep the full private `.all.json` inventory, remove exactly two validated Job
-UIDs of that kind from the legacy input, then retain strict legacy checks on
+keep the full private `.all.json` inventory, remove exactly the validated cohort
+UIDs of that kind from the legacy input (three migration, two qualification and
+two grants after ADR 0071), then retain strict legacy checks on
 all remaining Jobs. Unknown, missing, replaced or altered Jobs cannot be ignored.
 No failed gate permits probe/recovery or automatic repair. Offline tests do not
 establish live proof; main-only execution after merge must supply it. The bounded
@@ -136,3 +137,23 @@ No automatic repair, additional SQL Job, CI job/scenario/ref/right/credential/
 budget, production change or local execution. Heavy checks remain on PR CI;
 live API/controller proof stays post-merge main-only. This proves refusal before
 SQL Job creation, not recovery after partial or ambiguous SQL commits.
+
+## Qualification-create denial after migration
+
+[ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md) extends
+only the trusted-main initial adopted/paused fixture. One reversible CI copy
+suspends after the unchanged migration phase. Prove its successful native Job,
+full admission and unchanged state before guarded create-only Role narrowing.
+Resume only after effective create denial/get-watch preservation; require real
+qualification admission/quiescence then the exact native qualify-worker Forbidden.
+No qualification Job, grants execution or successful preparation output may exist.
+
+Only verified refusal and retention permit fresh UID/resourceVersion/rules-guarded
+Role restoration and effective-right checks before existing fresh first/repeat.
+The failed parent, its completed migration and unchanged state remain required
+through final gates. Evidence uses preparation-qualify-denied paths, with the
+pre-mutation snapshot under preparation-qualify-barrier. No automatic repair or
+recovery is introduced. The cohort is now seven Jobs: three migration, two
+qualification and two grants; legacy partitioning excludes only verified UIDs.
+Full private inventories remain available. No production changes or host cutover;
+heavy checks stay on PR CI and live proof remains post-merge main-only.

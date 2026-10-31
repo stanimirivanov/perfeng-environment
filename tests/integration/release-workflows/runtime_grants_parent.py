@@ -69,7 +69,7 @@ def execution(
     qualification: bool = False,
 ) -> dict[str, Any]:
     """Require actual native stages, authority, provenance and fixed owner Job."""
-    assert not qualification or (retained_admission and not any((denied, contention, rollback)))
+    assert not qualification or (retained_admission and not any((contention, rollback)))
     operation = "qualify" if qualification else "grant"
     leaf = "schema-qualification" if qualification else "runtime-grants"
     parent_template = (
@@ -85,7 +85,7 @@ def execution(
     assert sum((denied, contention, rollback)) <= 1
     sql_failure = contention or rollback
     failed_job = denied or sql_failure
-    assert not retained_admission or not failed_job
+    assert not retained_admission or not failed_job or (qualification and denied)
     assert workflow["status"]["phase"] in ({"Failed", "Error"} if failed_job else {"Succeeded"})
     args = workflow["spec"]["arguments"]["parameters"]
     assert len(args) == 4 and {p["name"]: p["value"] for p in args} == parameters
@@ -179,7 +179,7 @@ def execution(
     assert len(workers) == len(nodes) and len({w["uid"] for w in workers}) == len(workers)
     assert {w["nodeID"] for w in workers} == {n["id"] for n in nodes}
     for node in nodes:
-        failed = failed_job and node["displayName"] == "grant"
+        failed = failed_job and node["displayName"] == operation
         worker = next(w for w in workers if w["nodeID"] == node["id"])
         assert worker["uid"] and worker["account"] == "release-runtime-grants"
         assert worker["exitCode"] == (1 if failed else 0)
