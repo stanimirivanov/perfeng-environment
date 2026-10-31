@@ -307,3 +307,9 @@ CI refusal/guarded-restoration evidence around the unchanged complete parent.
 No production source, supported command or baseline entrypoint is retired.
 The 13-entrypoint baseline and two-module/708-line production verifier budget
 remain unchanged; live proof, SQL recovery and operational cutover stay separate.
+
+[ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md) adds only
+CI qualification-create refusal after a retained successful migration, guarded
+Role restoration and seven-Job cohort evidence. No production Python, supported
+host command or baseline entrypoint changes. All 13 entrypoints and the two-module/
+708-line verifier budget remain; live proof, SQL recovery and cutover stay separate.

@@ -9,6 +9,7 @@ import unittest
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import test_schema_qualification_parent as qualification
@@ -104,7 +105,19 @@ def populate(root, results):
         if narrowed:
             value["rules"] = DENIAL.narrowed(MODULE.role_source())
         save(f"preparation-denied.role-{role_state}.json", value)
-    for label in ("before", "null", "denied", "first", "repeat", "retained", "final"):
+    for path in root.glob("preparation-denied.role-*.json"):
+        save(path.name.replace("preparation-denied", "preparation-qualify-denied"), load(path.name))
+    for label in (
+        "before",
+        "null",
+        "denied",
+        "qualify-barrier",
+        "qualify-denied",
+        "first",
+        "repeat",
+        "retained",
+        "final",
+    ):
         for path in root.glob("qualification-before.*"):
             (
                 root
@@ -112,17 +125,26 @@ def populate(root, results):
             ).write_bytes(path.read_bytes())
         save(f"preparation-{label}.sources.json", {"items": declarations})
         current_authority = deepcopy(authority)
-        if label == "denied":
+        if label in {"denied", "qualify-denied"}:
             for obj in current_authority:
                 if obj["kind"] == "Role" and obj["metadata"]["namespace"] == "perf-platform":
                     obj.update(load("preparation-denied.role-narrowed.json"))
         save(f"preparation-{label}.authority.json", {"items": current_authority})
         save(f"preparation-{label}.jobs.json", {"items": []})
+    ci = {
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "WorkflowTemplate",
+        "metadata": {"namespace": "argo-workflows", "name": SCOPE.CI_NAME, "uid": "ci-template"},
+        "spec": SCOPE.ci_spec(declarations[0]["spec"]),
+    }
+    save("preparation-qualify-denied.installed.json", ci)
+    save("preparation-qualify-denied.current-template.json", ci)
     all_jobs = []
-    for index, label in enumerate(("null", "denied", "first", "repeat"), 1):
+    for index, label in enumerate(("null", "denied", "qualify-denied", "first", "repeat"), 1):
         refused = label == "null"
         denied = label == "denied"
-        failed = refused or denied
+        qualification_denied = label == "qualify-denied"
+        failed = refused or denied or qualification_denied
         name, uid = "prepare-" + label, f"00000000-0000-0000-0000-{index:012d}"
         parameters = load(
             "parent-parameters.json" if refused else "upgrade-request-parameters.json"
@@ -141,8 +163,12 @@ def populate(root, results):
                 qualify=load("qualification-first.workflow.json"),
                 grant=load("grant-adopted.workflow.json"),
             )
+        if qualification_denied:
+            phase_sources["qualify"] = load("qualification-first.workflow.json")
+            phase_sources["qualify"]["status"]["nodes"]["qualify"]["phase"] = "Failed"
         roots, nodes, workers, case_jobs = [], {}, [], []
         for offset, (phase, source) in enumerate(phase_sources.items()):
+            phase_failed = (refused or denied) or (qualification_denied and phase == "qualify")
             old_nodes = source["status"]["nodes"]
             old_nodes.pop(source["metadata"]["name"])
             phase_id = name + "-" + phase
@@ -180,7 +206,8 @@ def populate(root, results):
                             "nodeID": node["id"],
                             "account": "release-runtime-grants",
                             "exitCode": 1
-                            if denied and node["displayName"] == "migrate"
+                            if (denied and node["displayName"] == "migrate")
+                            or (qualification_denied and node["displayName"] == "qualify")
                             else 2
                             if refused and node["displayName"] == "candidate"
                             else 0,
@@ -190,13 +217,13 @@ def populate(root, results):
                 "id": phase_id,
                 "displayName": phase,
                 "type": "Steps",
-                "phase": "Failed" if failed else "Succeeded",
+                "phase": "Failed" if phase_failed else "Succeeded",
                 "boundaryID": name,
                 "templateRef": {"name": SCOPE.PHASES[phase], "template": phase},
                 "startedAt": (earliest + shift).isoformat(),
                 "finishedAt": max(n["finishedAt"] for n in old_nodes.values()),
             }
-            if not failed:
+            if not phase_failed:
                 leaf_name = {
                     "migrate": "schema-migration",
                     "qualify": "schema-qualification",
@@ -263,6 +290,8 @@ def populate(root, results):
                 case_jobs.append(job)
             else:
                 for operation in SCOPE.PHASES:
+                    if qualification_denied and operation == "migrate":
+                        continue
                     for suffix in ("", "current-"):
                         save(f"preparation-{label}.{operation}.{suffix}job.json", None)
                         save(f"preparation-{label}.{operation}.{suffix}pods.json", {"items": []})
@@ -300,7 +329,7 @@ def populate(root, results):
                 "Selected migration ledger and ownership qualified.\n"
             )
         nodes[name] = outer
-        workflow = {
+        workflow: dict[str, Any] = {
             "apiVersion": "argoproj.io/v1alpha1",
             "kind": "Workflow",
             "metadata": {"name": name, "uid": uid, "namespace": "argo-workflows"},
@@ -318,14 +347,65 @@ def populate(root, results):
                 "nodes": nodes,
             },
         }
+        if qualification_denied:
+            workflow["spec"]["workflowTemplateRef"] = {"name": SCOPE.CI_NAME}
+            workflow["status"]["storedWorkflowTemplateSpec"] = SCOPE.ci_spec(
+                workflow["status"]["storedWorkflowTemplateSpec"]
+            )
+            migration = nodes[name + "-migrate"]
+            barrier_id = name + "-barrier"
+            gate = {
+                "id": barrier_id,
+                "displayName": SCOPE.BARRIER,
+                "type": "Suspend",
+                "templateName": SCOPE.BARRIER,
+                "phase": "Succeeded",
+                "boundaryID": name,
+                "startedAt": migration["finishedAt"],
+                "finishedAt": migration["finishedAt"],
+            }
+            nodes[barrier_id] = gate
+            nodes[name + "-barrier-group"] = {
+                "id": name + "-barrier-group",
+                "displayName": "[1]",
+                "type": "StepGroup",
+                "boundaryID": name,
+                "phase": "Succeeded",
+                "children": [barrier_id],
+            }
+            paused = deepcopy(workflow)
+            paused["status"]["phase"] = paused["status"]["nodes"][name]["phase"] = "Running"
+            paused["status"]["nodes"][barrier_id]["phase"] = "Running"
+            del paused["status"]["nodes"][barrier_id]["finishedAt"]
+            paused["status"]["nodes"][name + "-barrier-group"]["phase"] = "Running"
+            for identity, node in list(paused["status"]["nodes"].items()):
+                if (
+                    identity == name + "-qualify"
+                    or node.get("boundaryID") == name + "-qualify"
+                    or node.get("boundaryID") == name + "-qualify-preflight"
+                    or (node["type"] == "StepGroup" and identity == name + "[1]")
+                ):
+                    del paused["status"]["nodes"][identity]
+            save("preparation-qualify-barrier.workflow.json", paused)
+            save(
+                "preparation-qualify-barrier.workers.json",
+                [w for w in workers if w["nodeID"].startswith(name + "-migrate-")],
+            )
+            for phase in SCOPE.PHASES:
+                for suffix in ("job", "pods"):
+                    save(
+                        f"preparation-qualify-barrier.{phase}.{suffix}.json",
+                        load(f"preparation-{label}.{phase}.{suffix}.json"),
+                    )
         for suffix in ("", "current-"):
             save(f"preparation-{label}.{suffix}workflow.json", workflow)
             save(f"preparation-{label}.{suffix}workers.json", workers)
-        if denied:
-            native_id = name + "-migrate-migrate"
+        if denied or qualification_denied:
+            operation = "qualify" if qualification_denied else "migrate"
+            native_id = name + "-" + operation + "-" + operation
             worker = next(w for w in workers if w["nodeID"] == native_id)
             save(
-                "preparation-denied.diagnostic-pod.json",
+                f"preparation-{label}.diagnostic-pod.json",
                 {
                     "metadata": {
                         "name": "denied-native-worker",
@@ -341,13 +421,16 @@ def populate(root, results):
                     },
                 },
             )
-            (root / "preparation-denied.worker.private").write_text(
-                'Error from server (Forbidden): jobs.batch "perfeng-schema-'
+            (root / f"preparation-{label}.worker.private").write_text(
+                'Error from server (Forbidden): jobs.batch "'
+                + MODULE.PREFIXES[operation]
                 + uid
                 + '" is forbidden: User "system:serviceaccount:argo-workflows:release-runtime-grants" cannot create resource "jobs" in API group "batch" in the namespace "perf-platform"\n'
             )
         all_jobs.extend(case_jobs)
         save(f"preparation-{label}.jobs.json", {"items": deepcopy(all_jobs)})
+        if qualification_denied:
+            save("preparation-qualify-barrier.jobs.json", {"items": deepcopy(all_jobs)})
     for label in ("retained", "final"):
         save(f"preparation-{label}.jobs.json", {"items": all_jobs})
     for suffix in ("workflow", "job", "worker"):
@@ -404,6 +487,8 @@ class PreparationAcceptanceTests(unittest.TestCase):
                 "before",
                 "null",
                 "denied",
+                "qualify-barrier",
+                "qualify-denied",
                 "first",
                 "repeat",
                 "complete",
@@ -411,8 +496,8 @@ class PreparationAcceptanceTests(unittest.TestCase):
                 "final",
             ):
                 reports = MODULE.verify(root, results, mode)
-            self.assertEqual(len(reports), 4)
-            self.assertEqual(sum(len(r["jobUIDs"]) for r in reports), 6)
+            self.assertEqual(len(reports), 5)
+            self.assertEqual(sum(len(r["jobUIDs"]) for r in reports), 7)
             self.assertEqual((root / "preparation-first.workflow.json").read_bytes(), raw)
 
     def test_missing_or_tampered_nested_evidence_blocks_publication_and_partition(self):
@@ -517,7 +602,11 @@ class PreparationAcceptanceTests(unittest.TestCase):
             for kind in SCOPE.PHASES:
                 originals = [
                     MODULE.load(root, f"preparation-{label}.{kind}.job.json")
-                    for label in ("first", "repeat")
+                    for label in (
+                        ("qualify-denied", "first", "repeat")
+                        if kind == "migrate"
+                        else ("first", "repeat")
+                    )
                 ]
                 extra = deepcopy(originals[0])
                 extra["metadata"].update(uid="unknown", name="unexpected-job")
@@ -578,7 +667,7 @@ uv() { local mode=${6}; log "verify-$mode"; [[ $FAIL != "$mode" ]]; }
 """
                     + case
                     + suite
-                    + "\npreparation_suite\nlog probe\nlog recovery\n",
+                    + "\npreparation_qualification_denial() { log qualification-denial; }\npreparation_suite\nlog probe\nlog recovery\n",
                     newline="\n",
                 )
                 result = subprocess.run(
