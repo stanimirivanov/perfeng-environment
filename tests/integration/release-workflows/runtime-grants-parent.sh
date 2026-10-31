@@ -117,14 +117,15 @@ runtime_grant_retention() {
 }
 
 runtime_grant_access() {
-  local denied=$1 verb expected answer rc ready deadline=$((SECONDS + 30))
+  local denied=$1 prefix=${2:-grant-denied} verb expected answer rc ready deadline=$((SECONDS + 30))
+  [[ $prefix == grant-denied || $prefix == preparation-denied ]] || return 2
   while ((SECONDS < deadline)); do
     ready=true
     for verb in create get watch; do
       expected=yes
       if [[ $denied == true && $verb == create ]]; then expected=no; fi
-      if answer=$(k --as system:serviceaccount:argo-workflows:release-runtime-grants --as-group system:serviceaccounts --as-group system:serviceaccounts:argo-workflows --as-group system:authenticated auth can-i "$verb" jobs.batch -n perf-platform 2> "$fixture/grant-denied.auth.private"); then rc=0; else rc=$?; fi
-      [[ ! -s $fixture/grant-denied.auth.private && ( ( $rc == 0 && $answer == yes ) || ( $rc == 1 && $answer == no ) ) ]] || return 1
+      if answer=$(k --as system:serviceaccount:argo-workflows:release-runtime-grants --as-group system:serviceaccounts --as-group system:serviceaccounts:argo-workflows --as-group system:authenticated auth can-i "$verb" jobs.batch -n perf-platform 2> "$fixture/$prefix.auth.private"); then rc=0; else rc=$?; fi
+      [[ ! -s $fixture/$prefix.auth.private && ( ( $rc == 0 && $answer == yes ) || ( $rc == 1 && $answer == no ) ) ]] || return 1
       if [[ $answer != "$expected" ]]; then ready=false; fi
     done
     if [[ $ready == true ]]; then return 0; fi

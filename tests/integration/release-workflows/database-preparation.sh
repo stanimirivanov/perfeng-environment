@@ -4,7 +4,7 @@ set -euo pipefail
 [[ ${BASH_SOURCE[0]} != "$0" && ${mode:-} == preflight-parent && ${scenario:-} == initial ]] || exit 2
 [[ ${GITHUB_ACTIONS:-} == true && ${RUNNER_ENVIRONMENT:-} == github-hosted && ${RUNNER_OS:-} == Linux ]] || exit 2
 [[ -f $fixture/owned && $KUBECONFIG == "$fixture/kubeconfig" && -f $fixture/grant-adopted.verified.json && -f $results/schema-qualification-retained.outcome.json ]] || exit 2
-declare -F k a schema_parent_snapshot runtime_acl_snapshot qualification_workers schema_parent_ledger_access > /dev/null || exit 2
+declare -F k a schema_parent_snapshot runtime_acl_snapshot qualification_workers schema_parent_ledger_access runtime_grant_access > /dev/null || exit 2
 
 preparation_snapshot() {
   local label=$1
@@ -38,7 +38,7 @@ preparation_jobs() {
 
 preparation_case() {
   local label=$1 name uid rc parameters="$fixture/upgrade-request-parameters.json"
-  [[ $label == null || $label == first || $label == repeat ]] || return 2
+  [[ $label == null || $label == denied || $label == first || $label == repeat ]] || return 2
   if [[ $label == null ]]; then parameters="$fixture/parent-parameters.json"; fi
   start_stage "database-preparation-$label"
   name=$(a submit --from workflowtemplate/perfeng-release-database-prepare-v1 --parameter-file "$parameters" -o json | jq -er .metadata.name)
@@ -47,12 +47,19 @@ preparation_case() {
   qualification_workers "$name" "$fixture/preparation-$label.workers.json"
   uid=$(jq -er .metadata.uid "$fixture/preparation-$label.workflow.json")
   preparation_jobs "$label" '' "$uid"
-  if [[ ( $label == null && ( $rc == 0 || $rc == 124 || $rc == 137 ) ) || ( $label != null && $rc != 0 ) ]]; then
+  if [[ ( ( $label == null || $label == denied ) && ( $rc == 0 || $rc == 124 || $rc == 137 ) ) || ( $label != null && $label != denied && $rc != 0 ) ]]; then
     printf '%s\n' '{"decision":"database-preparation-unexpected-parent-outcome"}' > "$results/database-preparation-$label.failure.json"
     printf '%s\n' '[DATABASE-PREPARATION] Unexpected parent outcome; inspect the stage and private Workflow/worker/Job observations. No later preparation, probe or recovery attempted.' >&2
     return 1
   fi
-  if [[ $label != null ]]; then
+  if [[ $label == denied ]]; then
+    local node pod
+    node=$(jq -er '[.status.nodes[]|select(.displayName=="migrate" and .type=="Pod" and (.phase=="Failed" or .phase=="Error"))]|if length==1 then .[0].id else error("expected one denied migration create") end' "$fixture/preparation-denied.workflow.json")
+    k -n argo-workflows get pods -l "workflows.argoproj.io/workflow=$name" -o json > "$fixture/preparation-denied.workflow-pods.json"
+    pod=$(jq -er --arg id "$node" '[.items[]|select(.metadata.annotations["workflows.argoproj.io/node-id"]==$id)]|if length==1 then .[0].metadata.name else error("expected one denied resource worker") end' "$fixture/preparation-denied.workflow-pods.json")
+    k -n argo-workflows get pod "$pod" -o json > "$fixture/preparation-denied.diagnostic-pod.json"
+    k -n argo-workflows logs "$pod" -c main --tail=30 --limit-bytes=16384 --request-timeout=10s > "$fixture/preparation-denied.worker.private"
+  elif [[ $label != null ]]; then
     k -n perf-platform logs "job/perfeng-schema-qualify-$uid" -c qualify --tail=20 --limit-bytes=8192 --request-timeout=10s > "$fixture/preparation-$label.qualify.worker.private"
   fi
   preparation_snapshot "$label"
@@ -60,11 +67,32 @@ preparation_case() {
   complete_stage
 }
 
+preparation_denial() {
+  start_stage database-preparation-denied-authority
+  runtime_grant_access false preparation-denied
+  k -n perf-platform get role/release-runtime-grants -o json > "$fixture/preparation-denied.role-original.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/database_preparation.py" role-prepare "$fixture" "$results"
+  k -n perf-platform patch role/release-runtime-grants --type=json --patch-file "$fixture/preparation-denied.narrow-patch.json" --request-timeout=10s -o json > "$fixture/preparation-denied.role-narrowed.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/database_preparation.py" role-narrowed "$fixture" "$results"
+  runtime_grant_access true preparation-denied
+  complete_stage
+  preparation_case denied
+  # No restoration may be planned until exact refusal and retained state qualify.
+  start_stage database-preparation-denied-restoration
+  runtime_grant_access true preparation-denied
+  k -n perf-platform get role/release-runtime-grants -o json > "$fixture/preparation-denied.role-current.json"
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/database_preparation.py" role-restore "$fixture" "$results"
+  k -n perf-platform patch role/release-runtime-grants --type=json --patch-file "$fixture/preparation-denied.restore-patch.json" --request-timeout=10s -o json > "$fixture/preparation-denied.role-restored.json"
+  runtime_grant_access false preparation-denied
+  PYTHONPATH=. uv run --locked --offline python "$source_dir/database_preparation.py" role-restored "$fixture" "$results"
+  complete_stage
+}
+
 preparation_retention() {
   local phase=${1:-retained} label name uid
   [[ $phase == retained || $phase == final ]] || return 2
   start_stage "database-preparation-$phase"
-  for label in null first repeat; do
+  for label in null denied first repeat; do
     name=$(jq -er .metadata.name "$fixture/preparation-$label.workflow.json")
     uid=$(jq -er .metadata.uid "$fixture/preparation-$label.workflow.json")
     a get "$name" -o json > "$fixture/preparation-$label.current-workflow.json"
@@ -73,6 +101,8 @@ preparation_retention() {
   done
   preparation_snapshot "$phase"
   schema_parent_ledger_access release-runtime-grants
+  k -n perf-platform get role/release-runtime-grants -o json > "$fixture/preparation-denied.role-final.json"
+  runtime_grant_access false preparation-denied
   name=$(jq -er .metadata.name "$results/runtime-grants-adopted.workflow.json")
   a get "$name" -o json > "$fixture/preparation.probe-workflow.json"
   name=$(jq -er .metadata.name "$results/runtime-grants-adopted.job.json")
@@ -96,7 +126,9 @@ preparation_suite() {
   preparation_snapshot before
   PYTHONPATH=. uv run --locked --offline python "$source_dir/database_preparation.py" before "$fixture" "$results"
   complete_stage
-  for label in null first repeat; do preparation_case "$label"; done
+  preparation_case null
+  preparation_denial
+  for label in first repeat; do preparation_case "$label"; done
   start_stage database-preparation-complete
   PYTHONPATH=. uv run --locked --offline python "$source_dir/database_preparation.py" complete "$fixture" "$results"
   complete_stage

@@ -27,10 +27,15 @@ def module(name, dependencies):
     return result
 
 
+DENIAL = module("schema_migration_denial", {})
 SCOPE = module("preparation_scope", {})
 MODULE = module(
     "database_preparation",
-    {"preparation_scope": SCOPE, "schema_qualification_parent": qualification.MODULE},
+    {
+        "preparation_scope": SCOPE,
+        "schema_qualification_parent": qualification.MODULE,
+        "schema_migration_denial": DENIAL,
+    },
 )
 DIRECTORY = MODULE.parent.DIRECTORY
 
@@ -79,18 +84,45 @@ def populate(root, results):
             + "-"
             + obj["metadata"]["name"]
         )
-    for label in ("before", "null", "first", "repeat", "retained", "final"):
+    original_role = deepcopy(
+        next(
+            o
+            for o in authority
+            if o["kind"] == "Role" and o["metadata"]["namespace"] == "perf-platform"
+        )
+    )
+    original_role["metadata"]["resourceVersion"] = "1"
+    save("preparation-denied.role-original.json", original_role)
+    for role_state, version, narrowed in (
+        ("narrowed", "2", True),
+        ("current", "2", True),
+        ("restored", "3", False),
+        ("final", "4", False),
+    ):
+        value = deepcopy(original_role)
+        value["metadata"]["resourceVersion"] = version
+        if narrowed:
+            value["rules"] = DENIAL.narrowed(MODULE.role_source())
+        save(f"preparation-denied.role-{role_state}.json", value)
+    for label in ("before", "null", "denied", "first", "repeat", "retained", "final"):
         for path in root.glob("qualification-before.*"):
             (
                 root
                 / ("preparation-" + label + "." + path.name.removeprefix("qualification-before."))
             ).write_bytes(path.read_bytes())
         save(f"preparation-{label}.sources.json", {"items": declarations})
-        save(f"preparation-{label}.authority.json", {"items": authority})
+        current_authority = deepcopy(authority)
+        if label == "denied":
+            for obj in current_authority:
+                if obj["kind"] == "Role" and obj["metadata"]["namespace"] == "perf-platform":
+                    obj.update(load("preparation-denied.role-narrowed.json"))
+        save(f"preparation-{label}.authority.json", {"items": current_authority})
         save(f"preparation-{label}.jobs.json", {"items": []})
     all_jobs = []
-    for index, label in enumerate(("null", "first", "repeat"), 1):
+    for index, label in enumerate(("null", "denied", "first", "repeat"), 1):
         refused = label == "null"
+        denied = label == "denied"
+        failed = refused or denied
         name, uid = "prepare-" + label, f"00000000-0000-0000-0000-{index:012d}"
         parameters = load(
             "parent-parameters.json" if refused else "upgrade-request-parameters.json"
@@ -102,7 +134,9 @@ def populate(root, results):
                 )[1]
             )
         }
-        if not refused:
+        if denied:
+            phase_sources["migrate"]["status"]["nodes"]["migrate"]["phase"] = "Failed"
+        if not failed:
             phase_sources.update(
                 qualify=load("qualification-first.workflow.json"),
                 grant=load("grant-adopted.workflow.json"),
@@ -145,20 +179,24 @@ def populate(root, results):
                             "uid": "worker-" + node["id"],
                             "nodeID": node["id"],
                             "account": "release-runtime-grants",
-                            "exitCode": 2 if refused and node["displayName"] == "candidate" else 0,
+                            "exitCode": 1
+                            if denied and node["displayName"] == "migrate"
+                            else 2
+                            if refused and node["displayName"] == "candidate"
+                            else 0,
                         }
                     )
             phase_root = {
                 "id": phase_id,
                 "displayName": phase,
                 "type": "Steps",
-                "phase": "Failed" if refused else "Succeeded",
+                "phase": "Failed" if failed else "Succeeded",
                 "boundaryID": name,
                 "templateRef": {"name": SCOPE.PHASES[phase], "template": phase},
                 "startedAt": (earliest + shift).isoformat(),
                 "finishedAt": max(n["finishedAt"] for n in old_nodes.values()),
             }
-            if not refused:
+            if not failed:
                 leaf_name = {
                     "migrate": "schema-migration",
                     "qualify": "schema-qualification",
@@ -226,8 +264,8 @@ def populate(root, results):
             else:
                 for operation in SCOPE.PHASES:
                     for suffix in ("", "current-"):
-                        save(f"preparation-null.{operation}.{suffix}job.json", None)
-                        save(f"preparation-null.{operation}.{suffix}pods.json", {"items": []})
+                        save(f"preparation-{label}.{operation}.{suffix}job.json", None)
+                        save(f"preparation-{label}.{operation}.{suffix}pods.json", {"items": []})
             roots.append(phase_root)
             nodes.update({node["id"]: node for node in old_nodes.values()})
             nodes[phase_id] = phase_root
@@ -244,9 +282,9 @@ def populate(root, results):
             "displayName": name,
             "type": "Steps",
             "templateName": "prepare",
-            "phase": "Failed" if refused else "Succeeded",
+            "phase": "Failed" if failed else "Succeeded",
         }
-        if not refused:
+        if not failed:
             outer["outputs"] = {
                 "parameters": [
                     {"name": key, "value": job["metadata"]["name"]}
@@ -283,6 +321,31 @@ def populate(root, results):
         for suffix in ("", "current-"):
             save(f"preparation-{label}.{suffix}workflow.json", workflow)
             save(f"preparation-{label}.{suffix}workers.json", workers)
+        if denied:
+            native_id = name + "-migrate-migrate"
+            worker = next(w for w in workers if w["nodeID"] == native_id)
+            save(
+                "preparation-denied.diagnostic-pod.json",
+                {
+                    "metadata": {
+                        "name": "denied-native-worker",
+                        "namespace": "argo-workflows",
+                        "uid": worker["uid"],
+                        "annotations": {"workflows.argoproj.io/node-id": native_id},
+                    },
+                    "spec": {"serviceAccountName": worker["account"]},
+                    "status": {
+                        "containerStatuses": [
+                            {"name": "main", "state": {"terminated": {"exitCode": 1}}}
+                        ]
+                    },
+                },
+            )
+            (root / "preparation-denied.worker.private").write_text(
+                'Error from server (Forbidden): jobs.batch "perfeng-schema-'
+                + uid
+                + '" is forbidden: User "system:serviceaccount:argo-workflows:release-runtime-grants" cannot create resource "jobs" in API group "batch" in the namespace "perf-platform"\n'
+            )
         all_jobs.extend(case_jobs)
         save(f"preparation-{label}.jobs.json", {"items": deepcopy(all_jobs)})
     for label in ("retained", "final"):
@@ -337,9 +400,18 @@ class PreparationAcceptanceTests(unittest.TestCase):
             results.mkdir()
             populate(root, results)
             raw = (root / "preparation-first.workflow.json").read_bytes()
-            for mode in ("before", "null", "first", "repeat", "complete", "retained", "final"):
+            for mode in (
+                "before",
+                "null",
+                "denied",
+                "first",
+                "repeat",
+                "complete",
+                "retained",
+                "final",
+            ):
                 reports = MODULE.verify(root, results, mode)
-            self.assertEqual(len(reports), 3)
+            self.assertEqual(len(reports), 4)
             self.assertEqual(sum(len(r["jobUIDs"]) for r in reports), 6)
             self.assertEqual((root / "preparation-first.workflow.json").read_bytes(), raw)
 
@@ -470,7 +542,20 @@ class PreparationAcceptanceTests(unittest.TestCase):
         ]
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for fail in ("before", "null", "wait", "first", "repeat", "complete", "pass"):
+            for fail in (
+                "before",
+                "null",
+                "role-prepare",
+                "role-narrowed",
+                "denied",
+                "role-restore",
+                "role-restored",
+                "wait",
+                "first",
+                "repeat",
+                "complete",
+                "pass",
+            ):
                 trace = root / (fail + ".trace")
                 script = root / (fail + ".sh")
                 script.write_text(
@@ -482,11 +567,12 @@ complete_stage() { log complete; }
 k() { printf '{}'; }
 a() { printf '{}'; }
 jq() { cat >/dev/null; printf workflow; }
-argo() { [[ $current_stage != database-preparation-null ]] && [[ $FAIL != wait || $current_stage != database-preparation-first ]]; }
+argo() { [[ $current_stage != database-preparation-null && $current_stage != database-preparation-denied ]] && [[ $FAIL != wait || $current_stage != database-preparation-first ]]; }
 timeout() { shift; "$@"; }
 qualification_workers() { printf '[]' > "$2"; }
 preparation_jobs() { log "jobs-$1"; }
 preparation_snapshot() { log "snapshot-$1"; }
+runtime_grant_access() { log "rights-$1-$2"; }
 schema_parent_ledger_access() { log access; }
 uv() { local mode=${6}; log "verify-$mode"; [[ $FAIL != "$mode" ]]; }
 """
@@ -518,7 +604,7 @@ uv() { local mode=${6}; log "verify-$mode"; [[ $FAIL != "$mode" ]]; }
         ]
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for failure in ("snapshot", "access", "retained", "pass"):
+            for failure in ("snapshot", "access", "rights", "retained", "pass"):
                 trace = root / (failure + ".trace")
                 script = root / (failure + ".sh")
                 script.write_text(
@@ -531,6 +617,7 @@ k() { printf '{}'; }; a() { printf '{}'; }
 qualification_workers() { printf '[]' > "$2"; }
 preparation_jobs() { :; }
 preparation_snapshot() { step snapshot; }
+runtime_grant_access() { step rights; }
 schema_parent_ledger_access() { step access; }
 uv() { step "${6}"; }
 """

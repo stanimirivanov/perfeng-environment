@@ -279,7 +279,9 @@ def execution(
     assert account == "release-schema-migration" or retained_admission
     assert label in {*LABELS, "install", "contention", "rollback"}
     if retained_admission:
-        assert label in {"current-null", "first", "repeat"}
+        assert label in {"current-null", "first", "repeat"} or (
+            label == "denied" and account == "release-runtime-grants"
+        )
     assert workflow["metadata"]["namespace"] == "argo-workflows" and workflow["metadata"]["uid"]
     assert workflow["spec"]["workflowTemplateRef"] == {
         "name": "perfeng-release-schema-migration-v2"
@@ -452,11 +454,12 @@ def execution(
             assert re.search(
                 r'Error from server \(Forbidden\): [^\r\n]*jobs\.batch(?: "'
                 + re.escape(expected_name)
-                + r'")? is forbidden: User "system:serviceaccount:argo-workflows:release-schema-migration" '
-                r'cannot create resource "jobs" in API group "batch" in (?:the )?namespace "perf-platform"',
+                + r'")? is forbidden: User "system:serviceaccount:argo-workflows:'
+                + re.escape(account)
+                + r'" cannot create resource "jobs" in API group "batch" in (?:the )?namespace "perf-platform"',
                 diagnostic,
             )
-            sequence += [checkpoint_node, migrate]
+            sequence += [migrate] if retained_admission else [checkpoint_node, migrate]
             ordered(sequence)
             return report
         if label in {"contention", "rollback"}:

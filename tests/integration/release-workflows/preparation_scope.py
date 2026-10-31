@@ -32,7 +32,7 @@ def scopes(
     wanted: dict[str, Any],
     parameters: dict[str, str],
     *,
-    refused: bool = False,
+    migration_failed: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Validate the enclosing execution before constructing any in-memory subview."""
     metadata, spec, status = (workflow[key] for key in ("metadata", "spec", "status"))
@@ -60,7 +60,7 @@ def scopes(
         assert controller_form(stored[key]) == controller_form(wanted[key])
         if key in spec:
             assert controller_form(spec[key]) == controller_form(wanted[key])
-    assert status["phase"] in ({"Failed", "Error"} if refused else {"Succeeded"})
+    assert status["phase"] in ({"Failed", "Error"} if migration_failed else {"Succeeded"})
     nodes = status["nodes"]
     assert all(key == node["id"] for key, node in nodes.items())
     root_id = metadata["name"]
@@ -74,13 +74,13 @@ def scopes(
             for n in nodes.values()
             if n.get("boundaryID") == root_id and n["displayName"] == phase and n["type"] == "Steps"
         ]
-        if refused and phase != "migrate":
+        if migration_failed and phase != "migrate":
             assert not found or all(n["phase"] in {"Skipped", "Omitted"} for n in found)
             continue
         assert len(found) == 1
         node = found[0]
         assert node["templateRef"] == {"name": reference, "template": phase}
-        assert node["phase"] in ({"Failed", "Error"} if refused else {"Succeeded"})
+        assert node["phase"] in ({"Failed", "Error"} if migration_failed else {"Succeeded"})
         roots[phase] = node
     root_phases = {node["id"]: phase for phase, node in roots.items()}
 
@@ -110,7 +110,7 @@ def scopes(
             selected[phase][identity] = deepcopy(node)
         elif identity != root_id:
             assert node["type"] == "StepGroup" or (
-                refused
+                migration_failed
                 and node["displayName"] in {"qualify", "grant"}
                 and node["phase"] in {"Skipped", "Omitted"}
                 and node["type"] != "Pod"
