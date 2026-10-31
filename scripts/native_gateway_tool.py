@@ -224,11 +224,11 @@ def metadata(binary: Path, serving: bool = True) -> str:
             go is None
             or "go" + ".".join(go.groups()) != GO_VERSION
             or net is None
-            or tuple(map(int, net.groups())) < (0, 60, 0)
+            or tuple(map(int, net.groups())) < (0, 62, 0)
         ):
             raise GatewayError(
                 "TOOL_SECURITY",
-                f"Caddy requires reviewed {GO_VERSION} and x/net >=v0.60.0",
+                f"Caddy requires reviewed {GO_VERSION} and x/net >=v0.62.0",
                 "publish a reviewed patched build; do not bypass the gate",
             )
         if "build\tGOOS=linux" not in info or "build\tGOARCH=amd64" not in info:

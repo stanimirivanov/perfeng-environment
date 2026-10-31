@@ -23,7 +23,7 @@ from scripts import native_gateway_release as release
 from scripts import native_gateway_tool as tool
 from scripts.native_gateway_processes import ProcessScope
 
-INFO = "go\tgo1.27.3\ndep\tgithub.com/caddyserver/caddy/v2\tv2.11.7\th1:fixture\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\nbuild\tGOOS=linux\nbuild\tGOARCH=amd64\n"
+INFO = "go\tgo1.27.3\ndep\tgithub.com/caddyserver/caddy/v2\tv2.11.7\th1:fixture\ndep\tgolang.org/x/net\tv0.62.0\th1:fixture\nbuild\tGOOS=linux\nbuild\tGOARCH=amd64\n"
 
 
 def redirect_headers(location: str) -> Message:
@@ -83,7 +83,8 @@ class GatewayToolTests(unittest.TestCase):
             (INFO, None),
             (INFO.replace("go1.27.3", "go1.27.2"), "TOOL_SECURITY"),
             (INFO.replace("go1.27.3", "go1.26.9"), "TOOL_SECURITY"),
-            (INFO.replace("v0.60.0", "v0.59.0"), "TOOL_SECURITY"),
+            (INFO.replace("v0.62.0", "v0.60.0"), "TOOL_SECURITY"),
+            (INFO.replace("v0.62.0", "v0.61.0"), "TOOL_SECURITY"),
             (INFO.replace("v2.11.7", "v2.11.6"), "TOOL_PROVENANCE"),
             (INFO + "=>\t../replacement\t(devel)\n", "TOOL_PROVENANCE"),
             (INFO.replace("GOOS=linux", "GOOS=darwin"), "TOOL_PLATFORM"),

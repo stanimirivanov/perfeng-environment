@@ -37,7 +37,7 @@ security fix does not inherit the control-plane dependency update.
 The official adaptation archive reports Go 1.26.8 and is not a serving fallback.
 Serving has a separate reviewed asset/checksum/source selection in
 `native-gateway/serving-release.json`. The publisher builds the standard entry
-point as a dependency using locked modules, Go 1.27.3 and x/net >=v0.60.0,
+point as a dependency using locked modules, Go 1.27.3 and x/net >=v0.62.0,
 without replacements. It checks real version/build output, audits the resulting
 executable and exercises isolated Linux TLS startup/shutdown. Local setup
 checks the selected bytes and metadata again. Build minima and a past audit do
