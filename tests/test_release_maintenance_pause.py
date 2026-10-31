@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -214,9 +213,6 @@ class MaintenancePauseTests(unittest.TestCase):
             ],
         )
 
-    @unittest.skipIf(
-        os.name == "nt" and not JQ, "jq unavailable on Windows; Linux CI requires native replay"
-    )
     def test_captured_projection_and_snapshot_verify_the_same_selected_resource(self):
         for name, template in (("child", "application"), ("deployment", "deployment")):
             code = self.templates[template]["outputs"]["parameters"][0]["valueFrom"]["jqFilter"]
@@ -309,9 +305,6 @@ class MaintenancePauseTests(unittest.TestCase):
             ):
                 runtime.run_adoption()
 
-    @unittest.skipIf(
-        os.name == "nt" and not JQ, "jq unavailable on Windows; Linux CI requires native replay"
-    )
     def test_fresh_reads_allow_status_refresh_but_refuse_spec_identity_and_ownership_changes(self):
         for name, original in self.resources.items():
             current = deepcopy(original)
@@ -344,10 +337,6 @@ class MaintenancePauseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.guarded(name, changed)
 
-    @unittest.skipIf(
-        os.name == "nt" and not (JQ and KUBECTL),
-        "Native tools unavailable on Windows; Linux CI requires jq and kubectl replay",
-    )
     def test_actual_kubectl_patch_changes_only_pause_fields_and_rejects_stale_guards(self):
         assert KUBECTL
         with tempfile.TemporaryDirectory() as temp:

@@ -105,16 +105,16 @@ class NativeConnectivityTests(unittest.TestCase):
                 patch.object(
                     gateway.native_gateway_tool,
                     "installed",
-                    return_value=root / "managed/caddy.exe",
+                    return_value=root / "managed/caddy",
                 ),
                 patch.object(gateway.native_gateway_host, "private_permissions"),
                 patch.object(gateway.native_gateway_tool, "metadata"),
-                patch.object(gateway.shutil, "which", return_value=str(root / "offline/caddy.exe")),
+                patch.object(gateway.shutil, "which", return_value=str(root / "offline/caddy")),
             ):
                 gateway.run_tool("gateway", root)
                 self.assertEqual(run.call_args.kwargs["timeout"], 3600)
                 self.assertEqual(run.call_args.kwargs["cwd"], root)
-                self.assertEqual(run.call_args.args[0][0], str(root / "managed/caddy.exe"))
+                self.assertEqual(run.call_args.args[0][0], str(root / "managed/caddy"))
                 gateway.run_tool("validate", root)
                 self.assertEqual(run.call_args.kwargs["timeout"], 10)
 
@@ -143,7 +143,7 @@ class NativeConnectivityTests(unittest.TestCase):
     def test_release_checksum_selection_agrees_with_tool_version(self):
         release = json.loads((gateway.ROOT / "native-gateway/caddy-release.json").read_text())
         self.assertEqual("v" + release["version"], gateway.CADDY_VERSION)
-        self.assertEqual(set(release["sha512"]), {"linux_amd64", "windows_amd64"})
+        self.assertEqual(set(release["sha512"]), {"linux_amd64"})
         for value in release["sha512"].values():
             self.assertRegex(value, r"^[0-9a-f]{128}$")
 

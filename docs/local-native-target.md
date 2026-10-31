@@ -7,7 +7,7 @@
 - After merge, verify the candidate with `task native:target-health`, then start `task native:target` in its own terminal.
 - Restart the gateway to apply its proxy-only target route; the HTTPS origin remains `https://127.0.0.1:10443/`.
 - `task native:check` requires both exact candidate bytes and the selected ready image/Pod; no file-serving fallback exists.
-- This is target connectivity acceptance, not accepted Windows qualification, native acquisition or M03 completion.
+- This is target connectivity acceptance, not accepted Linux qualification, native acquisition or M03 completion.
 
 ## Selection and ownership
 
@@ -35,7 +35,7 @@ until live drift/rollback behavior has been reviewed.
 
 Run the ordinary gate and the pinned integration tier:
 
-```powershell
+```sh
 make validate
 make release-selection-check
 uv run --locked python scripts/native_target_release.py validate
@@ -58,7 +58,7 @@ verification expectations and build source, never a fallback HTTP server.
 Complete the existing local GitOps prerequisites first. The root reads `main`,
 so uncommitted local changes cannot deploy the Application. After review/merge:
 
-```powershell
+```sh
 uv run --locked python scripts/gitops.py bootstrap --execute
 uv run --locked python scripts/gitops.py health --execute
 task native:target-health
@@ -96,7 +96,7 @@ Caddy build and previously reviewed CA trust. Stop an old gateway with Ctrl+C
 before restarting it; retain its CA and private state. Start these four bounded
 foreground sessions in separate terminals:
 
-```powershell
+```sh
 task native:api
 task native:s3
 task native:target
@@ -140,7 +140,7 @@ acceptance. No resource deletion or trust change is part of this workflow.
 
 ## Remaining M03 gates
 
-The target can be deployed independently of Windows qualification. The actual
+The target can be deployed independently of Linux qualification. The actual
 laptop still requires an accepted fresh report under its explicit profile.
 Native bundle promotion, the newer control-plane selection, worker credential,
 signed PUT/internal read-back, browser normalization/baseline decision,

@@ -65,7 +65,7 @@ selected provider without generating or rewriting desired state.
 Validate the explicit release and local objects without accessing the network,
 Docker or Kubernetes:
 
-```powershell
+```sh
 uv run --locked python scripts/infrastructure_release.py validate
 uv run --locked python scripts/infrastructure_runtime.py argocd validate
 uv run --locked python scripts/gitops.py validate
@@ -122,7 +122,7 @@ state reaches `main`:
 Task 3 provides the supported high-level entry point for stages 1 through the
 S3 initialization and access probe:
 
-```powershell
+```sh
 task bootstrap
 ```
 
@@ -135,18 +135,16 @@ control-plane preparation boundary; complete those reviewed stages below.
 The individual commands remain canonical for preview, diagnosis and partial
 recovery:
 
-```powershell
+```sh
 uv run --locked python scripts/infrastructure_runtime.py cluster ensure --execute
 uv run --locked python scripts/cluster.py bootstrap --execute
 uv run --locked python scripts/postgres.py bootstrap --execute
 uv run --locked python scripts/object_store.py bootstrap --execute
 
-$env:PERFENG_REPOSITORIES_READ_TOKEN = Read-Host `
-  "GHCR package-read token" -MaskInput
+read -rsp "GHCR package-read token: " PERFENG_REPOSITORIES_READ_TOKEN; printf "\n"; export PERFENG_REPOSITORIES_READ_TOKEN
 uv run --locked python scripts/control_plane_registry.py deploy --execute
 
-$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
-  "GitHub private-repository read token" -MaskInput
+read -rsp "GitHub private-repository read token: " PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN; printf "\n"; export PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN
 uv run --locked python scripts/infrastructure_runtime.py argocd bootstrap --execute
 uv run --locked python scripts/gitops.py bootstrap --execute
 uv run --locked python scripts/object_store.py initialize --execute
@@ -156,7 +154,7 @@ uv run --locked python scripts/storage_access.py --execute
 Publish the checkout policy through the exact reviewed command in
 [policy publication](policy-publication.md), then continue:
 
-```powershell
+```sh
 uv run --locked python scripts/control_plane_database.py deploy --execute
 uv run --locked python scripts/control_plane_migration.py deploy --execute
 uv run --locked python scripts/control_plane_runtime.py deploy --execute
@@ -179,7 +177,7 @@ creates the expected bucket if it is absent.
 After the remaining control-plane prerequisites are complete, use the compact
 status and acceptance entry points:
 
-```powershell
+```sh
 task status
 task smoke
 ```
@@ -216,7 +214,7 @@ health, complete the provisioning sections in
 inputs**. Use the staged `bootstrap` action on a fresh cluster. Verify the
 external resources with:
 
-```powershell
+```sh
 uv run --locked python scripts/control_plane_migration.py health --execute
 uv run --locked python scripts/control_plane_runtime.py health --execute
 ```
@@ -240,9 +238,8 @@ The classic `PERFENG_REPOSITORIES_READ_TOKEN` with `read:packages` remains a
 separate GHCR credential and cannot check out private Git repositories. Store
 the source token only in the current process environment:
 
-```powershell
-$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = Read-Host `
-  "GitHub private-repository read token" -MaskInput
+```sh
+read -rsp "GitHub private-repository read token: " PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN; printf "\n"; export PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN
 uv run --locked python scripts/gitops.py bootstrap --execute
 ```
 
@@ -251,9 +248,9 @@ Secret from the package-only token, replace only that known owned Secret before
 rerunning bootstrap. This is an explicit credential rotation; bootstrap never
 deletes or silently overwrites it:
 
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n argocd delete secret `
+```sh
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n argocd delete secret \
   perfeng-github-repository-credentials
 uv run --locked python scripts/gitops.py bootstrap --execute
 ```
@@ -291,7 +288,7 @@ immutable.
 
 Run the non-destructive health workflow after bootstrap:
 
-```powershell
+```sh
 uv run --locked python scripts/gitops.py health
 uv run --locked python scripts/gitops.py health --execute
 ```
@@ -334,10 +331,10 @@ explicitly announced refresh request changes Application metadata.
 Standard Kubernetes inspection remains available without installing the Argo CD
 CLI:
 
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+```sh
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
   --context kind-perfeng-local -n argocd get applications,appprojects
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
   --context kind-perfeng-local -n argocd get pods
 ```
 
@@ -354,12 +351,12 @@ disabled everywhere.
 After this change reaches `main` and GitOps health passes, introduce one bounded,
 reversible replica drift in the stateless sample SUT:
 
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n perf-sut patch deployment sample-sut `
+```sh
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n perf-sut patch deployment sample-sut \
   --type merge --patch '{"spec":{"replicas":2}}' -o jsonpath='{.spec.replicas}'
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n perf-sut wait `
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n perf-sut wait \
   --for=jsonpath='{.spec.replicas}'=1 deployment/sample-sut --timeout=180s
 uv run --locked python scripts/gitops.py health --execute
 ```
@@ -412,13 +409,13 @@ restart. This revision enables self-healing and makes the chart's rolling-update
 partition explicit at `0`. After merge, test only that safe field by changing it
 to `1` and waiting for Argo CD to restore `0`:
 
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n perf-platform patch statefulset postgres `
+```sh
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n perf-platform patch statefulset postgres \
   --type merge --patch '{"spec":{"updateStrategy":{"rollingUpdate":{"partition":1}}}}'
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n perf-platform wait `
-  --for=jsonpath='{.spec.updateStrategy.rollingUpdate.partition}'=0 `
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n perf-platform wait \
+  --for=jsonpath='{.spec.updateStrategy.rollingUpdate.partition}'=0 \
   statefulset/postgres --timeout=180s
 uv run --locked python scripts/gitops.py health --execute
 ```
@@ -444,13 +441,13 @@ rolling-update partition explicit at `0`.
 After this change reaches `main` and normal GitOps health passes, test only that
 safe field by changing it to `1` and waiting for Argo CD to restore `0`:
 
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n perf-platform patch statefulset seaweedfs `
+```sh
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n perf-platform patch statefulset seaweedfs \
   --type merge --patch '{"spec":{"updateStrategy":{"rollingUpdate":{"partition":1}}}}'
-kubectl --kubeconfig .local/perfeng-local.kubeconfig `
-  --context kind-perfeng-local -n perf-platform wait `
-  --for=jsonpath='{.spec.updateStrategy.rollingUpdate.partition}'=0 `
+kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local -n perf-platform wait \
+  --for=jsonpath='{.spec.updateStrategy.rollingUpdate.partition}'=0 \
   statefulset/seaweedfs --timeout=180s
 uv run --locked python scripts/gitops.py health --execute
 ```

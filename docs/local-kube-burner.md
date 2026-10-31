@@ -10,19 +10,19 @@ benchmark, modifies capture files, or assembles normalized results.
 
 Run the preview first from `perfeng-environment`:
 
-```powershell
-uv run --locked python scripts/kube_burner_upload.py `
-  ..\perfeng-k8s\.local\results\perf-20260908-120000-a1b2c3d4 `
+```sh
+uv run --locked python scripts/kube_burner_upload.py \
+  ..\perfeng-k8s\.local\results\perf-20260908-120000-a1b2c3d4 \
   --receipt .local\kube-burner-manifest-request.json
 ```
 
 The preview validates the execution receipt and its files without contacting
 Kubernetes or storage. Review the generated uploader Pod, then execute:
 
-```powershell
-uv run --locked python scripts/kube_burner_upload.py `
-  ..\perfeng-k8s\.local\results\perf-20260908-120000-a1b2c3d4 `
-  --receipt .local\kube-burner-manifest-request.json `
+```sh
+uv run --locked python scripts/kube_burner_upload.py \
+  ..\perfeng-k8s\.local\results\perf-20260908-120000-a1b2c3d4 \
+  --receipt .local\kube-burner-manifest-request.json \
   --execute
 ```
 
@@ -42,11 +42,11 @@ any created uploader Pod for diagnosis.
 The output is the exact request accepted by `perfeng-k8s`'s offline manifest
 assembler. Use it with the same unchanged capture directory:
 
-```powershell
-Set-Location ..\perfeng-k8s
-uv run --locked python -m scripts.manifest `
-  .local\results\perf-20260908-120000-a1b2c3d4 `
-  ..\perfeng-environment\.local\kube-burner-manifest-request.json `
+```sh
+cd ..\perfeng-k8s
+uv run --locked python -m scripts.manifest \
+  .local\results\perf-20260908-120000-a1b2c3d4 \
+  ..\perfeng-environment\.local\kube-burner-manifest-request.json \
   .local\raw-result.json
 ```
 
@@ -56,10 +56,10 @@ semantics.
 
 Publish the assembled manifest last at the stable discovery key:
 
-```powershell
-Set-Location ..\perfeng-environment
-uv run --locked python scripts/raw_result_upload.py `
-  ..\perfeng-k8s\.local\raw-result.json `
+```sh
+cd ..\perfeng-environment
+uv run --locked python scripts/raw_result_upload.py \
+  ..\perfeng-k8s\.local\raw-result.json \
   --receipt .local\kube-burner-raw-result-upload.json
 ```
 

@@ -23,7 +23,7 @@ from scripts import native_gateway_release as release
 from scripts import native_gateway_tool as tool
 from scripts.native_gateway_processes import ProcessScope
 
-INFO = "go\tgo1.27.3\ndep\tgithub.com/caddyserver/caddy/v2\tv2.11.7\th1:fixture\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\nbuild\tGOOS=windows\nbuild\tGOARCH=amd64\n"
+INFO = "go\tgo1.27.3\ndep\tgithub.com/caddyserver/caddy/v2\tv2.11.7\th1:fixture\ndep\tgolang.org/x/net\tv0.60.0\th1:fixture\nbuild\tGOOS=linux\nbuild\tGOARCH=amd64\n"
 
 
 def redirect_headers(location: str) -> Message:
@@ -35,7 +35,7 @@ def redirect_headers(location: str) -> Message:
 def selection(data: bytes = b"binary") -> dict:
     return {
         "schemaVersion": 1,
-        "platform": "windows/amd64",
+        "platform": "linux/amd64",
         "caddyVersion": "v2.11.7",
         "goVersion": "go1.27.3",
         "release": {
@@ -74,7 +74,7 @@ class GatewayToolTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 tool.GatewayError, r"TOOL_VERSION.*expected v2.11.7; observed unknown"
             ) as raised:
-                tool.metadata(Path("managed/caddy.exe"))
+                tool.metadata(Path("managed/caddy"))
         self.assertIn("managed", str(raised.exception))
         self.assertIn("native:setup", str(raised.exception))
 
@@ -86,7 +86,7 @@ class GatewayToolTests(unittest.TestCase):
             (INFO.replace("v0.60.0", "v0.59.0"), "TOOL_SECURITY"),
             (INFO.replace("v2.11.7", "v2.11.6"), "TOOL_PROVENANCE"),
             (INFO + "=>\t../replacement\t(devel)\n", "TOOL_PROVENANCE"),
-            (INFO.replace("GOOS=windows", "GOOS=linux"), "TOOL_PLATFORM"),
+            (INFO.replace("GOOS=linux", "GOOS=darwin"), "TOOL_PLATFORM"),
         ):
             with (
                 self.subTest(code=code),
@@ -101,9 +101,9 @@ class GatewayToolTests(unittest.TestCase):
             ):
                 if code:
                     with self.assertRaisesRegex(tool.GatewayError, code):
-                        tool.metadata(Path("caddy.exe"))
+                        tool.metadata(Path("caddy"))
                 else:
-                    self.assertEqual(tool.metadata(Path("caddy.exe")), INFO)
+                    self.assertEqual(tool.metadata(Path("caddy")), INFO)
 
     def test_metadata_never_echoes_vendor_stderr(self):
         with patch.object(
@@ -112,63 +112,20 @@ class GatewayToolTests(unittest.TestCase):
             side_effect=subprocess.CalledProcessError(1, [], stderr=b"secret-signature"),
         ):
             with self.assertRaises(tool.GatewayError) as raised:
-                tool.metadata(Path("caddy.exe"))
+                tool.metadata(Path("caddy"))
         self.assertNotIn("secret-signature", str(raised.exception))
 
-    def test_security_shell_uses_builtin_path_and_isolates_core_module_lookup(self):
-        with (
-            patch.dict(
-                host.os.environ,
-                {"SystemRoot": "C:/Windows", "PSModulePath": "unrelated-core-modules"},
-            ),
-            patch.object(
-                host.subprocess,
-                "run",
-                return_value=subprocess.CompletedProcess([], 0, stdout="private"),
-            ) as run,
-        ):
-            self.assertEqual(host.powershell("fixed-script", Path("private-state")), "private")
-        self.assertNotIn("PSModulePath", run.call_args.kwargs["env"])
-        self.assertEqual(Path(run.call_args.args[0][0]).name, "powershell.exe")
-        self.assertIn("WindowsPowerShell", run.call_args.args[0][0])
-        self.assertEqual(run.call_args.kwargs["timeout"], host.POWERSHELL_TIMEOUT)
-        self.assertGreater(host.POWERSHELL_TIMEOUT, 20)
-        self.assertLess(host.POWERSHELL_TIMEOUT, 45)
-
-    def test_security_timeout_is_distinct_sanitized_and_never_retried(self):
-        failures = (
-            (
-                subprocess.TimeoutExpired(
-                    ["powershell", "private-command"],
-                    host.POWERSHELL_TIMEOUT,
-                    output="private-output",
-                    stderr="private-error",
-                ),
-                "HOST_SECURITY_TIMEOUT",
-            ),
-            (
-                subprocess.CalledProcessError(
-                    1,
-                    ["powershell", "private-command"],
-                    output="private-output",
-                    stderr="private-error",
-                ),
-                "HOST_SECURITY",
-            ),
-        )
-        for failure, code in failures:
-            with (
-                self.subTest(code=code),
-                patch.dict(host.os.environ, {"SystemRoot": "C:/Windows"}),
-                patch.object(host.subprocess, "run", side_effect=failure) as run,
-                self.assertRaises(tool.GatewayError) as raised,
-            ):
-                host.powershell(host.SECURE_SCRIPT, Path("private-state"))
-            self.assertEqual(raised.exception.code, code)
-            self.assertNotIn("private-output", str(raised.exception))
-            self.assertNotIn("private-error", str(raised.exception))
-            self.assertNotIn("private-command", str(raised.exception))
-            run.assert_called_once()
+    def test_private_state_rejects_group_access_without_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            state = tool.safe_state(root)
+            state.mkdir(parents=True, mode=0o700)
+            state.chmod(0o750)
+            with self.assertRaises(tool.GatewayError):
+                host.private_permissions(root)
+            self.assertEqual(state.stat().st_mode & 0o777, 0o750)
+            state.chmod(0o700)
+            host.private_permissions(root)
 
     def test_unpublished_release_fails_closed(self):
         value = selection()
@@ -214,7 +171,7 @@ class GatewayToolTests(unittest.TestCase):
             (root / "native-gateway/serving-release.json").write_text(json.dumps(selection()))
             state = root / ".local/native-gateway"
             state.mkdir(parents=True)
-            legacy = state / "caddy.exe"
+            legacy = state / "caddy"
             legacy.write_bytes(b"legacy")
             with (
                 patch.object(
@@ -282,7 +239,7 @@ class GatewayToolTests(unittest.TestCase):
             patch.object(tool.urllib.request, "build_opener") as build,
         ):
             build.return_value.open.side_effect = [redirect, response]
-            target = Path(temporary) / "caddy.exe"
+            target = Path(temporary) / "caddy"
             tool.download(tool.parse_selection(selection()), target)
             self.assertEqual(target.read_bytes(), b"binary")
             first, second = build.return_value.open.call_args_list
@@ -291,7 +248,7 @@ class GatewayToolTests(unittest.TestCase):
 
     def test_foreign_redirect_and_missing_auth_are_safe_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary) / "caddy.exe"
+            target = Path(temporary) / "caddy"
             with (
                 patch.dict(tool.os.environ, {}, clear=True),
                 self.assertRaisesRegex(tool.GatewayError, "REPOSITORY_AUTH"),
@@ -320,8 +277,8 @@ class GatewayToolTests(unittest.TestCase):
         import yaml
 
         workflow = yaml.safe_load((tool.ROOT / ".github/workflows/native-gateway.yml").read_text())
-        build = workflow["jobs"]["windows-serving"]
-        self.assertEqual(build["runs-on"], "windows-latest")
+        build = workflow["jobs"]["linux-serving"]
+        self.assertEqual(build["runs-on"], "ubuntu-24.04")
         self.assertEqual(build["steps"][0]["with"].get("fetch-depth"), 0)
         self.assertFalse(build["steps"][0]["with"]["persist-credentials"])
         setup_go = next(
@@ -338,12 +295,11 @@ class GatewayToolTests(unittest.TestCase):
         publisher = workflow["jobs"]["publish"]
         self.assertIn("inputs.publish", publisher["if"])
         self.assertIn("refs/heads/main", publisher["if"])
-        self.assertEqual(publisher["needs"], "windows-serving")
-        self.assertIn("record.development", str(publisher))
+        self.assertEqual(publisher["needs"], "linux-serving")
+        self.assertIn(".development", str(publisher))
 
 
 class GatewayWorkflowTests(unittest.TestCase):
-    @unittest.skipUnless(os.name == "nt", "Windows OWNER RIGHTS ACL semantics")
     def test_python_private_temp_directory_and_hard_link_remain_account_private(self):
         with tempfile.TemporaryDirectory() as temporary, contextlib.redirect_stdout(io.StringIO()):
             root = Path(temporary).resolve()
@@ -352,7 +308,7 @@ class GatewayWorkflowTests(unittest.TestCase):
             with tempfile.TemporaryDirectory(dir=state) as download:
                 source = Path(download) / "fixture"
                 source.write_bytes(b"fixture")
-                target = state / "tools/fixture/caddy.exe"
+                target = state / "tools/fixture/caddy"
                 target.parent.mkdir(parents=True)
                 os.link(source, target)
                 host.private_permissions(root)
@@ -451,7 +407,7 @@ class GatewayWorkflowTests(unittest.TestCase):
         scope = Mock()
         with (
             patch.object(doctor, "collect", return_value=[]),
-            patch.object(tool, "installed", return_value=Path("managed/caddy.exe")),
+            patch.object(tool, "installed", return_value=Path("managed/caddy")),
             patch.object(host, "private_permissions"),
             patch.object(host, "ca_file", return_value=Path("root.crt")),
             patch.object(host, "fingerprint", return_value="a" * 64),
@@ -478,9 +434,7 @@ class GatewayWorkflowTests(unittest.TestCase):
         if failure != "startup":
             self.assertEqual(scope.start.call_count, 4)
             self.assertEqual(scope.start.call_args_list[2].args[1][-2], "pod/native-search-exact")
-            self.assertEqual(
-                scope.start.call_args_list[3].args[1][0], str(Path("managed/caddy.exe"))
-            )
+            self.assertEqual(scope.start.call_args_list[3].args[1][0], str(Path("managed/caddy")))
             self.assertEqual(check.call_args.kwargs["expected_pod"], "native-search-exact")
 
     def test_interrupt_stops_every_owned_child(self):

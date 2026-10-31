@@ -16,7 +16,7 @@
 
 ## 1. Complete the deployment prerequisites
 
-Use an ordinary PowerShell terminal in `perfeng-environment`. Keep Docker Desktop
+Use an ordinary Bash terminal in `perfeng-environment`. Keep Docker Desktop
 running. Finish every activation check in the
 [runtime deployment guide](kubernetes-runtime-deployment.md#activate-after-merge),
 including GitOps health, execution registry health, checkout smoke and all six
@@ -27,7 +27,7 @@ enable automatic sync, migrate a database, install metrics or provision Secrets.
 Keep `perfeng-k8s`, `perfeng-control-plane` and `perfeng-contracts` beside this
 repository with the selected Git objects available. Run:
 
-```powershell
+```sh
 make release-selection-check
 task kubernetes:acceptance
 ```
@@ -61,8 +61,8 @@ inter-operator lock and cannot prevent a new submission racing the check.
 On the first exercise, explicitly authorize creation, qualification and approval
 of the policy-selected integration baseline:
 
-```powershell
-task kubernetes:acceptance -- --execute --confirm perfeng-local `
+```sh
+task kubernetes:acceptance -- --execute --confirm perfeng-local \
   --candidate-git-sha $candidateRevision --approve-baseline
 ```
 
@@ -138,9 +138,9 @@ If baseline creation/transition was interrupted, inspect the journal and the
 existing source Run/baseline. Once active work and cleanup holds are resolved,
 an explicit retry may reuse that source:
 
-```powershell
-task kubernetes:acceptance -- --execute --confirm perfeng-local `
-  --candidate-git-sha $candidateRevision --reference-run $referenceRunId `
+```sh
+task kubernetes:acceptance -- --execute --confirm perfeng-local \
+  --candidate-git-sha $candidateRevision --reference-run $referenceRunId \
   --approve-baseline
 ```
 

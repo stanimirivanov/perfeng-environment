@@ -41,7 +41,7 @@ class BrowserDiagnosticsTests(unittest.TestCase):
             },
             "diagnosticMode": mode,
             "environment": {
-                "profile": {"id": "windows-mainstream", "version": "1.0.0"},
+                "profile": {"id": "linux-mainstream", "version": "1.0.0"},
                 "fingerprint": FINGERPRINT,
             },
             "measurementWindow": {
@@ -177,7 +177,7 @@ class BrowserDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(manifest["kind"], "BrowserDiagnostics")
         self.assertEqual(manifest["execution"]["captureIterations"], [1, 2, 3])
-        self.assertEqual(manifest["sources"], ["playwright", "web-performance", "windows"])
+        self.assertEqual(manifest["sources"], ["playwright", "web-performance"])
         self.assertEqual(manifest["captures"][0]["type"], "observations")
         self.assertEqual(manifest["captures"][0]["status"], "COMPLETE")
         self.assertEqual(manifest["environment"]["artifact"]["format"], "browser-environment/v1")

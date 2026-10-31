@@ -143,8 +143,8 @@ def assemble(
     os_data = mapping(observed["os"], "qualification.observed.os")
     runtime = mapping(measurements["runtime"], "measurements.runtime")
     browser = mapping(measurements["browser"], "measurements.browser")
-    if runtime["platform"] != "win32" or os_data["family"] != "windows":
-        raise ValueError("Browser environment artifact requires native Windows execution")
+    if runtime["platform"] != "linux" or os_data["family"] != "linux":
+        raise ValueError("Browser environment artifact requires native Linux execution")
     if runtime["architecture"] != os_data["architecture"]:
         raise ValueError("Browser runtime architecture does not match the qualified host")
     if (

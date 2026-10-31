@@ -21,7 +21,7 @@ after the issue branch was created from `main`. It covers the `bootstrap` and
 `kubernetes:prepare` task bodies because those are the supported cluster
 foundation and M04 release-preparation sequences. Each directly invoked
 `scripts/*.py` path is counted once, even when a task invokes it twice or both
-tasks use it. Physical lines are `Get-Content <file>` line counts, including
+tasks use it. Physical lines are `wc -l <file>` line counts, including
 comments and blanks. The table below records the 13 paths and makes the
 3,545-line sum reproducible without a new measurement program.
 

@@ -1,7 +1,6 @@
 """Prove grant-v2 wiring reuses admission policy without invoking schema migration."""
 
 import json
-import os
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -142,9 +141,6 @@ class RuntimeGrantsAdmissionTests(unittest.TestCase):
         self.assertIn("release-runtime-grants-v1.yaml", selected)
         self.assertIn("release-runtime-grants-v2.yaml", selected)
 
-    @unittest.skipIf(
-        os.name == "nt" and not admission.JQ, "jq unavailable on Windows; required on Linux CI"
-    )
     def test_actual_referenced_policy_accepts_baseline_and_refuses_conflicting_records(self):
         fixture = admission.SchemaAdmissionTests()
         fixture.setUp()

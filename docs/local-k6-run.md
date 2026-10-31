@@ -14,7 +14,7 @@ The run command never installs or repairs prerequisites.
 It rejects the obsolete echo fixture or a sample API image/source checksum that
 does not match the current chart.
 
-~~~powershell
+~~~sh
 uv run --locked python scripts/k6_run.py
 uv run --locked python scripts/k6_run.py --execute
 ~~~

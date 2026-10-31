@@ -41,7 +41,7 @@
   [release adoption recovery](release-adoption.md#partial-failure-and-recovery).
   Preserve receipts and pointer; do not apply, patch, delete or infer empty state.
 
-- For trusted Windows-worker API/S3 access or search-target failures, follow the
+- For trusted Linux-worker API/S3 access or search-target failures, follow the
   [native connectivity checklist](native-worker-connectivity.md#failure-and-recovery).
   TLS/readiness is not proof of signed upload, internal read-back or acquisition.
 
@@ -264,15 +264,11 @@ truthful. Publish and select a patched release through the existing explicit
 handoff; do not relabel the asset, downgrade the gate or delete installed/CA
 state. See [ADR 0029](decisions/0029-require-patched-native-gateway-toolchain.md).
 
-`HOST_SECURITY_TIMEOUT` means the fixed Windows PowerShell operation exceeded
-its 40-second budget, including cold startup. Inspect host load and gateway state
-before repeating a permissions action: it may have applied before timing out.
-The operation is never retried automatically and vendor output remains private.
-This budget stays below the doctor's 45-second command budget; a timeout is not
-evidence of an ACL violation. The explicit ACL checks remain unchanged.
+Linux host-probe failures retain existing state. Missing `glxinfo`, `xrandr`,
+`powerprofilesctl`, clock or power-source evidence is an unqualified host, not
+permission to fabricate values. See [Linux qualification](linux-browser-host.md).
 
-`STATE_PERMISSIONS`/`HOST_SECURITY` require review of the gateway directory's
-Security settings; `task native:permissions` is a separately prompted local
+`STATE_PERMISSIONS` require review of the gateway directory ownership and POSIX modes; `task native:permissions` is a separately prompted local
 permission change, never an implicit doctor repair. Previously exposed CA keys
 require a separate trust/CA review, not an automatic rotation. API/cluster probes
 have bounded command budgets; failures retain all cluster data. `native:up`
@@ -287,27 +283,26 @@ gateway to apply the proxy-only route. A missing target/tunnel fails closed,
 never back to checkout files. Retain pull credentials, CA and rejected evidence.
 
 For candidate image build/publication or rejected browser-host qualification,
-follow the [candidate guide](native-browser-candidate.md). GUID braces/case are
-equivalent power-plan identity; hardware, OS, display and calibration mismatches
+follow the [candidate guide](native-browser-candidate.md). Linux power-profile names are compared exactly; hardware, OS, display and calibration mismatches
 still require review. Never edit a rejected report to qualify a run. Image
 functional verification does not replace base/runtime advisory review.
 
 For the four-core 4K laptop, select
-`--profile profiles/browser/windows-four-core-4k.yaml` as documented in the
-[host guide](windows-browser-host.md#select-a-comparison-cohort). Use it for both
+`--profile profiles/browser/linux-four-core-4k.yaml` as documented in the
+[host guide](linux-browser-host.md#select-a-comparison-cohort). Use it for both
 the live host check and environment assembly, and match the runner's profile
 identity/fingerprint. A missing selection still uses mainstream and will reject
-the different hardware. OS build 22621 or background CPU 20% still rejects the
+the different hardware. Kernel major version 5 or background CPU 20% still rejects the
 laptop profile; resolve the independent gate before making a fresh capture.
 Never alter the earlier report, reuse its hash as environment evidence or mix
 the two cohorts' baselines. These checks do not modify host settings.
 
-This runbook diagnoses the supported local Windows and kind environment. It is
-not a production incident procedure. Start PowerShell in the repository root:
+This runbook diagnoses the supported local Linux and kind environment. It is
+not a production incident procedure. Start Bash in the repository root:
 
-```powershell
-Set-Location C:\Source\perf-eng\perfeng-environment
-$kubeconfig = (Resolve-Path .local/perfeng-local.kubeconfig).Path
+```sh
+cd ~/sources/perfeng/perfeng-environment
+kubeconfig="$(realpath .local/perfeng-local.kubeconfig)"
 ```
 
 The labels used below mean:
@@ -374,7 +369,7 @@ after cleanup, or a connection failure before any Kubernetes check.
 
 **Read-only** checks:
 
-```powershell
+```sh
 docker context show
 docker version
 kind get clusters
@@ -387,7 +382,7 @@ invalidate the repository configuration.
 
 If `perfeng-local` is genuinely absent, preview and then create it:
 
-```powershell
+```sh
 # read-only preview
 uv run --locked python scripts/infrastructure_runtime.py cluster ensure
 
@@ -439,22 +434,22 @@ alone is not proof that the endpoint is current.
 
 Use the repository-owned kubeconfig explicitly:
 
-```powershell
+```sh
 # read-only
 kubectl --kubeconfig $kubeconfig --context kind-perfeng-local get nodes
 ```
 
-For convenience, redirect only the current PowerShell process:
+For convenience, redirect only the current Bash process:
 
-```powershell
-$env:KUBECONFIG = $kubeconfig
+```sh
+export KUBECONFIG=$kubeconfig
 kubectl --context kind-perfeng-local get nodes
 ```
 
 Remove the process override when finished:
 
-```powershell
-Remove-Item Env:KUBECONFIG
+```sh
+unset KUBECONFIG
 ```
 
 The environment tools deliberately do not rewrite the user's global
@@ -465,20 +460,20 @@ it broadens a local operation into global configuration maintenance.
 
 First run the selected provider's read-only health boundary:
 
-```powershell
+```sh
 uv run --locked python scripts/infrastructure_runtime.py argocd health --execute
 ```
 
 Inspect the controller workloads and recent warnings:
 
-```powershell
+```sh
 # read-only
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
   get deployments,statefulsets,pods
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
-  get events --field-selector type=Warning `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
+  get events --field-selector type=Warning \
   --sort-by=.metadata.creationTimestamp
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n kube-system `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n kube-system \
   get pods -l k8s-app=kube-dns
 ```
 
@@ -490,12 +485,12 @@ If CoreDNS is ready but a repo server or application controller repeatedly
 reports transport or DNS failures, recreate only its Pod and wait for its owner
 to restore readiness:
 
-```powershell
+```sh
 # mutating; use only after recording the failure
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
-  delete pod -l app.kubernetes.io/name=argocd-repo-server `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
+  delete pod -l app.kubernetes.io/name=argocd-repo-server \
   --wait=true --timeout=120s
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
   rollout status deployment/argocd-repo-server --timeout=300s
 ```
 
@@ -510,11 +505,11 @@ bootstrap to repair missing provider controllers.
 
 Inspect all Applications, then describe only the failing one:
 
-```powershell
+```sh
 # read-only
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
   get applications -o wide
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
   describe application perfeng-local-root
 ```
 
@@ -541,9 +536,9 @@ Interpret the result before changing anything:
 
 Check only that the repository credential exists; never print its data:
 
-```powershell
+```sh
 # read-only; does not retrieve Secret content
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n argocd \
   get secret perfeng-github-repository-credentials -o name
 ```
 
@@ -592,16 +587,16 @@ changes must also satisfy the unchanged-identity and rollback gates in
 
 Inspect the Deployment, Pods and warning events without reading Secrets:
 
-```powershell
+```sh
 # read-only
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
   get deployment control-plane
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
   get pods -o wide
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
-  get events --field-selector type=Warning `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
+  get events --field-selector type=Warning \
   --sort-by=.metadata.creationTimestamp
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
   logs deployment/control-plane --tail=100
 ```
 
@@ -621,10 +616,10 @@ sharing them. Common classifications are:
 
 Inspect the selected non-secret runtime identity with:
 
-```powershell
+```sh
 # read-only
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
-  get deployment control-plane `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
+  get deployment control-plane \
   -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}'
 ```
 
@@ -633,11 +628,11 @@ kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
 The smoke command is **mutating** and intentionally retains its client Pod on
 failure. Record the printed Pod name, then inspect that exact Pod:
 
-```powershell
+```sh
 # read-only; replace the placeholder with the printed name
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
   describe pod <retained-smoke-pod>
-kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform `
+kubectl --kubeconfig $kubeconfig --context kind-perfeng-local -n perf-platform \
   logs <retained-smoke-pod>
 ```
 
@@ -650,7 +645,7 @@ reporting for the selected runtime bundle.
 
 Use these **read-only** checks before blaming live reconciliation:
 
-```powershell
+```sh
 uv run --locked python scripts/control_plane_release.py validate
 uv run --locked python scripts/control_plane_runtime.py validate
 uv run --locked python scripts/infrastructure_release.py validate

@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- The worker and Docker Desktop must run on the same Windows host; this is not LAN ingress.
+- The worker and Docker Desktop must run on the same Linux host; this is not LAN ingress.
 - Select the first audited serving release, run `task native:setup`, then `task native:doctor` and `task native:up` in one foreground terminal.
 - The supervisor owns three tunnels and Caddy, reports readiness and stops only its children. No PATH change or local Go build is required.
 - Caddy generates a private CA but does not install trust. Review its fingerprint before trusting it.
@@ -27,7 +27,7 @@ application code. See its [release](https://github.com/caddyserver/caddy/release
 and [local CA behavior](https://caddyserver.com/docs/caddyfile/directives/tls).
 
 The checked-in `native-gateway/caddy-release.json` anchors SHA-512 checksums for
-the official Windows/Linux amd64 archives. CI uses those binaries only to adapt
+the official Linux amd64 archives. CI uses those binaries only to adapt
 the configuration offline. For live serving, review the binary's build toolchain
 and current advisories as well as its release version. A checksum proves identity,
 not absence of vulnerabilities. In particular, use a patched Go toolchain when
@@ -39,7 +39,7 @@ Serving has a separate reviewed asset/checksum/source selection in
 `native-gateway/serving-release.json`. The publisher builds the standard entry
 point as a dependency using locked modules, Go 1.27.3 and x/net >=v0.60.0,
 without replacements. It checks real version/build output, audits the resulting
-executable and exercises isolated Windows TLS startup/shutdown. Local setup
+executable and exercises isolated Linux TLS startup/shutdown. Local setup
 checks the selected bytes and metadata again. Build minima and a past audit do
 not prove freedom from future advisories; security updates require release review.
 
@@ -62,40 +62,39 @@ Release-owner handoff, after merging the implementation:
    asset ID/checksum and workflow audit/TLS evidence. Keep it under ignored `results`.
 3. Preview then apply the exact selection, review the Git diff and commit it:
 
-```powershell
+```sh
 uv run --locked python -m scripts.native_gateway_release select --file results/release-selection.json
 uv run --locked python -m scripts.native_gateway_release select --file results/release-selection.json --execute
 ```
 
-Operator setup needs Windows AMD64, uv, Task and the existing cluster tools—not Go.
+Operator setup needs Linux AMD64, uv, Task and the existing cluster tools—not Go.
 Private release downloads use the existing repository **contents-read** token,
 not a packages-only GHCR token. If it is not already set in this terminal:
 
-```powershell
-$gatewayToken = Read-Host "Repository contents-read token" -AsSecureString
-$env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN = [System.Net.NetworkCredential]::new("", $gatewayToken).Password
+```sh
+read -rsp "Repository contents-read token: " PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN; printf "\n"
+export PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN
 task native:setup
 task native:doctor
 ```
 
-Setup installs under `.local/native-gateway/tools/<sha256>/caddy.exe`, checks
+Setup installs under `.local/native-gateway/tools/<sha256>/caddy`, checks
 bytes before execution and uses an absolute path thereafter. Repeating setup
 reuses verified bytes. Modified installations and unknown existing builds are
 not overwritten. New gateway state is created privately; existing state is
 never repaired implicitly. If doctor reports a permission problem, review the
 directory and any earlier CA exposure, then explicitly use `task native:permissions`.
-It restricts the root to this account, SYSTEM and administrators, retains every
-file and checks child ACLs. Separately protected/broad child ACLs require manual
-review. No certificate trust is installed. Do not trust previously exposed keys.
+It restricts the account-owned root to mode `0700` and retains every file.
+Review earlier exposure and any external links separately. No certificate trust is installed. Do not trust previously exposed keys.
 
 The setup token is not needed after installation; clear it when no longer needed:
-`Remove-Item Env:PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN`.
+`unset PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN`.
 
 ## Preview and start
 
 From the repository root, preview each boundary without external access:
 
-```powershell
+```sh
 uv run --locked python scripts/native_connectivity.py forward-api
 uv run --locked python scripts/native_connectivity.py forward-s3
 uv run --locked python scripts/native_connectivity.py forward-target
@@ -105,14 +104,14 @@ uv run --locked python scripts/native_connectivity.py check
 
 Normal operation uses one foreground terminal, from this repository:
 
-```powershell
+```sh
 task native:doctor
 task native:up
 ```
 
 Doctor reports every independent prerequisite as PASS, FAIL, ACTION REQUIRED or
 NOT CHECKED. Cluster reads have explicit command budgets; a foreign/unavailable
-cluster prevents resource reads. Missing Windows/Node trust is a separate browser
+cluster prevents resource reads. Missing Linux/Node trust is a separate browser
 action, not permission to bypass TLS. Occupied ports are conflicts: stop your old
 independent forwarding/gateway sessions first; no foreign listener is adopted.
 
@@ -120,8 +119,8 @@ Up verifies state/tool/resource identities, owns three tunnels and Caddy, waits
 for endpoints and checks CA-backed TLS, exact content and anonymous denial.
 Only then does it print CONNECTIVITY READY and URLs. It stays in the foreground,
 ends after at most one hour and stops all its children on Ctrl+C, partial startup
-failure or any child exit. Windows Job ownership also cleans up assigned children
-if the supervisor is terminated. It is not a service or automatic restart loop.
+failure or any child exit. Linux children run in owned process groups. Use graceful Ctrl+C shutdown;
+forced supervisor termination requires inspection of its retained child processes. It is not a service or automatic restart loop.
 Restart the session after a target Pod replacement. Gateway state and CA keys remain under ignored
 `.local/native-gateway/caddy-data`; do not commit, copy or delete that private
 state as an implicit repair.
@@ -146,38 +145,36 @@ After the gateway starts, the public root certificate is at:
 .local/native-gateway/caddy-data/pki/authorities/local/root.crt
 ```
 
-Before starting a gateway that creates CA keys, restrict the Windows directory
-ACL for `.local/native-gateway` to the execution account and necessary system
-administrators using the directory's Security settings. Verify that broad
-workspace read permissions are not inherited by private key files. The wrapper
-rejects redirected state but does not rewrite Windows ACLs; key access is an
-explicit host-setup responsibility. The managed doctor/up also verify private
-gateway permissions. Do not trust a CA whose private key has been
-exposed to other untrusted users.
+Before starting a gateway, provision an account-owned `.local/native-gateway`
+with mode `0700`. The managed doctor verifies ownership and private root mode;
+`native:permissions` explicitly restricts that root without rotating CA bytes.
+Do not trust a CA whose private key has been exposed to another user.
 
 Inspect that file and its fingerprint locally. The `.key` files are private and
 must not leave the gateway state directory. The Python probe takes the reviewed
 CA directly and needs no trust-store change:
 
-```powershell
+```sh
 task native:check
 ```
 
-For Chromium on this Windows user account, explicitly review and install the
-public CA into the current-user root store. This is a trust-store mutation;
-perform it only after checking that this is the CA just created by your gateway:
+For Chromium, review the public CA fingerprint and use your distribution's
+supported certificate-store procedure. This is a separate explicit trust-store
+mutation; the wrapper never installs trust. Inspect the CA before approval:
 
-```powershell
-certutil -dump .local/native-gateway/caddy-data/pki/authorities/local/root.crt
-certutil -user -addstore Root .local/native-gateway/caddy-data/pki/authorities/local/root.crt
+```sh
+openssl x509 -in .local/native-gateway/caddy-data/pki/authorities/local/root.crt -noout -subject -fingerprint -sha256
 ```
+
+The doctor reads Python's configured Linux system store; Chromium's store may
+be separate. Prove HTTPS access in the actual browser as well as the Node client.
 
 Restart Chromium after trust changes. Node's trust path is separate. In the
 terminal that will start the Native Worker, set the public CA before launching
 Node (it is read at process startup):
 
-```powershell
-$env:NODE_EXTRA_CA_CERTS = (Resolve-Path .local/native-gateway/caddy-data/pki/authorities/local/root.crt).Path
+```sh
+export NODE_EXTRA_CA_CERTS="$(realpath .local/native-gateway/caddy-data/pki/authorities/local/root.crt)"
 ```
 
 Never use `NODE_TLS_REJECT_UNAUTHORIZED=0`, `ignoreHTTPSErrors`, `--insecure`,
@@ -186,7 +183,7 @@ check is a failed preflight, not permission to weaken the worker boundary.
 
 ## Controlled target and identity
 
-Open `https://127.0.0.1:10443/` in the trusted Windows browser. Results start
+Open `https://127.0.0.1:10443/` in the trusted Linux browser. Results start
 hidden; clicking `#search` replaces the result list and reveals `#results`.
 Repeated clicks replace nodes rather than retaining an ever-growing list. The
 target uses no external dependencies, fetches or third-party resources. Its CSP
@@ -200,7 +197,7 @@ evidence hash, profile fingerprint, candidate image digest or approved baseline.
 
 Content is controlled; timing remains dependent on the host. Use this fixture
 to prove integration, not to claim an average customer workload or real-world
-regression threshold. Follow [Windows qualification](windows-browser-host.md)
+regression threshold. Follow [Linux qualification](linux-browser-host.md)
 for actual execution-host evidence.
 
 ## Promotion gates and credentials
@@ -242,7 +239,7 @@ Before running a native attempt, the subsequent release selection must:
 
 Run the existing Playwright `run-once` workflow only after those gates are
 complete; use its operating guide in the sibling component. Do not copy S3
-credentials onto the Windows host or expose a fake grant endpoint. Missing
+credentials onto the Linux host or expose a fake grant endpoint. Missing
 published image or qualification identities block promotion, not gateway use.
 
 ## Failure and recovery
@@ -289,7 +286,7 @@ delete unrelated roots or rotate the gateway CA automatically. Clear
 
 - `make verify`: deterministic preview, identity, transport, fixture and Task tests.
 - `make native-gateway-check`: real Caddyfile adaptation, offline and no trust/state provisioning.
-- Windows gateway workflow: actual locked binary build/audit and isolated TLS/Host/URI plus owned-child cleanup; no cluster or system trust.
+- Linux gateway workflow: actual locked binary build/audit and isolated TLS/Host/URI plus owned-child cleanup; no cluster or system trust.
 - `task native:doctor`/`task native:up`: explicit prerequisite inspection and supervised connectivity only, not worker/qualification acceptance.
 - `task native:check`: explicit live TLS/readiness/fixture/anonymous-denial checks.
 - Final M03 acceptance: actual qualified browser execution, signed upload,

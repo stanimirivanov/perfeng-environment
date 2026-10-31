@@ -167,3 +167,5 @@ How will the assumptions and consequences be verified?
 | [0069](0069-exercise-complete-database-preparation.md) | Proposed | Prove unchanged complete preparation refusal/first/repeat, six retained native Jobs and bounded inventory accounting in the adopted paused initial fixture, before recovery/final success. |
 | [0070](0070-refuse-complete-preparation-job-create.md) | Proposed | Prove exact complete-parent migration Job-create denial, guarded grants Role restoration and retained failure/state proof before fresh runs and final success. |
 | [0071](0071-refuse-preparation-qualification-job-create.md) | Proposed | Prove qualification Job-create denial after completed migration, reversible CI suspension, guarded restoration and seven-Job retention before fresh runs/recovery. |
+
+| [0072](0072-support-linux-hosts.md) | Proposed | Support Linux development and native browser hosts; retire active Windows support. |

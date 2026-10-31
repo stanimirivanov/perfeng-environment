@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from scripts import native_gateway_tool as tool
@@ -15,11 +16,11 @@ from scripts import native_gateway_tool as tool
 
 def build(output: Path, revision: str, root: Path = tool.ROOT) -> dict[str, object]:
     """Create a new package from locked inputs; failed builds/audits never become serving selections."""
-    if os.name != "nt" or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+    if sys.platform != "linux" or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
         raise tool.GatewayError(
             "BUILD_INPUT",
-            "Serving builds require Windows and a full source revision",
-            "use the Windows gateway workflow",
+            "Serving builds require Linux and a full source revision",
+            "use the Linux gateway workflow",
         )
     output = output.absolute()
     if output.resolve() != output or output.exists():
@@ -29,7 +30,7 @@ def build(output: Path, revision: str, root: Path = tool.ROOT) -> dict[str, obje
             "choose a fresh output directory; retain previous evidence",
         )
     output.mkdir(parents=True)
-    binary = output / "caddy.exe"
+    binary = output / "caddy"
     source = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=root,
@@ -121,7 +122,7 @@ def build(output: Path, revision: str, root: Path = tool.ROOT) -> dict[str, obje
     tool.metadata(binary)
     record: dict[str, object] = {
         "schemaVersion": 1,
-        "platform": "windows/amd64",
+        "platform": "linux/amd64",
         "caddyVersion": "v2.11.7",
         "goVersion": tool.GO_VERSION,
         "sourceRevision": revision,

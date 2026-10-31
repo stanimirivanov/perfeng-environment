@@ -30,7 +30,7 @@ credentials.
 
 Run from perfeng-environment after reviewing the previews:
 
-~~~powershell
+~~~sh
 uv run --locked python scripts/object_store.py bootstrap
 uv run --locked python scripts/object_store.py bootstrap --execute
 ~~~
@@ -38,7 +38,7 @@ uv run --locked python scripts/object_store.py bootstrap --execute
 After the staged GitOps bootstrap deploys and initializes SeaweedFS, verify the
 live authorization boundary:
 
-~~~powershell
+~~~sh
 uv run --locked python scripts/storage_access.py
 uv run --locked python scripts/storage_access.py --execute
 ~~~

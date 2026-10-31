@@ -63,10 +63,6 @@ class SchemaQualificationTests(unittest.TestCase):
 
     def test_inventory_and_sql_match_exact_selected_upstream_git_bytes(self):
         upstream = ROOT.parent / "perfeng-control-plane"
-        if not (upstream / ".git").exists() and os.name == "nt":
-            self.skipTest(
-                "Pinned upstream checkout is provided by Linux PR CI; unavailable on this Windows host"
-            )
         self.assertTrue(
             (upstream / ".git").exists(),
             "Pinned perfeng-control-plane checkout required for source qualification",

@@ -89,7 +89,7 @@ tasks:
       - uv run --locked python scripts/resource_metrics_health.py --execute
 
   native:setup:
-    desc: Install the checksum-selected audited Windows gateway without PATH or trust writes
+    desc: Install the checksum-selected audited Linux gateway without PATH or trust writes
     cmds:
       - uv run --locked python -m scripts.native_gateway setup --execute
 

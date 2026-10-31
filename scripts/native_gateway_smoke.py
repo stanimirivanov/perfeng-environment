@@ -1,4 +1,4 @@
-"""Explicit isolated Windows Caddy TLS smoke; no cluster, publication or trust-store mutation."""
+"""Explicit isolated Linux Caddy TLS smoke; no cluster, publication or trust-store mutation."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def smoke(binary: Path, root: Path = tool.ROOT) -> None:
             # An isolated delivery fixture exercises installation, not published-asset authentication.
             selected = {
                 "schemaVersion": 1,
-                "platform": "windows/amd64",
+                "platform": "linux/amd64",
                 "caddyVersion": "v2.11.7",
                 "goVersion": tool.GO_VERSION,
                 "release": {
@@ -134,7 +134,7 @@ def smoke(binary: Path, root: Path = tool.ROOT) -> None:
             if any(process.poll() is None for _, process in scope.children):
                 raise ValueError("Owned Caddy child survived shutdown")
         print(
-            "PASS isolated Windows Caddy installation/repeat setup, version/build, three TLS routes, Host/URI preservation and owned-child shutdown. Delivery was a test fixture, not published-download acceptance. No cluster or system trust was changed.",
+            "PASS isolated Linux Caddy installation/repeat setup, version/build, three TLS routes, Host/URI preservation and owned-child shutdown. Delivery was a test fixture, not published-download acceptance. No cluster or system trust was changed.",
             flush=True,
         )
     finally:

@@ -25,14 +25,14 @@ The base is NGINX unprivileged 1.30.5 Alpine slim, selected by the manifest dige
 
 Preview without Docker or state writes:
 
-```powershell
+```sh
 uv run --locked --offline python scripts/native_target.py validate
 uv run --locked --offline python scripts/native_target.py build
 ```
 
 To build and exercise an isolated development image explicitly:
 
-```powershell
+```sh
 make native-target-image-check
 ```
 
@@ -52,25 +52,25 @@ The package is associated with this repository through its OCI source label. Con
 
 ## Host qualification failures
 
-The current `windows-mainstream/1.0.0` reference requires OS build at least 22631, eight available logical cores, 1920×1080 at 125% and 60 Hz, Balanced power, and background CPU no higher than 10%. Check the rejection reasons before changing anything. The profile is a defined comparison cohort, not a claim that every reasonable laptop must match it.
+The current `linux-mainstream/1.0.0` reference requires OS build at least 22631, eight available logical cores, 1920×1080 at 125% and 60 Hz, Balanced power, and background CPU no higher than 10%. Check the rejection reasons before changing anything. The profile is a defined comparison cohort, not a claim that every reasonable laptop must match it.
 
-Braces and case around a Windows power-plan GUID do not change identity; the checker compares parsed GUIDs while preserving the raw observation. Different GUIDs still reject. This corrects a false mismatch without changing the profile or its fingerprint.
+Linux power-profile identifiers are compared exactly; different power profiles reject. Historical Windows observations cannot qualify a Linux host.
 
 Real hardware/display differences need an explicitly reviewed separate profile/version or a matching host. Do not silently rewrite this profile, lower the OS floor or relax calibration to accept the available machine. High background CPU requires another live capture under the approved conditions, not editing the report. Keep `results/` outside Git; existing reports are never overwritten or converted from REJECTED to ACCEPTED.
 
-The separate `windows-four-core-4k/1.0.0` cohort is now available through
-explicit selection in the [Windows host guide](windows-browser-host.md#select-a-comparison-cohort).
+The separate `linux-four-core-4k/1.0.0` cohort is now available through
+explicit selection in the [Linux host guide](linux-browser-host.md#select-a-comparison-cohort).
 It uses four available cores and 3840×2160 at 100% and the observed integer
 59 Hz, but retains OS build at least 22631 and background CPU at most 10%.
 Selecting it does not qualify the earlier rejected capture or promote a bundle.
 
-After host approval and a real runner capture, assemble `browser-environment/v1` following the [Windows host guide](windows-browser-host.md). A qualification JSON hash alone is not that environment artifact's hash.
+After host approval and a real runner capture, assemble `browser-environment/v1` following the [Linux host guide](linux-browser-host.md). A qualification JSON hash alone is not that environment artifact's hash.
 
 ## Promotion and recovery
 
 Next, select the published candidate, qualified environment artifact, exact Playwright source, compatible analysis/report images and the newer control-plane image in the complete native bundle. Preserve the existing immutable deployment until that review is complete. Then select the native bundle and content-addressed runtime inputs, provision the distinct worker identity and prove signed upload/internal read-back plus the full decision loop.
 
-Rollback stops candidate use and restores the previous selection; it does not delete evidence, rotate credentials, remove CA trust or rewrite prior bundles. Publication failure leaves no approved promotion input. A failed local check reports only a safe operation boundary rather than raw Docker logs. M03 remains incomplete until qualified live Windows/control-plane acceptance, cancellation and explicit recovery pass.
+Rollback stops candidate use and restores the previous selection; it does not delete evidence, rotate credentials, remove CA trust or rewrite prior bundles. Publication failure leaves no approved promotion input. A failed local check reports only a safe operation boundary rather than raw Docker logs. M03 remains incomplete until qualified live Linux/control-plane acceptance, cancellation and explicit recovery pass.
 
 ## Build failure classification
 

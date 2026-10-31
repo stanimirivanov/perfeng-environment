@@ -1,91 +1,20 @@
-"""Validate and evaluate the native Windows browser execution profile."""
+"""Validate and evaluate the native Linux browser execution profile."""
 
 import argparse
 import hashlib
 import json
-import platform
 import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILE = ROOT / "profiles/browser/windows-mainstream.yaml"
+PROFILE = ROOT / "profiles/browser/linux-mainstream.yaml"
 ID_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 VERSION_PATTERN = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
-
-POWERSHELL_SNAPSHOT = r"""
-$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$os = Get-CimInstance Win32_OperatingSystem
-$processors = @(Get-CimInstance Win32_Processor)
-$video = @(Get-CimInstance Win32_VideoController |
-  Where-Object { $_.CurrentHorizontalResolution -and $_.CurrentVerticalResolution } |
-  Select-Object -First 1)[0]
-if (-not $video) { $video = @(Get-CimInstance Win32_VideoController)[0] }
-$plan = Get-CimInstance -Namespace root/cimv2/power -ClassName Win32_PowerPlan |
-  Where-Object IsActive | Select-Object -First 1
-$powerPlanId = ([string]$plan.InstanceID).Split('\')[-1]
-$cpu = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'"
-& w32tm /query /status 2>$null | Out-Null
-$clockSynchronized = $LASTEXITCODE -eq 0
-$gpuName = [string]$video.Name
-$softwareRendering = $gpuName -match 'Microsoft Basic (Display|Render)'
-Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class PerfengNative {
-  [StructLayout(LayoutKind.Sequential)]
-  public struct PowerStatus {
-    public byte ACLineStatus, BatteryFlag, BatteryLifePercent, SystemStatusFlag;
-    public uint BatteryLifeTime, BatteryFullLifeTime;
-  }
-  [DllImport("kernel32.dll")] public static extern bool GetSystemPowerStatus(out PowerStatus status);
-  [DllImport("user32.dll")] public static extern uint GetDpiForSystem();
-}
-'@
-$powerStatus = [PerfengNative+PowerStatus]::new()
-if (-not [PerfengNative]::GetSystemPowerStatus([ref]$powerStatus)) {
-  throw 'GetSystemPowerStatus failed'
-}
-$powerSource = switch ($powerStatus.ACLineStatus) { 1 { 'ac' } 0 { 'battery' } default { 'unknown' } }
-$scaleFactor = [Math]::Round([PerfengNative]::GetDpiForSystem() / 96.0, 2)
-[ordered]@{
-  virtualization = if ((Get-CimInstance Win32_ComputerSystem).Model -match 'Virtual|VMware|KVM') { 'virtual' } else { 'physical' }
-  os = [ordered]@{
-    family = 'windows'; edition = [string]$os.Caption; version = [string]$os.Version
-    build = [int]$os.BuildNumber; architecture = if ([Environment]::Is64BitOperatingSystem) { 'x64' } else { 'x86' }
-  }
-  cpu = [ordered]@{
-    model = [string]$processors[0].Name
-    logicalCores = [int](($processors | Measure-Object NumberOfLogicalProcessors -Sum).Sum)
-    physicalCores = [int](($processors | Measure-Object NumberOfCores -Sum).Sum)
-    availableLogicalCores = [int][Environment]::ProcessorCount
-    idleCpuPercent = [double]$cpu.PercentProcessorTime
-  }
-  memory = [ordered]@{
-    totalBytes = [int64]$os.TotalVisibleMemorySize * 1024
-    availableBytes = [int64]$os.FreePhysicalMemory * 1024
-  }
-  gpu = [ordered]@{
-    model = $gpuName; driverVersion = [string]$video.DriverVersion
-    hardwareAcceleration = -not $softwareRendering; softwareRendering = $softwareRendering
-  }
-  display = [ordered]@{
-    width = [int]$video.CurrentHorizontalResolution; height = [int]$video.CurrentVerticalResolution
-    scaleFactor = $scaleFactor; refreshRateHz = [double]$video.CurrentRefreshRate
-  }
-  power = [ordered]@{
-    source = $powerSource; plan = $powerPlanId
-    batterySaver = $powerStatus.SystemStatusFlag -eq 1
-  }
-  clockSynchronized = $clockSynchronized
-} | ConvertTo-Json -Depth 5 -Compress
-"""
 
 
 def mapping(value: object, name: str) -> dict[str, Any]:
@@ -143,6 +72,8 @@ def load_profile(path: Path = PROFILE) -> dict[str, Any]:
     ):
         raise ValueError("Invalid profile version")
     spec = mapping(document["spec"], "spec")
+    if mapping(spec.get("os"), "spec.os").get("family") != "linux":
+        raise ValueError("Browser profiles require Linux")
     exact_keys(
         spec,
         "spec",
@@ -198,22 +129,12 @@ def fingerprint(profile: dict[str, Any]) -> str:
 
 
 def live_snapshot() -> dict[str, Any]:
-    if platform.system() != "Windows":
-        raise ValueError("Live browser-host inspection requires Windows")
-    completed = subprocess.run(
-        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", POWERSHELL_SNAPSHOT],
-        check=False,
-        capture_output=True,
-        timeout=30,
-    )
-    if completed.returncode:
-        detail = completed.stderr.decode("utf-8", errors="replace").strip().splitlines()
-        suffix = f": {detail[0]}" if detail else ""
-        raise ValueError(f"Windows host inspection failed (exit {completed.returncode}){suffix}")
     try:
-        return mapping(json.loads(completed.stdout.decode("utf-8-sig")), "snapshot")
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError("Windows host inspection returned invalid UTF-8 JSON") from error
+        from .linux_browser_host import snapshot
+    except ImportError:
+        from linux_browser_host import snapshot
+
+    return snapshot()
 
 
 def validate_snapshot(snapshot: dict[str, Any]) -> None:
@@ -326,7 +247,7 @@ def evaluate(profile: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any
     )
     for name in ("width", "height", "scaleFactor", "refreshRateHz"):
         require(display[name] == spec["display"][name], f"display {name} differs")
-    require(UUID(power["plan"]) == UUID(spec["power"]["plan"]), "power plan differs")
+    require(power["plan"] == spec["power"]["plan"], "power plan differs")
     for name in ("source", "batterySaver"):
         require(power[name] == spec["power"][name], f"power {name} differs")
     require(

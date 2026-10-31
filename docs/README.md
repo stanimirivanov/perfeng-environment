@@ -46,10 +46,10 @@
 | Control-plane deployment or runtime inputs | [Local control plane](local-control-plane.md) | Deployment lock and pinned sibling validation |
 | M04 runtime selection, migration or benchmark controller authority | [Kubernetes runtime deployment](kubernetes-runtime-deployment.md), [ADR 0013](decisions/0013-select-local-benchmark-runtime.md) | Explicit pause/prepare/manual sync; exact registry, cluster and execution credentials |
 | M04 end-to-end decision, baseline approval, cancellation or restart acceptance | [Kubernetes benchmark acceptance](kubernetes-benchmark-acceptance.md) | Preview-first explicit execution, retained partial evidence and no automatic repair |
-| k6, browser, or Kubernetes evidence workflows | [Local k6 run](local-k6-run.md), [Windows browser host](windows-browser-host.md), [local kube-burner](local-kube-burner.md) | Relevant tests and focused acceptance guide |
+| k6, browser, or Kubernetes evidence workflows | [Local k6 run](local-k6-run.md), [Linux browser host](linux-browser-host.md), [local kube-burner](local-kube-burner.md) | Relevant tests and focused acceptance guide |
 | Kubernetes benchmark qualification, pressure or interference | [Benchmark qualification](kubernetes-benchmark-qualification.md), [ADR 0011](decisions/0011-qualify-local-kubernetes-benchmarks.md) | Opt-in live preflight, pinned schema and integration-only eligibility |
 | Resource Metrics API selection, TLS prerequisites or scrape health | [Local resource metrics](local-resource-metrics.md), [ADR 0012](decisions/0012-select-verified-resource-metrics.md) | Separate restricted Project, pinned chart rendering and explicit read-only metrics health |
-| Windows worker HTTPS access or controlled browser target | [Native connectivity](native-worker-connectivity.md), [ADR 0006](decisions/0006-loopback-native-worker-connectivity.md) | Gateway adaptation, live preflight and final promotion gates |
+| Linux worker HTTPS access or controlled browser target | [Native connectivity](native-worker-connectivity.md), [ADR 0006](decisions/0006-loopback-native-worker-connectivity.md) | Gateway adaptation, live preflight and final promotion gates |
 | Managed native tool setup, diagnosis or session lifecycle | [Native connectivity](native-worker-connectivity.md), [ADR 0010](decisions/0010-manage-native-connectivity-workflow.md) | Explicit publisher/selection, native doctor and foreground ownership |
 | Image-backed target selection, deployment or forwarding | [Local native target](local-native-target.md), [ADR 0009](decisions/0009-select-image-backed-native-target.md) | Pinned release checks, candidate health and exact HTTPS content |
 | Milestones or cross-repository sequencing | [Milestones](roadmap/milestones.md) | Relevant ADRs and component repositories |
@@ -72,7 +72,7 @@ cases; full live proof remains post-merge main-only.
 For controlled target image builds/publication and qualification blockers, read
 [the immutable browser candidate guide](native-browser-candidate.md).
 For explicit four-core 4K cohort selection and evidence binding, read the
-[Windows host guide](windows-browser-host.md#select-a-comparison-cohort) and
+[Linux host guide](linux-browser-host.md#select-a-comparison-cohort) and
 [ADR 0008](decisions/0008-separate-four-core-4k-browser-cohort.md).
 
 - [Development](development/) contains engineering and harness guidance.

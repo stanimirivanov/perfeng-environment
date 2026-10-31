@@ -15,7 +15,6 @@ from scripts import k6_run as runner
 RUN = "perf-20260902-120000-abcdef12"
 
 
-@unittest.skipIf(os.name == "nt", "Generated container scripts require a POSIX shell")
 class CaptureShellTests(unittest.TestCase):
     def test_runner_preserves_exit_status_and_raw_bytes(self):
         for code in [0, 99, 107]:
