@@ -11,7 +11,7 @@ jobs:
   validate:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -70,10 +70,6 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - run: uv sync --locked
         working-directory: perfeng-environment
-      - name: Install GNU Make on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: choco install make --version=4.4.1 --no-progress --yes
       - name: Report toolchain
         run: make doctor
         working-directory: perfeng-environment
@@ -81,19 +77,16 @@ jobs:
         run: make verify
         working-directory: perfeng-environment
       - name: Install checksum-verified Caddy for offline gateway adaptation
-        shell: pwsh
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $release = Get-Content perfeng-environment/native-gateway/caddy-release.json -Raw | ConvertFrom-Json
-          $platform = if ($IsWindows) { 'windows_amd64' } else { 'linux_amd64' }
-          $extension = if ($IsWindows) { 'zip' } else { 'tar.gz' }
-          $archive = Join-Path $env:RUNNER_TEMP "caddy.$extension"
-          $destination = Join-Path $env:RUNNER_TEMP 'perfeng-caddy'
-          Invoke-WebRequest "https://github.com/caddyserver/caddy/releases/download/v$($release.version)/caddy_$($release.version)_$platform.$extension" -OutFile $archive
-          if ((Get-FileHash $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne $release.sha512.$platform) { throw 'Caddy release checksum mismatch' }
-          New-Item -ItemType Directory -Path $destination -Force | Out-Null
-          if ($IsWindows) { Expand-Archive $archive -DestinationPath $destination } else { tar -xzf $archive -C $destination; if ($LASTEXITCODE -ne 0) { throw 'Caddy extraction failed' } }
-          $destination | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+          set -euo pipefail
+          version=$(jq -r .version perfeng-environment/native-gateway/caddy-release.json)
+          expected=$(jq -r .sha512.linux_amd64 perfeng-environment/native-gateway/caddy-release.json)
+          curl --fail --location "https://github.com/caddyserver/caddy/releases/download/v${version}/caddy_${version}_linux_amd64.tar.gz" --output "$RUNNER_TEMP/caddy.tar.gz"
+          echo "$expected  $RUNNER_TEMP/caddy.tar.gz" | sha512sum --check
+          mkdir "$RUNNER_TEMP/perfeng-caddy"
+          tar -xzf "$RUNNER_TEMP/caddy.tar.gz" -C "$RUNNER_TEMP/perfeng-caddy" caddy
+          echo "$RUNNER_TEMP/perfeng-caddy" >> "$GITHUB_PATH"
       - name: Validate native gateway configuration without starting a server
         run: make native-gateway-check
         working-directory: perfeng-environment

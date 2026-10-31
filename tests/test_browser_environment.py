@@ -16,7 +16,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
     def setUpClass(cls):
         cls.profile = browser_host.load_profile()
         cls.snapshot = json.loads(
-            (browser_host.ROOT / "tests/fixtures/windows-browser-host.json").read_text()
+            (browser_host.ROOT / "tests/fixtures/linux-browser-host.json").read_text()
         )
 
     def qualification(self):
@@ -36,7 +36,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
             "runtime": {
                 "playwrightVersion": "1.62.1",
                 "nodeVersion": "24.18.0",
-                "platform": "win32",
+                "platform": "linux",
                 "architecture": "x64",
             },
             "browser": {
@@ -63,7 +63,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
         self.assertEqual(artifact["kind"], "BrowserEnvironment")
         self.assertEqual(artifact["runId"], "perf-20260902-130000-a1b2c3d5")
         self.assertEqual(artifact["profile"], self.profile["metadata"])
-        self.assertEqual(artifact["host"]["os"]["build"], "26100")
+        self.assertEqual(artifact["host"]["os"]["build"], "6")
         self.assertEqual(artifact["host"]["cpu"]["availableLogicalCores"], 12)
         self.assertEqual(artifact["host"]["cpu"]["physicalCores"], 6)
         self.assertNotIn("idleCpuPercent", artifact["host"]["cpu"])
@@ -81,7 +81,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
         self.assertEqual(artifact["calibration"]["idleCpuPercent"], 3.2)
         self.assertEqual(artifact["capturedAt"], "2026-09-02T12:59:58Z")
 
-    def test_rejects_unqualified_mismatched_and_non_windows_runs(self):
+    def test_rejects_unqualified_mismatched_and_non_linux_runs(self):
         cases = []
         rejected = self.qualification()
         rejected["status"] = "REJECTED"
@@ -97,8 +97,8 @@ class BrowserEnvironmentTests(unittest.TestCase):
         cases.append((self.qualification(), wrong_browser, "browser profile"))
 
         wrong_platform = self.measurements()
-        wrong_platform["runtime"]["platform"] = "linux"
-        cases.append((self.qualification(), wrong_platform, "native Windows"))
+        wrong_platform["runtime"]["platform"] = "darwin"
+        cases.append((self.qualification(), wrong_platform, "native Linux"))
 
         late_qualification = self.qualification()
         late_qualification["capturedAt"] = "2026-09-02T13:00:01Z"
@@ -146,7 +146,7 @@ class BrowserEnvironmentTests(unittest.TestCase):
 
     def test_laptop_evidence_is_bound_to_its_selected_cohort(self):
         profile = browser_host.load_profile(
-            browser_host.ROOT / "profiles/browser/windows-four-core-4k.yaml"
+            browser_host.ROOT / "profiles/browser/linux-four-core-4k.yaml"
         )
         snapshot = copy.deepcopy(self.snapshot)
         snapshot["cpu"].update(logicalCores=4, physicalCores=4, availableLogicalCores=4)

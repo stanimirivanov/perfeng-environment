@@ -280,7 +280,7 @@ kill() { step holder-alive; }; uv() { step "verify-${6}"; }; wait() { step holde
                 elif failure == "pass":
                     self.assertEqual((case / "input").read_text(), "\\q\n")
 
-    @unittest.skipUnless(BASH and os.name != "nt", "Linux FIFO transport is verified on CI")
+    @unittest.skipUnless(BASH, "Linux FIFO transport is verified on CI")
     def test_real_fifo_and_observer_stop_without_unproved_holder_disconnect(self):
         assert BASH
         text = (grants.FIXTURE / "runtime-grants-contention.sh").read_text()

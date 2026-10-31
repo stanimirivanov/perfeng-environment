@@ -96,7 +96,7 @@ explicit credential recovery; no token is silently rotated or added to Git.
 
 From `perfeng-environment`, the following checks are offline after dependency bootstrap:
 
-```powershell
+```sh
 uv sync --locked
 make validate
 make release-selection-check
@@ -109,10 +109,10 @@ The locked cryptography dependency is also needed by the selected provider's hea
 
 ## After-merge acceptance
 
-Run in PowerShell from `perfeng-environment`, after the GitOps files reach remote `main`:
+Run in Bash from `perfeng-environment`, after the GitOps files reach remote `main`:
 
-```powershell
-Set-Location C:\Source\perf-eng\perfeng-environment
+```sh
+cd ~/sources/perfeng/perfeng-environment
 uv sync --locked
 uv run --locked python scripts/gitops.py bootstrap --execute
 task kubernetes:metrics-health
@@ -159,7 +159,7 @@ metrics installation. Keep previous rejected/unknown evidence; do not overwrite 
 
 Read-only inspection using the dedicated context:
 
-```powershell
+```sh
 kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local --request-timeout=10s -n argocd get application perfeng-local-resource-metrics
 kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local --request-timeout=10s -n monitoring get pods -l app.kubernetes.io/name=metrics-server
 kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local --request-timeout=10s get apiservice v1beta1.metrics.k8s.io

@@ -67,11 +67,11 @@ token value stored in the GitHub Actions `PERFENG_REPOSITORIES_READ_TOKEN`
 secret, provided it has that scope. GitHub does not expose repository secrets to
 your local shell, so set the value explicitly before running the command:
 
-```powershell
-$env:PERFENG_REPOSITORIES_READ_TOKEN = Read-Host "GHCR package-read token" -MaskInput
+```sh
+read -rsp "GHCR package-read token: " PERFENG_REPOSITORIES_READ_TOKEN; printf "\n"; export PERFENG_REPOSITORIES_READ_TOKEN
 ```
 
-This sets the token only for the current PowerShell session. Then run:
+This sets the token only for the current Bash session. Then run:
 
 ```sh
 uv run --locked python scripts/control_plane_registry.py deploy
@@ -90,8 +90,8 @@ local file, Helm values, release history or terminal output.
 
 Remove the token from the current shell after deployment:
 
-```powershell
-Remove-Item Env:PERFENG_REPOSITORIES_READ_TOKEN
+```sh
+unset PERFENG_REPOSITORIES_READ_TOKEN
 ```
 
 An existing Secret must have the exact owned shape and remains subject to a live

@@ -1,8 +1,8 @@
-# Windows browser host
+# Linux browser host
 
 ## TL;DR
 
-- Browser performance runs execute on a qualified native Windows host rather
+- Browser performance runs execute on a qualified native Linux host rather
   than inside the Linux kind cluster.
 - Validate the versioned profile anywhere, then run the read-only host check
   immediately before Playwright execution.
@@ -15,9 +15,9 @@
 - Upload and diagnostic-manifest steps preserve exact bytes and remain separate
   from control-plane registration.
 
-Browser performance runs execute natively on an owned Windows machine rather
+Browser performance runs execute natively on an owned Linux machine rather
 than inside the local Linux kind cluster. The versioned
-`windows-mainstream/1.0.0` profile defines one controlled reference machine; it
+`linux-mainstream/1.0.0` profile defines one controlled reference machine; it
 is not a statistical claim about the average customer laptop.
 
 ## Select a comparison cohort
@@ -26,25 +26,25 @@ Two separately identified profiles are available:
 
 | Profile | Minimum available logical cores | Display (resolution, scale, integer Hz) | Selection |
 |:--|:--|:--|:--|
-| `windows-mainstream/1.0.0` | 8 | 1920×1080, 1.25, 60 | Default |
-| `windows-four-core-4k/1.0.0` | 4 | 3840×2160, 1, 59 | Explicit `--profile` |
+| `linux-mainstream/1.0.0` | 8 | 1920×1080, 1, 60 | Default |
+| `linux-four-core-4k/1.0.0` | 4 | 3840×2160, 1, 59 | Explicit `--profile` |
 
-[ADR 0008](decisions/0008-separate-four-core-4k-browser-cohort.md) records the
-separate laptop cohort. Both retain OS build at least 22631, 16 GiB total and
-8 GiB available memory, hardware acceleration, physical Windows x64 execution,
-headed Chrome for Testing, AC/Balanced power, synchronized clock and background
-CPU at most 10%. The 59 Hz value matches the Windows collector's integer
-observation, not a relaxed 59–60 Hz range. Confirm the intended display and
-100% scaling on the host; neither profile represents all Windows laptops.
+These are new Linux cohort identities, not migrated Windows qualifications.
+Both require Linux kernel major version at least 6, 16 GiB total and 8 GiB
+available memory, hardware acceleration, physical x64 execution, headed Chrome
+for Testing, AC power, the `balanced` power profile, a synchronized clock and
+background CPU at most 10%. `os.build` is the Linux kernel major version;
+`os.version` retains the complete observed kernel release. Display refresh is
+compared exactly, without rounding or silently accepting a different cohort.
 
 For the laptop, validate offline and then collect a fresh live report:
 
-```powershell
-uv run --locked python scripts/browser_host.py validate --profile profiles/browser/windows-four-core-4k.yaml
-uv run --locked python scripts/browser_host.py check --profile profiles/browser/windows-four-core-4k.yaml --output results/m03-four-core-4k-qualification.json
+```sh
+uv run --locked python scripts/browser_host.py validate --profile profiles/browser/linux-four-core-4k.yaml
+uv run --locked python scripts/browser_host.py check --profile profiles/browser/linux-four-core-4k.yaml --output results/m03-four-core-4k-qualification.json
 ```
 
-A different hardware profile does not waive other failures. OS build 22621
+A different hardware profile does not waive other failures. Kernel major version 5
 and background CPU 20% still reject under this profile. Do not edit an existing
 report or use a recorded snapshot to qualify the laptop. This workflow does not
 update the OS or change host settings; resolving those gates is a separate
@@ -54,8 +54,8 @@ Carry the exact printed profile identity and fingerprint into the Playwright
 configuration; do not reuse the mainstream fingerprint or baseline. After real
 measurements complete, assemble with the same explicit selection:
 
-```powershell
-uv run --locked python scripts/browser_environment.py assemble --profile profiles/browser/windows-four-core-4k.yaml --qualification results/m03-four-core-4k-qualification.json --measurements results/playwright-measurements.json --output results/browser-environment-four-core-4k.json
+```sh
+uv run --locked python scripts/browser_environment.py assemble --profile profiles/browser/linux-four-core-4k.yaml --qualification results/m03-four-core-4k-qualification.json --measurements results/playwright-measurements.json --output results/browser-environment-four-core-4k.json
 ```
 
 Selecting the profile does not update a worker configuration, promote a runtime
@@ -71,23 +71,26 @@ Validate the profile on any development platform:
 uv run --locked python scripts/browser_host.py validate
 ```
 
-On the Windows execution host, run the read-only qualification immediately
+On the Linux execution host, run the read-only qualification immediately
 before starting Playwright:
 
-```powershell
+```sh
 uv run --locked python scripts/browser_host.py check
 ```
 
-The command reads Windows CIM data and the time-service status. It does not
-change power, display, browser, or operating-system settings. An accepted result
-requires the configured physical-host, OS, CPU, memory, GPU, display, AC-power,
-Balanced-plan GUID, idle-CPU, and clock conditions. A rejected result lists every
-observed mismatch and must prevent a comparable baseline run.
+Live collection supports an interactive X11 session with one active, unscaled
+RandR output. It reads `/proc`, CPU topology, Mesa `glxinfo -B`, `xrandr`,
+`powerprofilesctl`, power-supply sysfs, `systemd-detect-virt` and `timedatectl`.
+Each external probe has a ten-second limit. Missing probes, unknown GPU/power
+state, Wayland, multiple active displays or scaling fail closed. No host settings
+are changed. Other desktops require a separately reviewed collector and fresh
+qualification; a synthetic fixture or old snapshot does not qualify this host.
+`--snapshot` exists for offline verification of explicitly supplied evidence.
 
 Write qualification evidence through the script rather than shell redirection.
 The destination is UTF-8 and is never overwritten:
 
-```powershell
+```sh
 uv run --locked python scripts/browser_host.py check --output results/browser-host-qualification.json
 ```
 
@@ -100,13 +103,13 @@ artifact.
 After the runner writes `playwright-measurements/v2`, assemble both sources into
 the immutable environment artifact:
 
-```powershell
+```sh
 uv run --locked python scripts/browser_environment.py assemble --qualification results/browser-host-qualification.json --measurements results/playwright-measurements.json --output results/browser-environment.json
 ```
 
 Assembly requires an accepted qualification captured no later than the start of
 the measurement window. It verifies the profile identity and fingerprint,
-native Windows platform and architecture, and actual browser name and headless
+native Linux platform and architecture, and actual browser name and headless
 mode against the selected profile. On success it prints the output SHA-256 and
 byte count. Existing outputs are never replaced.
 
@@ -123,10 +126,10 @@ publication steps below remain the earlier, independent evidence workflow.
 
 After the runner and environment assembler succeed, preview the storage bridge:
 
-```powershell
-uv run --locked python scripts/browser_upload.py upload `
-  --measurements results/playwright-measurements.json `
-  --environment results/browser-environment.json `
+```sh
+uv run --locked python scripts/browser_upload.py upload \
+  --measurements results/playwright-measurements.json \
+  --environment results/browser-environment.json \
   --receipt results/browser-upload.json
 ```
 
@@ -136,7 +139,7 @@ Add the output required by the selected diagnostic mode: `--observations`,
 
 Execution uses a short-lived locked-down AWS CLI Pod and the restricted uploader
 Secret already installed in the local cluster. Artifact bytes are streamed from
-the Windows host without copying credentials out of Kubernetes. Every PUT is
+the Linux host without copying credentials out of Kubernetes. Every PUT is
 conditional, every object is read back and checksum-verified, and a successful
 run writes `local-browser-upload/v1` as an immutable local receipt. The receipt
 contains raw `artifact/v1` references for later manifest construction; it is not
@@ -151,13 +154,13 @@ and retry recovery are intentionally outside this step.
 For a diagnostic run, combine the exact local outputs with both immutable
 receipts after publication succeeds:
 
-```powershell
-uv run --locked python scripts/browser_diagnostics.py assemble `
-  --measurements results/playwright-measurements.json `
-  --environment results/browser-environment.json `
-  --runner-receipt results/playwright-receipt.json `
-  --upload-receipt results/browser-upload.json `
-  --trace results/chrome-trace.json.gz `
+```sh
+uv run --locked python scripts/browser_diagnostics.py assemble \
+  --measurements results/playwright-measurements.json \
+  --environment results/browser-environment.json \
+  --runner-receipt results/playwright-receipt.json \
+  --upload-receipt results/browser-upload.json \
+  --trace results/chrome-trace.json.gz \
   --output results/browser-diagnostics.json
 ```
 
@@ -174,9 +177,9 @@ trace into complete evidence.
 Publish the assembled manifest only after all of the evidence it names has been
 uploaded and verified:
 
-```powershell
-uv run --locked python scripts/browser_upload.py upload-diagnostics `
-  --diagnostics results/browser-diagnostics.json `
+```sh
+uv run --locked python scripts/browser_upload.py upload-diagnostics \
+  --diagnostics results/browser-diagnostics.json \
   --receipt results/browser-diagnostics-upload.json
 ```
 
@@ -190,15 +193,15 @@ the original evidence receipt.
 After all evidence and the optional diagnostic manifest are published, assemble
 the transport manifest from their verified receipts:
 
-```powershell
-uv run --locked python scripts/browser_raw_result.py assemble `
-  --measurements results/playwright-measurements.json `
-  --environment results/browser-environment.json `
-  --runner-receipt results/playwright-receipt.json `
-  --upload-receipt results/browser-upload.json `
-  --trace results/chrome-trace.json.gz `
-  --diagnostics results/browser-diagnostics.json `
-  --diagnostics-upload-receipt results/browser-diagnostics-upload.json `
+```sh
+uv run --locked python scripts/browser_raw_result.py assemble \
+  --measurements results/playwright-measurements.json \
+  --environment results/browser-environment.json \
+  --runner-receipt results/playwright-receipt.json \
+  --upload-receipt results/browser-upload.json \
+  --trace results/chrome-trace.json.gz \
+  --diagnostics results/browser-diagnostics.json \
+  --diagnostics-upload-receipt results/browser-diagnostics-upload.json \
   --output results/raw-result.json
 ```
 
@@ -210,9 +213,9 @@ writes an immutable `raw-result/v2` for contracts bundle 0.12.0.
 
 Preview publication of the raw manifest only after assembly succeeds:
 
-```powershell
-uv run --locked python scripts/browser_upload.py upload-raw-result `
-  --raw-result results/raw-result.json `
+```sh
+uv run --locked python scripts/browser_upload.py upload-raw-result \
+  --raw-result results/raw-result.json \
   --receipt results/raw-result-upload.json
 ```
 
@@ -232,7 +235,7 @@ Recorded snapshots are accepted only through an explicit option for tests and
 offline troubleshooting:
 
 ```sh
-uv run --locked python scripts/browser_host.py check --snapshot tests/fixtures/windows-browser-host.json
+uv run --locked python scripts/browser_host.py check --snapshot tests/fixtures/linux-browser-host.json
 ```
 
 Do not use a recorded snapshot to qualify a real run. Profile changes require a

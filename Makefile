@@ -50,7 +50,7 @@ check: fmt-check docs-check
 	$(UV_RUN) python scripts/workspace.py validate
 	$(UV_RUN) python scripts/gitops.py validate
 	$(UV_RUN) python scripts/browser_host.py validate
-	$(UV_RUN) python scripts/browser_host.py validate --profile profiles/browser/windows-four-core-4k.yaml
+	$(UV_RUN) python scripts/browser_host.py validate --profile profiles/browser/linux-four-core-4k.yaml
 	$(UV_RUN) python scripts/native_target.py validate
 	$(UV_RUN) python -m scripts.kubernetes_benchmark validate
 

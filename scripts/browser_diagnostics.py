@@ -269,7 +269,7 @@ def assemble(
                 "artifact": references["observations"],
             }
         ]
-        sources = ["playwright", "web-performance", "windows"]
+        sources = ["playwright", "web-performance"]
     elif mode in {"trace", "smoothness"}:
         trace = mapping(artifacts["trace"], "runner trace")
         iterations = [trace["iteration"]]
@@ -286,7 +286,7 @@ def assemble(
                 "artifact": references["trace"],
             }
         ]
-        sources = ["playwright", "cdp", "windows"]
+        sources = ["playwright", "cdp"]
     else:
         memory = mapping(artifacts["memory"], "runner memory")
         iterations = memory["captureIterations"]
@@ -305,7 +305,7 @@ def assemble(
             }
             for key in ("before", "after")
         ]
-        sources = ["playwright", "cdp", "windows"]
+        sources = ["playwright", "cdp"]
 
     if (
         not isinstance(iterations, list)

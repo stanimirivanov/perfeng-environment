@@ -102,7 +102,7 @@ def collect(root: Path) -> list[Result]:
             cluster.verify_local_docker(),
             cluster.run(["docker", "info", "--format", "{{json .ServerVersion}}"]),
         ),
-        "inspect Docker Desktop; no automatic restart or reset",
+        "inspect Docker Engine; no automatic restart or reset",
     )
     ready = probe(
         "Named cluster/dedicated API",
@@ -137,7 +137,7 @@ def collect(root: Path) -> list[Result]:
         else:
             results.append(Result("Public CA SHA-256", "PASS", identity))
             for name, trusted in (
-                ("Windows current-user trust", host.windows_trust(root)),
+                ("Linux system trust", host.system_trust(root)),
                 ("Node trust in this terminal", host.node_trust(root)),
             ):
                 results.append(
@@ -154,7 +154,7 @@ def collect(root: Path) -> list[Result]:
             Result(
                 "CA/trust inspection",
                 "FAIL",
-                "Inspect retained public CA and current-user certificate store; no implicit repair",
+                "Inspect retained public CA and configured Linux certificate store; no implicit repair",
             )
         )
     return results

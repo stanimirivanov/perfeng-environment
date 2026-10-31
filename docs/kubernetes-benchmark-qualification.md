@@ -51,26 +51,26 @@ captures being presented as production-performance qualification.
 
 From this repository, validate or preview without external access or writes:
 
-```powershell
+```sh
 uv run --locked python -m scripts.kubernetes_benchmark validate
 uv run --locked python -m scripts.kubernetes_benchmark check
 ```
 
 Collect through the opt-in task; it chooses new filenames automatically:
 
-```powershell
+```sh
 task kubernetes:qualify
 ```
 
 Or explicitly choose a new result filename:
 
-```powershell
+```sh
 uv run --locked python -m scripts.kubernetes_benchmark check --execute --output results/m04-preflight.json
 ```
 
 Only new JSON files directly under ordinary ignored `results` are allowed.
 Existing files, links/junctions and redirected paths are refused before cluster
-reads. No PowerShell timestamp or shell redirection is necessary.
+reads. No shell timestamp or shell redirection is necessary.
 
 Four stages identify Docker/kind/API, inventory, metrics and evaluation. Commands
 share a 120-second budget; Kubernetes requests use 10-second timeouts. Resource
@@ -126,13 +126,13 @@ down and usage rounds up conservatively. Unavailable usage never becomes zero.
 
 For an UNKNOWN usage check, these dedicated-context commands are read-only:
 
-```powershell
+```sh
 kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local --request-timeout=10s get apiservice v1beta1.metrics.k8s.io
 kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local --request-timeout=10s get --raw /apis/metrics.k8s.io/v1beta1/nodes
 ```
 
 M03 remains deferred pending a suitable laptop. This cohort does not waive its
-Windows gates. M04 stays incomplete until dispatch, verified artifacts, approved
+Linux qualification gates. M04 stays incomplete until dispatch, verified artifacts, approved
 baseline reporting and safe recovery pass separate acceptance.
 
 ## Harness, rollout and rollback

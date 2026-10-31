@@ -230,7 +230,6 @@ class SchemaAdmissionTests(unittest.TestCase):
         bootstrap = (ROOT / "gitops/release-workflows-bootstrap/kustomization.yaml").read_text()
         self.assertNotIn(path.name, bootstrap)
 
-    @unittest.skipIf(os.name == "nt" and not JQ, "jq unavailable on Windows; required by Linux CI")
     def test_valid_records_bytes_and_fresh_identity_are_accepted(self):
         self.assertEqual(self.replay("pointer", self.pointer), self.pointer)
         self.assertEqual(self.replay("receipt", self.receipt), self.receipt)
@@ -241,7 +240,6 @@ class SchemaAdmissionTests(unittest.TestCase):
             self.replay("admission", self.pointer), {"status": "retained-baseline-verified"}
         )
 
-    @unittest.skipIf(os.name == "nt" and not JQ, "jq unavailable on Windows; required by Linux CI")
     def test_receipts_from_unchanged_adoption_policy_are_compatible(self):
         fixture = adoption.ReleaseAdoptionTests()
         fixture.setUp()
@@ -255,7 +253,6 @@ class SchemaAdmissionTests(unittest.TestCase):
             self.replay("admission", self.pointer), {"status": "retained-baseline-verified"}
         )
 
-    @unittest.skipIf(os.name == "nt" and not JQ, "jq unavailable on Windows; required by Linux CI")
     def test_pointer_refuses_absence_conflict_and_foreign_metadata(self):
         cases = [None]
         for key, value in (
@@ -282,7 +279,6 @@ class SchemaAdmissionTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.replay("pointer", bad)
 
-    @unittest.skipIf(os.name == "nt" and not JQ, "jq unavailable on Windows; required by Linux CI")
     def test_receipt_refuses_replacement_provenance_content_and_wrong_selection(self):
         cases = [None]
         for field, value in (("immutable", False), ("data", {"other": "data"})):
@@ -321,7 +317,6 @@ class SchemaAdmissionTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.replay("receipt", bad)
 
-    @unittest.skipIf(os.name == "nt" and not JQ, "jq unavailable on Windows; required by Linux CI")
     def test_final_gate_refuses_changed_records_and_checkpoint_identities(self):
         for field in ("uid", "annotations"):
             changed = deepcopy(self.receipt)

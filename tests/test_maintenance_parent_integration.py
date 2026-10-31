@@ -2,7 +2,6 @@
 
 import copy
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -177,9 +176,6 @@ class MaintenanceParentIntegrationTests(unittest.TestCase):
                     else:
                         self.assertNotEqual(completed.returncode, 0)
 
-    @unittest.skipIf(
-        os.name == "nt" and JQ is None, "Windows has no jq; Linux CI requires the refusal checker"
-    )
     def test_nested_preflight_is_allowed_but_checkpoint_or_downstream_execution_is_refused(self):
         self.assertIsNotNone(JQ, "Linux CI must provide jq")
         assert JQ is not None

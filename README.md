@@ -50,13 +50,13 @@ identity can read, but cannot publish, reviewed policy objects for reporting.
 The preview-first [policy publisher](docs/policy-publication.md) conditionally
 creates exact bundle-owned policy bytes with an operator-approved checksum and
 verifies the stored object before writing a local receipt.
-A [native Windows browser-host profile](docs/windows-browser-host.md) defines
+A [native Linux browser-host profile](docs/linux-browser-host.md) defines
 and checks the controlled machine conditions used by Playwright measurements.
 The default mainstream cohort is preserved; the separately versioned four-core
 4K laptop cohort requires explicit profile selection throughout the evidence workflow.
 The opt-in [native connectivity gateway](docs/native-worker-connectivity.md)
 provides loopback HTTPS API/storage access and a controlled search target on
-the same Windows host. It does not install trust or enable native acquisition.
+the same Linux host. It does not install trust or enable native acquisition.
 Use `task native:setup`, `task native:doctor`, then `task native:up` for the
 managed workflow. The first serving release must be explicitly published and
 selected; until then setup fails closed. No manual Go build or PATH change is
@@ -110,31 +110,18 @@ are intentionally not included. Workspace membership is source-development
 composition only; it does not grant an Argo CD AppProject permission to use a
 repository as workload desired state.
 
-## Bootstrap: PowerShell
+## Bootstrap on Linux
 
 Install Git, Python 3.12, and uv; configure GitHub access through Git's credential
 manager or SSH configuration before cloning. From the desired parent directory:
-
-```powershell
-git clone https://github.com/stanimirivanov/perfeng-environment.git
-Set-Location perfeng-environment
-uv sync --locked
-uv run --locked python scripts/workspace.py validate
-uv run --locked python scripts/browser_host.py validate
-uv run --locked python scripts/browser_environment.py --help
-uv run --locked python scripts/workspace.py bootstrap --dry-run
-uv run --locked python scripts/workspace.py bootstrap
-uv run --locked python scripts/workspace.py status
-code perfeng.code-workspace
-```
-
-## Bootstrap: shell
 
 ```sh
 git clone https://github.com/stanimirivanov/perfeng-environment.git
 cd perfeng-environment
 uv sync --locked
 uv run --locked python scripts/workspace.py validate
+uv run --locked python scripts/browser_host.py validate
+uv run --locked python scripts/browser_environment.py --help
 uv run --locked python scripts/workspace.py bootstrap --dry-run
 uv run --locked python scripts/workspace.py bootstrap
 uv run --locked python scripts/workspace.py status
@@ -256,4 +243,4 @@ separates repository-local checks, offline Helm rendering, exact sibling-release
 validation, supply-chain checks, and explicitly authorized live operations.
 
 Tests use temporary paths and mocked clone operations, never GitHub writes.
-CI is configured to validate on Windows and Linux.
+CI is configured to validate on Linux.

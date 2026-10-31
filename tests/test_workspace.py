@@ -1,6 +1,4 @@
-import importlib
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,11 +58,7 @@ class WorkspaceTests(unittest.TestCase):
     def test_linked_destination_is_rejected(self):
         external = self.root / "external"
         external.mkdir()
-        if os.name == "nt":
-            # A directory junction requires no symlink privilege on Windows.
-            importlib.import_module("_winapi").CreateJunction(str(external), str(self.repo.path))
-        else:
-            self.repo.path.symlink_to(external, target_is_directory=True)
+        self.repo.path.symlink_to(external, target_is_directory=True)
         with self.assertRaises(ValueError):
             self.load()
 

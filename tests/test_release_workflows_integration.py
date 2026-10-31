@@ -959,10 +959,6 @@ k() { printf '%s\\n' 'private-key-do-not-publish: No writable volumes for secret
                 self.assertEqual(result.stderr, message + "\n")
                 self.assertEqual(list(Path(temporary).iterdir()), [])
 
-    @unittest.skipIf(
-        os.name == "nt" and shutil.which("jq") is None,
-        "jq unavailable on Windows; Linux CI checks the native predicate",
-    )
     def test_readiness_refusal_allows_unresolved_declaration_but_rejects_any_result_value(self):
         jq = shutil.which("jq")
         self.assertIsNotNone(jq, "Linux CI requires jq for its native Workflow status checks")

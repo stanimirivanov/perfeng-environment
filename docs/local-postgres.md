@@ -27,7 +27,7 @@ described in [local Kubernetes](local-kubernetes.md). PostgreSQL requires the
 `perf-platform` namespace and kind's `standard` local-path StorageClass with
 `WaitForFirstConsumer` binding. No provisioner is installed by this script.
 
-From this repository, in PowerShell or a POSIX shell:
+From this repository, in Bash or a POSIX shell:
 
 ```sh
 uv run --locked python scripts/validate_cluster.py
@@ -136,8 +136,7 @@ backing local-path data. None of these operations constitutes a backup.
 
 Before teardown when data matters, export with PostgreSQL `pg_dump` to a secure
 location outside the cluster and preserve credentials separately. Use `pg_dump`
-custom format with a file destination and binary-safe copying, not a Windows
-PowerShell text pipeline. Test `pg_restore` into a separate disposable database
+custom format with a file destination and binary-safe copying, not a text pipeline. Test `pg_restore` into a separate disposable database
 before relying on the export. Backup scheduling, encryption, retention policies,
 automated restore, and major-version migration are not implemented here.
 

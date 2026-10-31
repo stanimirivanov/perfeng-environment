@@ -40,8 +40,8 @@ metrics must already pass [verified-TLS health](local-resource-metrics.md).
 The promoted descriptor binds the current cluster incarnation: `kube-system` UID
 `257a288d-9e0f-4956-a0e3-9c4104de6476`. Check it before preparation:
 
-```powershell
-kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local `
+```sh
+kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local \
   --request-timeout=10s get namespace kube-system -o jsonpath='{.metadata.uid}'
 ```
 
@@ -91,10 +91,10 @@ and Jobs before stopping the worker. Schedule downtime and retain an appropriate
 database backup before applying migrations. No automatic backup/restore is provided.
 Do not run another operator sync or rollout concurrently.
 
-Set the package token in the current PowerShell session if a pull Secret is missing:
+Set the package token in the current Bash session if a pull Secret is missing:
 
-```powershell
-$env:PERFENG_REPOSITORIES_READ_TOKEN = Read-Host "GHCR package-read token" -MaskInput
+```sh
+read -rsp "GHCR package-read token: " PERFENG_REPOSITORIES_READ_TOKEN; printf "\n"; export PERFENG_REPOSITORIES_READ_TOKEN
 uv run --locked python scripts/control_plane_maintenance.py pause
 uv run --locked python scripts/execution_registry.py deploy
 task kubernetes:prepare
@@ -128,8 +128,8 @@ Inspect the exact failed phase and retry the Task after resolving it. It never
 force-deletes Pods, replaces a failed migration Job or rolls back a schema.
 Remove the token when finished:
 
-```powershell
-Remove-Item Env:PERFENG_REPOSITORIES_READ_TOKEN
+```sh
+unset PERFENG_REPOSITORIES_READ_TOKEN
 ```
 
 Publish `pod-startup-k8s/1.1.0` as described in [policy publication](policy-publication.md).
@@ -141,10 +141,10 @@ Complete source review and merge only after preparation/publication succeed.
 
 From updated `main`, resume only the root reconciliation:
 
-```powershell
+```sh
 uv run --locked python scripts/gitops.py bootstrap --execute
-kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local `
-  --request-timeout=30s -n argocd wait application/perfeng-local-benchmark-authority `
+kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local \
+  --request-timeout=30s -n argocd wait application/perfeng-local-benchmark-authority \
   --for=jsonpath='{.status.sync.status}'=Synced --timeout=180s
 ```
 
@@ -163,7 +163,7 @@ The reviewed chart restores the single replica only after the migration window.
 
 Verify the complete live selection and compatibility path:
 
-```powershell
+```sh
 uv run --locked python scripts/execution_registry.py health --execute
 uv run --locked python scripts/gitops.py health --execute
 uv run --locked python scripts/control_plane_smoke.py --execute

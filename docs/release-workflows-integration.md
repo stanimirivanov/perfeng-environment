@@ -2115,7 +2115,7 @@ job/scenario/ref/right/budget or local execution is added. Retain the failed
 Job/Workflow through the later paused suite, distinguishing its failure from
 successful install/repeat Jobs. Final recovery needs five Jobs and eight parent
 Workflows plus all existing data/identity retention. Linux PR CI exercises the
-real FIFO with an inert transport; Windows covers typed evidence and shell gates.
+real FIFO with an inert transport alongside typed evidence and shell gates.
 Live database proof remains post-merge. Partial writes and ambiguous commit
 outcomes remain separate work.
 

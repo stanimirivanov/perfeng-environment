@@ -37,7 +37,7 @@ class BrowserRawResultTests(unittest.TestCase):
             },
             "diagnosticMode": mode,
             "environment": {
-                "profile": {"id": "windows-mainstream", "version": "1.0.0"},
+                "profile": {"id": "linux-mainstream", "version": "1.0.0"},
                 "fingerprint": "f" * 64,
             },
             "runtime": {"playwrightVersion": "1.62.1"},

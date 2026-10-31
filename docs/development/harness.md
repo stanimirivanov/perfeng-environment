@@ -15,7 +15,7 @@
 | Setup | `make bootstrap` | Resolve the locked Python environment; network may be required. |
 | Inner loop | `make verify` | Run repository-local formatting, policy, static, configuration, and unit checks without cluster access. |
 | Render acceptance | `make render-check` | Lint and render charts offline; requires Helm. |
-| Native gateway configuration | `make native-gateway-check` | Adapt the real Caddyfile offline using reviewed Caddy 2.11.7; no server, CA or trust provisioning. CI verifies archive checksums on Windows/Linux. |
+| Native gateway configuration | `make native-gateway-check` | Adapt the real Caddyfile offline using reviewed Caddy 2.11.7; no server, CA or trust provisioning. CI verifies archive checksums on Linux. |
 | Supply chain | `make supply-chain` | Check the lock and known vulnerabilities; vulnerability data may require network access. |
 | Complete non-live acceptance | `make validate` | Aggregate verification, rendering, and supply-chain checks; advisory lookup may require network access. |
 | Pinned integration | `make release-selection-check` | Validate exact sibling revisions selected by deployment locks; requires the adjacent repositories and their selected commits. |
@@ -50,7 +50,7 @@ the documented advisory lookup in the separate supply-chain tier). Template
 regressions use local fixtures. Missing `gh` or authentication is a delivery
 blocker, not grounds for installing tools or changing credentials implicitly.
 
-The explicit `native-gateway.yml` Windows tier builds the serving binary from
+The explicit `native-gateway.yml` Linux tier builds the serving binary from
 locked Go inputs, audits it and exercises real isolated TLS/Host/URI and child
 cleanup. It creates temporary loopback listeners/CA state but never changes a
 trust store or contacts Kubernetes. This is separate from offline adaptation
@@ -62,7 +62,7 @@ acceptance remain separate live tiers.
 PR jobs running the full unit suite require a checkout with `fetch-depth: 0`
 and credential persistence disabled. With `GITHUB_BASE_REF` set, the immutable
 verifier retirement audit compares against the merge base with `origin/<base>`
-and reads historical source bytes. The native gateway Windows tier has the same
+and reads historical source bytes. The native gateway Linux tier has the same
 history requirement as main validation; a shallow PR merge checkout is insufficient.
 
 

@@ -1,29 +1,29 @@
 apiVersion: perfeng.dev/v1
 kind: BrowserExecutionProfile
 metadata:
-  id: windows-four-core-4k
+  id: linux-mainstream
   version: 1.0.0
 spec:
   virtualization: physical
   os:
-    family: windows
+    family: linux
     architecture: x64
-    minimumBuild: 22631
+    minimumBuild: 6
   cpu:
-    minimumLogicalCores: 4
+    minimumLogicalCores: 8
   memory:
     minimumTotalBytes: 17179869184
     minimumAvailableBytes: 8589934592
   gpu:
     hardwareAcceleration: true
   display:
-    width: 3840
-    height: 2160
+    width: 1920
+    height: 1080
     scaleFactor: 1
-    refreshRateHz: 59
+    refreshRateHz: 60
   power:
     source: ac
-    plan: 381b4222-f694-41f0-9685-ff5bb260df2e
+    plan: balanced
     batterySaver: false
   browser:
     name: chromium

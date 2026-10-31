@@ -127,7 +127,7 @@ The lock intentionally does not follow `main`. Workspace bootstrap may clone
 Run this acceptance after every provider promotion reaches `main`. It mutates
 the local environment and may reuse retained data in the existing named cluster:
 
-```powershell
+```sh
 uv run --locked python scripts/infrastructure_release.py validate
 task bootstrap
 task status
@@ -193,7 +193,7 @@ unselected working tree.
 
 Run the corresponding selected health command directly through the wrapper:
 
-```powershell
+```sh
 uv run --locked python scripts/infrastructure_runtime.py cluster health --execute
 uv run --locked python scripts/infrastructure_runtime.py argocd health --execute
 ```

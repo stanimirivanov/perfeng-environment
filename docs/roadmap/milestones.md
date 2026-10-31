@@ -11,7 +11,7 @@
   local evidence path.
 - M02 — Declarative Local Operations completed the reversible migration of local
   workload composition to Argo CD.
-- M03 is deferred pending a suitable laptop; M04 is in progress and M05 is planned. M06 remains deliberately deferred until a real
+- M03 is being retargeted to native Linux with fresh acceptance pending; M04 is in progress and M05 is planned. M06 remains deliberately deferred until a real
   non-local deployment is required.
 
 ## Ownership and update rules
@@ -39,7 +39,7 @@ only their local implementation and operating instructions.
 |:--|:--|:--|:--|
 | M01 — Local Performance Decision Loop | Complete | Execute k6, retain artifacts, normalize results, evaluate policies and baselines, and recover the control plane locally. | All current `perfeng-*` repositories |
 | M02 — Declarative Local Operations | Complete | Operate local workloads through reversible, observable GitOps ownership while preserving state and explicit recovery boundaries. | `perfeng-environment`, `perfeng-k8s`, `perfeng-control-plane` |
-| M03 — Native Browser Decision Loop | Deferred | Schedule and observe Playwright runs on qualified Windows workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
+| M03 — Native Browser Decision Loop | In progress | Schedule and observe Playwright runs on qualified Linux workers through the control plane. | `perfeng-playwright`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M04 — Kubernetes Benchmark Decision Loop | In progress | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M05 — Operator Visibility and Diagnostics | Planned | Make runs, failures, decisions and correlated telemetry understandable without inspecting individual Pods or scripts. | Primarily `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis` |
 | M06 — Production Readiness | Deferred | Provide a secure, recoverable, upgradeable multi-user deployment when a non-local environment becomes an actual requirement. | All affected `perfeng-*` repositories and `k8s-infrastructure` |
@@ -122,19 +122,19 @@ local environment; see the
 
 ## M03 — Native Browser Decision Loop
 
-**Status:** Deferred at the owner's request pending a suitable laptop. Retain
-the implemented source, connectivity acceptance and rejected qualification
-reports. Resume its existing promotion and live acceptance gates once a host
-qualifies; do not relax Windows/cohort requirements to declare completion.
+**Status:** In progress: the owner selected native Linux as the execution host.
+Retain historical evidence; fresh Linux qualification, compatible immutable
+runtime selection and complete live acceptance are still required. Source
+retargeting does not qualify this workstation or complete M03.
 
 Planned outcomes:
 
-- register and authenticate native Windows workers;
+- register and authenticate native Linux workers;
 - advertise qualification and execution capabilities;
 - schedule, lease, time out, cancel and recover native runs;
 - publish artifacts without shared local-filesystem assumptions;
 - analyze browser results and compare approved baselines; and
-- prove the complete path on a representative Windows laptop.
+- prove the complete path on a representative Linux workstation.
 
 The browser capture, CDP diagnostics and environment qualification created in
 M01 are foundations, not evidence that this control-plane loop is complete.
@@ -145,7 +145,7 @@ The remaining work is organized by substantial outcomes rather than individual
 files or layers. Known-attempt inspection is already implemented. The separate
 HTTPS upload-signing origin is a completed control-plane prerequisite.
 
-1. `perfeng-k8s`: publish the complete immutable native Windows runtime bundle,
+1. `perfeng-k8s`: publish the complete immutable native Linux runtime bundle,
    including source, qualification, recipe, policy and analysis/report selection.
    Real qualification evidence and candidate identities remain promotion gates.
 2. `perfeng-environment`: establish trusted local API/S3 connectivity and the
@@ -162,19 +162,19 @@ HTTPS upload-signing origin is a completed control-plane prerequisite.
    but this environment still selects the previous service and runtime bundle.
 5. `perfeng-playwright`: complete explicit manual recovery using authoritative
    server state and retained local evidence, with no inferred lease authority.
-   Source complete in `c918cdb`; functional Windows checks passed. Real
-   Windows/control-plane recovery acceptance remains part of batch 6.
+   Source complete in `c918cdb`; historical functional Windows checks passed. Real
+   Linux/control-plane recovery acceptance remains part of batch 6.
 6. `perfeng-environment`: prove qualification through approved-baseline decision
-   on a representative Windows host, including cancellation and restart recovery.
+   on a representative Linux host, including cancellation and restart recovery.
 
 Batch 2's controlled target has published [immutable candidate packaging](../native-browser-candidate.md)
 and [image-backed GitOps selection/gateway cutover](../local-native-target.md),
 pinning chart revision `a20633e` and the candidate digest. Live target/HTTPS
 acceptance and native runtime selection remain promotion gates. The earlier host report is REJECTED against
-`windows-mainstream/1.0.0`. The separately identified
-`windows-four-core-4k/1.0.0` profile now represents the available laptop's
-CPU/display conditions while retaining OS and calibration gates; a fresh
-accepted live capture is still required. Do not treat a qualification-report
+`windows-mainstream/1.0.0`; it is retained as historical evidence.
+The new `linux-mainstream/1.0.0` and `linux-four-core-4k/1.0.0` profiles
+define separate Linux cohorts. Neither establishes that this laptop qualifies;
+a fresh accepted live capture is still required. Do not treat a qualification-report
 hash as a browser-environment artifact.
 
 Managed native connectivity is prepared under [ADR 0010](../decisions/0010-manage-native-connectivity-workflow.md):
@@ -185,7 +185,7 @@ native runtime or accept a rejected host report.
 
 M03 remains incomplete until live acceptance passes. An operator-started
 `run-once` worker and safe manual recovery are the intended scope; an unattended
-Windows service is not required. Do not count mocks or readiness as completion.
+Linux service is not required. Do not count mocks or readiness as completion.
 
 ## M04 — Kubernetes Benchmark Decision Loop
 

@@ -1,13 +1,7 @@
 {
   "schemaVersion": 1,
-  "platform": "windows/amd64",
+  "platform": "linux/amd64",
   "caddyVersion": "v2.11.7",
-  "goVersion": "go1.26.9",
-  "release": {
-    "tag": "native-gateway-d31f8932695124afa23ff565b3dc7edcb90754fe",
-    "assetId": 637244965,
-    "sha256": "b6ce302002e8a6fa29635b8e35a48400acbd856d797fad9de2b01b4da9f02291",
-    "sizeBytes": 82617344,
-    "sourceRevision": "d31f8932695124afa23ff565b3dc7edcb90754fe"
-  }
+  "goVersion": "go1.27.3",
+  "release": null
 }

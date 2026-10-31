@@ -63,7 +63,7 @@ class Selection:
 
 
 def safe_state(root: Path) -> Path:
-    """Reject redirected gateway state while normalizing legitimate Windows path aliases."""
+    """Reject redirected gateway state while normalizing legitimate path aliases."""
     root = root.resolve()
     state = root / ".local/native-gateway"
     for path in (root / ".local", state):
@@ -111,7 +111,7 @@ def parse_selection(value: object) -> Selection:
         value["caddyVersion"],
     ) != (
         1,
-        "windows/amd64",
+        "linux/amd64",
         "v2.11.7",
     ):
         raise GatewayError(
@@ -160,7 +160,7 @@ def parse_selection(value: object) -> Selection:
 
 def executable(root: Path, selected: Selection) -> Path:
     """Locate one content-selected installation without considering ambient PATH."""
-    return safe_state(root) / "tools" / selected.sha256 / "caddy.exe"
+    return safe_state(root) / "tools" / selected.sha256 / "caddy"
 
 
 def digest(path: Path) -> str:
@@ -224,18 +224,18 @@ def metadata(binary: Path, serving: bool = True) -> str:
             go is None
             or "go" + ".".join(go.groups()) != GO_VERSION
             or net is None
-            or tuple(map(int, net.groups())) < (0, 60, 0)
+            or tuple(map(int, net.groups())) < (0, 62, 0)
         ):
             raise GatewayError(
                 "TOOL_SECURITY",
-                f"Caddy requires reviewed {GO_VERSION} and x/net >=v0.60.0",
+                f"Caddy requires reviewed {GO_VERSION} and x/net >=v0.62.0",
                 "publish a reviewed patched build; do not bypass the gate",
             )
-        if "build\tGOOS=windows" not in info or "build\tGOARCH=amd64" not in info:
+        if "build\tGOOS=linux" not in info or "build\tGOARCH=amd64" not in info:
             raise GatewayError(
                 "TOOL_PLATFORM",
-                "Expected a Windows AMD64 serving binary",
-                "use the selected Windows release",
+                "Expected a Linux AMD64 serving binary",
+                "use the selected Linux release",
             )
     return info
 
@@ -366,7 +366,7 @@ def setup(root: Path = ROOT) -> Path:
     private_state(root)
     print(f"[1/3] Downloading selected Caddy asset {selected.asset_id}...", flush=True)
     with tempfile.TemporaryDirectory(prefix="download-", dir=state) as directory:
-        candidate = Path(directory) / "caddy.exe"
+        candidate = Path(directory) / "caddy"
         download(selected, candidate)
         if candidate.stat().st_size != selected.size or digest(candidate) != selected.sha256:
             raise GatewayError(
@@ -375,6 +375,7 @@ def setup(root: Path = ROOT) -> Path:
                 "review the release selection; nothing was installed",
             )
         print("[2/3] Checking executable version and patched build metadata...", flush=True)
+        candidate.chmod(0o700)
         metadata(candidate)
         target.parent.mkdir(parents=True, exist_ok=True)
         # Hard-link publication is exclusive: concurrent setup must never replace bytes.

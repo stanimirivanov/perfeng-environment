@@ -15,14 +15,14 @@ class BrowserHostTests(unittest.TestCase):
     def setUpClass(cls):
         cls.profile = browser_host.load_profile()
         cls.snapshot = json.loads(
-            (browser_host.ROOT / "tests/fixtures/windows-browser-host.json").read_text()
+            (browser_host.ROOT / "tests/fixtures/linux-browser-host.json").read_text()
         )
 
     def test_profile_has_stable_identity_and_accepts_reference_host(self):
         result = browser_host.evaluate(self.profile, copy.deepcopy(self.snapshot))
         self.assertEqual(result["status"], "ACCEPTED")
         self.assertEqual(result["reasons"], [])
-        self.assertEqual(result["profile"], {"id": "windows-mainstream", "version": "1.0.0"})
+        self.assertEqual(result["profile"], {"id": "linux-mainstream", "version": "1.0.0"})
         self.assertRegex(result["fingerprint"], r"^[0-9a-f]{64}$")
 
     def test_environment_and_calibration_drift_are_all_reported(self):
@@ -49,14 +49,14 @@ class BrowserHostTests(unittest.TestCase):
 
     def test_four_core_4k_profile_is_a_distinct_explicit_cohort(self):
         profile = browser_host.load_profile(
-            browser_host.ROOT / "profiles/browser/windows-four-core-4k.yaml"
+            browser_host.ROOT / "profiles/browser/linux-four-core-4k.yaml"
         )
-        self.assertEqual(profile["metadata"], {"id": "windows-four-core-4k", "version": "1.0.0"})
+        self.assertEqual(profile["metadata"], {"id": "linux-four-core-4k", "version": "1.0.0"})
         self.assertNotEqual(
             browser_host.fingerprint(profile), browser_host.fingerprint(self.profile)
         )
         expected = copy.deepcopy(self.profile)
-        expected["metadata"]["id"] = "windows-four-core-4k"
+        expected["metadata"]["id"] = "linux-four-core-4k"
         expected["spec"]["cpu"]["minimumLogicalCores"] = 4
         expected["spec"]["display"] = {
             "width": 3840,
@@ -73,22 +73,21 @@ class BrowserHostTests(unittest.TestCase):
 
     def test_laptop_profile_does_not_relax_os_or_idle_cpu_gates(self):
         profile = browser_host.load_profile(
-            browser_host.ROOT / "profiles/browser/windows-four-core-4k.yaml"
+            browser_host.ROOT / "profiles/browser/linux-four-core-4k.yaml"
         )
         snapshot = copy.deepcopy(self.snapshot)
         snapshot["cpu"].update(
             logicalCores=4, physicalCores=4, availableLogicalCores=4, idleCpuPercent=20
         )
         snapshot["display"] = dict(profile["spec"]["display"])
-        snapshot["os"]["build"] = 22621
-        snapshot["power"]["plan"] = "{" + snapshot["power"]["plan"] + "}"
+        snapshot["os"]["build"] = 5
         result = browser_host.evaluate(profile, snapshot)
         self.assertEqual(result["status"], "REJECTED")
         self.assertEqual(result["reasons"], ["OS build is too old", "background CPU is too high"])
 
     def test_laptop_profile_still_rejects_capacity_and_display_drift(self):
         profile = browser_host.load_profile(
-            browser_host.ROOT / "profiles/browser/windows-four-core-4k.yaml"
+            browser_host.ROOT / "profiles/browser/linux-four-core-4k.yaml"
         )
         snapshot = copy.deepcopy(self.snapshot)
         snapshot["display"] = dict(profile["spec"]["display"])
@@ -103,7 +102,7 @@ class BrowserHostTests(unittest.TestCase):
                 self.assertIn(reason, browser_host.evaluate(profile, changed)["reasons"])
 
     def test_explicit_laptop_profile_validation_is_offline(self):
-        profile_path = browser_host.ROOT / "profiles/browser/windows-four-core-4k.yaml"
+        profile_path = browser_host.ROOT / "profiles/browser/linux-four-core-4k.yaml"
         with (
             patch("sys.argv", ["browser_host.py", "validate", "--profile", str(profile_path)]),
             patch.object(browser_host.subprocess, "run") as run,
@@ -111,13 +110,11 @@ class BrowserHostTests(unittest.TestCase):
         ):
             self.assertEqual(browser_host.main(), 0)
             run.assert_not_called()
-            self.assertIn("windows-four-core-4k", output.getvalue())
+            self.assertIn("linux-four-core-4k", output.getvalue())
 
-    def test_balanced_plan_braces_and_case_do_not_change_identity(self):
+    def test_power_profile_is_exact_and_not_a_windows_guid(self):
         snapshot = copy.deepcopy(self.snapshot)
-        snapshot["power"]["plan"] = "{" + snapshot["power"]["plan"].upper() + "}"
-        self.assertEqual(browser_host.evaluate(self.profile, snapshot)["status"], "ACCEPTED")
-        snapshot["power"]["plan"] = "00000000-0000-0000-0000-000000000000"
+        snapshot["power"]["plan"] = "performance"
         self.assertIn(
             "power plan differs", browser_host.evaluate(self.profile, snapshot)["reasons"]
         )
@@ -145,7 +142,7 @@ class BrowserHostTests(unittest.TestCase):
                 browser_host.load_profile()
 
     def test_validate_is_offline_and_check_can_use_a_recorded_snapshot(self):
-        fixture = browser_host.ROOT / "tests/fixtures/windows-browser-host.json"
+        fixture = browser_host.ROOT / "tests/fixtures/linux-browser-host.json"
         for arguments in (
             ["browser_host.py", "validate"],
             ["browser_host.py", "check", "--snapshot", str(fixture)],
@@ -157,15 +154,15 @@ class BrowserHostTests(unittest.TestCase):
             ):
                 self.assertEqual(browser_host.main(), 0)
                 run.assert_not_called()
-                self.assertIn("windows-mainstream", output.getvalue())
+                self.assertIn("linux-mainstream", output.getvalue())
 
-    def test_live_inspection_fails_closed_outside_windows(self):
-        with patch.object(browser_host.platform, "system", return_value="Linux"):
-            with self.assertRaisesRegex(ValueError, "requires Windows"):
+    def test_live_inspection_fails_closed_outside_linux(self):
+        with patch("scripts.linux_browser_host.platform.system", return_value="Darwin"):
+            with self.assertRaisesRegex(ValueError, "requires Linux"):
                 browser_host.live_snapshot()
 
     def test_check_can_write_an_immutable_utf8_qualification(self):
-        fixture = browser_host.ROOT / "tests/fixtures/windows-browser-host.json"
+        fixture = browser_host.ROOT / "tests/fixtures/linux-browser-host.json"
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "qualification.json"
             arguments = [

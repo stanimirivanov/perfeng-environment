@@ -25,7 +25,7 @@ Platform artifact contracts remain vendor-neutral S3 references.
 First complete the base cluster up/bootstrap steps. The script requires the
 perf-platform namespace and kind's standard local-path StorageClass with delayed
 binding. It verifies the local Docker endpoint and dedicated kubeconfig before
-cluster access. Run from this repository in PowerShell or a POSIX shell:
+cluster access. Run from this repository in Bash or a POSIX shell:
 
 ~~~sh
 uv run --locked python scripts/validate_cluster.py

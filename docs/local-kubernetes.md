@@ -67,7 +67,7 @@ Provider commands reserve `.local/perfeng-local.kubeconfig` and never use the
 global kubeconfig. Every kubectl operation pins that file and context
 `kind-perfeng-local`. Do not edit or share the file: it contains cluster-admin
 credentials. The directory is Git-ignored, with owner-only permissions
-requested on POSIX; review Windows ACLs on shared machines.
+requested on Linux; inspect file ownership and modes on shared machines.
 
 Execution requires a local Docker socket context. TCP and SSH Docker contexts
 are rejected. The global `KUBECONFIG` variable is not used by child commands.

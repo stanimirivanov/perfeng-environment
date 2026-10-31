@@ -43,7 +43,7 @@ change credential scopes or alter machine-wide PATH implicitly.
 The opt-in native gateway uses Caddy 2.11.7 (Apache-2.0); see the
 [connectivity guide](../native-worker-connectivity.md) for the replacement
 boundary and patched-toolchain requirement for live serving. Its official
-Windows/Linux archive SHA-512 values are pinned in
+Linux archive SHA-512 values are pinned in
 `native-gateway/caddy-release.json`. CI uses checksum-verified binaries solely
 for offline adaptation. Changes to these pins require a release/security review
 and actual Caddyfile adaptation, not a text-only configuration test.
@@ -72,7 +72,7 @@ assessment, not an advisory suppression or claim that the entire module is
 vulnerability-free. Re-review this assessment for each release/dependency update.
 
 Serving uses a separate `native-gateway/serving-release.json` selection. The
-Windows publisher builds the standard entry point as a dependency with the
+Linux publisher builds the standard entry point as a dependency with the
 checked-in `native-gateway/build` and `native-gateway/audit` Go module locks,
 then audits the executable and runs an isolated real TLS smoke. The main-only
 publisher never overwrites releases or selects its own output. Explicit setup

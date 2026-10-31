@@ -71,13 +71,13 @@ is not a live submission.
 Submit an already reviewed request with the Argo CLI, naming the exact
 request and selection commits:
 
-```powershell
-$env:KUBECONFIG = (Resolve-Path .local/perfeng-local.kubeconfig).Path
-argo --context kind-perfeng-local -n argo-workflows submit `
-  --from workflowtemplate/perfeng-release-preflight-v3 `
-  -p request-revision=<reviewed-request-commit> `
-  -p request-path=deployments/release-requests/<name>.json `
-  -p request-sha256=sha256:<exact-request-bytes-hash> `
+```sh
+export KUBECONFIG="$(realpath .local/perfeng-local.kubeconfig)"
+argo --context kind-perfeng-local -n argo-workflows submit \
+  --from workflowtemplate/perfeng-release-preflight-v3 \
+  -p request-revision=<reviewed-request-commit> \
+  -p request-path=deployments/release-requests/<name>.json \
+  -p request-sha256=sha256:<exact-request-bytes-hash> \
   -p selection-revision=<reviewed-selection-commit> --watch
 ```
 

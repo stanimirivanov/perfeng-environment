@@ -1,4 +1,4 @@
-"""Operate the loopback-only Windows gateway without changing cluster workloads."""
+"""Operate the loopback-only Linux gateway without changing cluster workloads."""
 
 from __future__ import annotations
 

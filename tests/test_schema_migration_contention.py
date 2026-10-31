@@ -169,7 +169,7 @@ def run(mode, root, results):
 
 
 class SchemaMigrationContentionTests(unittest.TestCase):
-    @unittest.skipUnless(BASH and os.name != "nt", "Linux FIFO transport is verified on CI")
+    @unittest.skipUnless(BASH, "Linux FIFO transport is verified on CI")
     def test_real_fifo_holder_and_observer_stop_without_unproved_disconnect(self):
         assert BASH
         text = (installation.repeats.pause.FIXTURE / "schema-migration-contention.sh").read_text()
