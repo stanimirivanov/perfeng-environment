@@ -65,7 +65,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Retain only non-secret fixture evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-workflows-kind-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release-workflows-results/

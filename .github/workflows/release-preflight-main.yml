@@ -87,7 +87,7 @@ jobs:
         run: rm -f -- "$RUNNER_TEMP/perfeng-argocd-token"
       - name: Retain only non-secret fixture evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-preflight-main-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.adoption-scenario }}
           path: ${{ runner.temp }}/release-workflows-results/
