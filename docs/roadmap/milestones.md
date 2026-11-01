@@ -43,6 +43,7 @@ only their local implementation and operating instructions.
 | M04 — Kubernetes Benchmark Decision Loop | In progress | Run kube-burner benchmarks through control-plane execution, analysis, baseline and reporting. | `perfeng-k8s`, `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis`, `perfeng-contracts` |
 | M05 — Operator Visibility and Diagnostics | Planned | Make runs, failures, decisions and correlated telemetry understandable without inspecting individual Pods or scripts. | Primarily `perfeng-control-plane`, `perfeng-environment`, `perfeng-analysis` |
 | M06 — Production Readiness | Deferred | Provide a secure, recoverable, upgradeable multi-user deployment when a non-local environment becomes an actual requirement. | All affected `perfeng-*` repositories and `k8s-infrastructure` |
+| M07 — Argus integration | In progress | Consume reviewed performance evidence through Argus and measure joint development workflows while preserving product ownership. | `perfeng-environment`, affected Perfeng components and `argus` |
 
 ## M01 — Local Performance Decision Loop
 
@@ -796,6 +797,24 @@ current zero-cost options. OCI OKE is the first candidate, but a cloud pilot is
 blocked until the runtime has reviewed `linux/arm64` releases and the provider
 capacity and zero-cost preflight pass. A free integration lab is not evidence of
 production readiness.
+
+## M07 — Argus integration
+
+**Status:** In progress. Joint source composition is the first slice; it does not
+establish runtime integration or acceptance.
+
+Coordinate with **Argus M09 - Perfeng integration**, retaining the existing
+product-specific numbering. This milestone owns Perfeng's side of workspace
+composition, explicit joint acceptance fixtures, a real k6 evidence flow and
+measured shadow CI. Argus owns its consumption, runtime configuration and public
+decision projection. Argus SRE has no runtime deliverable in this milestone.
+
+Completion requires authenticated retained evidence consumption, scoped read-only
+projection, lifecycle/recovery acceptance and measured selected/full-control
+observations. Workspace membership alone satisfies none of those gates.
+The [joint development guide](../joint-development.md) defines current ownership
+and commands. Production readiness and deployment-script retirement remain
+separate; no deployment cutover is implied by this milestone.
 
 ## Planning review
 

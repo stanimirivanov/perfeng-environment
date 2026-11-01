@@ -36,7 +36,9 @@ operator-facing local workflows. It does not own component implementation,
 published data contracts, runner behavior or statistical analysis.
 
 - Component behavior belongs in its component repository.
-- Cross-repository contracts belong in `perfeng-contracts`.
+- Perfeng cross-repository contracts belong in `perfeng-contracts`; Argus and
+  Argus SRE publish their own contracts. Workspace membership does not transfer
+  product or deployment ownership.
 - Kubernetes workload packaging belongs in `perfeng-k8s`; environment-specific
   selection and composition belong here.
 - Credentials, generated receipts and machine-specific state MUST remain

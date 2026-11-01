@@ -64,6 +64,22 @@
       "source": {
         "branch": "main"
       }
+    },
+    {
+      "name": "argus",
+      "path": "../argus",
+      "url": "https://github.com/stanimirivanov/argus.git",
+      "source": {
+        "branch": "main"
+      }
+    },
+    {
+      "name": "argus-sre",
+      "path": "../argus-sre",
+      "url": "https://github.com/stanimirivanov/argus-sre.git",
+      "source": {
+        "branch": "main"
+      }
     }
   ]
 }

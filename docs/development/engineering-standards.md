@@ -41,7 +41,8 @@ and acceptance evidence. A module should have one cohesive operational purpose.
   business logic.
 - Charts package workloads; environment configuration selects reviewed releases
   and supplies environment-specific values.
-- `perfeng-contracts` owns cross-repository schemas and compatibility meaning.
+- `perfeng-contracts` owns Perfeng cross-repository schemas and compatibility
+  meaning; cooperating products retain ownership of their published contracts.
 - Component repositories own executable behavior and their release artifacts.
 - External Secrets, retained volumes, Helm releases and Argo CD Applications
   have explicit, non-overlapping owners.

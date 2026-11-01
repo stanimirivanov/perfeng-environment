@@ -13,7 +13,7 @@
 |:--|:--|:--|
 | Contributor workflow, ambiguity, or issue preparation | [Contributor guide](../CONTRIBUTING.md) | [Working agreement](../AGENTS.md) |
 | Build, CI, repository policy, dependency, or local setup | [Harness guide](development/harness.md), [dependency policy](development/dependency-policy.md) | [Engineering standards](development/engineering-standards.md), `make verify` |
-| Workspace composition or sibling checkouts | [Repository README](../README.md) | `scripts/workspace.py`, `workspace.json` |
+| Workspace composition or sibling checkouts | [Joint development](joint-development.md), [repository README](../README.md) | `scripts/workspace.py`, `workspace.json` |
 | Local Kubernetes substrate or Argo CD bootstrap | [Local infrastructure release](local-infrastructure-release.md), [local Kubernetes](local-kubernetes.md) | [ADR index](decisions/README.md), specialized release-selection checks |
 | GitOps composition, ownership, or recovery | [Local GitOps](local-gitops.md), [manifest layout](../gitops/README.md), [migration completion](gitops-migration-completion.md) | [Troubleshooting](troubleshooting.md), `scripts/gitops.py`, `make render-check` |
 | Release workflow ownership or deployment-script retirement | [ADR 0014](decisions/0014-separate-release-and-run-orchestration.md), [retirement baseline](deployment-script-retirement.md) | [Taskfile](../Taskfile.yml), [M04 cutover](kubernetes-runtime-deployment.md) |

@@ -31,6 +31,14 @@
     {
       "name": "perfeng-environment",
       "path": "."
+    },
+    {
+      "name": "argus",
+      "path": "../argus"
+    },
+    {
+      "name": "argus-sre",
+      "path": "../argus-sre"
     }
   ],
   "settings": {}

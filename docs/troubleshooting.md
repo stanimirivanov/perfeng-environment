@@ -1986,3 +1986,11 @@ failed parent, migration and restored authority again. The seven-Job cohort has
 three migration Jobs and two each of qualification/grants; preserve full private
 inventories rather than broadening ignores. This is disposable CI acceptance,
 not local recovery authorization or partial/ambiguous SQL commit proof.
+
+## Joint workspace composition
+
+For missing Argus folders or workspace inventory drift, follow
+[joint development troubleshooting](joint-development.md#workspace-troubleshooting).
+Validate from `perfeng-environment` with `python3 scripts/workspace.py validate`.
+Inspect existing branches with `python3 scripts/workspace.py status`; missing-only
+bootstrap preserves existing work and does not synchronize branches or toolchains.
