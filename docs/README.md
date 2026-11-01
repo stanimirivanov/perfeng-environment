@@ -53,6 +53,7 @@
 | Managed native tool setup, diagnosis or session lifecycle | [Native connectivity](native-worker-connectivity.md), [ADR 0010](decisions/0010-manage-native-connectivity-workflow.md) | Explicit publisher/selection, native doctor and foreground ownership |
 | Image-backed target selection, deployment or forwarding | [Local native target](local-native-target.md), [ADR 0009](decisions/0009-select-image-backed-native-target.md) | Pinned release checks, candidate health and exact HTTPS content |
 | Milestones or cross-repository sequencing | [Milestones](roadmap/milestones.md) | Relevant ADRs and component repositories |
+| Disposable Argus–Perfeng database preparation | [Joint fixture](argus-perfeng-fixture.md) | Pinned source candidates, isolated databases, guarded cleanup; product-flow acceptance remains separate |
 | Operational failure or live recovery | [Troubleshooting](troubleshooting.md) | The focused operating guide; live commands require explicit authorization |
 
 Staged retained-baseline schema admission is documented in the
