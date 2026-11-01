@@ -5,7 +5,15 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from scripts.workspace import Repository, State, bootstrap, canonical_origin, inspect, load_manifest
+from scripts.workspace import (
+    Repository,
+    State,
+    bootstrap,
+    canonical_origin,
+    inspect,
+    load_manifest,
+    main,
+)
 
 URL = "https://github.com/stanimirivanov/perfeng-k6.git"
 
@@ -54,6 +62,77 @@ class WorkspaceTests(unittest.TestCase):
 
         self.assertEqual(repository.name, "k8s-infrastructure")
         self.assertEqual(repository.path, self.root / "k8s-infrastructure")
+
+    def test_joint_workspace_inventory_and_editor_drift(self):
+        root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((root / "workspace.json").read_text())
+        editor = json.loads((root / "perfeng.code-workspace").read_text())
+        names = {item["name"] for item in manifest["repositories"]}
+        self.assertEqual(
+            names,
+            {
+                "perfeng-contracts",
+                "perfeng-control-plane",
+                "perfeng-analysis",
+                "perfeng-k6",
+                "perfeng-playwright",
+                "perfeng-k8s",
+                "k8s-infrastructure",
+                "perfeng-environment",
+                "argus",
+                "argus-sre",
+            },
+        )
+        self.manifest.write_text(json.dumps(manifest))
+        workspace = self.environment / "perfeng.code-workspace"
+        for name in ("argus", "argus-sre"):
+            entry = next(item for item in manifest["repositories"] if item["name"] == name)
+            self.assertEqual(entry["url"], f"https://github.com/stanimirivanov/{name}.git")
+            self.assertEqual(entry["source"], {"branch": "main"})
+        variants = [
+            editor["folders"],
+            editor["folders"][:-1],
+            editor["folders"] + [{"name": "extra", "path": "../extra"}],
+            [
+                {**item, "path": "../renamed"} if item["name"] == "argus" else item
+                for item in editor["folders"]
+            ],
+        ]
+        for index, folders in enumerate(variants):
+            with self.subTest(index=index):
+                workspace.write_text(json.dumps({"folders": folders, "settings": {}}))
+                with (
+                    patch("scripts.workspace.git", return_value=""),
+                    patch(
+                        "sys.argv", ["workspace.py", "validate", "--manifest", str(self.manifest)]
+                    ),
+                ):
+                    self.assertEqual(main(), 0 if index == 0 else 1)
+
+    def test_existing_argus_issue_branches_are_not_synchronized(self):
+        repositories = [
+            Repository(
+                name, self.root / name, f"https://github.com/stanimirivanov/{name}.git", "main"
+            )
+            for name in ("argus", "argus-sre")
+        ]
+        for repo in repositories:
+            repo.path.mkdir()
+            (repo.path / "local-work").write_text("retain this work")
+        with (
+            patch(
+                "scripts.workspace.inspect",
+                side_effect=[
+                    State(repo, "existing", "feature/issue-17", "abcdef", True)
+                    for repo in repositories
+                ],
+            ),
+            patch("scripts.workspace.git") as git,
+        ):
+            self.assertEqual(bootstrap(repositories, dry_run=False), 0)
+            git.assert_not_called()
+        for repo in repositories:
+            self.assertEqual((repo.path / "local-work").read_text(), "retain this work")
 
     def test_linked_destination_is_rejected(self):
         external = self.root / "external"

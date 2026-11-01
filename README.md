@@ -99,7 +99,7 @@ remain disabled.
 ## Layout
 
 Clone this repository into a directory named perfeng-environment. Its parent is
-the workspace root; the seven other repositories are siblings. Paths are resolved
+the workspace root; the nine other repositories are siblings. Paths are resolved
 relative to workspace.json, never the terminal's current directory. No absolute
 machine paths, submodules, or copied component sources are used.
 
@@ -109,6 +109,9 @@ detects drift between them. The prototype and external working-notes folder
 are intentionally not included. Workspace membership is source-development
 composition only; it does not grant an Argo CD AppProject permission to use a
 repository as workload desired state.
+
+See [joint development](docs/joint-development.md) for Perfeng, Argus and Argus
+SRE ownership, per-repository toolchains and milestone names.
 
 ## Bootstrap on Linux
 
