@@ -5,10 +5,11 @@ CONTRACTS_ROOT ?= ../perfeng-contracts
 NATIVE_TARGET_K8S_ROOT ?= $(K8S_ROOT)
 UV_RUN := uv run --locked --offline
 
-.PHONY: help bootstrap doctor fmt fmt-check docs-check check test verify render-check workflow-lint release-workflows-integration native-gateway-check native-target-image-check release-selection-check supply-chain validate
+.PHONY: argus-perfeng-fixture-check help bootstrap doctor fmt fmt-check docs-check check test verify render-check workflow-lint release-workflows-integration native-gateway-check native-target-image-check release-selection-check supply-chain validate
 
 help:
 	@echo perfeng-environment engineering command surface
+	@echo "  make argus-perfeng-fixture-check  Validate disposable joint inputs and safety offline"
 	@echo "  make bootstrap  Resolve the locked Python environment"
 	@echo "  make doctor     Report the effective engineering toolchain"
 	@echo "  make fmt        Format Python sources"
@@ -91,3 +92,8 @@ supply-chain:
 	uv audit --locked
 
 validate: verify render-check supply-chain
+
+# Offline only; live preparation requires the documented --execute path.
+argus-perfeng-fixture-check:
+	$(UV_RUN) python tests/integration/argus-perfeng/fixture.py
+	$(UV_RUN) python -m unittest tests.test_argus_fixture -v

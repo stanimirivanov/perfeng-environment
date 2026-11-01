@@ -116,3 +116,8 @@ If tools disagree with a product's pins, use `make doctor` where available and
 that product's setup guide. Do not change dependency locks just to validate the
 workspace. Reverting workspace entries removes editor/bootstrap membership;
 it neither deletes existing checkouts nor reverses any product deployment.
+
+The [disposable joint fixture](argus-perfeng-fixture.md) builds pinned product
+candidates and prepares isolated databases. Its offline gate is
+`make argus-perfeng-fixture-check`; execution is explicit and does not establish
+running-product or real-flow acceptance.

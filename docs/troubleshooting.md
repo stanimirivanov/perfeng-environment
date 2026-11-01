@@ -1994,3 +1994,14 @@ For missing Argus folders or workspace inventory drift, follow
 Validate from `perfeng-environment` with `python3 scripts/workspace.py validate`.
 Inspect existing branches with `python3 scripts/workspace.py status`; missing-only
 bootstrap preserves existing work and does not synchronize branches or toolchains.
+
+## Disposable Argus–Perfeng preparation fails
+
+Run `make argus-perfeng-fixture-check` for offline pin and lifecycle validation.
+For an explicitly executed run, retain the printed private directory and inspect
+`evidence.json`. `preparationReady` and `cleanup` are separate signals; neither
+claims running-product acceptance. Build failures require Git/Go network access;
+database failures require Docker and the exact pinned migrators. Unresolved cleanup
+requires exact run-label/name/ID checks before removal, never Docker prune or an
+ambient cluster operation. Raw Docker inspection contains private credentials;
+do not attach it to issues. Follow the [fixture recovery guide](argus-perfeng-fixture.md).
