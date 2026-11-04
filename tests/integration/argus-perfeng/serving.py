@@ -280,6 +280,9 @@ class Serving:
     def candidate_revision(self, source, target):
         return source
 
+    def registry_entries(self, entry, files):
+        return [entry]
+
     def checkout(self, lock):
         source = self.fixture.command(["git", "-C", str(ROOT), "rev-parse", "HEAD"]).stdout.strip()
         target = self.fixture.command(
@@ -329,7 +332,7 @@ class Serving:
             "principalIssuer": ARGUS_ISSUER,
             "producerVersion": "1.0.0",
         }
-        registry["entries"] = [entry]
+        registry["entries"] = self.registry_entries(entry, files)
         self.private("registry/registry.json", json.dumps(registry))
         for path in (
             entry["policy"],
@@ -356,14 +359,21 @@ class Serving:
         ]["image"]
 
     def storage(self, aws_image):
-        [entry] = json.loads((self.root / "registry/registry.json").read_text())["entries"]
-        policy_path = f"registry/{entry['policy']}"
-        policy = json.loads((self.root / policy_path).read_text())["metadata"]
-        policy_key = f"policies/{policy['name']}/{policy['version']}/performance-policy.json"
+        entries = json.loads((self.root / "registry/registry.json").read_text())["entries"]
+        policy_paths = tuple(f"registry/{entry['policy']}" for entry in entries)
+        uploads = []
+        for path in policy_paths:
+            policy = json.loads((self.root / path).read_text())["metadata"]
+            key = f"policies/{policy['name']}/{policy['version']}/performance-policy.json"
+            uploads.append(
+                f"aws_s3 put-object --bucket {BUCKET} --key {shlex.quote(key)}"
+                f" --body {shlex.quote('/fixture/' + path)}"
+            )
         bootstrap, uploader, reader = (
             {"access-key": secrets.token_hex(16), "secret-key": secrets.token_hex(32)}
             for _ in range(3)
         )
+        self.report_reader = reader
         config = storage_access.server_config(bootstrap, uploader)
         config["identities"].append(
             {
@@ -374,8 +384,21 @@ class Serving:
                         "secretKey": reader["secret-key"],
                     }
                 ],
-                "actions": [f"Read:{BUCKET}/runs/*"],
+                "policyNames": ["fixture-report-reader"],
             }
+        )
+        read_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{BUCKET}/runs/*"],
+                }
+            ],
+        }
+        config["policies"].append(
+            {"name": "fixture-report-reader", "content": json.dumps(read_policy)}
         )
         self.private("s3.json", json.dumps(config))
         self.fixture.command(
@@ -398,6 +421,7 @@ class Serving:
                 str(self.root / "store.crt"),
             ]
         )
+        (self.root / "store.crt").chmod(0o644)
         for ns in (PLATFORM, GENERATORS):
             self.secret("perfeng-s3-uploader-auth", ns, uploader)
         self.secret("report-reader", PLATFORM, reader)
@@ -446,11 +470,17 @@ class Serving:
                     "-ec",
                     f"""
 aws_s3() {{
-  aws --endpoint-url https://{STORE_HOST}:8443 --ca-bundle /fixture/store.crt s3api "$@"
+  AWS_MAX_ATTEMPTS=1 aws --endpoint-url https://{STORE_HOST}:8443 \
+    --ca-bundle /fixture/store.crt --cli-connect-timeout 4 --cli-read-timeout 8 s3api "$@"
 }}
-aws_s3 create-bucket --bucket {BUCKET}
-aws_s3 put-object --bucket {BUCKET} --key {shlex.quote(policy_key)} \
-  --body {shlex.quote("/fixture/" + policy_path)}
+for attempt in 1 2 3 4 5; do
+  if aws_s3 create-bucket --bucket {BUCKET} || aws_s3 head-bucket --bucket {BUCKET}; then
+    break
+  fi
+  test "$attempt" != 5
+  sleep 2
+done
+{chr(10).join(uploads)}
 export AWS_ACCESS_KEY_ID="$FIXTURE_UPLOADER_ACCESS_KEY"
 export AWS_SECRET_ACCESS_KEY="$FIXTURE_UPLOADER_SECRET_KEY"
 printf '%s' fixture-storage-ready > /tmp/probe
@@ -460,7 +490,7 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
 """,
                 ],
                 secret="store-bootstrap",
-                paths=("store.crt", policy_path),
+                paths=("store.crt", *policy_paths),
             )
         )
         self.k(
@@ -469,8 +499,8 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
             "wait",
             "--for=jsonpath={.status.phase}=Succeeded",
             "pod/store-init",
-            "--timeout=90s",
-            timeout=100,
+            "--timeout=150s",
+            timeout=160,
         )
         return uploader
 
@@ -488,12 +518,29 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
     def argus_configuration(self):
         return {}, ()
 
+    def argus_pod(self, paths):
+        return pod(
+            "argus",
+            PLATFORM,
+            PYTHON_IMAGE,
+            ["/fixture/argus-control-plane"],
+            secret="argus-env",
+            paths=("argus-control-plane", *paths),
+            probe={"tcpSocket": {"port": 8080}},
+        )
+
+    def provider_permissions(self):
+        return ["catalog:read", "runs:create", "runs:read"]
+
+    def perfeng_configuration(self):
+        return {}
+
     def products(self, lock, uploader):
         token = secrets.token_urlsafe(48)
         auth = runtime.authentication(token)
         document = json.loads(auth["credentials.json"])
         document["credentials"][0].update(
-            principal="fixture-argus", permissions=["catalog:read", "runs:create", "runs:read"]
+            principal="fixture-argus", permissions=self.provider_permissions()
         )
         self.private("perfeng-auth.json", json.dumps(document))
         self.private("fixture-provider-token", token)
@@ -537,7 +584,7 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
             "AWS_ACCESS_KEY_ID": uploader["access-key"],
             "AWS_SECRET_ACCESS_KEY": uploader["secret-key"],
         }
-        self.secret("perfeng-env", PLATFORM, env)
+        self.secret("perfeng-env", PLATFORM, env | self.perfeng_configuration())
         argus_env, argus_paths = self.argus_configuration()
         self.secret(
             "argus-env",
@@ -561,15 +608,7 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
                 account="perfeng",
                 probe={"httpGet": {"path": "/readyz", "port": 8080}},
             ),
-            pod(
-                "argus",
-                PLATFORM,
-                PYTHON_IMAGE,
-                ["/fixture/argus-control-plane"],
-                secret="argus-env",
-                paths=("argus-control-plane", *argus_paths),
-                probe={"tcpSocket": {"port": 8080}},
-            ),
+            self.argus_pod(argus_paths),
         )
         for name in ("perfeng", "argus"):
             self.service(name, PLATFORM, 8080)

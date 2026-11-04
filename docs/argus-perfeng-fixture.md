@@ -111,3 +111,26 @@ exit and the run-scoped raw, normalized and analysis artifacts. The smoke
 request is submitted directly for fixture qualification. `productAcceptance`
 remains `not-run` pending reviewed Argus dispatch, protected report consumption
 and authorized export.
+
+## Reviewed acceptance
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.acceptance --execute
+```
+
+This driver uses the pinned checkout scenario and images with a separately hashed
+seven-second fixture profile. The short profile leaves time for analysis and
+reporting before the provider enforces the one-minute catalog deadline. It first
+runs the signed change and reference checkout smoke, verifies
+the reference Run's artifact bytes, qualifies the baseline using observed HTTP
+timings, and approves that disposable baseline through Perfeng. It publishes the
+scoped catalog to Argus and uses a fixture-issued review for one exact selection.
+Argus dispatches the approved request and consumes its matching report over
+HTTPS with a read-only object credential. The exporter uses a separate restricted
+database login and must refuse an unapproved position.
+
+The private run directory contains the authorized projection after it passes
+the Run and report correlation checks. The safe `jointAcceptance` receipt
+records the Run ID and the request, report, intent and projection digests.
+Require `productAcceptance: passed`, `servingCleanup: passed`, and
+`cleanup: passed` for joint acceptance.

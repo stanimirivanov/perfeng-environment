@@ -2017,3 +2017,9 @@ The signed change and checkout smoke driver writes separate `changeIngress` and
 listener and Argus ingress using the private kubeconfig. If only the second is
 absent, check the checkout Job, its pinned image pulls and Perfeng's Run state.
 Keep the webhook and provider credentials private.
+
+For reviewed acceptance, the last printed stage distinguishes baseline
+qualification, reviewed request creation, admission, report publication,
+retention and export. Inspect only the disposable cluster and private evidence
+for the run. Preserve the report digest and receipt for comparison without
+publishing protected approvals or connection settings.

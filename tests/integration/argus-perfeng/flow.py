@@ -233,7 +233,7 @@ with urlopen(request, timeout=12) as response:
 
     def checkout_smoke(self):
         print("Running the checkout smoke workload for the retained Git head", flush=True)
-        [entry] = json.loads((self.root / "registry/registry.json").read_text())["entries"]
+        entry = json.loads((self.root / "registry/registry.json").read_text())["entries"][0]
         lock = serving.release.load_lock(serving.ROOT / "deployments/local-control-plane.json")
         request = control_plane_smoke.smoke_request(
             lock, self.change["head"], serving.ROOT.parent / "perfeng-k8s"

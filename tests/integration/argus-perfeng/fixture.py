@@ -29,6 +29,8 @@ class Evidence(TypedDict):
     servingReady: NotRequired[bool]
     changeIngress: NotRequired[dict[str, str]]
     checkoutSmoke: NotRequired[dict[str, object]]
+    checkoutBaseline: NotRequired[dict[str, str]]
+    jointAcceptance: NotRequired[dict[str, str]]
     servingClusterUID: NotRequired[str]
     servingCleanup: NotRequired[str]
     schemaVersion: int
