@@ -154,3 +154,19 @@ timestamps. Delayed consumption does not change the publication time. The
 projection marks a publication late only if the provider published it at or
 after the deadline. This fixture exercises delayed consumption of a real
 publication that normally predates the deadline.
+
+## Advisory CI observation
+
+The **Argus shadow observation** workflow runs after pushes to `main`. It can
+also be dispatched against `main` for a fresh observation. The workflow uses the
+disposable recovery driver with the same controlled Git change for the reference
+checkout and the Argus-reviewed checkout. Each execution uses the pinned public
+source and a fresh GitHub-hosted Linux runner.
+
+The job summary records `passed`, `failed`, `not-run`, or `invalid-evidence`.
+A passing run uploads a three-day receipt containing the two Run IDs, the report
+and projection digests, and the retained event count and publication-lateness
+flag. Failure receipts contain a fixed status. Private evidence, approvals,
+credentials, and the projection itself stay in runner-local storage. Existing
+validation jobs provide the merge and release checks. Disable the advisory
+workflow in Actions to stop observations.
