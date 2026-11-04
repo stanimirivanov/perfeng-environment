@@ -27,6 +27,8 @@ class ProductEvidence(TypedDict):
 
 class Evidence(TypedDict):
     servingReady: NotRequired[bool]
+    changeIngress: NotRequired[dict[str, str]]
+    checkoutSmoke: NotRequired[dict[str, object]]
     servingClusterUID: NotRequired[str]
     servingCleanup: NotRequired[str]
     schemaVersion: int

@@ -2011,3 +2011,9 @@ that kind, kubectl and OpenSSL are on PATH, the pinned `perfeng-k8s` source is
 available, and the kind node can pull the pinned container images. Use only the
 printed run directory's kubeconfig for cluster diagnostics and keep credentials
 and Kubernetes Secret contents private.
+
+The signed change and checkout smoke driver writes separate `changeIngress` and
+`checkoutSmoke` receipts. If the first is absent, check the fixture GitHub
+listener and Argus ingress using the private kubeconfig. If only the second is
+absent, check the checkout Job, its pinned image pulls and Perfeng's Run state.
+Keep the webhook and provider credentials private.

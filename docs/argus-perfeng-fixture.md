@@ -73,19 +73,41 @@ uv run --locked --offline python -m tests.integration.argus-perfeng.serving --ex
 
 This also needs kind, kubectl, OpenSSL, the pinned `perfeng-k8s` source in the
 sibling checkout, and registry access for the pinned container images. It
-starts a fresh loopback-only kind cluster using a private kubeconfig, attaches
+starts a fresh loopback-only kind cluster using a private kubeconfig. Separate
+control-plane and generator nodes satisfy the pinned Job selectors. It attaches
 the two run-owned databases to its own Docker network, and runs the pinned
 Argus and Perfeng binaries against those databases. It serves the tracked
 checkout target and provisions a TLS-enabled, fixture-authenticated S3 endpoint.
 The driver checks both product HTTP routes and verifies the Perfeng catalog
 requires authentication and reports the fixture principal. The signed bucket
-bootstrap verifies the HTTPS endpoint. Report access with the reader identity
+bootstrap stages the pinned report policy. The scoped uploader write/read checks
+the HTTPS endpoint and writable volume capacity. Report access with the reader identity
 is exercised by the subsequent consumption slice.
 
 Look for `servingReady: true`, `servingCleanup: passed`, and `cleanup: passed`.
 The evidence also records the disposable cluster UID. `productAcceptance`
 stays `not-run` until a later slice runs the change, k6, analysis consumption,
 and projection export. For serving cleanup recovery, verify the exact kind
-node name and cluster label, its attachment to the run-owned Docker network,
+node names and cluster label, their attachment to the run-owned Docker network,
 and the network's run label and ID before taking action with the private
 kubeconfig. Keep the run directory private.
+
+## Signed change and checkout smoke
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.flow --execute
+```
+
+The driver creates two Git commits containing the checkout target and a single
+OpenAPI change. Its private HTTPS GitHub API fixture serves the exact commit
+contents and Git diff. The driver submits a signed pull-request webhook to Argus
+and checks that Argus retained the same base, head, delivery and checkout
+capability. The `changeIngress` receipt records those identities and an impact
+digest.
+
+The driver then uses Perfeng's authenticated Run API to execute the pinned
+checkout smoke workload for that head. `checkoutSmoke` requires a successful k6
+exit and the run-scoped raw, normalized and analysis artifacts. The smoke
+request is submitted directly for fixture qualification. `productAcceptance`
+remains `not-run` pending reviewed Argus dispatch, protected report consumption
+and authorized export.
