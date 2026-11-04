@@ -1,0 +1,79 @@
+name: Argus shadow observation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  argus-shadow:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: perfeng-environment
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: perfeng-environment
+          persist-credentials: false
+      - name: Check out the pinned Perfeng deployment bundle
+        uses: actions/checkout@v7
+        with:
+          repository: stanimirivanov/perfeng-k8s
+          ref: 4c762262422420a1a223e1d56c2c469ab1c38c89
+          path: perfeng-k8s
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: perfeng-environment/.python-version
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.10'
+          cache: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Install pinned kind and kubectl
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/argus-shadow-tools"
+          mkdir "$tools"
+          curl --fail --location --max-time 90 https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64 --output "$tools/kind"
+          curl --fail --location --max-time 90 https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl --output "$tools/kubectl"
+          printf '%s  %s\n' \
+            eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa "$tools/kind" \
+            a2e984a18a0c063279d692533031c1eff93a262afcc0afdc517375432d060989 "$tools/kubectl" | sha256sum --check
+          chmod +x "$tools/kind" "$tools/kubectl"
+          echo "$tools" >> "$GITHUB_PATH"
+      - run: uv sync --locked
+      - name: Observe the disposable reference, reviewed run, and recovery
+        id: fixture
+        timeout-minutes: 18
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TMPDIR="$RUNNER_TEMP/argus-shadow-private"
+          mkdir -m 700 "$TMPDIR"
+          uv run --locked --offline python -m tests.integration.argus-perfeng.recovery --execute
+      - name: Record advisory outcome and safe receipt
+        if: ${{ !cancelled() }}
+        env:
+          FIXTURE_OUTCOME: ${{ steps.fixture.outcome }}
+        run: >-
+          python3 -m tests.integration.argus-perfeng.shadow
+          "$FIXTURE_OUTCOME" "$RUNNER_TEMP/argus-shadow-private"
+          "$RUNNER_TEMP/argus-shadow-receipt.json" "$GITHUB_STEP_SUMMARY"
+      - name: Retain only the advisory receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: argus-shadow-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/argus-shadow-receipt.json
+          if-no-files-found: error
+          retention-days: 3

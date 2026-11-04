@@ -2028,3 +2028,10 @@ For the recovery driver, check the `recovery` receipt alongside
 `jointAcceptance` and both cleanup markers. The original Argus pod must be absent
 before its replacement starts. A replay failure requires checking the replacement
 Argus logs and retained event identity with the private kubeconfig.
+
+For the Argus shadow workflow, start with its advisory job summary and the
+short-lived receipt. `invalid-evidence` means the fixture command exited
+successfully but the receipt validator could not confirm its acceptance and
+cleanup fields. `failed` means the fixture command failed. `not-run` means
+execution did not start. Use the documented recovery command in a disposable
+local fixture to investigate a failure that requires private evidence.
