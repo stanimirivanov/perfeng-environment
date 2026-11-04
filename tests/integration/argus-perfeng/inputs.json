@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "postgres": "postgres@sha256:3b0cda93be7c8dba2ed484d19393d93845dc3dafb88973e248ba8e6d99d784e1",
   "products": {
-    "argus": "8576be31b827ef6cc3714bd4758ad297717f6a08",
+    "argus": "28367a3fe3e91b8808ac9ecc01b0d2ea715f8169",
     "perfeng-control-plane": "a2c8b546ec73a79ebc654929e25c618b81f4a2ca"
   },
   "go": "go1.26.10"

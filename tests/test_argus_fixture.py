@@ -1,5 +1,6 @@
 """Offline safety checks for the opt-in joint fixture."""
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -55,6 +56,36 @@ class JointFixtureTests(unittest.TestCase):
         path.write_text('{"schemaVersion": 1, "schemaVersion": 1}')
         with self.assertRaisesRegex(ValueError, "duplicate"):
             fixture.inputs(path)
+
+    def test_argus_artifacts_include_the_operators_needed_for_the_flow(self):
+        revision = self.subject.selection["products"]["argus"]
+        source = self.root / "argus"
+        source.mkdir()
+        (source / "go.mod").write_text(f"go {self.subject.selection['go'][2:]}\n")
+
+        def build_artifact(args, **_options):
+            if args[0] == "go":
+                Path(args[args.index("-o") + 1]).write_bytes(args[-1].encode())
+            return result(stdout=revision)
+
+        with patch.object(self.subject, "command", side_effect=build_artifact):
+            self.subject.artifacts("argus", revision)
+
+        evidence = self.subject.evidence["products"]["argus"]
+        self.assertEqual(evidence["sourceRevision"], revision)
+        for target in (
+            "catalog",
+            "performance-catalog",
+            "select-performance",
+            "performance-requests",
+            "performance-evidence",
+        ):
+            binary = self.root / f"argus-{target}"
+            self.assertTrue(binary.is_file(), f"missing operator binary {target}")
+            self.assertEqual(
+                evidence["artifacts"][target]["sha256"],
+                hashlib.sha256(binary.read_bytes()).hexdigest(),
+            )
 
     def test_shared_run_directory_is_refused(self):
         shared = self.root / "shared"

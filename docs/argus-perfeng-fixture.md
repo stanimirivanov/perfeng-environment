@@ -24,7 +24,9 @@ Changing pins requires review; the active deployment lock remains independent.
 
 Each invocation creates a private mode-0700 temporary directory, builds the actual
 migration/server commands, and records source revisions and artifact hashes in
-`evidence.json`. Two separate PostgreSQL containers have ephemeral memory-backed
+`evidence.json`. The Argus pin includes the merged authorized exporter. The fixture
+also builds the catalog, selection, request and evidence operator commands from
+that same source revision and records each binary's SHA-256. Two separate PostgreSQL containers have ephemeral memory-backed
 storage, CPU/memory/process limits, a private internal network and no host-published
 ports. Each pinned static migrator is mounted read-only into its database container and
 initializes its own schema over authenticated loopback TCP. Separate runtime roles

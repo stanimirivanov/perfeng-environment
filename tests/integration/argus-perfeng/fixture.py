@@ -218,7 +218,16 @@ class Fixture:
             "GOOS": "linux",
             "GOARCH": "amd64",
         }
-        for target in ("migrate", "control-plane"):
+        targets = ("migrate", "control-plane")
+        if product == "argus":
+            targets += (
+                "catalog",
+                "performance-catalog",
+                "select-performance",
+                "performance-requests",
+                "performance-evidence",
+            )
+        for target in targets:
             binary = self.root / (product + "-" + target)
             self.command(
                 [
