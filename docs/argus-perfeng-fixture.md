@@ -1,10 +1,10 @@
-# Disposable Argus–Perfeng preparation fixture
+# Disposable Argus–Perfeng fixture
 
 ## TL;DR
 
 - Run `make argus-perfeng-fixture-check` for offline validation and safety tests.
 - Select `--execute` explicitly to build pinned candidates and migrate two fresh databases.
-- A passing result proves artifact/database preparation, not running-product acceptance.
+- Use the separate serving driver to start and probe both products in a fresh kind cluster.
 - The fixture removes only its run-owned resources; retain private evidence after failure.
 
 ## Execution and evidence
@@ -50,10 +50,10 @@ standalone preparation command exits the same context immediately after readines
 ## Boundaries and recovery
 
 Success means `preparationReady: true`, both databases migrated with verified
-runtime identities, and `cleanup: passed`. `productAcceptance: not-run` is deliberate:
-no product service, protected object store, Kubernetes runner, k6 flow, analysis
-publication or read-only projection is exercised here. Those need joint flow
-composition before any integration claim; Argus SRE has no runtime in this fixture.
+runtime identities, and `cleanup: passed`. The preparation command covers
+artifacts and databases. The serving driver adds
+running services and storage. The Kubernetes runner, k6 flow, analysis publication
+and projection are subsequent flow gates. Argus SRE has no runtime in this fixture.
 
 On failure, inspect the private evidence's resource names and the run label
 `dev.perfeng.joint-fixture`. Do not print container inspection output: PostgreSQL
@@ -62,3 +62,30 @@ Docker access, verify exact name/label/ID ownership, and remove only those owned
 containers followed by their network. Never prune or touch an existing cluster,
 volume or deployment. A new invocation always uses fresh names; it does not adopt
 or repair a previous run. See [troubleshooting](troubleshooting.md).
+
+## Serving readiness
+
+Run the serving driver from the same locked environment.
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.serving --execute
+```
+
+This also needs kind, kubectl, OpenSSL, the pinned `perfeng-k8s` source in the
+sibling checkout, and registry access for the pinned container images. It
+starts a fresh loopback-only kind cluster using a private kubeconfig, attaches
+the two run-owned databases to its own Docker network, and runs the pinned
+Argus and Perfeng binaries against those databases. It serves the tracked
+checkout target and provisions a TLS-enabled, fixture-authenticated S3 endpoint.
+The driver checks both product HTTP routes and verifies the Perfeng catalog
+requires authentication and reports the fixture principal. The signed bucket
+bootstrap verifies the HTTPS endpoint. Report access with the reader identity
+is exercised by the subsequent consumption slice.
+
+Look for `servingReady: true`, `servingCleanup: passed`, and `cleanup: passed`.
+The evidence also records the disposable cluster UID. `productAcceptance`
+stays `not-run` until a later slice runs the change, k6, analysis consumption,
+and projection export. For serving cleanup recovery, verify the exact kind
+node name and cluster label, its attachment to the run-owned Docker network,
+and the network's run label and ID before taking action with the private
+kubeconfig. Keep the run directory private.

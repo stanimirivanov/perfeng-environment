@@ -2005,3 +2005,9 @@ database failures require Docker and the exact pinned migrators. Unresolved clea
 requires exact run-label/name/ID checks before removal, never Docker prune or an
 ambient cluster operation. Raw Docker inspection contains private credentials;
 do not attach it to issues. Follow the [fixture recovery guide](argus-perfeng-fixture.md).
+
+For serving failures, check `servingCleanup` and `cleanup` independently. Verify
+that kind, kubectl and OpenSSL are on PATH, the pinned `perfeng-k8s` source is
+available, and the kind node can pull the pinned container images. Use only the
+printed run directory's kubeconfig for cluster diagnostics and keep credentials
+and Kubernetes Secret contents private.

@@ -26,6 +26,9 @@ class ProductEvidence(TypedDict):
 
 
 class Evidence(TypedDict):
+    servingReady: NotRequired[bool]
+    servingClusterUID: NotRequired[str]
+    servingCleanup: NotRequired[str]
     schemaVersion: int
     products: dict[str, ProductEvidence]
     preparationReady: bool
