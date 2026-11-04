@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import threading
 import unittest
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,7 @@ class KubeletImageWaitTests(unittest.TestCase):
     def run_wait(self, argument, *, bootstrap=False):
         assert KUBECTL is not None
         watches = []
+        requests: deque[str] = deque(maxlen=20)
         pod: dict[str, Any] = {
             "apiVersion": "v1",
             "kind": "Pod",
@@ -73,6 +75,7 @@ class KubeletImageWaitTests(unittest.TestCase):
 
             def do_GET(self):
                 parsed = urlsplit(self.path)
+                requests.append(parsed.path)
                 query = parse_qs(parsed.query)
                 if query.get("watch") == ["true"]:
                     establishing = stage_marker is not None and stage_marker.exists()
@@ -245,7 +248,8 @@ class KubeletImageWaitTests(unittest.TestCase):
                     )
                 except subprocess.TimeoutExpired as error:
                     self.fail(
-                        f"Native wait timed out: {watches!r}; {error.stdout!r}; {error.stderr!r}"
+                        f"Native wait timed out. Requests: {list(requests)!r}. "
+                        f"Watches: {watches!r}. stdout: {error.stdout!r}. stderr: {error.stderr!r}."
                     )
         finally:
             server.shutdown()
