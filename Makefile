@@ -96,4 +96,4 @@ validate: verify render-check supply-chain
 # Offline only; live preparation requires the documented --execute path.
 argus-perfeng-fixture-check:
 	$(UV_RUN) python tests/integration/argus-perfeng/fixture.py
-	$(UV_RUN) python -m unittest tests.test_argus_fixture -v
+	$(UV_RUN) python -m unittest tests.test_argus_fixture tests.test_argus_serving tests.test_argus_flow -v

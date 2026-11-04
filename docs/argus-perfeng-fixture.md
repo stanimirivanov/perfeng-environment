@@ -1,10 +1,10 @@
-# Disposable Argus–Perfeng preparation fixture
+# Disposable Argus–Perfeng fixture
 
 ## TL;DR
 
 - Run `make argus-perfeng-fixture-check` for offline validation and safety tests.
 - Select `--execute` explicitly to build pinned candidates and migrate two fresh databases.
-- A passing result proves artifact/database preparation, not running-product acceptance.
+- Use the separate serving driver to start and probe both products in a fresh kind cluster.
 - The fixture removes only its run-owned resources; retain private evidence after failure.
 
 ## Execution and evidence
@@ -24,7 +24,9 @@ Changing pins requires review; the active deployment lock remains independent.
 
 Each invocation creates a private mode-0700 temporary directory, builds the actual
 migration/server commands, and records source revisions and artifact hashes in
-`evidence.json`. Two separate PostgreSQL containers have ephemeral memory-backed
+`evidence.json`. The Argus pin includes the merged authorized exporter. The fixture
+also builds the catalog, selection, request and evidence operator commands from
+that same source revision and records each binary's SHA-256. Two separate PostgreSQL containers have ephemeral memory-backed
 storage, CPU/memory/process limits, a private internal network and no host-published
 ports. Each pinned static migrator is mounted read-only into its database container and
 initializes its own schema over authenticated loopback TCP. Separate runtime roles
@@ -48,10 +50,10 @@ standalone preparation command exits the same context immediately after readines
 ## Boundaries and recovery
 
 Success means `preparationReady: true`, both databases migrated with verified
-runtime identities, and `cleanup: passed`. `productAcceptance: not-run` is deliberate:
-no product service, protected object store, Kubernetes runner, k6 flow, analysis
-publication or read-only projection is exercised here. Those need joint flow
-composition before any integration claim; Argus SRE has no runtime in this fixture.
+runtime identities, and `cleanup: passed`. The preparation command covers
+artifacts and databases. The serving driver adds
+running services and storage. The Kubernetes runner, k6 flow, analysis publication
+and projection are subsequent flow gates. Argus SRE has no runtime in this fixture.
 
 On failure, inspect the private evidence's resource names and the run label
 `dev.perfeng.joint-fixture`. Do not print container inspection output: PostgreSQL
@@ -60,3 +62,75 @@ Docker access, verify exact name/label/ID ownership, and remove only those owned
 containers followed by their network. Never prune or touch an existing cluster,
 volume or deployment. A new invocation always uses fresh names; it does not adopt
 or repair a previous run. See [troubleshooting](troubleshooting.md).
+
+## Serving readiness
+
+Run the serving driver from the same locked environment.
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.serving --execute
+```
+
+This also needs kind, kubectl, OpenSSL, the pinned `perfeng-k8s` source in the
+sibling checkout, and registry access for the pinned container images. It
+starts a fresh loopback-only kind cluster using a private kubeconfig. Separate
+control-plane and generator nodes satisfy the pinned Job selectors. It attaches
+the two run-owned databases to its own Docker network, and runs the pinned
+Argus and Perfeng binaries against those databases. It serves the tracked
+checkout target and provisions a TLS-enabled, fixture-authenticated S3 endpoint.
+The driver checks both product HTTP routes and verifies the Perfeng catalog
+requires authentication and reports the fixture principal. The signed bucket
+bootstrap stages the pinned report policy. The scoped uploader write/read checks
+the HTTPS endpoint and writable volume capacity. Report access with the reader identity
+is exercised by the subsequent consumption slice.
+
+Look for `servingReady: true`, `servingCleanup: passed`, and `cleanup: passed`.
+The evidence also records the disposable cluster UID. `productAcceptance`
+stays `not-run` until a later slice runs the change, k6, analysis consumption,
+and projection export. For serving cleanup recovery, verify the exact kind
+node names and cluster label, their attachment to the run-owned Docker network,
+and the network's run label and ID before taking action with the private
+kubeconfig. Keep the run directory private.
+
+## Signed change and checkout smoke
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.flow --execute
+```
+
+The driver creates two Git commits containing the checkout target and a single
+OpenAPI change. Its private HTTPS GitHub API fixture serves the exact commit
+contents and Git diff. The driver submits a signed pull-request webhook to Argus
+and checks that Argus retained the same base, head, delivery and checkout
+capability. The `changeIngress` receipt records those identities and an impact
+digest.
+
+The driver then uses Perfeng's authenticated Run API to execute the pinned
+checkout smoke workload for that head. `checkoutSmoke` requires a successful k6
+exit and the run-scoped raw, normalized and analysis artifacts. The smoke
+request is submitted directly for fixture qualification. `productAcceptance`
+remains `not-run` pending reviewed Argus dispatch, protected report consumption
+and authorized export.
+
+## Reviewed acceptance
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.acceptance --execute
+```
+
+This driver uses the pinned checkout scenario and images with a separately hashed
+seven-second fixture profile. The short profile leaves time for analysis and
+reporting before the provider enforces the one-minute catalog deadline. It first
+runs the signed change and reference checkout smoke, verifies
+the reference Run's artifact bytes, qualifies the baseline using observed HTTP
+timings, and approves that disposable baseline through Perfeng. It publishes the
+scoped catalog to Argus and uses a fixture-issued review for one exact selection.
+Argus dispatches the approved request and consumes its matching report over
+HTTPS with a read-only object credential. The exporter uses a separate restricted
+database login and must refuse an unapproved position.
+
+The private run directory contains the authorized projection after it passes
+the Run and report correlation checks. The safe `jointAcceptance` receipt
+records the Run ID and the request, report, intent and projection digests.
+Require `productAcceptance: passed`, `servingCleanup: passed`, and
+`cleanup: passed` for joint acceptance.

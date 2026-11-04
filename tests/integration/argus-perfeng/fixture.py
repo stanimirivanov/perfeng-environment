@@ -26,6 +26,13 @@ class ProductEvidence(TypedDict):
 
 
 class Evidence(TypedDict):
+    servingReady: NotRequired[bool]
+    changeIngress: NotRequired[dict[str, str]]
+    checkoutSmoke: NotRequired[dict[str, object]]
+    checkoutBaseline: NotRequired[dict[str, str]]
+    jointAcceptance: NotRequired[dict[str, str]]
+    servingClusterUID: NotRequired[str]
+    servingCleanup: NotRequired[str]
     schemaVersion: int
     products: dict[str, ProductEvidence]
     preparationReady: bool
@@ -218,7 +225,16 @@ class Fixture:
             "GOOS": "linux",
             "GOARCH": "amd64",
         }
-        for target in ("migrate", "control-plane"):
+        targets = ("migrate", "control-plane")
+        if product == "argus":
+            targets += (
+                "catalog",
+                "performance-catalog",
+                "select-performance",
+                "performance-requests",
+                "performance-evidence",
+            )
+        for target in targets:
             binary = self.root / (product + "-" + target)
             self.command(
                 [
