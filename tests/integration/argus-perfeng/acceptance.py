@@ -636,6 +636,9 @@ JOIN argus_catalog.performance_dispatch_outcomes o USING (position);
             raise ValueError("Argus retained a foreign or rejected admission")
         return admitted
 
+    def before_review(self, publication, admitted):
+        pass
+
     def consume(self, request_context, admitted):
         print("Waiting for the admitted k6 Run and protected analysis publication", flush=True)
         request = request_context["request"]
@@ -707,6 +710,7 @@ JOIN argus_catalog.performance_dispatch_outcomes o USING (position);
             "producer": self.reviewed_entry["reportProducer"],
             "contractsVersion": self.reviewed_entry["contractsVersion"],
         }
+        self.before_review(publication, admitted)
         self.private("argus-tools/reviews/" + admitted["requestSha256"] + ".json", encode(review))
         sql = """SELECT json_build_object('position', position, 'event', event_id,
             'reportSha256', encode(sha256(report), 'hex'))
@@ -749,6 +753,22 @@ GRANT SELECT ON argus_catalog.performance_request_intents,
                 }
             ),
         )
+        denied = self.read_projection(position + 1, optional=True)
+        if not denied.returncode or denied.stdout:
+            raise ValueError("out-of-scope export was not refused")
+        raw = self.read_projection(position).stdout
+        projection = json.loads(raw)
+        verify_projection(projection, run, report_sha)
+        if (
+            projection["request"]["payloadSha256"] != admitted["requestSha256"]
+            or projection["provenance"]["intentFingerprint"] != admitted["intentFingerprint"]
+            or projection["target"]["source"]["digest"] != self.change["head"]
+        ):
+            raise ValueError("authorized projection does not match the reviewed request provenance")
+        self.private("authorized-projection.json", raw)
+        return serving.digest(raw.encode())
+
+    def read_projection(self, position, *, optional=False):
         command = [
             "-n",
             serving.PLATFORM,
@@ -773,20 +793,7 @@ exec /fixture/argus-performance-evidence "$@"
             "fixture-argus",
             "-position",
         ]
-        denied = self.k_command(*command, str(position + 1), optional=True)
-        if not denied.returncode or denied.stdout:
-            raise ValueError("out-of-scope export was not refused")
-        raw = self.k(*command, str(position))
-        projection = json.loads(raw)
-        verify_projection(projection, run, report_sha)
-        if (
-            projection["request"]["payloadSha256"] != admitted["requestSha256"]
-            or projection["provenance"]["intentFingerprint"] != admitted["intentFingerprint"]
-            or projection["target"]["source"]["digest"] != self.change["head"]
-        ):
-            raise ValueError("authorized projection does not match the reviewed request provenance")
-        self.private("authorized-projection.json", raw)
-        return serving.digest(raw.encode())
+        return self.k_command(*command, str(position), optional=optional)
 
     def after_ready(self):
         super().after_ready()

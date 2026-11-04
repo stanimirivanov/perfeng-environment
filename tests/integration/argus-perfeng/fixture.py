@@ -31,6 +31,7 @@ class Evidence(TypedDict):
     checkoutSmoke: NotRequired[dict[str, object]]
     checkoutBaseline: NotRequired[dict[str, str]]
     jointAcceptance: NotRequired[dict[str, str]]
+    recovery: NotRequired[dict[str, object]]
     servingClusterUID: NotRequired[str]
     servingCleanup: NotRequired[str]
     schemaVersion: int

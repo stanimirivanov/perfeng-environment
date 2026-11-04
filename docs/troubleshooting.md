@@ -2023,3 +2023,8 @@ qualification, reviewed request creation, admission, report publication,
 retention and export. Inspect only the disposable cluster and private evidence
 for the run. Preserve the report digest and receipt for comparison without
 publishing protected approvals or connection settings.
+
+For the recovery driver, check the `recovery` receipt alongside
+`jointAcceptance` and both cleanup markers. The original Argus pod must be absent
+before its replacement starts. A replay failure requires checking the replacement
+Argus logs and retained event identity with the private kubeconfig.

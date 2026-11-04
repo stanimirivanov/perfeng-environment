@@ -134,3 +134,23 @@ the Run and report correlation checks. The safe `jointAcceptance` receipt
 records the Run ID and the request, report, intent and projection digests.
 Require `productAcceptance: passed`, `servingCleanup: passed`, and
 `cleanup: passed` for joint acceptance.
+
+## Interruption and post-deadline recovery
+
+```sh
+uv run --locked --offline python -m tests.integration.argus-perfeng.recovery --execute
+```
+
+This variant waits for the reviewed Run and its durable report publication.
+Before issuing the protected analysis review, it deletes the fixture Argus pod
+with a UID precondition and verifies that no analysis was retained. A replacement
+starts after the original request deadline and consumes the original report. A
+second replacement replays the publication and must leave exactly one retained
+analysis event and the same admission. The scoped exporter checks the same
+Run, report digest and event. The two authorized exports must match byte for byte.
+
+The receipt records three pod UIDs and the publication, deadline and recovery
+timestamps. Delayed consumption does not change the publication time. The
+projection marks a publication late only if the provider published it at or
+after the deadline. This fixture exercises delayed consumption of a real
+publication that normally predates the deadline.
