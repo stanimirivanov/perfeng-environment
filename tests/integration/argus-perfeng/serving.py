@@ -63,7 +63,10 @@ def pod(name, namespace, image, command, *, secret=None, paths=(), account=None,
             "readOnlyRootFilesystem": True,
             "capabilities": {"drop": ["ALL"]},
         },
-        "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
+        "resources": {
+            "requests": {"cpu": "100m"},
+            "limits": {"cpu": "1", "memory": "512Mi"},
+        },
         "volumeMounts": mounts,
     }
     volumes = [{"name": "scratch", "emptyDir": {"sizeLimit": "256Mi"}}]
@@ -505,9 +508,6 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
         return uploader
 
     def wait(self, name, namespace):
-        # The cold storage image is over 700 MB. Include acquisition in this
-        # bounded window while retaining the fixture's overall deadline.
-        seconds = 180 if name == "seaweedfs" else 90
         try:
             self.k(
                 "-n",
@@ -515,8 +515,8 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
                 "wait",
                 "--for=condition=Ready",
                 f"pod/{name}",
-                f"--timeout={seconds}s",
-                timeout=seconds + 10,
+                "--timeout=90s",
+                timeout=100,
             )
         except ValueError:
             reason = "Unavailable"
@@ -550,11 +550,30 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
                     if candidate in allowed:
                         reason = candidate
                         break
+                if any(
+                    condition.get("type") == "PodScheduled"
+                    and condition.get("status") == "False"
+                    and condition.get("reason") == "Unschedulable"
+                    for condition in status.get("conditions", [])
+                ):
+                    reason = "Unschedulable"
                 if reason == "Unavailable" and status.get("phase") == "Running":
                     reason = "RunningNotReady"
             except (ValueError, TypeError, KeyError, OSError, AttributeError):
                 pass
-            service = name if name in {"seaweedfs", "sample-sut", "argus", "perfeng"} else "service"
+            service = (
+                name
+                if name
+                in {
+                    "seaweedfs",
+                    "sample-sut",
+                    "argus",
+                    "perfeng",
+                    "baseline-reader",
+                    "fixture-github",
+                }
+                else "service"
+            )
             print(f"Fixture pod {service} readiness failed: {reason}", flush=True)
             raise ValueError("fixture pod readiness failed") from None
 

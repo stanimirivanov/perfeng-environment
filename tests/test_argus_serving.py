@@ -57,23 +57,6 @@ class ServingReadinessTests(unittest.TestCase):
         prepared.command.assert_not_called()
         self.assertEqual(prepared.docker.call_count, 2)
 
-    def test_cold_storage_startup_can_finish_after_the_old_readiness_window(self):
-        serving = serving_module()
-        prepared = Mock(root=Path("/tmp/private-fixture"), run_id="joint-test")
-        driver = serving.Serving(prepared)
-
-        def eventual_readiness(args, **kwargs):
-            # Model an image pull and startup taking 120 seconds. A real
-            # ready condition is still required within the finite budget.
-            ready_window = next(arg for arg in args if arg.startswith("--timeout="))
-            if int(ready_window.removeprefix("--timeout=").removesuffix("s")) < 120:
-                raise ValueError("pod readiness timed out")
-            self.assertGreater(kwargs["timeout"], 120)
-            return SimpleNamespace(stdout="pod/seaweedfs condition met")
-
-        prepared.command.side_effect = eventual_readiness
-        driver.wait("seaweedfs", serving.PLATFORM)
-
     def test_failed_storage_readiness_reports_only_a_fixed_state_signal(self):
         import contextlib
         import io
@@ -107,4 +90,52 @@ class ServingReadinessTests(unittest.TestCase):
         with contextlib.redirect_stdout(output), self.assertRaises(ValueError):
             driver.wait("seaweedfs", serving.PLATFORM)
         self.assertIn("ImagePullBackOff", output.getvalue())
+        self.assertNotIn("private", output.getvalue())
+
+    def test_colocated_helper_requests_fit_the_hosted_node_budget(self):
+        serving = serving_module()
+        names = ("sample-sut", "seaweedfs", "baseline-reader", "fixture-github", "argus", "perfeng")
+        reserved_millicpu = 0
+        for name in names:
+            document = serving.pod(name, serving.PLATFORM, "reviewed-image", ["run"])
+            resources = document["spec"]["containers"][0]["resources"]
+            self.assertEqual(resources["limits"], {"cpu": "1", "memory": "512Mi"})
+            request = resources.get("requests", {}).get("cpu", resources["limits"]["cpu"])
+            reserved_millicpu += int(request[:-1]) if request.endswith("m") else int(request) * 1000
+        # Leave room for Kubernetes and the real execution/analysis Jobs on
+        # the standard four-core runner instead of reserving six whole cores.
+        self.assertLessEqual(reserved_millicpu, 1000)
+
+    def test_unschedulable_pod_reports_condition_without_vendor_message(self):
+        import contextlib
+        import io
+
+        serving = serving_module()
+        prepared = Mock(root=Path("/tmp/private-fixture"), run_id="joint-test")
+        driver = serving.Serving(prepared)
+        prepared.command.side_effect = [
+            ValueError("vendor command failed"),
+            SimpleNamespace(
+                stdout=json.dumps(
+                    {
+                        "status": {
+                            "phase": "Pending",
+                            "conditions": [
+                                {
+                                    "type": "PodScheduled",
+                                    "status": "False",
+                                    "reason": "Unschedulable",
+                                    "message": "untrusted private scheduler message",
+                                }
+                            ],
+                        }
+                    }
+                ),
+                returncode=0,
+            ),
+        ]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), self.assertRaises(ValueError):
+            driver.wait("baseline-reader", serving.PLATFORM)
+        self.assertIn("Unschedulable", output.getvalue())
         self.assertNotIn("private", output.getvalue())
