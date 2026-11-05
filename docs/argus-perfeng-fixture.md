@@ -163,6 +163,12 @@ disposable recovery driver with the same controlled Git change for the reference
 checkout and the Argus-reviewed checkout. Each execution uses the pinned public
 source and a fresh GitHub-hosted Linux runner.
 
+Fixture helper pods request 100 millicpu each and can burst to their one-CPU
+limit. Their co-located scheduling reservations leave room for Kubernetes and
+the real execution Jobs on the hosted runner. Failed readiness emits a fixed
+container-state or Unschedulable reason before cleanup. Vendor messages and
+private configuration stay in runner-local storage.
+
 The job summary records `passed`, `failed`, `not-run`, or `invalid-evidence`.
 A passing run uploads a three-day receipt containing the two Run IDs, the report
 and projection digests, and the retained event count and publication-lateness

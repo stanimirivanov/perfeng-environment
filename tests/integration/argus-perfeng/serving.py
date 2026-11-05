@@ -63,7 +63,10 @@ def pod(name, namespace, image, command, *, secret=None, paths=(), account=None,
             "readOnlyRootFilesystem": True,
             "capabilities": {"drop": ["ALL"]},
         },
-        "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
+        "resources": {
+            "requests": {"cpu": "100m"},
+            "limits": {"cpu": "1", "memory": "512Mi"},
+        },
         "volumeMounts": mounts,
     }
     volumes = [{"name": "scratch", "emptyDir": {"sizeLimit": "256Mi"}}]
@@ -505,15 +508,74 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
         return uploader
 
     def wait(self, name, namespace):
-        self.k(
-            "-n",
-            namespace,
-            "wait",
-            "--for=condition=Ready",
-            f"pod/{name}",
-            "--timeout=90s",
-            timeout=100,
-        )
+        try:
+            self.k(
+                "-n",
+                namespace,
+                "wait",
+                "--for=condition=Ready",
+                f"pod/{name}",
+                "--timeout=90s",
+                timeout=100,
+            )
+        except ValueError:
+            reason = "Unavailable"
+            try:
+                result = self.k_command(
+                    "-n",
+                    namespace,
+                    "get",
+                    f"pod/{name}",
+                    "-o",
+                    "json",
+                    optional=True,
+                    cleanup=True,
+                    timeout=5,
+                )
+                status = json.loads(result.stdout)["status"]
+                allowed = {
+                    "ContainerCreating",
+                    "ImagePullBackOff",
+                    "ErrImagePull",
+                    "CreateContainerConfigError",
+                    "CreateContainerError",
+                    "CrashLoopBackOff",
+                    "OOMKilled",
+                    "Error",
+                    "Completed",
+                }
+                for container in status.get("containerStatuses", []):
+                    state = container.get("state", {})
+                    candidate = state.get("waiting", state.get("terminated", {})).get("reason")
+                    if candidate in allowed:
+                        reason = candidate
+                        break
+                if any(
+                    condition.get("type") == "PodScheduled"
+                    and condition.get("status") == "False"
+                    and condition.get("reason") == "Unschedulable"
+                    for condition in status.get("conditions", [])
+                ):
+                    reason = "Unschedulable"
+                if reason == "Unavailable" and status.get("phase") == "Running":
+                    reason = "RunningNotReady"
+            except (ValueError, TypeError, KeyError, OSError, AttributeError):
+                pass
+            service = (
+                name
+                if name
+                in {
+                    "seaweedfs",
+                    "sample-sut",
+                    "argus",
+                    "perfeng",
+                    "baseline-reader",
+                    "fixture-github",
+                }
+                else "service"
+            )
+            print(f"Fixture pod {service} readiness failed: {reason}", flush=True)
+            raise ValueError("fixture pod readiness failed") from None
 
     def argus_configuration(self):
         return {}, ()
