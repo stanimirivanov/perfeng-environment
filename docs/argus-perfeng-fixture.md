@@ -170,3 +170,73 @@ flag. Failure receipts contain a fixed status. Private evidence, approvals,
 credentials, and the projection itself stay in runner-local storage. Existing
 validation jobs provide the merge and release checks. Disable the advisory
 workflow in Actions to stop observations.
+
+## Offline shadow campaign report
+
+Run `make argus-campaign-check` for the focused offline regression tests.
+Run the campaign aggregator over an explicit inventory of downloaded hosted
+artifacts. It reads local files and creates a new report. Select the observation
+window and record every expected run, including failed runs and runs with expired
+artifacts. The report covers the inventory supplied by the operator. It cannot
+discover omitted runs or authenticate a downloaded receipt's GitHub origin.
+
+Download each run's artifact with `gh run download RUN_ID --repo OWNER/REPOSITORY
+--dir DIRECTORY`. Record the run's `head_sha` and `run_attempt` from `gh api
+repos/OWNER/REPOSITORY/actions/runs/RUN_ID`. Use the artifact's extracted directory,
+which contains the JSON documents. Keep all generated files outside Git.
+
+Create an inventory such as the following, substituting actual downloaded paths
+relative to the inventory directory and exact run metadata.
+
+```json
+{
+  "schemaVersion": 1,
+  "observations": [
+    {
+      "kind": "functional-api",
+      "repository": "stanimirivanov/perfeng-control-plane",
+      "runId": 41920413021,
+      "runAttempt": 1,
+      "headSha": "ed997869daa7ca1688f8cc7e52cfd83584cd0dbd",
+      "artifact": "functional/argus-functional-shadow-41920413021-1"
+    },
+    {
+      "kind": "performance-integration",
+      "repository": "stanimirivanov/perfeng-environment",
+      "runId": 41904440987,
+      "runAttempt": 1,
+      "headSha": "09b6f5026952fda58a67ed473df28ba06d48caa8",
+      "artifact": "integration/argus-shadow-41904440987-1"
+    }
+  ]
+}
+```
+
+Run `uv run --locked --offline python -m scripts.argus_campaign INVENTORY OUTPUT`.
+The output path must be new. Inventory identity duplicates, path traversal and
+symlinks are refused. Each artifact document is bounded to 1 MiB, with at most
+1,000 observations. Malformed or absent evidence remains visible as `invalid`
+or `missing`. Valid observation metadata with no complete normalized pair is
+`unpaired`. A direct fallback has no paired selection measurement.
+
+Functional reports require the four reviewed pilot identities and exact
+repository, base/head revision, delivery, attempt, plan and canonical manifest
+digest correlation. Retain the producer's manifest field order when copying
+artifacts. The aggregator reproduces the v1 compact JSON digest and rejects
+rewritten documents that change its canonical byte representation.
+
+Failure comparison follows Argus ADR-0011. A full-control `failed` or `error`
+result is caught by an early `failed` or `error` result for the same test.
+Misses distinguish `not-selected` from `not-reproduced`. Recall uses pooled
+failure counts and is null when the controls contain no failures. Skipped tests
+remain visible through skipped counts and incomplete pair counts.
+
+Native test duration reduction sums test durations. Runner elapsed reduction
+compares the sequential selected and full-control processes. Either can be
+negative. These values describe the recorded sequential processes.
+Conservative full-pilot selections remain paired observations. Reruns count as
+separate observations with distinct attempt numbers. Performance integration
+receipts have separate acceptance counts.
+
+This report records observations for review. Promotion criteria, minimum sample
+size and statistical confidence require a later reviewed decision.
