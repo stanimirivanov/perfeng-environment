@@ -84,6 +84,13 @@ bootstrap stages the pinned report policy. The scoped uploader write/read checks
 the HTTPS endpoint and writable volume capacity. Report access with the reader identity
 is exercised by the subsequent consumption slice.
 
+The pinned SeaweedFS image configures its filer database at `/data/filerldb2`.
+The fixture explicitly mounts its existing group-writable scratch volume at
+`/data` as well as `/tmp`. This supports the caller's UID, including hosted
+UID 1001, while preserving the read-only container root filesystem and the
+combined 256 MiB scratch bound. The filer database shares the disposable
+cluster lifecycle and cleanup proof.
+
 Look for `servingReady: true`, `servingCleanup: passed`, and `cleanup: passed`.
 The evidence also records the disposable cluster UID. `productAcceptance`
 stays `not-run` until a later slice runs the change, k6, analysis consumption,

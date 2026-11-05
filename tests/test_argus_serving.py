@@ -139,3 +139,41 @@ class ServingReadinessTests(unittest.TestCase):
             driver.wait("baseline-reader", serving.PLATFORM)
         self.assertIn("Unschedulable", output.getvalue())
         self.assertNotIn("private", output.getvalue())
+
+    def test_seaweed_filer_data_uses_group_writable_fixture_scratch(self):
+        import tempfile
+
+        serving = serving_module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "registry").mkdir()
+            (root / "registry/registry.json").write_text('{"entries":[]}')
+            prepared = Mock(root=root, run_id="joint-test")
+
+            def create_certificate(args, **kwargs):
+                if args[0] == "openssl":
+                    (root / "store.crt").touch()
+                return SimpleNamespace(stdout="", returncode=0)
+
+            prepared.command.side_effect = create_certificate
+            driver = serving.Serving(prepared)
+            driver.secret = Mock()
+            driver.service = Mock()
+            driver.wait = Mock()
+            driver.k = Mock()
+            objects = []
+            driver.apply = objects.append
+            driver.storage("reviewed-aws-image")
+            [storage] = [obj for obj in objects if obj["metadata"]["name"] == "seaweedfs"]
+            container = storage["spec"]["containers"][0]
+            mounts = {mount["mountPath"]: mount for mount in container["volumeMounts"]}
+            self.assertIn("/data", mounts)
+            self.assertEqual(mounts["/data"]["name"], mounts["/tmp"]["name"])
+            self.assertFalse(mounts["/data"].get("readOnly", False))
+            [scratch] = [
+                volume
+                for volume in storage["spec"]["volumes"]
+                if volume["name"] == mounts["/data"]["name"]
+            ]
+            self.assertEqual(scratch["emptyDir"]["sizeLimit"], "256Mi")
+            self.assertTrue(container["securityContext"]["readOnlyRootFilesystem"])

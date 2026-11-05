@@ -2060,3 +2060,13 @@ Helper CPU requests reserve 100 millicpu each, with a one-CPU limit.
 Readiness remains bounded by its 90-second window and the overall fixture deadline. Preserve failed observations in the campaign inventory when collecting
 a later successful receipt. Private vendor logs and credentials belong only in
 the owned disposable fixture directory.
+
+## SeaweedFS terminates before recovery readiness
+
+The pinned image's filer configuration uses `/data/filerldb2`. Its image-owned
+data directory can be inaccessible to hosted UID 1001 even when local UID 1000
+starts successfully. Verify that the fixture SeaweedFS Pod mounts the existing
+scratch emptyDir at both `/tmp` and `/data`, with the caller's group selected by
+fsGroup. A private startup log containing a permission refusal under
+`/data/filerldb2` identifies this failure. The corrected fixture supplies that
+writable mount and retains the read-only root filesystem and 256 MiB bound.

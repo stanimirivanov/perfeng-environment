@@ -439,16 +439,20 @@ class Serving:
             "-s3.key.file=/fixture/store.key -s3.config=/fixture/s3.json -s3.iam=false "
             "-s3.port.iceberg=0 -s3.port.lance=0",
         ]
-        self.apply(
-            pod(
-                "seaweedfs",
-                PLATFORM,
-                image,
-                command,
-                paths=("s3.json", "store.key", "store.crt"),
-                probe={"tcpSocket": {"port": 8443}},
-            )
+        storage = pod(
+            "seaweedfs",
+            PLATFORM,
+            image,
+            command,
+            paths=("s3.json", "store.key", "store.crt"),
+            probe={"tcpSocket": {"port": 8443}},
         )
+        # The pinned filer config writes /data/filerldb2. An explicit scratch
+        # mount gives the caller's UID/group access to this image-owned path.
+        storage["spec"]["containers"][0]["volumeMounts"].append(
+            {"name": "scratch", "mountPath": "/data"}
+        )
+        self.apply(storage)
         self.service("seaweedfs", PLATFORM, 8333, 8443)
         self.wait("seaweedfs", PLATFORM)
         self.secret(
