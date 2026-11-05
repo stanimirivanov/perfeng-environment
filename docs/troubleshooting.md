@@ -2035,3 +2035,13 @@ successfully but the receipt validator could not confirm its acceptance and
 cleanup fields. `failed` means the fixture command failed. `not-run` means
 execution did not start. Use the documented recovery command in a disposable
 local fixture to investigate a failure that requires private evidence.
+
+## Argus shadow campaign evidence is missing or invalid
+
+Use the [offline campaign guide](argus-perfeng-fixture.md#offline-shadow-campaign-report)
+to check the exact run ID, attempt, head revision and extracted artifact directory.
+Retain missing observations in the inventory when artifacts have expired. Download
+the original artifact again when available. Copy every JSON document together and
+preserve the producer manifest field order. Inspect the hosted job when an
+observation is unpaired or its full pilot used direct fallback. A missing control
+provides no paired recall or timing measurement.
