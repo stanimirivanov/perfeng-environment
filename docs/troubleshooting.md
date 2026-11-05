@@ -2045,3 +2045,17 @@ the original artifact again when available. Copy every JSON document together an
 preserve the producer manifest field order. Inspect the hosted job when an
 observation is unpaired or its full pilot used direct fallback. A missing control
 provides no paired recall or timing measurement.
+
+
+## Argus recovery fixture stops at object storage
+
+Inspect the fixed readiness reason in the hosted job. ImagePullBackOff and
+ErrImagePull identify image acquisition failures. ContainerCreating identifies
+startup still in progress, and OOMKilled identifies a terminated container that
+exceeded its memory limit. RunningNotReady identifies a running pod that has
+not satisfied readiness. Unavailable means diagnostic state could not be read.
+Treat the retained receipt as failed until a fresh run produces a passed receipt.
+The storage startup window is 180 seconds, bounded by the overall fixture
+deadline. Preserve failed observations in the campaign inventory when collecting
+a later successful receipt. Private vendor logs and credentials belong only in
+the owned disposable fixture directory.

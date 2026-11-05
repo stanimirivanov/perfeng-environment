@@ -505,15 +505,58 @@ test "$(cat /tmp/probe-read)" = fixture-storage-ready
         return uploader
 
     def wait(self, name, namespace):
-        self.k(
-            "-n",
-            namespace,
-            "wait",
-            "--for=condition=Ready",
-            f"pod/{name}",
-            "--timeout=90s",
-            timeout=100,
-        )
+        # The cold storage image is over 700 MB. Include acquisition in this
+        # bounded window while retaining the fixture's overall deadline.
+        seconds = 180 if name == "seaweedfs" else 90
+        try:
+            self.k(
+                "-n",
+                namespace,
+                "wait",
+                "--for=condition=Ready",
+                f"pod/{name}",
+                f"--timeout={seconds}s",
+                timeout=seconds + 10,
+            )
+        except ValueError:
+            reason = "Unavailable"
+            try:
+                result = self.k_command(
+                    "-n",
+                    namespace,
+                    "get",
+                    f"pod/{name}",
+                    "-o",
+                    "json",
+                    optional=True,
+                    cleanup=True,
+                    timeout=5,
+                )
+                status = json.loads(result.stdout)["status"]
+                allowed = {
+                    "ContainerCreating",
+                    "ImagePullBackOff",
+                    "ErrImagePull",
+                    "CreateContainerConfigError",
+                    "CreateContainerError",
+                    "CrashLoopBackOff",
+                    "OOMKilled",
+                    "Error",
+                    "Completed",
+                }
+                for container in status.get("containerStatuses", []):
+                    state = container.get("state", {})
+                    candidate = state.get("waiting", state.get("terminated", {})).get("reason")
+                    if candidate in allowed:
+                        reason = candidate
+                        break
+                if reason == "Unavailable" and status.get("phase") == "Running":
+                    reason = "RunningNotReady"
+            except (ValueError, TypeError, KeyError, OSError, AttributeError):
+                pass
+            service = name if name in {"seaweedfs", "sample-sut", "argus", "perfeng"} else "service"
+            print(f"Fixture pod {service} readiness failed: {reason}", flush=True)
+            raise ValueError("fixture pod readiness failed") from None
 
     def argus_configuration(self):
         return {}, ()
