@@ -1,0 +1,16 @@
+{
+  "platform": "linux-x86_64",
+  "pythonVersion": "3.12.14",
+  "pythonSha256": "8f9781a98200d9ecda7e00464e4c64b1327abae788ae8e6979d5c859311410c7",
+  "verifierVersion": "2.103.3",
+  "verifierArchiveSha256": "4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d",
+  "verifierSha256": "b768184570b12536be4ac1528893f6340d1c6a7b40b56ad45bca9cd0e87ad34d",
+  "trustRootSha256": "455b3fe53e2678889f093d66ebbfda5f12ebb9d682b146c3535fa04e97689787",
+  "qualification": {
+    "repository": "malancas/attest-demo",
+    "sourceDigest": "95baf27389e83e6a5c48f42e190d48d7abcea19e",
+    "sourceRef": "refs/heads/main",
+    "signerWorkflow": "github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d",
+    "signerDigest": "09b495c3f12c7881b3cc17209a327792065c1a1d"
+  }
+}
