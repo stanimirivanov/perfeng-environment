@@ -119,3 +119,43 @@ inspect inactive state before any cleanup. Process interruption is covered
 by the gate. Power-loss recovery is outside this task. Run
 `make contracts-materializer-check` and `make contracts-inspect-check` for
 offline verification.
+
+## Materializer tool release
+
+The release archive contains the materializer, its schema and trust inputs,
+the pinned GitHub CLI, and the Python interpreter, standard library and locked
+packages needed to run it. The build restores its own archive in a temporary
+directory and exercises both materializer startup and the offline verifier
+qualification fixture there. The runtime requires a compatible Linux x86-64
+glibc host and procfs for the materializer's directory ownership checks.
+
+Use a trusted reviewed checkout and the independently qualified verifier to
+restore the tool. Obtain the archive and detached Sigstore bundle for the
+exact reviewed release. Record the archive SHA-256, `linux-x86_64` platform,
+and exact source and signer commit IDs in an independently reviewed JSON file
+with fields `archiveSha256`, `platform`, `sourceDigest`, and `signerDigest`.
+A digest downloaded alongside the release is insufficient to establish trust.
+
+```sh
+uv run --locked --offline python -m scripts.contracts_tool_release restore \
+  --archive materializer.tar.gz --bundle materializer.sigstore.jsonl \
+  --verifier /absolute/path/to/trusted/gh --pins /absolute/path/to/reviewed-pins.json \
+  --target /absolute/path/to/new-tool
+/absolute/path/to/new-tool/runtime/bin/python3.12 -IB \
+  /absolute/path/to/new-tool/materialize.py --help
+```
+
+Restore requires a fresh target under an operator-controlled parent.
+After a filesystem interruption use a new target. Retain the archive,
+attestation and reviewed pins with the bootstrap verifier and trust inputs
+for offline recovery. Keep earlier reviewed releases for rollback.
+
+Before enabling hosted release publication, an administrator must configure
+the `contract-tool-attestation` and `contract-tool-publication` environments
+with required reviewers and protected-main restrictions, and enable immutable
+releases. Set `PERFENG_TOOL_PUBLICATION_ENABLED=true` only after confirming
+those protections. Dispatch with the exact reviewed main commit. The
+publication job reserves the commit-specific tag, uploads both assets to a
+draft, then makes the complete release visible. Investigate interrupted
+drafts before any retry. Hosted publication and positive verification of
+its provenance require a separate authorized exercise.

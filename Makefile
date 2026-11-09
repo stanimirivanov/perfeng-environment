@@ -11,6 +11,7 @@ help:
 	@echo perfeng-environment engineering command surface
 	@echo "  make contracts-inspect-check  Verify offline contract artifact inspection"
 	@echo "  make contracts-materializer-check  Verify atomic local projection activation"
+	@echo "  make contracts-tool-release-check  Verify materializer release boundaries"
 	@echo "  make argus-campaign-check  Verify offline shadow campaign aggregation"
 	@echo "  make argus-perfeng-fixture-check  Validate disposable joint inputs and safety offline"
 	@echo "  make bootstrap  Resolve the locked Python environment"
@@ -116,3 +117,7 @@ contracts-inspect-check:
 .PHONY: contracts-materializer-check
 contracts-materializer-check:
 	$(UV_RUN) python -m unittest discover -s tests -p 'test_contract_materialize.py' -v
+
+.PHONY: contracts-tool-release-check
+contracts-tool-release-check:
+	$(UV_RUN) python -m unittest discover -s tests -p test_contract_tool_release.py -v
