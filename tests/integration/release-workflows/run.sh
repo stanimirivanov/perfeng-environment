@@ -92,7 +92,17 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 download() {
-  curl --fail --location --retry 2 --max-time 120 --max-filesize 268435456 --proto '=https' "$1" --output "$2"
+  local -a flags=(--fail --location --silent --show-error --retry 2 --max-time 120
+    --retry-max-time 180 --max-filesize 268435456 --proto '=https' --proto-redir '=https')
+  local status
+  if curl "${flags[@]}" "$1" --output "$2"; then
+    :
+  else
+    status=$?
+    [[ -n ${4:-} ]] || return "$status"
+    printf '%s\n' 'Release download failed. Trying the pinned public asset API.'
+    curl "${flags[@]}" --header 'Accept: application/octet-stream' "$4" --output "$2" || return
+  fi
   printf '%s  %s\n' "$3" "$2" | sha256sum --check
 }
 for tool in kind kubectl argo; do
@@ -149,7 +159,8 @@ complete_stage
 run_stage authority-smoke verify_adoption_create_authority
 start_stage controllers
 download "$(jq -r .workflows.url "$source_dir/toolchain.json")" "$fixture/namespace-install.yaml" \
-  "$(jq -r .workflows.sha256 "$source_dir/toolchain.json")"
+  "$(jq -r .workflows.sha256 "$source_dir/toolchain.json")" \
+  "$(jq -er .workflows.assetApiUrl "$source_dir/toolchain.json")"
 k -n argo-workflows apply --server-side -f "$fixture/namespace-install.yaml"
 k -n argo-workflows rollout status deployment/workflow-controller --timeout=300s
 k -n argo-workflows rollout status deployment/argo-server --timeout=300s
