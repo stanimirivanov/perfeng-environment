@@ -1,0 +1,8 @@
+{
+  "platform": "linux-x86_64",
+  "version": "2.7.2",
+  "revision": "9e0a0d3c3504a0a00b45e61355afac5e35c78379",
+  "archive": "openbao_2.7.2_linux_amd64.tar.gz",
+  "archiveSha256": "582b1f3c2fdc5afd443b2d57a225ef654de75adea609fdb66731fd582a9cbc96",
+  "executableSha256": "9c5f36287c673f386e1533e9c044169a248e4ee50dd54810fa766e95bd41b788"
+}

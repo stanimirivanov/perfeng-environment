@@ -9,6 +9,7 @@
 
 ## Route by task
 For offline contract verifier preparation, see [Contract distribution verifier qualification](contract-distribution-tools.md).
+For disposable OpenBao identity and delivery checks, see [Local OpenBao qualification](openbao-qualification.md).
 
 | Task or changed area | Read first | Verify or consult as needed |
 |:--|:--|:--|
