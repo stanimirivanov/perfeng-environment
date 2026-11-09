@@ -101,3 +101,8 @@ argus-perfeng-fixture-check:
 
 argus-campaign-check:
 	$(UV_RUN) python -m unittest tests.test_argus_campaign -v
+
+# The verifier is independently prepared and never downloaded by this check.
+.PHONY: contracts-tools-check
+contracts-tools-check:
+	$(UV_RUN) python -m scripts.contracts_distribution_tools --verifier "$(CONTRACTS_VERIFIER)"

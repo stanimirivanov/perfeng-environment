@@ -8,6 +8,7 @@
 - Update this map whenever a canonical guide moves or a recurring task lacks a clear route.
 
 ## Route by task
+For offline contract verifier preparation, see [Contract distribution verifier qualification](contract-distribution-tools.md).
 
 | Task or changed area | Read first | Verify or consult as needed |
 |:--|:--|:--|

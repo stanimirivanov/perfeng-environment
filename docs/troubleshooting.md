@@ -2070,3 +2070,10 @@ scratch emptyDir at both `/tmp` and `/data`, with the caller's group selected by
 fsGroup. A private startup log containing a permission refusal under
 `/data/filerldb2` identifies this failure. The corrected fixture supplies that
 writable mount and retains the read-only root filesystem and 256 MiB bound.
+
+## Contract distribution verifier refuses local inputs
+
+A missing file, SHA-256 mismatch or unqualified Python executable blocks the
+offline check before the verifier runs. Restore the pinned input and retry
+using the [qualification guide](contract-distribution-tools.md). A signature
+or publisher identity failure calls for checking the reviewed bundle and policy.
