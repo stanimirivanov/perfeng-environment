@@ -12,6 +12,7 @@ help:
 	@echo "  make contracts-inspect-check  Verify offline contract artifact inspection"
 	@echo "  make contracts-materializer-check  Verify atomic local projection activation"
 	@echo "  make contracts-tool-release-check  Verify materializer release boundaries"
+	@echo "  make openbao-qualification  Qualify pinned OpenBao with synthetic identities"
 	@echo "  make argus-campaign-check  Verify offline shadow campaign aggregation"
 	@echo "  make argus-perfeng-fixture-check  Validate disposable joint inputs and safety offline"
 	@echo "  make bootstrap  Resolve the locked Python environment"
@@ -121,3 +122,8 @@ contracts-materializer-check:
 .PHONY: contracts-tool-release-check
 contracts-tool-release-check:
 	$(UV_RUN) python -m unittest discover -s tests -p test_contract_tool_release.py -v
+
+.PHONY: openbao-qualification
+openbao-qualification:
+	$(UV_RUN) python -m unittest discover -s tests -p test_openbao_qualification.py -v
+	$(UV_RUN) python -m scripts.openbao_qualification --bao "$(OPENBAO_BIN)" --execute
