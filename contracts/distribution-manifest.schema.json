@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perfeng.dev/distribution/v1/manifest.schema.json",
+  "title": "Perfeng contract distribution metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "source", "members"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "enum": ["selection", "candidate", "promoted"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision", "version"],
+      "properties": {
+        "repository": { "const": "https://github.com/stanimirivanov/perfeng-contracts.git" },
+        "revision": {
+          "type": "string",
+          "minLength": 40,
+          "maxLength": 40,
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$",
+          "not": { "pattern": "[^0-9.]" }
+        }
+      }
+    },
+    "members": {
+      "type": "object",
+      "minProperties": 2,
+      "required": ["LICENSE"],
+      "propertyNames": {
+        "maxLength": 512,
+        "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$",
+        "not": { "pattern": "[^A-Za-z0-9_./-]" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/sha256" }
+    },
+    "releaseId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9.-]*$",
+      "not": { "pattern": "[^a-z0-9.-]" }
+    },
+    "archiveSha256": { "$ref": "#/$defs/sha256" },
+    "admissionSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "selection" } } },
+      "then": {
+        "properties": { "releaseId": false, "archiveSha256": false, "admissionSha256": false }
+      },
+      "else": { "required": ["releaseId", "archiveSha256"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "promoted" } } },
+      "then": { "required": ["admissionSha256"] },
+      "else": { "properties": { "admissionSha256": false } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -18,8 +18,8 @@ TOOL_LIMIT = 128 * 1024 * 1024
 ROOT_LIMIT = 1024 * 1024
 
 
-def checked_bytes(path: Path, digest: str, *, limit: int) -> bytes:
-    """Read bounded regular-file bytes and require the independently pinned digest."""
+def local_bytes(path: Path, *, limit: int) -> bytes:
+    """Read one bounded local regular file without waiting on special files."""
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
         with os.fdopen(fd, "rb") as source:
@@ -31,22 +31,32 @@ def checked_bytes(path: Path, digest: str, *, limit: int) -> bytes:
         raise ValueError(f"Local input unavailable: {path.name}") from exc
     if not 0 < len(data) <= limit:
         raise ValueError(f"Invalid file size: {path.name}")
+    return data
+
+
+def checked_bytes(path: Path, digest: str, *, limit: int) -> bytes:
+    """Require a digest from a separate trusted input."""
+    data = local_bytes(path, limit=limit)
     if hashlib.sha256(data).hexdigest() != digest:
         raise ValueError(f"SHA-256 mismatch: {path.name}")
     return data
 
 
-def verify_fixture(
-    executable: Path, trust_root: Path, directory: Path, policy: dict[str, str]
+def verify_attestation(
+    executable: Path,
+    trust_root: Path,
+    artifact: Path,
+    bundle: Path,
+    policy: dict[str, str],
 ) -> bool:
-    """Check the fixture with pinned certificate identity and local trust material."""
+    """Check local bytes against pinned certificate identity and trust material."""
     command = [
         str(executable),
         "attestation",
         "verify",
-        str(FIXTURE / "reusable-workflow-artifact"),
+        str(artifact),
         "--bundle",
-        str(FIXTURE / "reusable-workflow-attestation.sigstore.json"),
+        str(bundle),
         "--custom-trusted-root",
         str(trust_root),
         "--repo",
@@ -63,7 +73,11 @@ def verify_fixture(
     ]
     result = subprocess.run(
         command,
-        env={"HOME": str(directory), "GH_CONFIG_DIR": str(directory), "GH_PROMPT_DISABLED": "1"},
+        env={
+            "HOME": str(executable.parent),
+            "GH_CONFIG_DIR": str(executable.parent),
+            "GH_PROMPT_DISABLED": "1",
+        },
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -73,8 +87,8 @@ def verify_fixture(
     return result.returncode == 0
 
 
-def qualify(verifier: Path) -> None:
-    """Verify positive and negative outcomes using the same checked executable and root."""
+def stage_verifier(verifier: Path, directory: Path) -> tuple[Path, Path]:
+    """Stage the independently pinned verifier and root in a private directory."""
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
     if f"{sys.platform}-{platform.machine()}" != lock["platform"]:
         raise ValueError("Unqualified verifier platform")
@@ -85,14 +99,21 @@ def qualify(verifier: Path) -> None:
     root_bytes = checked_bytes(
         FIXTURE / "trusted_root.json", lock["trustRootSha256"], limit=ROOT_LIMIT
     )
+    executable, trust_root = directory / "gh", directory / "trusted_root.json"
+    executable.write_bytes(executable_bytes)
+    executable.chmod(0o700)
+    trust_root.write_bytes(root_bytes)
+    return executable, trust_root
+
+
+def qualify(verifier: Path) -> None:
+    """Verify positive and negative outcomes using the same checked executable and root."""
     with tempfile.TemporaryDirectory(prefix="perfeng-contract-verifier-") as tmp:
-        directory = Path(tmp)
-        executable, trust_root = directory / "gh", directory / "trusted_root.json"
-        executable.write_bytes(executable_bytes)
-        executable.chmod(0o700)
-        trust_root.write_bytes(root_bytes)
-        policy: dict[str, str] = lock["qualification"]
-        if not verify_fixture(executable, trust_root, directory, policy):
+        executable, trust_root = stage_verifier(verifier, Path(tmp))
+        artifact = FIXTURE / "reusable-workflow-artifact"
+        bundle = FIXTURE / "reusable-workflow-attestation.sigstore.json"
+        policy: dict[str, str] = json.loads(LOCK.read_text(encoding="utf-8"))["qualification"]
+        if not verify_attestation(executable, trust_root, artifact, bundle, policy):
             raise ValueError("Pinned offline attestation failed verification")
         for field, wrong in (
             ("repository", "malancas/other"),
@@ -102,7 +123,9 @@ def qualify(verifier: Path) -> None:
                 "github/artifact-attestations-workflows/.github/workflows/other.yml",
             ),
         ):
-            if verify_fixture(executable, trust_root, directory, {**policy, field: wrong}):
+            if verify_attestation(
+                executable, trust_root, artifact, bundle, {**policy, field: wrong}
+            ):
                 raise ValueError(f"Verifier accepted incorrect {field}")
 
 
