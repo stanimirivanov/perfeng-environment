@@ -83,3 +83,39 @@ for installation. The manifest binds the admission record's digest.
 The inspector leaves interpretation of that record to the separate
 admission protocol. Run `make contracts-inspect-check` for the local inspection
 fixtures.
+
+## Activate a local projection
+
+Use a dedicated existing directory owned by the current user and writable
+only by that user. Prepare a reviewed selection JSON file independently from
+the release. It names the expected `sourceRevision` and a `members` object
+keyed by every provider member path. Each value names its expected `sha256`
+and its relative `destination` in the projection. Pass the separate
+publisher policy used by inspection alongside the selection.
+
+```sh
+target=$(mktemp -d)
+uv run --locked --offline python -m scripts.contracts_materialize --execute \
+  --manifest manifest.json --archive archive.tar.gz --bundle bundle.jsonl \
+  --policy publisher.json --verifier /absolute/path/to/gh \
+  --selection selection.json --target "$target"
+```
+
+The command verifies once, then stages the captured member bytes. It prints
+the path to the activated generation. The store's regular `current` file
+names that immutable generation. A reader should read the pointer once and
+use that generation for the entire operation. The installer keeps prior
+generations available and refuses to overwrite mismatched files. Competing
+writers receive a busy error and can retry after the active writer exits.
+Each target and ancestor must be a real directory rather than a symlink.
+This Linux implementation uses descriptor-relative directory traversal and
+an advisory lock shared by materializer writers. Keep the store under trusted
+local control and avoid external writers.
+
+An interruption before pointer replacement leaves the prior generation
+active. Interrupted staging may leave an inactive `.stage-*` directory or
+a complete unreferenced generation. Keep the active generation in place and
+inspect inactive state before any cleanup. Process interruption is covered
+by the gate. Power-loss recovery is outside this task. Run
+`make contracts-materializer-check` and `make contracts-inspect-check` for
+offline verification.

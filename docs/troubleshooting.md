@@ -2085,3 +2085,10 @@ bundle against the same release. Restore the exact archive named by that
 manifest. Candidates, altered archives, invalid references and limits
 violations are hard failures. See
 [offline contract inspection](contract-distribution-tools.md#inspect-a-local-distribution).
+
+For local contract materialization, a busy store means another writer holds
+the activation lock. Retry after that writer exits. A refused store or
+generation may contain unrelated content, an unsafe path, or files that
+differ from the reviewed selection. Inspect it without modifying the active
+pointer. Use a dedicated empty directory for a fresh projection. See the
+[activation guide](contract-distribution-tools.md#activate-a-local-projection).

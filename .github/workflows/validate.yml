@@ -96,7 +96,17 @@ jobs:
           set -euo pipefail
           version=$(jq -r .version perfeng-environment/native-gateway/caddy-release.json)
           expected=$(jq -r .sha512.linux_amd64 perfeng-environment/native-gateway/caddy-release.json)
-          curl --fail --location "https://github.com/caddyserver/caddy/releases/download/v${version}/caddy_${version}_linux_amd64.tar.gz" --output "$RUNNER_TEMP/caddy.tar.gz"
+          asset=$(jq -er .linux_amd64_asset_id perfeng-environment/native-gateway/caddy-release.json)
+          download_flags=(--fail --location --silent --show-error --retry 2 --max-time 30
+            --retry-max-time 70 --max-filesize 268435456 --proto '=https' --proto-redir '=https')
+          if ! curl "${download_flags[@]}" \
+            "https://github.com/caddyserver/caddy/releases/download/v${version}/caddy_${version}_linux_amd64.tar.gz" \
+            --output "$RUNNER_TEMP/caddy.tar.gz"; then
+            echo "Caddy release download failed. Trying the pinned public asset API."
+            curl "${download_flags[@]}" --header 'Accept: application/octet-stream' \
+              "https://api.github.com/repos/caddyserver/caddy/releases/assets/$asset" \
+              --output "$RUNNER_TEMP/caddy.tar.gz"
+          fi
           echo "$expected  $RUNNER_TEMP/caddy.tar.gz" | sha512sum --check
           mkdir "$RUNNER_TEMP/perfeng-caddy"
           tar -xzf "$RUNNER_TEMP/caddy.tar.gz" -C "$RUNNER_TEMP/perfeng-caddy" caddy
