@@ -1,0 +1,137 @@
+name: Publish pinned contract materializer
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed commit at the head of protected main
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: contract-tool-publication
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'stanimirivanov/perfeng-environment' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.sha == inputs.expected_sha && github.run_attempt == 1 &&
+      vars.PERFENG_TOOL_PUBLICATION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.12.5'
+          enable-cache: false
+      - name: Build and exercise the offline execution closure
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          uv python install 3.12.14
+          uv sync --locked --managed-python --python 3.12.14
+          make contracts-tool-release-check
+          mkdir release-inputs
+          archive="$RUNNER_TEMP/gh.tar.gz"
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error \
+            --location --max-time 120 --max-filesize 134217728 --output "$archive" \
+            https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_amd64.tar.gz
+          expected=$(jq -er .verifierArchiveSha256 contracts/distribution-tools.lock.json)
+          echo "$expected  $archive" | sha256sum --check
+          tar -xOzf "$archive" gh_2.103.3_linux_amd64/bin/gh > release-inputs/gh
+          uv run --locked --offline python -m scripts.contracts_tool_release build \
+            --verifier release-inputs/gh --output release-inputs/materializer.tar.gz
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: materializer-inputs
+          path: release-inputs/
+          if-no-files-found: error
+
+  attest:
+    needs: prepare
+    if: >-
+      github.repository == 'stanimirivanov/perfeng-environment' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.sha == inputs.expected_sha && github.run_attempt == 1 &&
+      vars.PERFENG_TOOL_PUBLICATION_ENABLED == 'true'
+    environment: contract-tool-attestation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: materializer-inputs
+          path: release-inputs
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        id: provenance
+        with:
+          subject-path: release-inputs/materializer.tar.gz
+      - name: Retain offline attestation
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          test -s "$BUNDLE_PATH"
+          cp -- "$BUNDLE_PATH" materializer.sigstore.jsonl
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: materializer-provenance
+          path: materializer.sigstore.jsonl
+          if-no-files-found: error
+
+  publish:
+    needs: attest
+    if: >-
+      github.repository == 'stanimirivanov/perfeng-environment' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.sha == inputs.expected_sha && github.run_attempt == 1 &&
+      vars.PERFENG_TOOL_PUBLICATION_ENABLED == 'true'
+    environment: contract-tool-publication
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: materializer-inputs
+          path: release-inputs
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: materializer-provenance
+          path: release-inputs
+      - name: Publish complete materializer assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh="$PWD/release-inputs/gh"
+          echo "b768184570b12536be4ac1528893f6340d1c6a7b40b56ad45bca9cd0e87ad34d  $gh" | sha256sum --check
+          chmod 700 "$gh"
+          tag="contract-materializer-v1-$GITHUB_SHA"
+          test -s release-inputs/materializer.tar.gz
+          test -s release-inputs/materializer.sigstore.jsonl
+          "$gh" api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" > /dev/null
+          "$gh" release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --draft --latest=false --title "Contract materializer $GITHUB_SHA" \
+            --notes "Verified Linux x86-64 tool from $GITHUB_SHA." \
+            release-inputs/materializer.tar.gz release-inputs/materializer.sigstore.jsonl
+          "$gh" release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
