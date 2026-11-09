@@ -74,6 +74,15 @@
 - Never paste Secret YAML, credential environment variables, decoded tokens or
   unreviewed logs into an issue.
 
+## Contract cold recovery
+
+A failing `contracts-restore-check` with retained assets indicates a missing,
+corrupt or untrusted input, an unprepared toolchain, or a dirty consumer
+checkout. Preserve the failed input and compare it with the reviewed recovery
+locks. Re-run from a clean checkout and an approved copy using the
+[cold recovery procedure](contract-distribution-tools.md#rehearse-cold-recovery).
+The existing environment snapshot remains authoritative.
+
 ## Disposable Argo CD acceptance
 
 For `changed-request` and `upgrade-request`, inspect the scenario's generated

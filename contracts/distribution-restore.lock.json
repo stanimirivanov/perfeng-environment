@@ -1,0 +1,39 @@
+{
+  "historyRelease": "contract-history-42672401359",
+  "history": {
+    "sourceDigest": "52c72f3cefefadef697b0b55cbf4f77ca7b4a118",
+    "signerDigest": "52c72f3cefefadef697b0b55cbf4f77ca7b4a118",
+    "sourceRef": "refs/heads/main",
+    "signerWorkflow": "stanimirivanov/perfeng-contracts/.github/workflows/contracts-publish.yml",
+    "manifestSha256": "434b8aca8a5d2e0f6922cfe43663cd91faf2999a0a01efd0ffb1173bd946a8e3"
+  },
+  "selection": {
+    "sourceRevision": "3b86afa18b468d831c7c2c176618180db18b2764",
+    "members": {
+      "LICENSE": {
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "destination": "LICENSE"
+      },
+      "examples/kubernetes-benchmark-evidence/accepted-preflight.json": {
+        "sha256": "e16d57c4c114a8b39f88afe917e7834371b4b8c6d6b96b7575f2b85ac4fb3c65",
+        "destination": "examples/kubernetes-benchmark-evidence/accepted-preflight.json"
+      },
+      "schemas/artifact/v1/artifact-reference.schema.json": {
+        "sha256": "d83a170967087017307a7efd33707d7e782c390ec6d6a031213d229a6e98ebc6",
+        "destination": "schemas/artifact/v1/artifact-reference.schema.json"
+      },
+      "schemas/environment/v1/environment.schema.json": {
+        "sha256": "02cc142771b4b20df26cbfb45e98d90269aaecf6acc5b10acfdaa543c899cf9f",
+        "destination": "schemas/environment/v1/environment.schema.json"
+      },
+      "schemas/kubernetes-benchmark-evidence/v1/kubernetes-benchmark-evidence.schema.json": {
+        "sha256": "aae5daa05c2be154c67227bddde99da3f4d9ad9c5b406c10395140d4d65737a1",
+        "destination": "contracts/kubernetes-benchmark-evidence.schema.json"
+      },
+      "schemas/raw-result/v2/raw-result.schema.json": {
+        "sha256": "1393795e9821b4fde8454ad6c5b593a700f0f1ec6ec028108cc67b60092d0d84",
+        "destination": "schemas/raw-result/v2/raw-result.schema.json"
+      }
+    }
+  }
+}

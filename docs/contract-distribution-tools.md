@@ -185,3 +185,38 @@ Kubernetes evidence lock and runs the same valid and invalid cases against
 both copies. The JSON receipt identifies the checked releases and outcomes.
 Missing or mismatched inputs fail the shadow check. Ordinary validation uses
 its existing local snapshot.
+
+## Rehearse cold recovery
+
+Keep a separate local or approved independent copy of these exact release
+assets. Prepare the retained copy before the outage exercise.
+
+| Retained directory | Release and assets |
+|:--|:--|
+| `tool/` | The tool release in [the shadow lock](../contracts/distribution.lock.json). Keep `materializer.tar.gz` and `materializer.sigstore.jsonl`. |
+| `history/` | The history release in [the recovery lock](../contracts/distribution-restore.lock.json). Keep the selected revision's `<revision>.manifest.json`, `<revision>.tar.gz`, and `manifest.sigstore.jsonl`. |
+| `tracer/` | The tracer release in the shadow lock. Keep `manifest.json`, `tracer.tar.gz`, and `manifest.sigstore.jsonl`. |
+
+Retain a clean checkout of the reviewed consumer revision, including the locks
+and pinned trust root, and an independently checksum-pinned bootstrap verifier.
+Pre-provision the admitted Python/uv environment. From that clean checkout, run
+the rehearsal with networking denied by the local isolation mechanism. For
+example, on a qualified Linux host with `strace` and ptrace available:
+
+```sh
+strace -f -e inject=socket:error=EACCES -e trace=socket,connect,sendto \
+  -o /path/outside/the/checkout/recovery-network.trace \
+  make contracts-restore-check CONTRACTS_RETAINED_ASSETS=/absolute/path/to/retained \
+  CONTRACTS_VERIFIER=/absolute/path/to/trusted/gh
+```
+
+Without retained asset arguments, the Make target runs the focused unit tests.
+A successful rehearsal emits a JSON receipt with the consumer revision, trusted
+tool identity, and each projection's source revision, manifest and archive
+digests. Both stores start empty. The environment's prior signed tracer is the
+rollback distribution path for the same Kubernetes evidence revision. This
+exercise covers that environment selection and leaves the authoritative
+snapshot in place. It does not establish rollback coverage for other
+consumers, current security admission, or an offline build with unprepared
+language dependencies. Missing or corrupt inputs fail closed. Use an approved
+retained copy or a reviewed locator change for recovery.
