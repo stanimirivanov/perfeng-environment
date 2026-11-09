@@ -46,3 +46,40 @@ exact approved inputs or review a new set of pins and rerun qualification.
 There is no automatic download, system CLI upgrade or fallback. This gate
 does not install artifacts or authorize a Perfeng publisher. Reverting this
 additive tooling has no effect on existing consumers.
+
+## Inspect a local distribution
+
+Pass the reviewed policy separately from the downloaded release material. It
+contains the exact `manifestSha256`, the publisher run's `sourceDigest` and
+`sourceRef` (`refs/heads/main`), and the reviewed `signerWorkflow` (repository
+and workflow path) and `signerDigest` (workflow revision). The publisher run
+revision is distinct from the historical Git revision named inside a
+distribution. The inspector fixes both the publisher and signer repository
+to `stanimirivanov/perfeng-contracts`. Prepare these policy pins through
+independent review once the publisher is admitted.
+
+```sh
+uv run --locked --offline python -m scripts.contracts_inspect \
+  --policy /absolute/path/to/reviewed-policy.json \
+  --manifest /absolute/path/to/promoted.json \
+  --archive /absolute/path/to/archive.tar.gz \
+  --bundle /absolute/path/to/manifest-attestation.jsonl \
+  --verifier /absolute/path/to/gh
+```
+
+The inspector verifies the attestation over the exact promoted manifest bytes,
+then checks the archive hash, member inventory and member hashes. The manifest
+schema is a byte-identical copy of `distribution/manifest.schema.json` from
+`perfeng-contracts` revision `aae9004ec1e204d52df6afc7c7d36839c0eaa2f7`.
+Inspection bounds compressed and expanded sizes before parsing the tar
+stream. The reference profile admits local JSON Pointers and relative
+references to other declared JSON members. A root identifier, when present,
+must match its canonical `https://perfeng.dev/` member URI. Nested identifiers,
+named fragments and network retrieval are unsupported.
+
+Success prints a verified member inventory and leaves the inputs untouched.
+The output is informational and cannot authorize reopening changed paths
+for installation. The manifest binds the admission record's digest.
+The inspector leaves interpretation of that record to the separate
+admission protocol. Run `make contracts-inspect-check` for the local inspection
+fixtures.

@@ -2077,3 +2077,11 @@ A missing file, SHA-256 mismatch or unqualified Python executable blocks the
 offline check before the verifier runs. Restore the pinned input and retry
 using the [qualification guide](contract-distribution-tools.md). A signature
 or publisher identity failure calls for checking the reviewed bundle and policy.
+
+### Contract archive inspection fails
+
+Check the reviewed publisher policy, the promoted manifest and its attestation
+bundle against the same release. Restore the exact archive named by that
+manifest. Candidates, altered archives, invalid references and limits
+violations are hard failures. See
+[offline contract inspection](contract-distribution-tools.md#inspect-a-local-distribution).
