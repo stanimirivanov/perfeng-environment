@@ -11,6 +11,7 @@ help:
 	@echo perfeng-environment engineering command surface
 	@echo "  make contracts-inspect-check  Verify offline contract artifact inspection"
 	@echo "  make contracts-materializer-check  Verify atomic local projection activation"
+	@echo "  make contracts-shadow  Compare the signed tracer with the local contract offline"
 	@echo "  make contracts-tool-release-check  Verify materializer release boundaries"
 	@echo "  make openbao-qualification  Qualify pinned OpenBao with synthetic identities"
 	@echo "  make argus-campaign-check  Verify offline shadow campaign aggregation"
@@ -127,3 +128,7 @@ contracts-tool-release-check:
 openbao-qualification:
 	$(UV_RUN) python -m unittest discover -s tests -p test_openbao_qualification.py -v
 	$(UV_RUN) python -m scripts.openbao_qualification --bao "$(OPENBAO_BIN)" --execute
+
+.PHONY: contracts-shadow
+contracts-shadow:
+	$(UV_RUN) python -m scripts.contracts_shadow --assets "$(CONTRACTS_SHADOW_ASSETS)" --verifier "$(CONTRACTS_VERIFIER)"

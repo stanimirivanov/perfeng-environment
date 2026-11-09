@@ -159,3 +159,29 @@ publication job reserves the commit-specific tag, uploads both assets to a
 draft, then makes the complete release visible. Investigate interrupted
 drafts before any retry. Hosted publication and positive verification of
 its provenance require a separate authorized exercise.
+
+## Verify the first downstream tracer
+
+Use the exact release tags in [the shadow lock](../contracts/distribution.lock.json).
+Prepare the release assets in a private local directory before running the
+offline check. The tool and tracer have separate publishers and pins.
+
+```sh
+assets=$(mktemp -d)
+lock=contracts/distribution.lock.json
+gh release download "$(jq -er .toolRelease "$lock")" \
+  --repo stanimirivanov/perfeng-environment --dir "$assets/tool"
+gh release download "$(jq -er .tracerRelease "$lock")" \
+  --repo stanimirivanov/perfeng-contracts --dir "$assets/tracer"
+make contracts-shadow CONTRACTS_SHADOW_ASSETS="$assets" \
+  CONTRACTS_VERIFIER=/absolute/path/to/trusted/gh
+```
+
+The shadow check restores the signed tool and verifies the signed tracer
+using the independently pinned publisher policies. It projects the selected
+members into a temporary store and checks exact schema bytes against the
+authoritative environment snapshot. Validation uses the consumer's reviewed
+Kubernetes evidence lock and runs the same valid and invalid cases against
+both copies. The JSON receipt identifies the checked releases and outcomes.
+Missing or mismatched inputs fail the shadow check. Ordinary validation uses
+its existing local snapshot.
