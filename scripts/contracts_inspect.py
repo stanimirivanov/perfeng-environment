@@ -12,6 +12,7 @@ import sys
 import tarfile
 import tempfile
 import zlib
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -98,15 +99,14 @@ def validate_members(members: dict[str, str]) -> None:
         raise ValueError("Manifest contains conflicting or excessive member paths")
 
 
-def archive_members(compressed: bytes, expected: dict[str, str]) -> dict[str, Any]:
+def archive_members(compressed: bytes, expected: dict[str, str]) -> dict[str, bytes]:
     validate_members(expected)
     try:
         with gzip.GzipFile(fileobj=io.BytesIO(compressed)) as stream:
             expanded = stream.read(TAR_LIMIT + 1)
         if len(expanded) > TAR_LIMIT:
             raise ValueError("Archive exceeds expanded size limit")
-        seen: set[str] = set()
-        documents: dict[str, Any] = {}
+        contents: dict[str, bytes] = {}
         total = 0
         with tarfile.open(fileobj=io.BytesIO(expanded), mode="r:") as archive:
             for entry in archive:
@@ -118,7 +118,7 @@ def archive_members(compressed: bytes, expected: dict[str, str]) -> dict[str, An
                     raise ValueError("Archive entries must be regular files")
                 if name not in expected:
                     raise ValueError("Archive contains undeclared member")
-                if name in seen:
+                if name in contents:
                     raise ValueError("Archive contains duplicate member")
                 total += entry.size
                 if not 0 <= entry.size <= MEMBER_LIMIT or total > TOTAL_LIMIT:
@@ -133,15 +133,13 @@ def archive_members(compressed: bytes, expected: dict[str, str]) -> dict[str, An
                     or hashlib.sha256(content).hexdigest() != expected[name]
                 ):
                     raise ValueError("Archive member digest mismatch")
-                seen.add(name)
-                if name.endswith(".json"):
-                    documents[name] = json_data(content)
-            if seen != expected.keys():
+                contents[name] = content
+            if contents.keys() != expected.keys():
                 raise ValueError("Archive is missing declared members")
             trailer = expanded[archive.offset :]
             if len(trailer) < 1024 or len(trailer) % 512 or any(trailer):
                 raise ValueError("Invalid archive trailing data or end markers")
-        return documents
+        return contents
     except (OSError, EOFError, tarfile.TarError, RecursionError, zlib.error) as exc:
         raise ValueError("Invalid or truncated distribution archive") from exc
 
@@ -202,10 +200,18 @@ def check_references(documents: dict[str, Any]) -> None:
                 pending.extend(node)
 
 
-def inspect(
+@dataclass(frozen=True)
+class VerifiedArchive:
+    """Exact member bytes captured during authenticated inspection."""
+
+    source_revision: str
+    members: dict[str, bytes]
+
+
+def inspect_verified(
     manifest_path: Path, archive_path: Path, bundle_path: Path, policy_path: Path, verifier: Path
-) -> dict[str, str]:
-    """Return member digests only after checking approval, bytes and reference closure."""
+) -> VerifiedArchive:
+    """Capture the verified bytes for a caller without reopening any input."""
     policy = publisher_policy(policy_path)
     manifest_bytes = checked_bytes(manifest_path, policy["manifestSha256"], limit=METADATA_LIMIT)
     manifest = json_data(manifest_bytes)
@@ -218,8 +224,19 @@ def inspect(
     verify_publisher(verifier, manifest_bytes, bundle, policy)
     compressed = checked_bytes(archive_path, manifest["archiveSha256"], limit=ARCHIVE_LIMIT)
     members: dict[str, str] = manifest["members"]
-    check_references(archive_members(compressed, members))
-    return dict(sorted(members.items()))
+    contents = archive_members(compressed, members)
+    check_references(
+        {name: json_data(data) for name, data in contents.items() if name.endswith(".json")}
+    )
+    return VerifiedArchive(manifest["source"]["revision"], contents)
+
+
+def inspect(
+    manifest_path: Path, archive_path: Path, bundle_path: Path, policy_path: Path, verifier: Path
+) -> dict[str, str]:
+    """Report only the verified member digests."""
+    result = inspect_verified(manifest_path, archive_path, bundle_path, policy_path, verifier)
+    return {name: hashlib.sha256(data).hexdigest() for name, data in sorted(result.members.items())}
 
 
 def main() -> int:

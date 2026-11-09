@@ -10,7 +10,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.contracts_inspect import inspect, publisher_policy
+from scripts.contracts_inspect import inspect, inspect_verified, publisher_policy
+from scripts.contracts_materialize import materialize
 
 
 def sha(data: bytes) -> str:
@@ -86,6 +87,27 @@ class ContractInspectTests(unittest.TestCase):
         self.assertEqual(verify.call_args.args[1], original)
         self.assertEqual(verify.call_args.args[3]["sourceDigest"], "c" * 40)
         self.assertFalse((self.root / "LICENSE").exists())
+
+    @patch("scripts.contracts_inspect.verify_publisher")
+    def test_install_uses_captured_archive_bytes(self, _verify) -> None:
+        self.prepare()
+        with patch(
+            "scripts.contracts_inspect.check_references",
+            side_effect=lambda _: self.archive.write_bytes(b"replaced after reading"),
+        ):
+            verified = inspect_verified(
+                self.manifest, self.archive, self.bundle, self.policy, self.root / "gh"
+            )
+        target = self.root / "installed"
+        target.mkdir(mode=0o700)
+        selection = {
+            "sourceRevision": "a" * 40,
+            "members": {
+                name: {"destination": name, "sha256": sha(data)} for name, data, _ in self.members
+            },
+        }
+        generation = materialize(target, verified, selection)
+        self.assertEqual((generation / "schema.json").read_bytes(), self.members[1][1])
 
     @patch("scripts.contracts_inspect.verify_publisher")
     def test_refuses_unapproved_and_modified_inputs(self, verify) -> None:
