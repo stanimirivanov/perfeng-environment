@@ -13,6 +13,7 @@ help:
 	@echo "  make contracts-materializer-check  Verify atomic local projection activation"
 	@echo "  make contracts-shadow  Compare the signed tracer with the local contract offline"
 	@echo "  make contracts-restore-check  Test cold restoration from retained signed assets"
+	@echo "  make contracts-update-check  Verify the signed benchmark schema update path"
 	@echo "  make contracts-tool-release-check  Verify materializer release boundaries"
 	@echo "  make openbao-qualification  Qualify pinned OpenBao with synthetic identities"
 	@echo "  make argus-campaign-check  Verify offline shadow campaign aggregation"
@@ -139,4 +140,11 @@ contracts-restore-check:
 	$(UV_RUN) python -m unittest discover -s tests -p test_contract_restore.py -v
 ifneq ($(strip $(CONTRACTS_RETAINED_ASSETS)),)
 	$(UV_RUN) python -m scripts.contracts_restore --retained "$(CONTRACTS_RETAINED_ASSETS)" --verifier "$(CONTRACTS_VERIFIER)"
+endif
+
+.PHONY: contracts-update-check
+contracts-update-check:
+	$(UV_RUN) python -m unittest discover -s tests -p test_contract_update.py -v
+ifneq ($(strip $(CONTRACTS_UPDATE_ASSETS)),)
+	$(UV_RUN) python -m scripts.contracts_update --assets "$(CONTRACTS_UPDATE_ASSETS)" --verifier "$(CONTRACTS_VERIFIER)"
 endif
