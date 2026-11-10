@@ -173,6 +173,82 @@ class ContractInspectTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "reference"):
                     self.inspect()
 
+    @patch("scripts.contracts_inspect.verify_publisher")
+    def test_resolves_absolute_reference_and_preserves_target_document_scope(self, _verify) -> None:
+        self.members[1:] = [
+            (
+                "schemas/source.json",
+                b'{"$id":"https://perfeng.dev/schemas/source.json","$ref":'
+                b'"https://perfeng.dev/schemas/nested/target.json#/$defs/entry"}',
+                tarfile.REGTYPE,
+            ),
+            (
+                "schemas/nested/target.json",
+                b'{"$id":"https://perfeng.dev/schemas/nested/target.json","$defs":'
+                b'{"entry":{"$ref":"local.json#/$defs/value"}}}',
+                tarfile.REGTYPE,
+            ),
+            ("schemas/nested/local.json", b'{"$defs":{"value":{}}}', tarfile.REGTYPE),
+        ]
+        self.prepare()
+        self.assertEqual(self.inspect(), {name: sha(data) for name, data, _ in self.members})
+
+    @patch("scripts.contracts_inspect.verify_publisher")
+    def test_rejects_noncanonical_or_undeclared_absolute_targets(self, _verify) -> None:
+        self.members[2] = (
+            "other.json",
+            b'{"$id":"https://perfeng.dev/other.json","$defs":{"example":{}}}',
+            tarfile.REGTYPE,
+        )
+        for reference in (
+            "https://perfeng.dev/missing.json",
+            "https://perfeng.dev/other.json#/$defs/missing",
+            "https://perfeng.dev/other.json#named-anchor",
+            "https://perfeng.dev/other.json?",
+            "https://perfeng.dev:443/other.json",
+            "https://perfeng.dev@invalid.test/other.json",
+            "HTTPS://perfeng.dev/other.json",
+            "https://perfeng.dev/%6Fther.json",
+            "https://perfeng.dev/dir/../other.json",
+            "//perfeng.dev/other.json",
+        ):
+            with self.subTest(reference=reference):
+                self.members[1] = (
+                    "schema.json",
+                    json.dumps({"$ref": reference}).encode(),
+                    tarfile.REGTYPE,
+                )
+                self.prepare()
+                with self.assertRaisesRegex(ValueError, "reference"):
+                    self.inspect()
+
+    @patch("scripts.contracts_inspect.verify_publisher")
+    def test_rejects_identifier_aliases_and_nested_scope(self, _verify) -> None:
+        self.members[1] = ("schema.json", b'{ "$ref": "other.json" }', tarfile.REGTYPE)
+        for document in (
+            {"$id": "https://perfeng.dev/schema.json"},
+            {"$id": "https://perfeng.dev/other.json#"},
+            {"$id": "other.json"},
+            {"$id": 1},
+            {"$defs": {"inner": {"$id": "nested.json", "$ref": "#"}}},
+        ):
+            with self.subTest(document=document):
+                self.members[2] = ("other.json", json.dumps(document).encode(), tarfile.REGTYPE)
+                self.prepare()
+                with self.assertRaisesRegex(ValueError, "identifier"):
+                    self.inspect()
+
+    @patch("scripts.contracts_inspect.verify_publisher")
+    def test_absolute_reference_requires_a_declared_identifier(self, _verify) -> None:
+        self.members[1] = (
+            "schema.json",
+            b'{"$ref":"https://perfeng.dev/other.json"}',
+            tarfile.REGTYPE,
+        )
+        self.prepare()
+        with self.assertRaisesRegex(ValueError, "Undeclared JSON reference target"):
+            self.inspect()
+
     def test_policy_cannot_admit_other_repositories(self) -> None:
         self.prepare()
         value = json.loads(self.policy.read_bytes())

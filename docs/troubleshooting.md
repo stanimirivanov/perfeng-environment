@@ -2092,7 +2092,9 @@ or publisher identity failure calls for checking the reviewed bundle and policy.
 Check the reviewed publisher policy, the promoted manifest and its attestation
 bundle against the same release. Restore the exact archive named by that
 manifest. Candidates, altered archives, invalid references and limits
-violations are hard failures. See
+violations are hard failures. If a pinned tool rejects a canonical absolute
+`perfeng.dev` reference in a historical archive, check whether that tool was
+qualified for the profile before selecting a separately signed tool release. See
 [offline contract inspection](contract-distribution-tools.md#inspect-a-local-distribution).
 
 For local contract materialization, a busy store means another writer holds

@@ -73,9 +73,15 @@ schema is a byte-identical copy of `distribution/manifest.schema.json` from
 `perfeng-contracts` revision `aae9004ec1e204d52df6afc7c7d36839c0eaa2f7`.
 Inspection bounds compressed and expanded sizes before parsing the tar
 stream. The reference profile admits local JSON Pointers and relative
-references to other declared JSON members. A root identifier, when present,
-must match its canonical `https://perfeng.dev/` member URI. Nested identifiers,
-named fragments and network retrieval are unsupported.
+references to declared JSON members. An absolute reference must match the
+canonical `https://perfeng.dev/` root identifier declared by a member of that
+same archive. A root identifier, when present, must match its member URI.
+Nested identifiers, named fragments and network retrieval are unsupported.
+
+Before consumers repin a tool with a changed resolver, qualify it against all
+nine signed profiles in `contract-history-42672401359`. Publish the qualified
+tool through the protected tool release workflow and verify its signed release
+independently of the historical contract publication.
 
 Success prints a verified member inventory and leaves the inputs untouched.
 The output is informational and cannot authorize reopening changed paths
