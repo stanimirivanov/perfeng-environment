@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts/distribution-manifest.schema.json"
 SCHEMA_SHA256 = "4501e3a7840f1ba3c4130cf8fac515973f9cac0d5319529d2d83348054fa8d8d"
 REPOSITORY = "stanimirivanov/perfeng-contracts"
+MEMBER_URI = "https://perfeng.dev/"
 METADATA_LIMIT = 4 * 1024 * 1024
 ARCHIVE_LIMIT = 72 * 1024 * 1024
 TAR_LIMIT = 80 * 1024 * 1024
@@ -147,20 +148,25 @@ def archive_members(compressed: bytes, expected: dict[str, str]) -> dict[str, by
 def resolve_reference(path: str, ref: object, documents: dict[str, Any]) -> None:
     if not isinstance(ref, str) or any(char.isspace() or ord(char) < 32 for char in ref):
         raise ValueError("Invalid JSON reference")
+    location = ref.partition("#")[0]
     uri = urlsplit(ref)
-    if (
-        uri.scheme
-        or uri.netloc
-        or uri.query
-        or uri.path.startswith("/")
-        or any(char in uri.path for char in ("%", "\\"))
-    ):
+    if "?" in location or any(char in uri.path for char in ("%", "\\")):
         raise ValueError("External or noncanonical JSON reference")
-    target = (
-        posixpath.normpath(posixpath.join(posixpath.dirname(path), uri.path)) if uri.path else path
-    )
-    if target not in documents:
-        raise ValueError("Undeclared JSON reference target")
+    if uri.scheme or uri.netloc or uri.path.startswith("/"):
+        target = uri.path.removeprefix("/")
+        if location != MEMBER_URI + target or target != posixpath.normpath(target):
+            raise ValueError("External or noncanonical JSON reference")
+        document = documents.get(target)
+        if not isinstance(document, dict) or document.get("$id") != location:
+            raise ValueError("Undeclared JSON reference target")
+    else:
+        target = (
+            posixpath.normpath(posixpath.join(posixpath.dirname(path), uri.path))
+            if uri.path
+            else path
+        )
+        if target not in documents:
+            raise ValueError("Undeclared JSON reference target")
     node = documents[target]
     pointer = unquote(uri.fragment, errors="strict")
     if pointer and not pointer.startswith("/"):
@@ -182,8 +188,10 @@ def resolve_reference(path: str, ref: object, documents: dict[str, Any]) -> None
 
 
 def check_references(documents: dict[str, Any]) -> None:
-    """Check the v1 inspection profile without resolving network identifiers."""
+    """Check references against the authenticated archive without fetching URIs."""
     for path, root in documents.items():
+        if isinstance(root, dict) and "$id" in root and root["$id"] != MEMBER_URI + path:
+            raise ValueError("Root resource identifier does not match the member URI")
         pending = [root]
         while pending:
             node = pending.pop()
