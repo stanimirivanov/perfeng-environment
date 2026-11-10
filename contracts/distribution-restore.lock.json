@@ -35,5 +35,12 @@
         "destination": "schemas/raw-result/v2/raw-result.schema.json"
       }
     }
+  },
+  "updateToolRelease": "contract-materializer-v1-bf00cff3dc7b83fc8474324159fbfe69ba6c842d",
+  "updateTool": {
+    "sourceDigest": "bf00cff3dc7b83fc8474324159fbfe69ba6c842d",
+    "signerDigest": "bf00cff3dc7b83fc8474324159fbfe69ba6c842d",
+    "archiveSha256": "20cedf8ab549f3ccdfbbf87d7f5c980fb85e2c468b5680c58e27fe28a78c87d2",
+    "platform": "linux-x86_64"
   }
 }

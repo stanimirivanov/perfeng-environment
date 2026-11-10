@@ -38,15 +38,15 @@ def verify_projection(store: Path, members: dict[str, dict[str, str]]) -> str:
     return generation
 
 
-def restore_selection(
+def materialize_selection(
     tool: Path,
     scratch: Path,
     manifest: Path,
     archive: Path,
     policy: dict[str, str],
     selection: dict,
-) -> dict[str, str]:
-    """Recreate one selected projection in a fresh store using the released tool."""
+) -> tuple[Path, dict[str, str]]:
+    """Recreate and verify one selected projection using the released tool."""
     store = scratch / "store"
     store.mkdir(parents=True, mode=0o700)
     policy_path, selection_path = scratch / "policy.json", scratch / "selection.json"
@@ -79,15 +79,28 @@ def restore_selection(
     )
     generation = verify_projection(store, selection["members"])
     projection = store / generation
-    verify_parity((projection / SCHEMA).read_bytes(), (projection / EXAMPLE).read_bytes())
     descriptor = json_data(checked_bytes(manifest, policy["manifestSha256"], limit=METADATA_LIMIT))
-    return {
+    return projection, {
         "sourceRevision": selection["sourceRevision"],
         "release": descriptor["releaseId"],
         "manifestSha256": policy["manifestSha256"],
         "archiveSha256": descriptor["archiveSha256"],
         "projectionSha256": generation,
     }
+
+
+def restore_selection(
+    tool: Path,
+    scratch: Path,
+    manifest: Path,
+    archive: Path,
+    policy: dict[str, str],
+    selection: dict,
+) -> dict[str, str]:
+    """Prove the restored projection still behaves like the runtime snapshot."""
+    projection, receipt = materialize_selection(tool, scratch, manifest, archive, policy, selection)
+    verify_parity((projection / SCHEMA).read_bytes(), (projection / EXAMPLE).read_bytes())
+    return receipt
 
 
 def restore_retained(retained: Path, verifier: Path) -> dict:

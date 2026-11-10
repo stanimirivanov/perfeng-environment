@@ -2103,3 +2103,9 @@ generation may contain unrelated content, an unsafe path, or files that
 differ from the reviewed selection. Inspect it without modifying the active
 pointer. Use a dedicated empty directory for a fresh projection. See the
 [activation guide](contract-distribution-tools.md#activate-a-local-projection).
+
+For `contracts-update` failures, compare the history and tool tags with the
+reviewed distribution lock. Missing inputs, a failed signature, or a mismatched
+selection stop the update before the benchmark schema is written. Restage the
+exact assets and rerun the [update preview](development/contract-distribution.md)
+before applying it.

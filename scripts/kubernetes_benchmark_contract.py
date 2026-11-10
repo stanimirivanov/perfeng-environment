@@ -50,8 +50,8 @@ def document(content: bytes) -> dict[str, Any]:
     return value
 
 
-def schema(root: Path = ROOT) -> dict[str, Any]:
-    """Check the local snapshot and lock identity before using any schema keywords."""
+def validate_lock(root: Path) -> None:
+    """Require the reviewed local contract identity independently of the snapshot."""
     lock = document((root / "contracts/kubernetes-benchmark-lock.json").read_bytes())
     expected = {
         "schemaVersion": 1,
@@ -63,6 +63,11 @@ def schema(root: Path = ROOT) -> dict[str, Any]:
     }
     if lock != expected or type(lock.get("schemaVersion")) is not int:
         raise ValueError("Kubernetes benchmark contract lock differs from the reviewed selection")
+
+
+def schema(root: Path = ROOT) -> dict[str, Any]:
+    """Check the local snapshot and lock identity before using any schema keywords."""
+    validate_lock(root)
     content = (root / "contracts/kubernetes-benchmark-evidence.schema.json").read_bytes()
     if hashlib.sha256(content).hexdigest() != DIGEST:
         raise ValueError("Kubernetes benchmark schema checksum differs from the contract lock")
