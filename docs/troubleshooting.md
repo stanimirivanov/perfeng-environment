@@ -2109,3 +2109,13 @@ reviewed distribution lock. Missing inputs, a failed signature, or a mismatched
 selection stop the update before the benchmark schema is written. Restage the
 exact assets and rerun the [update preview](development/contract-distribution.md)
 before applying it.
+
+## Contract distribution campaign fails
+
+Inspect unavailableChecks in the SR-27 receipt and the affected consumer's
+current or rollback result. Prepare missing pinned dependencies, images and
+retained assets before repeating the outage run with fresh staging targets.
+A digest or revision mismatch needs reviewed inputs. Do not substitute a newer
+release, bypass the namespace, or count a partial campaign as passing. The
+[campaign guide](contract-distribution-tools.md#cross-repository-outage-campaign)
+describes the manifest and explicit execution command.
