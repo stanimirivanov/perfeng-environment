@@ -80,6 +80,16 @@ GATES = {
         ),
     ),
 }
+# Analysis preview already materializes and validates a private signed projection.
+EXPECTED_STATUS = {
+    "environment": ("unchanged", "passed"),
+    "analysis": ("preview", "passed"),
+    "k6": ("prepared", "passed"),
+    "k8s": ("passed", "passed"),
+    "playwright": ("prepared", "passed"),
+    "control-plane": ("prepared", "prepared"),
+    "console": ("prepared", "prepared"),
+}
 OFFLINE = """
 import hashlib, json, os, socket, subprocess, sys
 from pathlib import Path
@@ -182,7 +192,9 @@ def admit(revisions: dict, observations: dict, parent_namespace: str) -> list[di
             if (
                 row.get("revision") != revisions[name]
                 or not valid_evidence(evidence, parent_namespace)
-                or receipt.get("status") not in {"passed", "prepared", "preview", "unchanged"}
+                or receipt.get("status")
+                != EXPECTED_STATUS[name][("current", "rollback").index(stage)]
+                or (name == "k8s" and receipt.get("prepared") is not True)
                 or not isinstance(selected, dict)
                 or selected.get("consumerCommit", revisions[name]) != revisions[name]
                 or receipt.get("consumerRevision", revisions[name]) != revisions[name]

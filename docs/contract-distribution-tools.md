@@ -250,6 +250,10 @@ loopback interface exists and no external route is present, and retains each
 exact JSON receipt with its SHA-256. It checks the tracked checkout revision
 before and after each gate. Untracked editor files do not establish evidence.
 
+The Analysis current gate reports preview after materializing and validating a
+private signed projection. The campaign requires each fixed gate's documented
+success status and requires both k8s stages to confirm preparation.
+
 The campaign reports all current and rollback outcomes and lists unavailable
 checks. Missing, stale, failed or unisolated receipts make the campaign fail.
 Input artifacts must match the reviewed request hashes. The campaign covers
