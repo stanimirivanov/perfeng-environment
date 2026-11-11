@@ -226,3 +226,34 @@ snapshot in place. It does not establish rollback coverage for other
 consumers, current security admission, or an offline build with unprepared
 language dependencies. Missing or corrupt inputs fail closed. Use an approved
 retained copy or a reviewed locator change for recovery.
+
+## Cross-repository outage campaign
+
+SR-27 invokes the existing current and rollback gates at seven reviewed consumer
+commits. Prepare a request following the request definition in
+[the campaign schema](../contracts/distribution-campaign.schema.json). Every
+consumer needs its checkout path and commit, preprovisioned binary paths,
+independently reviewed file hashes, and the current/rollback Make variables
+listed by GATES in [the runner](../scripts/contracts_campaign.py).
+
+Prepare packages and local images from their reviewed commits before the
+campaign. Retain the prior wheel, Playwright package and clean snapshot exports
+with their hashes and the signed release inputs. Each current and rollback
+staging target must be a fresh directory outside the consumer checkouts.
+
+    make contracts-campaign-check CONTRACTS_CAMPAIGN_MANIFEST=/absolute/path/to/reviewed-request.json
+    make contracts-campaign-check CONTRACTS_CAMPAIGN_MANIFEST=/absolute/path/to/reviewed-request.json CONTRACTS_CAMPAIGN_ARGS=--execute > /absolute/path/to/campaign.out
+
+The first command previews the consumer inventory. The explicit execution path
+runs each gate inside a fresh user/network namespace, verifies that only the
+loopback interface exists and no external route is present, and retains each
+exact JSON receipt with its SHA-256. It checks the tracked checkout revision
+before and after each gate. Untracked editor files do not establish evidence.
+
+The campaign reports all current and rollback outcomes and lists unavailable
+checks. Missing, stale, failed or unisolated receipts make the campaign fail.
+Input artifacts must match the reviewed request hashes. The campaign covers
+distribution recovery at the same schema revisions and requires preprovisioned
+dependencies and local images. Component gates still own validator, package
+and image semantics. The campaign does not replace browser, database or live
+cluster acceptance. A failed or incomplete campaign blocks provider retirement.

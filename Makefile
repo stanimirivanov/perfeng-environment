@@ -148,3 +148,10 @@ contracts-update-check:
 ifneq ($(strip $(CONTRACTS_UPDATE_ASSETS)),)
 	$(UV_RUN) python -m scripts.contracts_update --assets "$(CONTRACTS_UPDATE_ASSETS)" --verifier "$(CONTRACTS_VERIFIER)"
 endif
+
+.PHONY: contracts-campaign-check
+contracts-campaign-check:
+	$(UV_RUN) python -m unittest discover -s tests -p test_contract_campaign.py -v
+ifneq ($(strip $(CONTRACTS_CAMPAIGN_MANIFEST)),)
+	@$(UV_RUN) python -m scripts.contracts_campaign --manifest "$(CONTRACTS_CAMPAIGN_MANIFEST)" $(CONTRACTS_CAMPAIGN_ARGS)
+endif

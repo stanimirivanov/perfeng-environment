@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "campaignRevision",
+    "coverage",
+    "unavailableChecks",
+    "inputManifestSha256",
+    "scope",
+    "preconditions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "campaignRevision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "environment",
+        "analysis",
+        "k6",
+        "k8s",
+        "playwright",
+        "control-plane",
+        "console"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "$ref": "#/$defs/observation"
+        },
+        "analysis": {
+          "$ref": "#/$defs/observation"
+        },
+        "k6": {
+          "$ref": "#/$defs/observation"
+        },
+        "k8s": {
+          "$ref": "#/$defs/observation"
+        },
+        "playwright": {
+          "$ref": "#/$defs/observation"
+        },
+        "control-plane": {
+          "$ref": "#/$defs/observation"
+        },
+        "console": {
+          "$ref": "#/$defs/observation"
+        }
+      }
+    },
+    "unavailableChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "consumer",
+          "stage",
+          "reason"
+        ],
+        "properties": {
+          "consumer": {
+            "enum": [
+              "environment",
+              "analysis",
+              "k6",
+              "k8s",
+              "playwright",
+              "control-plane",
+              "console"
+            ]
+          },
+          "stage": {
+            "enum": [
+              "current",
+              "rollback"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "inputManifestSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "preconditions": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "consumers"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "consumers": {
+          "type": "object",
+          "required": [
+            "environment",
+            "analysis",
+            "k6",
+            "k8s",
+            "playwright",
+            "control-plane",
+            "console"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "environment": {
+              "$ref": "#/$defs/entry"
+            },
+            "analysis": {
+              "$ref": "#/$defs/entry"
+            },
+            "k6": {
+              "$ref": "#/$defs/entry"
+            },
+            "k8s": {
+              "$ref": "#/$defs/entry"
+            },
+            "playwright": {
+              "$ref": "#/$defs/entry"
+            },
+            "control-plane": {
+              "$ref": "#/$defs/entry"
+            },
+            "console": {
+              "$ref": "#/$defs/entry"
+            }
+          }
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "revision",
+        "binPath",
+        "inputs",
+        "current",
+        "rollback"
+      ],
+      "properties": {
+        "root": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "binPath": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^/"
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^/"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "current": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "rollback": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "error"
+          ],
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "namespace",
+            "receipt",
+            "rawReceipt",
+            "receiptSha256"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "pattern": "^net:\\[\\d+\\]$"
+            },
+            "receipt": {
+              "type": "object"
+            },
+            "rawReceipt": {
+              "type": "string"
+            },
+            "receiptSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "current",
+        "rollback"
+      ],
+      "properties": {
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "current": {
+          "$ref": "#/$defs/evidence"
+        },
+        "rollback": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "passed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "unavailableChecks": {
+            "maxItems": 0
+          },
+          "coverage": {
+            "properties": {
+              "environment": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              },
+              "analysis": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              },
+              "k6": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              },
+              "k8s": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              },
+              "playwright": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              },
+              "control-plane": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              },
+              "console": {
+                "properties": {
+                  "current": {
+                    "required": [
+                      "receipt"
+                    ]
+                  },
+                  "rollback": {
+                    "required": [
+                      "receipt"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
