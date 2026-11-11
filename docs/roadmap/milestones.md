@@ -246,7 +246,16 @@ first working decision loops.
 
 ## M06 — Production Readiness
 
-This remains deferred until a real non-local deployment is required. Its scope
+Option 0 remains the supported contract-distribution architecture, using signed
+immutable artifacts, independent tool/contract pins and offline consumer inputs.
+[ADR 0073](../decisions/0073-defer-schema-registry-admission.md) records Option C
+as no-go/deferred following SR-29's `NOT_ADMITTED` result. The
+[SR plan amendment](contract-distribution-plan.md) defers SR-31 recovery
+qualification and lets SR-32 record failed admission. Neither issue closure nor
+this negative decision satisfies a future positive-admission gate. No registry
+deployment or consumer migration is authorized.
+
+M06 remains deferred until a real non-local deployment is required. Its scope
 includes:
 
 - SSO, authorization and service identity;

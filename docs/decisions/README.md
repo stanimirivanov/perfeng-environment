@@ -169,3 +169,4 @@ How will the assumptions and consequences be verified?
 | [0071](0071-refuse-preparation-qualification-job-create.md) | Proposed | Prove qualification Job-create denial after completed migration, reversible CI suspension, guarded restoration and seven-Job retention before fresh runs/recovery. |
 
 | [0072](0072-support-linux-hosts.md) | Proposed | Support Linux development and native browser hosts; retire active Windows support. |
+| [0073](0073-defer-schema-registry-admission.md) | Accepted | Retain Option 0 immutable distributions, record Option C no-go and defer SR-31 recovery qualification. |
