@@ -2119,3 +2119,15 @@ A digest or revision mismatch needs reviewed inputs. Do not substitute a newer
 release, bypass the namespace, or count a partial campaign as passing. The
 [campaign guide](contract-distribution-tools.md#cross-repository-outage-campaign)
 describes the manifest and explicit execution command.
+
+## Disposable Keycloak qualification fails
+
+The [Keycloak qualification guide](keycloak-qualification.md) defines the opt-in
+boundary. Check Docker availability, the exact pre-pulled digest, Linux amd64,
+UID 1000 and `/dev/shm` access. A readiness timeout or nonzero exit is not admission;
+never enable HTTP serving or broaden token checks to obtain a passing receipt.
+The fixture uses first-start augmentation; `--optimized` is inappropriate for the
+official unbuilt image. Logs are disabled to protect credentials. Cleanup removes
+only its labelled container; never prune Docker resources or remove another
+operator's container as a repair. Human/exchange gates remain pending even after
+a successful machine receipt.

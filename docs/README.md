@@ -87,6 +87,8 @@ For explicit four-core 4K cohort selection and evidence binding, read the
 - [Roadmap](roadmap/milestones.md) owns checked-in cross-repository sequencing.
 - The focused local guides document prerequisites, healthy signals, recovery, and explicit execution boundaries.
 
+For authorized disposable real-provider machine checks, see [Keycloak qualification](keycloak-qualification.md).
+
 ## Keeping this map useful
 
 This map routes readers; it does not restate policy. A change MUST update it when a canonical source is added, renamed, moved, or removed. `make docs-check` verifies repository-local links and policy structure, while semantic ownership still requires review.
