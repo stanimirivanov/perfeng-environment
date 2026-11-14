@@ -170,3 +170,4 @@ How will the assumptions and consequences be verified?
 
 | [0072](0072-support-linux-hosts.md) | Proposed | Support Linux development and native browser hosts; retire active Windows support. |
 | [0073](0073-defer-schema-registry-admission.md) | Accepted | Retain Option 0 immutable distributions, record Option C no-go and defer SR-31 recovery qualification. |
+| [0074](0074-qualify-disposable-keycloak.md) | Proposed | Qualify a disposable real Keycloak machine profile without enabling provider serving. |

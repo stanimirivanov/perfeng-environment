@@ -1,0 +1,6 @@
+{
+  "version": "26.8.2",
+  "platform": "linux/amd64",
+  "image": "quay.io/keycloak/keycloak@sha256:4da21f9a53bcbac1026a0d654b740a81e98e5de4c45457076acc74b4d94b1551",
+  "release": "https://www.keycloak.org/2026/11/keycloak-2682-released"
+}

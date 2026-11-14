@@ -15,6 +15,7 @@ help:
 	@echo "  make contracts-restore-check  Test cold restoration from retained signed assets"
 	@echo "  make contracts-update-check  Verify the signed benchmark schema update path"
 	@echo "  make contracts-tool-release-check  Verify materializer release boundaries"
+	@echo "  make keycloak-qualification  Run the opt-in disposable Keycloak machine fixture"
 	@echo "  make openbao-qualification  Qualify pinned OpenBao with synthetic identities"
 	@echo "  make argus-campaign-check  Verify offline shadow campaign aggregation"
 	@echo "  make argus-perfeng-fixture-check  Validate disposable joint inputs and safety offline"
@@ -155,3 +156,8 @@ contracts-campaign-check:
 ifneq ($(strip $(CONTRACTS_CAMPAIGN_MANIFEST)),)
 	@$(UV_RUN) python -m scripts.contracts_campaign --manifest "$(CONTRACTS_CAMPAIGN_MANIFEST)" $(CONTRACTS_CAMPAIGN_ARGS)
 endif
+
+.PHONY: keycloak-qualification
+keycloak-qualification:
+	$(UV_RUN) python -m unittest discover -s tests -p test_keycloak_qualification.py -v
+	$(UV_RUN) python -m scripts.keycloak_qualification --execute
