@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import NameOID
 
 from scripts import keycloak_human as human
+from scripts import keycloak_rotation as rotation
 
 LOCK = Path(__file__).resolve().parents[1] / "tests/qualification/keycloak/fixture.lock.json"
 CI_CLIENT = "perfeng-ci"
@@ -198,7 +199,11 @@ def receipt(checks: list[str]) -> dict[str, Any]:
                 else ["human-login-and-delegate-exchange"]
             ),
             "control-plane-real-token-conformance",
-            "real-key-rotation",
+            *(
+                ["control-plane-real-key-rotation"]
+                if set(rotation.CHECKS).issubset(checks)
+                else ["real-key-rotation"]
+            ),
             "BFF-browser-session-and-shared-pilot",
         ],
     }
@@ -286,6 +291,7 @@ def execute() -> dict[str, Any]:
             client: rsa.generate_private_key(public_exponent=65537, key_size=2048)
             for client in (human.LOGIN, human.DELEGATE)
         }
+        rotation_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         password = secrets.token_urlsafe(32)
         config = realm(certificate(key))
         human.configure(
@@ -293,6 +299,7 @@ def execute() -> dict[str, Any]:
             {client: certificate(signing_key) for client, signing_key in human_keys.items()},
             password,
         )
+        rotation.configure(config, certificate(rotation_key))
         files["import/perfeng-fixture-realm.json"] = json.dumps(config).encode()
         for path, content in files.items():
             target = root / path
@@ -447,6 +454,9 @@ def execute() -> dict[str, Any]:
                 verify,
                 require_denial,
             )
+            rotation_checks = rotation.qualify(
+                issuer, context, rotation_key, key, result["access_token"], jwks, sign, verify
+            )
             return receipt(
                 [
                     "loopback-TLS",
@@ -454,6 +464,7 @@ def execute() -> dict[str, Any]:
                     "password-grant-denied",
                     "wrong-key-denied",
                     *human_checks,
+                    *rotation_checks,
                 ]
             )
         finally:

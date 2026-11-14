@@ -2135,3 +2135,11 @@ audience or token type is a refusal, not a reason to relax expectations. Code
 replay runs last so credential revocation cannot contaminate the positive flow.
 A successful fixture still leaves control-plane, rotation and BFF/browser gates
 pending; the receipt remains NOT_ADMITTED.
+
+The signing-key fixture administrator needs the pinned release's dedicated
+`kc-admin-api` scope and realm Admin API audience; `realm-management` roles alone
+are insufficient. Preserve the server audience check. A 401/403 is not permission
+to grant the BFF or CI administration. Key/component mismatches, missing overlap
+or surviving retired keys fail qualification; never delete an unverified provider
+or switch to a shared realm to repair the run. New-key administration is minted
+before retirement because the old administrative bearer uses the retiring key.

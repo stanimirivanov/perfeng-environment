@@ -5,7 +5,7 @@
 - Preview offline; run the fixture only with explicit `--execute` authorization.
 - The image lock selects official Keycloak 26.8.2 by Linux amd64 manifest digest.
 - Test-only TLS and client keys, realm and database are fresh for each invocation.
-- Passing machine and human/exchange checks still emits `NOT_ADMITTED`: provider/rotation/BFF gates remain.
+- Provider rotation/retirement now runs too; Go cache and BFF gates still block admission.
 
 ## Commands and ownership
 
@@ -63,10 +63,34 @@ same-origin login form action, and captures the fixed callback without contactin
 it. This is an HTTP protocol test, not a browser or Console session implementation.
 No credential or user is retained; no permanent issuer identity is selected.
 
+## Disposable signing-key lifecycle
+
+After machine and human protocol checks, a separate fresh private-key client
+administers this temporary realm only. Its service account has `view-realm` and
+`manage-realm`, the pinned release's `kc-admin-api` scope and exact realm Admin
+API audience. These are coarse realm-management privileges, not key-only RBAC.
+No CI/login/delegate client receives them and no master administrator is created.
+
+The gate checks the initial verified token against the active RS256 metadata,
+validates its provider type and parent realm, creates a priority-200 RSA provider,
+and explicitly makes the old provider passive. Fresh JWKS must contain both
+keys; new issuance must use a different active key. It then obtains administration
+under the new key before deleting only the observed old provider. Fresh JWKS
+must omit the old key and reject its still-valid token, while old-snapshot
+verification proves that refusal was not token expiry. Tokens minted before and
+after retirement under the new key must verify. CI must be denied Admin API access.
+
+This is provider lifecycle evidence using real keys, real tokens and real JWKS.
+It is not Go-cache retirement, refresh-rate/freshness or outage qualification.
+The complete provider checklist changes the pending `real-key-rotation` gate to
+`control-plane-real-key-rotation`; partial observations do not. The control-plane
+must advance its pinned fixture and rerun its own qualification before claiming
+those cache semantics. See [ADR 0075](decisions/0075-qualify-disposable-keycloak-rotation.md).
+
 Only non-secret check names, the image and proof limits reach the JSON receipt.
 No credentials, tokens, private keys or generated receipt are committed. This
 fixture does not activate public serving or complete control-plane #356. Real
-control-plane conformance, rotation and BFF browser/shared
+control-plane conformance/cache rotation and BFF browser/shared
 pilot gates remain explicit. See [ADR 0074](decisions/0074-qualify-disposable-keycloak.md).
 
 The client attributes and subject mapper follow the pinned upstream sources:
