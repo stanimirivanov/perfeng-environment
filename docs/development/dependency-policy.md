@@ -87,7 +87,7 @@ normal installation path. See [ADR 0010](../decisions/0010-manage-native-connect
 
 The opt-in Keycloak fixture selects Apache-2.0 Keycloak 26.8.2 by official Linux
 amd64 manifest digest in `tests/qualification/keycloak/fixture.lock.json`.
-Existing cryptography verifies its observed machine token profile; no new Python
+Existing cryptography verifies its observed machine and human/exchange token profiles; no new Python
 package is admitted. See [qualification and limits](../keycloak-qualification.md).
 The version/digest is reproducibility evidence, not a whole-image vulnerability
 clearance or production operational qualification.
