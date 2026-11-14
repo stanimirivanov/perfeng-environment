@@ -2129,5 +2129,9 @@ never enable HTTP serving or broaden token checks to obtain a passing receipt.
 The fixture uses first-start augmentation; `--optimized` is inappropriate for the
 official unbuilt image. Logs are disabled to protect credentials. Cleanup removes
 only its labelled container; never prune Docker resources or remove another
-operator's container as a repair. Human/exchange gates remain pending even after
-a successful machine receipt.
+operator's container as a repair. Human/exchange qualification uses the real login form and two separate signed
+client assertions. A changed form target, callback state/issuer, nonce, subject,
+audience or token type is a refusal, not a reason to relax expectations. Code
+replay runs last so credential revocation cannot contaminate the positive flow.
+A successful fixture still leaves control-plane, rotation and BFF/browser gates
+pending; the receipt remains NOT_ADMITTED.

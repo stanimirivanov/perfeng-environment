@@ -1,4 +1,4 @@
-"""Opt-in, disposable Keycloak machine-identity qualification; never enable serving."""
+"""Opt-in, disposable Keycloak identity qualification; never enable serving."""
 
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import NameOID
+
+from scripts import keycloak_human as human
 
 LOCK = Path(__file__).resolve().parents[1] / "tests/qualification/keycloak/fixture.lock.json"
 CI_CLIENT = "perfeng-ci"
@@ -112,8 +114,18 @@ def realm(certificate: str) -> dict[str, Any]:
     }
 
 
-def verify(token: str, jwks: dict[str, Any], issuer: str) -> None:
-    """Verify signature and the narrow observed CI profile, not full CP admission."""
+def verify(
+    token: str,
+    jwks: dict[str, Any],
+    issuer: str,
+    *,
+    subject: str = CI_SUBJECT,
+    client: str = CI_CLIENT,
+    audience: str = AUDIENCE,
+    kind: str = "Bearer",
+    nonce: str | None = None,
+) -> dict[str, Any]:
+    """Verify a declared exact fixture profile; never infer expectations from output."""
     stage = "envelope"
     try:
         if len(token) > 16384:
@@ -144,14 +156,16 @@ def verify(token: str, jwks: dict[str, Any], issuer: str) -> None:
             decode(signature), f"{head}.{body}".encode(), padding.PKCS1v15(), hashes.SHA256()
         )
         stage = "identity-and-audience"
-        audience = claims["aud"] if isinstance(claims["aud"], list) else [claims["aud"]]
-        if (claims["iss"], claims["sub"], claims["azp"], claims["typ"], audience) != (
-            issuer,
-            CI_SUBJECT,
-            CI_CLIENT,
-            "Bearer",
-            [AUDIENCE],
-        ):
+        observed_audience = claims["aud"] if isinstance(claims["aud"], list) else [claims["aud"]]
+        for field, expected in {"iss": issuer, "sub": subject, "azp": client, "typ": kind}.items():
+            stage = field
+            if claims.get(field) != expected:
+                raise ValueError
+        stage = "audience"
+        if observed_audience != [audience]:
+            raise ValueError
+        stage = "nonce"
+        if nonce is not None and claims.get("nonce") != nonce:
             raise ValueError
         stage = "time-bounds"
         issued, expires = claims["iat"], claims["exp"]
@@ -166,8 +180,9 @@ def verify(token: str, jwks: dict[str, Any], issuer: str) -> None:
             raise ValueError
         if type(not_before) is not int or not_before > time.time() + 30 or not_before >= expires:
             raise ValueError
+        return claims
     except (ValueError, KeyError, TypeError, InvalidSignature) as error:
-        raise ValueError("CI token profile refused at " + stage) from error
+        raise ValueError("Fixture token profile refused at " + stage + " for " + client) from error
 
 
 def receipt(checks: list[str]) -> dict[str, Any]:
@@ -177,7 +192,11 @@ def receipt(checks: list[str]) -> dict[str, Any]:
         "admission": "NOT_ADMITTED",
         "passedChecks": checks,
         "remainingGates": [
-            "human-login-and-delegate-exchange",
+            *(
+                []
+                if set(human.HUMAN_CHECKS).issubset(checks)
+                else ["human-login-and-delegate-exchange"]
+            ),
             "control-plane-real-token-conformance",
             "real-key-rotation",
             "BFF-browser-session-and-shared-pilot",
@@ -249,22 +268,32 @@ def execute() -> dict[str, Any]:
         }
         import_dir = root / "import"
         import_dir.mkdir(mode=0o700)
-        files["import/perfeng-fixture-realm.json"] = json.dumps(
-            realm(
-                base64.b64encode(
-                    (
-                        x509.CertificateBuilder()
-                        .subject_name(name)
-                        .issuer_name(name)
-                        .public_key(key.public_key())
-                        .serial_number(x509.random_serial_number())
-                        .not_valid_before(now - dt.timedelta(minutes=1))
-                        .not_valid_after(now + dt.timedelta(hours=1))
-                        .sign(key, hashes.SHA256())
-                    ).public_bytes(serialization.Encoding.DER)
-                ).decode("ascii")
+
+        def certificate(signing_key: rsa.RSAPrivateKey) -> str:
+            cert = (
+                x509.CertificateBuilder()
+                .subject_name(name)
+                .issuer_name(name)
+                .public_key(signing_key.public_key())
+                .serial_number(x509.random_serial_number())
+                .not_valid_before(now - dt.timedelta(minutes=1))
+                .not_valid_after(now + dt.timedelta(hours=1))
+                .sign(signing_key, hashes.SHA256())
             )
-        ).encode()
+            return base64.b64encode(cert.public_bytes(serialization.Encoding.DER)).decode("ascii")
+
+        human_keys = {
+            client: rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            for client in (human.LOGIN, human.DELEGATE)
+        }
+        password = secrets.token_urlsafe(32)
+        config = realm(certificate(key))
+        human.configure(
+            config,
+            {client: certificate(signing_key) for client, signing_key in human_keys.items()},
+            password,
+        )
+        files["import/perfeng-fixture-realm.json"] = json.dumps(config).encode()
         for path, content in files.items():
             target = root / path
             target.touch(mode=0o600)
@@ -408,12 +437,23 @@ def execute() -> dict[str, Any]:
                     response,
                     "unauthorized_client" if grant_type == "password" else "invalid_client",
                 )
+            human_checks = human.qualify(
+                issuer,
+                context,
+                {**human_keys, CI_CLIENT: key},
+                password,
+                jwks,
+                sign,
+                verify,
+                require_denial,
+            )
             return receipt(
                 [
                     "loopback-TLS",
                     "private-key-jwt-machine-profile",
                     "password-grant-denied",
                     "wrong-key-denied",
+                    *human_checks,
                 ]
             )
         finally:

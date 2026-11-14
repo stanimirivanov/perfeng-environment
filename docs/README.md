@@ -87,7 +87,7 @@ For explicit four-core 4K cohort selection and evidence binding, read the
 - [Roadmap](roadmap/milestones.md) owns checked-in cross-repository sequencing.
 - The focused local guides document prerequisites, healthy signals, recovery, and explicit execution boundaries.
 
-For authorized disposable real-provider machine checks, see [Keycloak qualification](keycloak-qualification.md).
+For authorized disposable real-provider identity checks, see [Keycloak qualification](keycloak-qualification.md).
 
 ## Keeping this map useful
 

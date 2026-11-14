@@ -1,11 +1,11 @@
-# Disposable Keycloak machine identity qualification
+# Disposable Keycloak identity qualification
 
 ## TL;DR
 
 - Preview offline; run the fixture only with explicit `--execute` authorization.
 - The image lock selects official Keycloak 26.8.2 by Linux amd64 manifest digest.
 - Test-only TLS and client keys, realm and database are fresh for each invocation.
-- Passing machine checks still emits `NOT_ADMITTED`: human exchange and provider/BFF gates remain.
+- Passing machine and human/exchange checks still emits `NOT_ADMITTED`: provider/rotation/BFF gates remain.
 
 ## Commands and ownership
 
@@ -44,11 +44,34 @@ The real provider must accept a CI private-key JWT assertion, issue a signed
 access token with the exact enrolled test subject, CI caller, API audience and
 five-minute maximum lifetime, and deny a wrong signing key and password grant.
 The Python cryptographic observation check is not the control-plane verifier.
-The login/delegate client shapes have no usable credentials in this slice;
-no real human login or exchange is claimed.
+The protocol fixture also submits the actual Keycloak human login form, then
+redeems an authorization code using PKCE S256 and a private-key-authenticated
+login client. It validates callback state/issuer and the signed ID-token nonce,
+subject and audience before using the initial access token. That token targets
+only the delegate, never the API. A separate private-key-authenticated delegate
+uses supported standard exchange for the same subject and the API audience only.
+No exchanged refresh token is allowed. Password grants and machine credentials
+for human clients, wrong PKCE, code replay, ID-token substitution, and exchange
+by the login/CI client must fail. Code replay runs last because providers may
+revoke credentials derived from a replayed code.
+
+The user/password, login key and delegate key are fresh and distinct from CI and
+TLS keys. Browser-protocol cookies/assertions/tokens stay in memory. The user
+password is only in the private imported realm file and HTTPS form POST. The
+fixture disables proxies and automatic redirects, bounds responses, validates the
+same-origin login form action, and captures the fixed callback without contacting
+it. This is an HTTP protocol test, not a browser or Console session implementation.
+No credential or user is retained; no permanent issuer identity is selected.
 
 Only non-secret check names, the image and proof limits reach the JSON receipt.
 No credentials, tokens, private keys or generated receipt are committed. This
 fixture does not activate public serving or complete control-plane #356. Real
-human/delegate tokens, control-plane conformance, rotation and BFF browser/shared
+control-plane conformance, rotation and BFF browser/shared
 pilot gates remain explicit. See [ADR 0074](decisions/0074-qualify-disposable-keycloak.md).
+
+The client attributes and subject mapper follow the pinned upstream sources:
+[exchange controls](https://github.com/keycloak/keycloak/blob/26.8.2/server-spi-private/src/main/java/org/keycloak/protocol/oidc/OIDCConfigAttributes.java)
+and [immutable subject mapping](https://github.com/keycloak/keycloak/blob/26.8.2/services/src/main/java/org/keycloak/protocol/oidc/mappers/SubMapper.java).
+Expectations are declared before execution; observed output never sets subject,
+audience, caller or token-type expectations. A machine-only receipt retains the
+human gate until every declared human check has passed.
