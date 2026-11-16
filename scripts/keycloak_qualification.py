@@ -16,6 +16,8 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -235,7 +237,17 @@ def require_local_docker() -> None:
         raise ValueError("Remote Docker context refused")
 
 
-def execute() -> dict[str, Any]:
+@dataclass(frozen=True, slots=True, repr=False)
+class CodePairFixture:
+    """Fresh public TLS trust and private in-memory candidates, not an admission receipt."""
+
+    tls_ca_pem: str
+    pair: human.UnverifiedCodePair
+
+
+def execute(
+    *, observe_code_pair: Callable[[CodePairFixture], None] | None = None
+) -> dict[str, Any]:
     """Own only one uniquely labelled container and a private temporary directory."""
     lock = json.loads(LOCK.read_bytes())
     require_local_docker()
@@ -256,6 +268,7 @@ def execute() -> dict[str, Any]:
             .serial_number(x509.random_serial_number())
             .not_valid_before(now - dt.timedelta(minutes=1))
             .not_valid_after(now + dt.timedelta(hours=1))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
             .add_extension(
                 x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),
                 critical=False,
@@ -444,6 +457,11 @@ def execute() -> dict[str, Any]:
                     response,
                     "unauthorized_client" if grant_type == "password" else "invalid_client",
                 )
+
+            def observe(pair: human.UnverifiedCodePair) -> None:
+                if observe_code_pair is not None:
+                    observe_code_pair(CodePairFixture(pem.decode(), pair))
+
             human_checks = human.qualify(
                 issuer,
                 context,
@@ -453,6 +471,7 @@ def execute() -> dict[str, Any]:
                 sign,
                 verify,
                 require_denial,
+                observe_code_pair=observe if observe_code_pair is not None else None,
             )
             rotation_checks = rotation.qualify(
                 issuer, context, rotation_key, key, result["access_token"], jwks, sign, verify
