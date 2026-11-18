@@ -91,3 +91,13 @@ Existing cryptography verifies its observed machine and human/exchange token pro
 package is admitted. See [qualification and limits](../keycloak-qualification.md).
 The version/digest is reproducibility evidence, not a whole-image vulnerability
 clearance or production operational qualification.
+
+
+The optional BFF transaction integration consumes the separately admitted Console
+runtime through `tests/qualification/keycloak/console.lock.json`: exact Git commit,
+lock SHA-256 and Node/pnpm/Effect versions. It adds no Python/npm dependency here,
+installs nothing at execution and does not activate a production identity route.
+The existing frozen Console dependency graph is a prerequisite; direct runtime
+versions are checked, without claiming full installed-content attestation. The
+standalone Node protocol CI gate uses only built-ins and the same Node version.
+See the [qualification boundary](../keycloak-qualification.md#bff-owned-transaction-consumer).

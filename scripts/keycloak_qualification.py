@@ -257,8 +257,13 @@ def execute(
     *,
     observe_code_pair: Callable[[CodePairFixture], None] | None = None,
     observe_key_phase: Callable[[RotationFixture], None] | None = None,
+    console_source: Path | None = None,
 ) -> dict[str, Any]:
     """Own only one uniquely labelled container and a private temporary directory."""
+    if console_source is not None:
+        from scripts import keycloak_bff
+
+        keycloak_bff.preflight(console_source)
     lock = json.loads(LOCK.read_bytes())
     require_local_docker()
     docker("image", "inspect", lock["image"])
@@ -321,6 +326,7 @@ def execute(
             config,
             {client: certificate(signing_key) for client, signing_key in human_keys.items()},
             password,
+            **({"bff": True} if console_source is not None else {}),
         )
         rotation.configure(config, certificate(rotation_key))
         files["import/perfeng-fixture-realm.json"] = json.dumps(config).encode()
@@ -484,6 +490,25 @@ def execute(
                 observe_code_pair=observe if observe_code_pair is not None else None,
             )
 
+            bff_result = None
+            if console_source is not None:
+                from scripts import keycloak_bff
+
+                bff_result = keycloak_bff.qualify(
+                    console_source,
+                    issuer,
+                    context,
+                    pem.decode(),
+                    human_keys[human.LOGIN]
+                    .private_bytes(
+                        serialization.Encoding.PEM,
+                        serialization.PrivateFormat.PKCS8,
+                        serialization.NoEncryption(),
+                    )
+                    .decode(),
+                    password,
+                )
+
             def observe_phase(phase: rotation.KeyPhase) -> None:
                 if observe_key_phase is not None:
                     observe_key_phase(RotationFixture(pem.decode(), phase))
@@ -499,7 +524,7 @@ def execute(
                 verify,
                 observe_key_phase=observe_phase if observe_key_phase is not None else None,
             )
-            return receipt(
+            result = receipt(
                 [
                     "loopback-TLS",
                     "private-key-jwt-machine-profile",
@@ -509,6 +534,9 @@ def execute(
                     *rotation_checks,
                 ]
             )
+            if bff_result is not None:
+                result["bffTransaction"] = bff_result
+            return result
         finally:
             if not container:
                 container = docker(
@@ -537,20 +565,26 @@ def execute(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument(
+        "--console-source",
+        type=Path,
+        help="Opt in to the pinned BFF-owned transaction; preview remains offline",
+    )
     args = parser.parse_args(argv)
-    if not args.execute:
-        print(
-            json.dumps(
-                {
-                    "mode": "offline-preview",
-                    "image": json.loads(LOCK.read_bytes())["image"],
-                    "admission": "NOT_ADMITTED",
-                }
-            )
-        )
-        return 0
     try:
-        print(json.dumps(execute(), sort_keys=True))
+        if not args.execute:
+            result = {
+                "mode": "offline-preview",
+                "image": json.loads(LOCK.read_bytes())["image"],
+                "admission": "NOT_ADMITTED",
+            }
+            if args.console_source is not None:
+                from scripts import keycloak_bff
+
+                result["bffTransaction"] = keycloak_bff.preview(args.console_source)
+            print(json.dumps(result))
+            return 0
+        print(json.dumps(execute(console_source=args.console_source), sort_keys=True))
         return 0
     except (ValueError, OSError, subprocess.SubprocessError):
         print("Keycloak qualification failed; no admission", file=sys.stderr)
