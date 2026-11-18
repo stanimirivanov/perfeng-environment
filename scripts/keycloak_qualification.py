@@ -245,8 +245,18 @@ class CodePairFixture:
     pair: human.UnverifiedCodePair
 
 
+@dataclass(frozen=True, slots=True, repr=False)
+class RotationFixture:
+    """Fresh public TLS trust and verified public IDs; no token or administration data."""
+
+    tls_ca_pem: str
+    phase: rotation.KeyPhase
+
+
 def execute(
-    *, observe_code_pair: Callable[[CodePairFixture], None] | None = None
+    *,
+    observe_code_pair: Callable[[CodePairFixture], None] | None = None,
+    observe_key_phase: Callable[[RotationFixture], None] | None = None,
 ) -> dict[str, Any]:
     """Own only one uniquely labelled container and a private temporary directory."""
     lock = json.loads(LOCK.read_bytes())
@@ -473,8 +483,21 @@ def execute(
                 require_denial,
                 observe_code_pair=observe if observe_code_pair is not None else None,
             )
+
+            def observe_phase(phase: rotation.KeyPhase) -> None:
+                if observe_key_phase is not None:
+                    observe_key_phase(RotationFixture(pem.decode(), phase))
+
             rotation_checks = rotation.qualify(
-                issuer, context, rotation_key, key, result["access_token"], jwks, sign, verify
+                issuer,
+                context,
+                rotation_key,
+                key,
+                result["access_token"],
+                jwks,
+                sign,
+                verify,
+                observe_key_phase=observe_phase if observe_key_phase is not None else None,
             )
             return receipt(
                 [

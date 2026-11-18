@@ -186,6 +186,77 @@ class KeycloakQualificationTests(unittest.TestCase):
         self.assertEqual(calls[-1], ("rm", "--force", "owned-container"))
         self.assertFalse(any("CANARY" in str(args) for args in calls))
 
+    def test_key_phase_observer_failure_preserves_trust_context_and_cleanup(self):
+        from dataclasses import FrozenInstanceError, asdict
+        from unittest.mock import Mock, patch
+
+        from scripts import keycloak_rotation as rotation
+
+        calls = []
+        observed = []
+
+        def docker(*args):
+            calls.append(args)
+            if args[0] == "context":
+                return "unix:///var/run/docker.sock"
+            if args[0] == "create":
+                return "owned-container"
+            if args[0] == "inspect":
+                return "true" if "Running" in args[2] else "fixture-nonce"
+            return ""
+
+        def response(status, body):
+            result = Mock()
+            result.status = status
+            result.read.return_value = json.dumps(body).encode()
+            return result
+
+        def qualify(issuer, *_args, observe_key_phase):
+            observe_key_phase(rotation.KeyPhase("initial", issuer, "old", None))
+            self.fail("failed observer was ignored")
+
+        def observer(context):
+            observed.append(context)
+            self.assertEqual(set(asdict(context)), {"tls_ca_pem", "phase"})
+            self.assertTrue(context.tls_ca_pem.startswith("-----BEGIN CERTIFICATE-----"))
+            certificate = x509.load_pem_x509_certificate(context.tls_ca_pem.encode())
+            constraints = certificate.extensions.get_extension_for_class(x509.BasicConstraints)
+            self.assertTrue(constraints.critical)
+            self.assertTrue(constraints.value.ca)
+            self.assertEqual(constraints.value.path_length, 0)
+            names = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            self.assertEqual(
+                [str(value) for value in names.value.get_values_for_type(x509.IPAddress)],
+                ["127.0.0.1"],
+            )
+            with self.assertRaises(FrozenInstanceError):
+                context.tls_ca_pem = "changed"
+            self.assertNotIn("ACCESS-CANARY", repr(context))
+            raise ValueError("observer stopped qualification")
+
+        connection = Mock()
+        connection.getresponse.side_effect = [
+            response(200, {}),
+            response(200, {"token_type": "Bearer", "access_token": "CI-CANARY"}),
+            response(200, {"keys": []}),
+            response(401, {"error": "unauthorized_client"}),
+            response(401, {"error": "invalid_client"}),
+        ]
+        with (
+            patch.object(fixture, "docker", side_effect=docker),
+            patch.object(fixture.os, "getuid", return_value=1000),
+            patch.object(fixture.secrets, "token_hex", return_value="fixture-nonce"),
+            patch.object(fixture.http.client, "HTTPSConnection", return_value=connection),
+            patch.object(fixture, "verify", return_value={}),
+            patch.object(fixture.human, "qualify", return_value=fixture.human.HUMAN_CHECKS),
+            patch.object(fixture.rotation, "qualify", side_effect=qualify),
+        ):
+            with self.assertRaisesRegex(ValueError, "observer stopped qualification"):
+                fixture.execute(observe_key_phase=observer)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(calls[-1], ("rm", "--force", "owned-container"))
+        self.assertFalse(any("CANARY" in str(args) for args in calls))
+
     def test_ambiguous_create_timeout_recovers_exact_owned_container(self):
         from unittest.mock import patch
 
