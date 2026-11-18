@@ -136,3 +136,36 @@ not run Keycloak, invoke the Console verifier, or claim a new real-provider rece
 The next Console slice must pin the merged fixture, supply a bounded consumer and
 obtain that actual-provider evidence before production/runtime admission. Revert the
 optional API/tests/docs together if needed; no retained credential migration exists.
+
+## Verified public key-phase observer — M05-PR52q
+
+The Python execution API additionally accepts optional `observe_key_phase`.
+`rotation.qualify` invokes a synchronous observer with a frozen, repr-redacted
+`KeyPhase` containing only phase, issuer, old_key_id and new_key_id. `execute`
+wraps it in a separate frozen `RotationFixture` with the same fresh public
+`tls_ca_pem`. No token, password, assertion, administrative bearer, private key,
+provider component data or raw JWKS crosses this boundary.
+
+The declared sequence is independent of any Console output:
+
+| Phase | Independently established boundary | IDs |
+|---|---|---|
+| initial | Old token/provider binding, owned RSA component and CI administration denial verified; before creating the new provider | old ID; new ID is None |
+| overlap | Old is passive, both IDs are published, both tokens verify and new issuance uses the distinct active ID; before retirement | old and new IDs |
+| retired | Fresh JWKS rejects the still-valid old token, accepts the new token and surviving issuance retains the new ID | old and new IDs |
+
+Invalid observations never emit the failed phase. A consumer exception is scrubbed
+into a fixed ValueError, stops later lifecycle operations and retains the existing
+owned-container/temporary-directory cleanup. Process control exceptions keep their
+normal semantics. Consumers must bound their work; return values are ignored and
+add no admission/checks. Default command behavior and receipt remain unchanged.
+
+This interface has offline protocol/cleanup evidence only; it is **not a Console
+shared-cache rotation receipt**. The next Console slice must pin the merged fixture
+and use one persistent consumer through all phases. Its expectations must preserve
+the approved freshness policy: a retired provider key may remain usable in an already
+fresh cached snapshot until its five-minute limit, then be refused after an expired
+snapshot is refreshed. Provider retirement does not guarantee immediate cache revocation.
+No clock policy, identity activation, credential deployment or live provider execution
+is part of this interface-only change. Roll back the optional observers/wrappers,
+tests and this guide together; keep the existing provider checks and NOT_ADMITTED gate.

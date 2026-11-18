@@ -9,7 +9,8 @@ import secrets
 import ssl
 import time
 from collections.abc import Callable
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 from urllib.parse import urlencode, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -25,6 +26,16 @@ CHECKS = [
     "provider-surviving-key-issuance",
     "fixture-admin-isolation",
 ]
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class KeyPhase:
+    """Verified public provider phase, never token or cache-admission authority."""
+
+    phase: Literal["initial", "overlap", "retired"]
+    issuer: str
+    old_key_id: str
+    new_key_id: str | None
 
 
 def configure(config: dict[str, Any], certificate: str) -> None:
@@ -108,6 +119,8 @@ def qualify(
     original_jwks: dict[str, Any],
     sign: Callable[..., str],
     verify: Callable[..., dict[str, Any]],
+    *,
+    observe_key_phase: Callable[[KeyPhase], None] | None = None,
 ) -> list[str]:
     origin = urlsplit(issuer)
     if (
@@ -122,6 +135,15 @@ def qualify(
         raise ValueError("Foreign rotation fixture refused")
     token_path = ISSUER_PATH + "/protocol/openid-connect/token"
     jwks_path = ISSUER_PATH + "/protocol/openid-connect/certs"
+
+    def observe(phase: Literal["initial", "overlap", "retired"], new_key_id: str | None) -> None:
+        if observe_key_phase is not None:
+            try:
+                observe_key_phase(KeyPhase(phase, issuer, old, new_key_id))
+            except Exception:
+                # Consumer errors may contain private state; retain only a safe
+                # classification while execute's finally removes owned resources.
+                raise ValueError("Key phase observer failed") from None
 
     def request(
         method: str, path: str, *, bearer: str = "", data: Any = None, form: bool = False
@@ -241,6 +263,7 @@ def qualify(
     denied, _ = request("GET", ADMIN + "/keys", bearer=old_token)
     if denied not in (401, 403):
         raise ValueError("CI received administrative authority")
+    observe("initial", None)
     status, _ = request(
         "POST",
         ADMIN + "/components",
@@ -275,6 +298,7 @@ def qualify(
     verify(old_token, overlap, issuer)
     if kid(rotated) != new:
         raise ValueError("New issuance did not use new active key")
+    observe("overlap", new)
     # Obtain administration under the new key before retiring the old one.
     admin = credential(CLIENT, admin_key)
     verify(
@@ -303,4 +327,5 @@ def qualify(
     verify(surviving, retired, issuer)
     if kid(surviving) != new:
         raise ValueError("Surviving issuance changed active key")
+    observe("retired", new)
     return list(CHECKS)
