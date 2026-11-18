@@ -99,3 +99,40 @@ and [immutable subject mapping](https://github.com/keycloak/keycloak/blob/26.8.2
 Expectations are declared before execution; observed output never sets subject,
 audience, caller or token-type expectations. A machine-only receipt retains the
 human gate until every declared human check has passed.
+
+## Ephemeral human code-pair observer — M05-PR52o
+
+The Python execution API accepts an optional keyword-only `observe_code_pair`
+callback. `human.qualify` calls it after the existing signed ID/initial-access
+checks and bounded candidate-envelope checks, before delegated exchange or code
+replay. Its frozen `UnverifiedCodePair` contains only issuer, nonce, the integer
+wall-clock millisecond instant immediately before the accepted token POST,
+id_token, access_token, expires_in (1..300), and stage=`unverified-code`.
+The timestamp includes the POST/response interval, not authorization initiation.
+It is captured after client assertion signing. The name deliberately grants no
+Console verification, consumed-transaction or session authority.
+
+`execute(observe_code_pair=...)` additionally supplies a frozen `CodePairFixture`
+with that pair and the fresh public TLS trust anchor as `tls_ca_pem`. The test-only
+self-signed certificate retains its 127.0.0.1 SAN and now declares critical
+BasicConstraints CA=true/path_length=0, matching the Console's already-qualified
+explicit-CA requirement. No Console TLS check is weakened. No password, refresh
+token, assertion, signing key or cookie is part of the handoff.
+
+Both representations disable default repr output. This prevents accidental default
+formatting, not deliberate serialization or retention. A trusted consumer must keep
+candidates in memory, bound its work, and never log, put them in argv, write them to
+files or include them in receipts. Consumers must raise on failed qualification;
+return values are ignored and add no checks or admission to the fixture receipt.
+Ordinary callback exceptions become a fixed ValueError without their diagnostic
+text, abort subsequent protocol steps and retain the existing owned-container and
+temporary-directory cleanup. Process control exceptions keep their normal semantics.
+
+The command-line options, preview path and default receipt/check list are unchanged.
+A no-op observer still leaves admission NOT_ADMITTED. Offline protocol tests cover
+ordering, timing, immutability/redaction, bounds, refused/failed responses, callback
+failure, fresh CA constraints and cleanup. This interface-only prerequisite does
+not run Keycloak, invoke the Console verifier, or claim a new real-provider receipt.
+The next Console slice must pin the merged fixture, supply a bounded consumer and
+obtain that actual-provider evidence before production/runtime admission. Revert the
+optional API/tests/docs together if needed; no retained credential migration exists.

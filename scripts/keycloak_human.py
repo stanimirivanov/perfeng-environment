@@ -10,8 +10,9 @@ import secrets
 import ssl
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, Literal
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import (
@@ -31,6 +32,19 @@ HUMAN = "e3295d37-a188-4753-b89c-1ca188d85102"
 REDIRECT = "https://127.0.0.1/callback"
 EXCHANGE = "urn:ietf:params:oauth:grant-type:token-exchange"
 ACCESS = "urn:ietf:params:oauth:token-type:access_token"
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class UnverifiedCodePair:
+    """Memory-only candidates for an independent consumer; never session authority."""
+
+    issuer: str
+    nonce: str
+    request_started_at_ms: int
+    id_token: str
+    access_token: str
+    expires_in: int
+    stage: Literal["unverified-code"] = field(default="unverified-code", init=False)
 
 
 HUMAN_CHECKS = [
@@ -158,6 +172,8 @@ def qualify(
     sign: Callable[..., str],
     verify: Callable[..., dict[str, Any]],
     deny: Callable[..., None],
+    *,
+    observe_code_pair: Callable[[UnverifiedCodePair], None] | None = None,
 ) -> list[str]:
     """Use the real login protocol; keep tokens/cookies/assertions in memory only."""
     opener = build_opener(
@@ -183,7 +199,7 @@ def qualify(
                 raise ValueError("Oversized human fixture response")
             return response.code, response.headers, data.decode()
 
-    def token(client: str, form: dict[str, str]) -> tuple[int, dict[str, Any]]:
+    def token_response(client: str, form: dict[str, str]) -> tuple[int, dict[str, Any], int]:
         now = int(time.time())
         assertion = sign(
             keys[client],
@@ -197,6 +213,7 @@ def qualify(
             },
             kid=None,
         )
+        request_started_at_ms = time.time_ns() // 1_000_000
         status, _, data = request(
             endpoint,
             {
@@ -206,7 +223,11 @@ def qualify(
                 "client_assertion": assertion,
             },
         )
-        return status, json.loads(data)
+        return status, json.loads(data), request_started_at_ms
+
+    def token(client: str, form: dict[str, str]) -> tuple[int, dict[str, Any]]:
+        status, result, _started = token_response(client, form)
+        return status, result
 
     def code() -> tuple[str, str, str]:
         verifier, state, nonce = (
@@ -264,7 +285,7 @@ def qualify(
         "redirect_uri": REDIRECT,
         "code_verifier": verifier,
     }
-    status, result = token(LOGIN, code_form)
+    status, result, request_started_at_ms = token_response(LOGIN, code_form)
     if status != 200:
         raise ValueError("Human code grant refused")
     verify(
@@ -278,6 +299,30 @@ def qualify(
         nonce=nonce,
     )
     verify(result["access_token"], jwks, issuer, subject=HUMAN, client=LOGIN, audience=DELEGATE)
+    if observe_code_pair is not None:
+        if (
+            any(
+                not isinstance(result.get(name), str) or not 1 <= len(result[name]) <= 16384
+                for name in ("id_token", "access_token")
+            )
+            or type(result.get("expires_in")) is not int
+            or not 1 <= result["expires_in"] <= 300
+        ):
+            raise ValueError("Human code-pair candidate envelope refused")
+        pair = UnverifiedCodePair(
+            issuer,
+            nonce,
+            request_started_at_ms,
+            result["id_token"],
+            result["access_token"],
+            result["expires_in"],
+        )
+        try:
+            observe_code_pair(pair)
+        except Exception:
+            # External consumer diagnostics may contain credentials. Fail closed
+            # with a fixed boundary; execute's finally still owns all cleanup.
+            raise ValueError("Human code-pair observer failed") from None
     exchange = {
         "grant_type": EXCHANGE,
         "subject_token": result["access_token"],
