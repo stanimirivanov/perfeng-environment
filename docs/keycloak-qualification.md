@@ -5,7 +5,8 @@
 - Preview offline; run the fixture only with explicit `--execute` authorization.
 - The image lock selects official Keycloak 26.8.2 by Linux amd64 manifest digest.
 - Test-only TLS and client keys, realm and database are fresh for each invocation.
-- Provider rotation/retirement now runs too; Go cache and BFF gates still block admission.
+- Provider rotation/retirement runs too; an optional pinned Console consumer qualifies
+  BFF-owned transactions. Browser/session/shared-pilot gates still block admission.
 
 ## Commands and ownership
 
@@ -169,3 +170,62 @@ snapshot is refreshed. Provider retirement does not guarantee immediate cache re
 No clock policy, identity activation, credential deployment or live provider execution
 is part of this interface-only change. Roll back the optional observers/wrappers,
 tests and this guide together; keep the existing provider checks and NOT_ADMITTED gate.
+
+
+## BFF-owned transaction consumer
+
+Issue #399 adds an opt-in integration driver; Console application code is unchanged.
+The reviewed [Console lock](../tests/qualification/keycloak/console.lock.json) selects
+merged PR #124 by commit and lockfile SHA-256, with exact Node/pnpm/Effect versions.
+Prepare that exact clean checkout and its frozen dependency installation using the
+Console's documented bootstrap. This command never installs packages or moves a
+checkout. Unrelated untracked files outside consumed source directories are permitted.
+Commit qualification source changes before executing so the receipt identifies
+reviewable Environment code. Preview validates local Git objects only:
+
+```sh
+uv run --locked --offline python -m scripts.keycloak_qualification --console-source ../perfeng-console
+node --test --test-isolation=none tests/qualification/keycloak/bff-consumer.test.mjs
+uv run --locked --offline python -m scripts.keycloak_qualification --console-source ../perfeng-console --execute
+```
+
+Only the last command provisions a provider and needs explicit authorization.
+The original command, default receipt and Python observers remain compatible.
+The optional realm change allowlists one additional exact redirect on the login
+client; it grants neither new privileges nor a wildcard redirect.
+
+The driver exports regular Git objects from the pinned Console revision into a
+private temporary directory and resolves its public `#perfeng/bff-verified-exchange`
+factory there. A domain-separated, length-framed SHA-256 digest binds exported
+path/content bytes; the receipt names that format and both repository commits.
+Installed dependencies come from the existing frozen Console installation. Direct
+runtime versions and the reviewed lock digest are checked; this is not whole-tree
+installed-package integrity attestation.
+
+The actual BFF generates state, nonce, PKCE and a binding cookie. Python follows
+only the validated authorization URL and fixture login form, then returns the raw
+callback target over private pipes. It neither exchanges that code nor supplies
+nonce, verifier or cookie. The BFF performs its own signed client assertion, token
+POST, explicit-CA key retrieval and verification. Expectations were fixed before
+execution: the enrolled human subject, signed nonce binding, exact Run return
+intent, short validity horizon and cookie deletion. A callback without the binding
+cookie must fail without consuming the legitimate transaction; the bound callback
+must pass, replay must fail, and a stopped owner must reject a new transaction.
+
+The child receives only fresh public CA, issuer and the generated login-client
+private key through stdin. The password stays in Python; administrative/delegation
+keys are never handed to Node. Pipes enforce two canonical JSON frames, clean EOF,
+input/output bounds and a 30-second exchange deadline. Login HTTP calls additionally
+have socket/read deadlines; cancellation kills/reaps the child, with bounded HTTP
+thread completion before provider cleanup. No inherited Node options, bearer, code,
+key, cookie or authorization URL appears in the receipt. Child diagnostics cause a
+fixed refusal rather than being echoed. Temporary exports and the owned provider
+are cleaned up on success or failure.
+
+A successful `bffTransaction` receipt means this real-provider transaction passed.
+It remains **NOT_ADMITTED**: no browser callback HTTP route, browser cookie behavior,
+operator session, delegated API grant, production issuer deployment or shared-pilot
+admission is proved. Conditional `at_hash` handling does not establish that this
+provider always emits it. ADRs Console 0004 and Control Plane 0046 remain authoritative.
+Rollback removes the optional driver, lock, tests/workflow and opt-in wiring together;
+default machine/human/rotation qualification and pending admission gates stay intact.

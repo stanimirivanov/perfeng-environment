@@ -2143,3 +2143,15 @@ to grant the BFF or CI administration. Key/component mismatches, missing overlap
 or surviving retired keys fail qualification; never delete an unverified provider
 or switch to a shared realm to repair the run. New-key administration is minted
 before retirement because the old administrative bearer uses the retiring key.
+
+
+For opt-in BFF transaction refusal, first run the offline `--console-source`
+preview and compare the selected checkout, lock SHA, Node version and existing
+frozen dependencies with the reviewed Console lock. Commit fixture sources before
+execution. A fixed child refusal deliberately contains no provider response or
+credential diagnostics: do not enable raw token, cookie, form or private-pipe
+logging. Reproduce with the protocol unit tests and inspect only the declared
+non-secret stages. Do not relax cookie binding, signed nonce/subject, replay,
+explicit-CA or wire bounds to obtain PASS. The fixture still cleans up its owned
+container; a PASS remains NOT_ADMITTED for browser/session/shared-pilot serving.
+See [BFF transaction qualification](keycloak-qualification.md#bff-owned-transaction-consumer).

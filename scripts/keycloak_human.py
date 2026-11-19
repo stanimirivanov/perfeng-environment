@@ -30,6 +30,7 @@ LOGIN = "perfeng-console-login"
 DELEGATE = "perfeng-console-delegate"
 HUMAN = "e3295d37-a188-4753-b89c-1ca188d85102"
 REDIRECT = "https://127.0.0.1/callback"
+BFF_REDIRECT = "https://127.0.0.1/console/auth/callback"
 EXCHANGE = "urn:ietf:params:oauth:grant-type:token-exchange"
 ACCESS = "urn:ietf:params:oauth:token-type:access_token"
 
@@ -57,7 +58,9 @@ HUMAN_CHECKS = [
 ]
 
 
-def configure(config: dict[str, Any], certificates: dict[str, str], password: str) -> None:
+def configure(
+    config: dict[str, Any], certificates: dict[str, str], password: str, *, bff: bool = False
+) -> None:
     """Provision a test person and disjoint, private-key-authenticated BFF clients."""
     clients = {client["clientId"]: client for client in config["clients"]}
     for name in (LOGIN, DELEGATE):
@@ -93,6 +96,8 @@ def configure(config: dict[str, Any], certificates: dict[str, str], password: st
                 "config": {"access.token.claim": "true"},
             }
         )
+    if bff:
+        clients[LOGIN]["redirectUris"].append(BFF_REDIRECT)
     config["users"].append(
         {
             "id": HUMAN,
@@ -135,9 +140,11 @@ def form_action(html: str, issuer: str) -> str:
     return action
 
 
-def callback_code(location: str, state: str, issuer: str) -> str:
+def callback_code(location: str, state: str, issuer: str, *, redirect: str = REDIRECT) -> str:
     target = urlsplit(location)
-    callback = urlsplit(REDIRECT)
+    if redirect not in (REDIRECT, BFF_REDIRECT):
+        raise ValueError("Unapproved fixture redirect")
+    callback = urlsplit(redirect)
     values = parse_qs(target.query, keep_blank_values=True)
     if (target.scheme, target.netloc, target.path) != (
         callback.scheme,

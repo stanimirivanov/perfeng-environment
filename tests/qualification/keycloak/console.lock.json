@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/stanimirivanov/perfeng-console.git",
+  "commit": "62d2c9b96ff25de46a07c6baba4c3b1d504839f4",
+  "lockSha256": "ad88b5c1bb110be3933502b68e6a779a331ce4e7925e3a2e29fe0c1e832f5745",
+  "node": "26.13.0",
+  "pnpm": "12.16.1",
+  "effect": "4.1.2",
+  "subject": "e3295d37-a188-4753-b89c-1ca188d85102",
+  "runId": "perf-20260902-120000-abcdef12"
+}
