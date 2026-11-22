@@ -1,7 +1,7 @@
 Closes #<issue-number>
 
 <!-- PR title: [#<issue-number>] <concise summary>. Replace placeholders and
-record actual verification below. Create with gh; do not print a chat draft. -->
+record actual verification below. -->
 
 ## Linked work
 

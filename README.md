@@ -224,7 +224,7 @@ Start with the repository working agreement and follow the linked sources of
 truth:
 
 - [Repository working agreement](AGENTS.md)
-- [Contributor workflow](CONTRIBUTING.md)
+- [Contribution requirements](CONTRIBUTING.md)
 - [Documentation map](docs/README.md)
 - [Coding harness](docs/development/harness.md)
 - [Engineering standards](docs/development/engineering-standards.md)
@@ -235,7 +235,7 @@ truth:
 - [Code of conduct](CODE_OF_CONDUCT.md)
 
 Contribution and documentation conventions include the required TL;DR for long
-documents and the issue-first GitHub CLI workflow used for PR-sized work.
+documents and the [agent skills configuration](AGENTS.md).
 Authorized implementation creates or reuses the issue, uses an issue-linked
 branch and `[#N]` commits/PR title, and submits verification evidence in the PR.
 The contributor then returns only the PR URL and waits for human review and merge.
