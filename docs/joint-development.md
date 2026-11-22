@@ -66,7 +66,7 @@ immutable evidence, not sibling filesystem paths. Selection, execution completio
 performance verdicts and remediation approval retain distinct meanings.
 
 Read each repository's `AGENTS.md`, `CONTRIBUTING.md` and documentation map before
-working there. Apply its issue-first workflow and preserve unrelated changes.
+working there. Use the owning repository's skill configuration and preserve unrelated changes.
 This workspace guide does not override product policies.
 
 ## Per-repository toolchains and checks

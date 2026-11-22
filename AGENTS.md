@@ -1,32 +1,23 @@
-# Repository working agreement
+# Repository agent guide
 
-## TL;DR
+## Agent skills
 
-- Read `CONTRIBUTING.md`; it is the canonical workflow policy.
-- Preserve existing work, local state, credentials and resource identities.
-- Keep validation offline and make live or external mutations explicit.
-- Run the exact repository checks and report their results honestly.
-- For authorized implementation, follow the issue-first GitHub CLI workflow,
-  then return the PR URL and wait for human review; never auto-merge.
+Use `mattpocock/skills` as the primary workflow for planning, ticketing,
+implementation, TDD, review, and pull requests. The skills take precedence where
+contributor guidance covers the same steps. Follow the repository's technical
+requirements, CI gates, and authorization boundaries.
 
-This file is the concise, tool-facing entry point for contributors and coding
-agents. [CONTRIBUTING.md](CONTRIBUTING.md) is the canonical workflow policy.
-Normative terms such as MUST, SHOULD and MAY have the meanings defined there.
+### Issue tracker
 
-## Before changing anything
+Use GitHub Issues in `stanimirivanov/perfeng-environment`. See [issue tracker configuration](docs/agents/issue-tracker.md).
 
-1. You MUST read [CONTRIBUTING.md](CONTRIBUTING.md), especially its ambiguity,
-   issue-timing, verification, external-side-effect and review-pause rules.
-2. You MUST inspect the branch and working tree and preserve pre-existing work.
-3. You MUST use the [documentation map](docs/README.md) to select the relevant
-   engineering standard, operational guide, accepted ADR and roadmap material.
-   You MUST NOT bulk-read unrelated guides merely because they exist.
-4. You MUST use the repository-local checks. You MUST NOT claim an unavailable
-   or unexecuted check passed.
+### Triage labels
 
-If code, documentation and an accepted decision disagree, you MUST NOT silently
-pick one. Correct an obvious local defect or propose a superseding ADR. Ordinary
-ambiguity follows CONTRIBUTING; it does not automatically require an ADR.
+Use the default Matt Pocock label mapping. See [triage labels](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single context with a root glossary and ADRs in `docs/decisions/`. See [domain docs](docs/agents/domain.md).
 
 ## Repository responsibility
 
@@ -44,23 +35,11 @@ published data contracts, runner behavior or statistical analysis.
 - Credentials, generated receipts and machine-specific state MUST remain
   outside Git.
 
-## Shape of work
-
-- Each task and pull request MUST deliver one coherent, independently
-  reviewable outcome.
-- Prefer a thin end-to-end capability over an unused layer or speculative
-  abstraction.
-- Unrelated refactoring, dependency updates, generated churn and formatting
-  MUST stay out of behavioral changes.
-- Preserve existing local data and resource identities by default.
-- Preview and validation paths MUST remain offline. Network or cluster access
-  requires an explicitly selected execution path; preview-first commands
-  require `--execute`.
-- Scope, exclusions, compatibility effects, risks, assumptions, rollout,
-  rollback and verification evidence MUST be explicit.
-
 ## Environment and implementation
 
+- Preserve existing local data and resource identities. Keep preview and
+  validation offline. Use an explicitly selected execution path for network or
+  cluster access, including `--execute` for preview-first commands.
 - Use the dedicated kubeconfig and context; never rely on the ambient default
   Kubernetes context.
 - Verify Docker, kind and cluster identity before cluster mutation.
@@ -79,8 +58,7 @@ Follow the engineering standards and applicable operational or migration ADR.
 
 ## Quality and documentation
 
-- Test observable behavior at the lowest boundary that proves it. Defect fixes
-  SHOULD begin with a failing regression test.
+- Test observable behavior at the lowest boundary that proves it.
 - Tests MUST be deterministic, isolated and independent of wall clock, network,
   locale and execution order unless those are the subject.
 - Cover relevant ownership conflicts, stale revisions, timeouts, retries,
@@ -90,16 +68,9 @@ Follow the engineering standards and applicable operational or migration ADR.
 - Long documents MUST include the TL;DR required by CONTRIBUTING.
 - Operational behavior and `docs/troubleshooting.md` MUST change together.
 
-## Completion
+## Verification
 
-Follow the canonical [development workflow](CONTRIBUTING.md#development-workflow)
-and [review pause](CONTRIBUTING.md#completion-and-review-pause): use `gh` to create
-or reuse the issue before implementation, work on `feature/issue-N` or
-`fix/issue-N`, stage only task files, prefix commits and PR titles with `[#N]`,
-and begin the PR body with `Closes #N`. Put scope and verification evidence in
-GitHub, not chat drafts or committed handoff files.
-
-After PR creation, output only its URL and stop: no merge or further Git commands.
-For requested fixes or delivered CI failures, use new issue-prefixed commits on
-the same branch, push, add the structured `Fix Applied` comment and wait again.
-The workflow does not authorize unrelated writes or live infrastructure changes.
+Run `make verify` and the applicable additional checks documented in
+[CONTRIBUTING.md](CONTRIBUTING.md#verification-and-constrained-environments).
+Use the [documentation map](docs/README.md) to find affected standards, operational
+guides and decisions. Report checks as passed, failed or unavailable.

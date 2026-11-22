@@ -851,22 +851,14 @@ retained M04 cutover continues through its existing operator guide.
 
 ## Contributor GitHub delivery failures
 
-The [automated contributor workflow](../CONTRIBUTING.md#development-workflow)
-requires an authenticated `gh` executable, but offline verification does not.
-If `gh` is absent from PATH, locate the installed executable and use its full
-path; do not reinstall or change machine configuration implicitly. Use
-`gh auth status` to inspect account/access without printing credentials. A
-missing login or denied permission needs owner action, not a token pasted into
-the issue, repository or command arguments.
+Check GitHub access using `gh auth status` without printing credentials.
+Offline verification runs independently of GitHub access. A missing login
+or denied permission requires an authorized account.
 
-If issue/PR creation times out, inspect existing task records with read-only
-`gh issue list`, `gh issue view`, `gh pr list` or `gh pr view` before retrying.
-Reuse an already-created record instead of duplicating it. Preserve a local
-commit after a failed push and retry only after resolving the reported failure;
-do not force-push, amend history, bypass protection or switch to a chat draft.
-After PR creation, return the URL and wait for human review without further Git
-commands. Delivered CI failures or owner-requested fixes use the same branch
-and a structured `Fix Applied` PR comment. Never auto-merge.
+If a write times out, inspect existing issues or PRs before retrying. Reuse
+any record already created. If a push fails, preserve the local commit and
+resolve the reported failure before retrying the same branch. Preserve
+published history and branch protection.
 
 ## What to include in a defect report
 

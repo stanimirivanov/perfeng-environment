@@ -6,8 +6,8 @@ labels: ""
 assignees: ""
 ---
 
-<!-- Create or reuse this issue with gh before implementation. Select an existing
-milestone using its exact GitHub title. See CONTRIBUTING.md#issue-timing. -->
+<!-- Select an existing milestone using its exact GitHub title. See the
+issue tracker configuration in docs/agents/issue-tracker.md. -->
 
 **Repository:** perfeng-environment
 **Milestone:** MNN — Outcome
