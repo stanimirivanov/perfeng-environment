@@ -271,7 +271,7 @@ Caddy/kubectl process. Stop your old independent sessions before `native:up`.
 Go 1.27.3 serving profile. Its recorded checksum/compiler provenance must stay
 truthful. Publish and select a patched release through the existing explicit
 handoff; do not relabel the asset, downgrade the gate or delete installed/CA
-state. See [ADR 0029](decisions/0029-require-patched-native-gateway-toolchain.md).
+state. See [ADR 0029](adr/0029-require-patched-native-gateway-toolchain.md).
 
 Linux host-probe failures retain existing state. Missing `glxinfo`, `xrandr`,
 `powerprofilesctl`, clock or power-source evidence is an unqualified host, not
@@ -590,7 +590,7 @@ The complete creation order and recovery boundaries are maintained in the
 control-plane Application may be `Degraded` during that bounded staged interval;
 final GitOps health must not be accepted in that state. Stateful GitOps ownership
 changes must also satisfy the unchanged-identity and rollback gates in
-[ADR 0002](decisions/0002-stateful-gitops-ownership.md).
+[ADR 0002](adr/0002-stateful-gitops-ownership.md).
 
 ## The control-plane workload is unhealthy
 
@@ -1093,7 +1093,7 @@ For `root changed during adoption` from older v2 planners, compare retained
 root samples before treating the refusal as semantic drift. Run 40227060836's
 initial and receipt-only legs differed only in generation/resourceVersion and
 reconciledAt from normal Argo CD refresh. Use the reviewed v3 package under
-[ADR 0036](decisions/0036-tolerate-root-reconciliation-bookkeeping.md) and a fresh
+[ADR 0036](adr/0036-tolerate-root-reconciliation-bookkeeping.md) and a fresh
 Workflow; never patch a published verifier or edit ledger records to recover.
 v3 validates both root samples and tolerates only those three paths. Any other
 change still requires inspection. A root that becomes unhealthy, out of sync,
@@ -1137,7 +1137,7 @@ The trusted-main `response-loss` leg is isolated from `initial` and `receipt-onl
 It uses a CI-only parent copy with a pre-create suspension and scoped receipt
 transport; its recovering submission uses the unchanged production parent.
 See [the scenario](release-workflows-integration.md#complete-parent-receipt-response-loss)
-and [ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md).
+and [ADR 0031](adr/0031-exercise-complete-adoption-response-loss.md).
 
 A failed Workflow alone is not the expected healthy fault signal. Require
 `adoption-response-loss.outcome.json`, a failed `create-receipt` worker after
@@ -1383,7 +1383,7 @@ rewrite ledger records or advance the recovered baseline to make acceptance pass
 Both Applications were already disabled, so these cases should replace no
 workload Pod. Existing owned disposable-cluster cleanup remains the only cleanup.
 See [maintenance pause](release-maintenance-pause.md) and
-[ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md). No local operation
+[ADR 0040](adr/0040-exercise-maintenance-partial-pause.md). No local operation
 or operational recovery is authorized by this fixture.
 
 ## Disposable Deployment interruption and recovery
@@ -1410,7 +1410,7 @@ unchanged. Later receipt faults may use only the fixed checked recovery snapshot
 never accept an arbitrary baseline path. Existing owned-cluster cleanup is the
 only automatic cleanup. Raw logs/API/Secret snapshots stay private; public
 artifacts contain verified outcomes and the validated independent checkpoint.
-See [ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md). This is
+See [ADR 0041](adr/0041-exercise-deployment-pause-interruption.md). This is
 CI acceptance and adds no local or production recovery command.
 
 ### Maintenance lingering-Pod acceptance fails
@@ -1430,7 +1430,7 @@ stops; owned disposable-cluster teardown is the failure cleanup boundary. After
 successful deletion, absence and zero replicas must precede a fresh unchanged
 checkpoint; only its verified success permits the existing checked recovery.
 This fixture does not authorize any local cluster action. See
-[ADR 0042](decisions/0042-exercise-lingering-pod-checkpoint-refusal.md).
+[ADR 0042](adr/0042-exercise-lingering-pod-checkpoint-refusal.md).
 
 ### Maintenance write-denial acceptance fails
 
@@ -1449,7 +1449,7 @@ restoration patch testing captured UID, fresh resourceVersion and narrowed rules
 A stale restoration or failed effective-grant check stops before the next case.
 There is no EXIT repair; owned disposable-cluster teardown is the failure cleanup
 boundary. This fault authorizes no local cluster or production permission change.
-See [ADR 0043](decisions/0043-exercise-maintenance-write-denial.md).
+See [ADR 0043](adr/0043-exercise-maintenance-write-denial.md).
 
 ### PATCH proxy rejects kubectl's preliminary Deployment GET
 
@@ -1462,7 +1462,7 @@ query keys. A route comparison against the query-free URL causes a local proxy
 403 before any PATCH. The regression requires that the bounded GET reaches the
 API and exactly one guarded PATCH commits before its response is dropped. Keep
 the existing RBAC, token, TLS and payload checks intact. See
-[ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md).
+[ADR 0044](adr/0044-exercise-maintenance-patch-response-loss.md).
 
 ### Maintenance PATCH response-loss acceptance fails
 
@@ -1486,7 +1486,7 @@ checked recovery. Later baseline advancement also requires unchanged adoption
 records/result and exactly one approved same-ReplicaSet replacement. No EXIT
 recovery is installed; owned disposable-cluster teardown is the failure cleanup
 boundary. No local or production action is authorized. See
-[ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md).
+[ADR 0044](adr/0044-exercise-maintenance-patch-response-loss.md).
 
 ### Root/child Application response-loss acceptance fails
 
@@ -1507,7 +1507,7 @@ reuse both records and the original adoption result. There is no automatic repai
 Pod replacement or baseline advancement. Keep raw diagnostics private; failure
 cleanup remains owned disposable-cluster teardown. This authorizes no local or
 production action. See
-[ADR 0045](decisions/0045-exercise-application-patch-response-loss.md).
+[ADR 0045](adr/0045-exercise-application-patch-response-loss.md).
 
 ### Child transition acceptance fails or root becomes OutOfSync
 
@@ -1525,7 +1525,7 @@ root, manually sync, repair, or advance the baseline to pass acceptance. A faile
 case stops for owned disposable-cluster teardown, even if the child remains
 enabled. This is CI leaf proof, not a supported local recovery command or full
 parent transition acceptance. See
-[ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md).
+[ADR 0046](adr/0046-exercise-child-auto-sync-transition.md).
 
 ### Maintenance unadopted-baseline acceptance fails
 
@@ -1540,7 +1540,7 @@ only after exact refusal and retained-state verification. Do not create records,
 retry maintenance, bypass retention or run recovery to make this gate pass.
 First adoption remains blocked until the gate succeeds; existing disposable
 cleanup owns teardown. This adds no supported local operation. See
-[ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md).
+[ADR 0047](adr/0047-refuse-maintenance-before-initial-adoption.md).
 
 ### Receipt-only maintenance refusal blocks adoption recovery
 
@@ -1556,12 +1556,12 @@ persistent-state retention pass. The approved quota increase and fresh adoption
 retry remain blocked until then. Do not rewrite records, bypass the gate, retry
 maintenance or sync/recover workloads to pass acceptance. Existing disposable
 cleanup owns teardown. No local action is authorized. See
-[ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md).
+[ADR 0048](adr/0048-refuse-maintenance-during-receipt-only-recovery.md).
 
 ### Staged schema migration is refused or incomplete
 
 `perfeng-release-schema-migration-v1` remains staged with live acceptance pending.
-The separately staged v2 adds retained-baseline admission ([ADR 0062](decisions/0062-stage-retained-schema-admission.md)).
+The separately staged v2 adds retained-baseline admission ([ADR 0062](adr/0062-stage-retained-schema-admission.md)).
 For `retained-baseline admission refused` or `[RELEASE_ADMISSION]` failures,
 inspect the failed candidate/pointer/receipt/byte/identity stage before any Job.
 Confirm non-null expectedCurrent, the exact accepted request bytes, owned pointer
@@ -1572,7 +1572,7 @@ under separately authorized execution; it is not selected by bootstrap by defaul
 Do not overwrite records, switch to v1 as a bypass, retry nodes or resume service
 to repair admission. Retain private evidence and leave maintenance in place.
 V2 acceptance is wired in the existing trusted-main initial job; live proof is
-post-merge ([ADR 0063](decisions/0063-exercise-retained-schema-admission.md)).
+post-merge ([ADR 0063](adr/0063-exercise-retained-schema-admission.md)).
 Inspect `schema-parent-current-null` for candidate exit 2 after successful
 preflight/selection/intent, with no later ledger or migration worker. A hash,
 startup, permission or timeout error cannot satisfy that refusal. First/repeat
@@ -1596,7 +1596,7 @@ and follow coordinated M04 recovery. Do not retry nodes, delete/recreate Jobs,
 force sync or infer rollback from Git. Job Complete does not establish runtime
 grants, schema parity, admission or activation. See the
 [staged migration guide](release-schema-migration.md) and
-[ADR 0049](decisions/0049-stage-pinned-schema-migration.md); this authorizes no
+[ADR 0049](adr/0049-stage-pinned-schema-migration.md); this authorizes no
 local execution or host-script cutover.
 
 ### Native target Docker build reports only an exit code
@@ -1629,12 +1629,12 @@ rows/sequences, provenance, credentials or paused resources block recovery.
 Do not retry nodes, rewrite records, delete Jobs, relax comparisons or sync the
 service to pass acceptance. Only all case/retention gates permit the existing
 explicit recovery; failures remain paused for owned disposable cleanup.
-See [ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md).
+See [ADR 0050](adr/0050-exercise-paused-schema-migration-repeats.md).
 Heavy checks stay on PR CI; live proof remains post-merge, with no local action.
 
 ### Schema-parent denied authority does not qualify
 
-[ADR 0051](decisions/0051-exercise-schema-job-create-denial.md) requires
+[ADR 0051](adr/0051-exercise-schema-job-create-denial.md) requires
 `schema-parent-denied-authority`, `schema-parent-denied` and
 `schema-parent-denied-restoration` in the initial paused suite. Expected access
 is create=no/get=yes/watch=yes while narrowed, and all yes after restoration.
@@ -1656,7 +1656,7 @@ live proof remains post-merge, with no local action.
 ### Complete schema first installation stops
 
 `schema-install-setup` and `schema-install-parent` run only in the trusted-main
-initial leg ([ADR 0052](decisions/0052-exercise-complete-schema-first-install.md)).
+initial leg ([ADR 0052](adr/0052-exercise-complete-schema-first-install.md)).
 Setup must observe the naturally empty database and explicit paused bootstrap
 objects. A preexisting schema, application relation, native migration Job or
 fixed pull Secret is a refusal, never a reason to delete or reset anything.
@@ -1677,7 +1677,7 @@ remains post-merge; placeholder installation is not adopted server readiness.
 
 ### Schema SQL contention does not qualify
 
-[ADR 0053](decisions/0053-exercise-schema-sql-contention.md) requires exact
+[ADR 0053](adr/0053-exercise-schema-sql-contention.md) requires exact
 catalog evidence before an expected failed native execution can qualify.
 `schema-contention-holder` must show one owned granted lock on the exact key.
 A partial owned-connection startup observation may be pending; a foreign holder,
@@ -1705,7 +1705,7 @@ partial-write rollback or ambiguous-commit recovery.
 
 ### Schema rollback proof or fixture cleanup stops
 
-[ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md) requires exact
+[ADR 0054](adr/0054-exercise-schema-ddl-rollback.md) requires exact
 PostgreSQL collision evidence after the complete parent's real prefix and
 native failure. Check `schema-rollback-setup/parent/proof/cleanup` and private
 catalog/row/log/Job/Pod snapshots. The error must name artifacts for the selected
@@ -1750,12 +1750,12 @@ only ledger/ownership observation, not complete DDL equivalence, a backup or a
 future mutation lease. Bounded first/repeat and retention acceptance is wired
 under ADR 0067 for post-merge trusted-main CI; live SQL refusal faults remain
 separate work. See [schema qualification](release-schema-qualification.md)
-and [ADR 0066](decisions/0066-stage-read-only-schema-qualification.md).
+and [ADR 0066](adr/0066-stage-read-only-schema-qualification.md).
 
 ### Staged runtime grant worker refuses input or authority
 
 Staged runtime-grants v2 shares schema-v2 admission leaves but does not migrate
-the schema ([ADR 0064](decisions/0064-stage-retained-runtime-grant-admission.md)).
+the schema ([ADR 0064](adr/0064-stage-retained-runtime-grant-admission.md)).
 For a grants-v2 admission failure, inspect candidate, pointer, receipt, accepted
 bytes, quiescence, receipt-stable and admission before the grant node. Confirm the
 existing grants identity has the explicitly installed standalone
@@ -1763,7 +1763,7 @@ existing grants identity has the explicitly installed standalone
 must fail ledger reads. Do not substitute the migration ServiceAccount, add ledger
 writes, overwrite records, fall back to v1, retry nodes or resume service as repair.
 Schema/role qualification remains independent. Bootstrap/fault/correction CI
-cases remain v1; only the adopted initial window now uses v2 ([ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md)).
+cases remain v1; only the adopted initial window now uses v2 ([ADR 0065](adr/0065-exercise-adopted-runtime-grant-admission.md)).
 Inspect `grant-adopted-v2-setup`, `grant-parent-adopted-null`,
 `grant-parent-adopted` and `grant-adopted-runtime`. Null-current refusal requires
 candidate main exit 2 after successful input/intent gates, no later worker/Job
@@ -1785,7 +1785,7 @@ success, unchanged ACLs and SQL/S3/ledger/workload/storage retention before
 existing recovery. Final acceptance uses the explicit complete-retention mode,
 requiring the extra parent/Job and re-read probe identities; missing evidence
 cannot fall back to bootstrap-only counts. No failure may resume workloads or
-advance the baseline. [ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)
+advance the baseline. [ADR 0061](adr/0061-exercise-grants-on-adopted-paused-application.md)
 adds CI proof only, with production admission, ambiguity and local execution deferred.
 
 For `grant-parent-corrected`, first require the existing excess-DELETE runtime
@@ -1796,7 +1796,7 @@ The unchanged owner parent must pass its real gates and fixed Job, preserve
 non-ACL state and restore original ACL bytes, followed by the corrected runtime
 TCP probe. Do not fall back to administrator SQL after a failed boundary. Final
 retention must preserve the additional successful Job/Workflow and replay exact
-correction evidence. [ADR 0060](decisions/0060-exercise-owner-grant-correction.md)
+correction evidence. [ADR 0060](adr/0060-exercise-owner-grant-correction.md)
 changes only the initial scenario; other five scenarios keep their existing path.
 
 For `grant-rollback-fixture`, `grant-parent-rollback` or `grant-rollback-proof`,
@@ -1810,7 +1810,7 @@ cleanup. Only complete rollback/retention proof generates guarded transactional
 DROP RESTRICT; never use CASCADE, replace foreign objects or add EXIT repair.
 Cleanup must restore the original catalog before fresh grants, and final
 retention must find no fixture objects with successful runtime USAGE established.
-See [ADR 0059](decisions/0059-exercise-runtime-grant-rollback.md); actual trigger
+See [ADR 0059](adr/0059-exercise-runtime-grant-rollback.md); actual trigger
 proof runs post-merge, while ambiguity and local execution remain outside scope.
 
 For `grant-contention-holder`, `grant-parent-contention` or
@@ -1824,7 +1824,7 @@ is still held. Only that proof permits normal owned-session disconnect; both
 sessions and key locks must disappear before fresh first/repeat grants. Never
 terminate a database backend or add EXIT repair to get past this gate. Final
 retention rechecks the failed Job/Workflow and fresh session absence. See
-[ADR 0058](decisions/0058-exercise-runtime-grant-sql-contention.md); partial writes,
+[ADR 0058](adr/0058-exercise-runtime-grant-sql-contention.md); partial writes,
 ambiguous commits and local execution remain outside scope.
 
 For the initial fixture's `grant-denied-authority` / `grant-parent-denied` stages,
@@ -1836,7 +1836,7 @@ state snapshots. Preserve get/watch and all reads while denying only create.
 Only verified refusal/retention allows guarded restoration of the captured Role;
 any failed boundary stops with no EXIT repair or successful grant continuation.
 Final retention must attest the restored Role and its effective rights as well
-as the failed Workflow. [ADR 0057](decisions/0057-refuse-runtime-grant-job-create.md)
+as the failed Workflow. [ADR 0057](adr/0057-refuse-runtime-grant-job-create.md)
 adds no SQL fault recovery or local execution.
 
 For the trusted-main initial scenario, inspect the `grant-parent-first` or
@@ -1848,10 +1848,10 @@ also re-reads both Jobs/Workflows and installed sources. Shared artifacts contai
 only validated `grant-parent-<case>.outcome.json` identifiers, not SQL/credential
 diagnostics. A failure leaves the fixture paused: do not replace Jobs, fall back
 to administrator grants or infer that a failed response rolled back SQL.
-[ADR 0056](decisions/0056-exercise-owner-runtime-grants.md) authorizes disposable
+[ADR 0056](adr/0056-exercise-owner-runtime-grants.md) authorizes disposable
 first/repeat acceptance only; no local execution, cutover or recovery is added.
 
-[ADR 0055](decisions/0055-stage-native-runtime-grants.md) stages the owner-only
+[ADR 0055](adr/0055-stage-native-runtime-grants.md) stages the owner-only
 runtime-grants parent; no local/live execution or host cutover is authorized by
 its staging PR. An input refusal occurs before psql when migration-url differs
 from the reviewed local owner/host/port/database/password contract. Inspect the
@@ -1887,7 +1887,7 @@ failure or SQL/source drift must block success. No later grant/recovery is allow
 from an unverified pre-recovery gate. Keep SQL vendor output and raw state private;
 never upload passwords or raw diagnostic files. Fix the actual prerequisite or
 implementation and use a fresh owned disposable run; do not repair on EXIT.
-[ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md) bounds this
+[ADR 0067](adr/0067-exercise-read-only-schema-qualification.md) bounds this
 acceptance; SQL faults, local execution and production cutover remain separate.
 
 
@@ -1913,7 +1913,7 @@ used. Preserve Jobs/Workflows, database and paused workloads; do not retry nodes
 remove evidence, manually finish grants or resume on EXIT. Inspect actual state
 under explicit authority and obtain a reviewed recovery decision. The checkpoint
 output is the grants phase's pre-Job observation, not post-grant readiness or
-activation authority. [ADR 0068](decisions/0068-stage-database-preparation-composition.md)
+activation authority. [ADR 0068](adr/0068-stage-database-preparation-composition.md)
 defers live complete-parent failure/retention acceptance and operational cutover.
 
 
@@ -1938,7 +1938,7 @@ or duplicate cohort Jobs must stop; unexpected remaining Jobs are not blanket-
 filtered. Do not delete Jobs or weaken counts to pass. Preserve paused workloads,
 SQL, data, credentials and release records. Timeout can follow committed SQL;
 never retry nodes, repair on EXIT or resume based on a partial output. Diagnose
-within the existing budget before proposing a cost change. [ADR 0069](decisions/0069-exercise-complete-database-preparation.md)
+within the existing budget before proposing a cost change. [ADR 0069](adr/0069-exercise-complete-database-preparation.md)
 limits this to disposable trusted-main acceptance; local execution, deliberate
 fault injection and production cutover require separate scope.
 
@@ -1961,13 +1961,13 @@ requires verified returned rules and effective create/get/watch restoration.
 
 Before recovery/final success, require the failed complete parent and current
 restored authority again. No new SQL Jobs are expected from this case. No local
-execution or production authority change is authorized. [ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md)
+execution or production authority change is authorized. [ADR 0070](adr/0070-refuse-complete-preparation-job-create.md)
 limits this to disposable trusted-main acceptance; partial/ambiguous SQL outcomes
 need independent diagnosis and separately reviewed recovery.
 
 ## Preparation qualification-create denial does not qualify
 
-The trusted-main initial case in [ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md)
+The trusted-main initial case in [ADR 0071](adr/0071-refuse-preparation-qualification-job-create.md)
 requires a completed migration before its CI suspension. If the barrier is absent,
 terminal or times out, inspect the private preparation-qualify-barrier Workflow,
 workers and Job observations; authority must not be narrowed or the parent resumed.

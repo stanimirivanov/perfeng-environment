@@ -70,7 +70,7 @@ Deployment, kube-system Namespace and Git Secret, list platform Pods, publish
 Argo task results and create/get/watch platform Jobs. It cannot pause workloads,
 sync Applications, mutate the ledger, delete Jobs or write Secrets. Job creation
 can mount namespace Secrets and RBAC does not restrict template fields, so
-trusted submitters are required; see [ADR 0049](decisions/0049-stage-pinned-schema-migration.md).
+trusted submitters are required; see [ADR 0049](adr/0049-stage-pinned-schema-migration.md).
 
 The Job uses fixed migration/pull Secret references, no Pod API token, non-root
 UID/GID, read-only container filesystem, dropped capabilities, RuntimeDefault
@@ -86,13 +86,13 @@ phase remains separate and has not exercised this complete parent.
 
 The separate [staged read-only qualification parent](release-schema-qualification.md)
 checks selected ledger hashes and ownership using upstream-byte-derived inputs
-([ADR 0066](decisions/0066-stage-read-only-schema-qualification.md)). It does not run
+([ADR 0066](adr/0066-stage-read-only-schema-qualification.md)). It does not run
 automatically after migration, and its live proof is still required before use
 as an independently qualified preparation step. It does not prove full DDL equivalence.
 
 ## Retained-baseline admission in v2
 
-[ADR 0062](decisions/0062-stage-retained-schema-admission.md) adds
+[ADR 0062](adr/0062-stage-retained-schema-admission.md) adds
 `perfeng-release-schema-migration-v2` alongside v1. It uses the same four inputs,
 exact local lock and forward-only/0018 intent. Require non-null expectedCurrent,
 then verify the owned current pointer, immutable receipt UID/content/provenance
@@ -131,7 +131,7 @@ It does not revoke v1 authority, add admission to runtime grants, prove schema
 checksums or handle ambiguous SQL commits. Host cutover remains separate;
 heavy checks run on existing PR CI.
 
-[ADR 0063](decisions/0063-exercise-retained-schema-admission.md) now wires v2 into
+[ADR 0063](adr/0063-exercise-retained-schema-admission.md) now wires v2 into
 the existing trusted-main initial job after verified adoption/pause. Preserve v1
 none-intent and Job-create denial, then submit the existing initial request to
 v2 and require its exact null-expectedCurrent candidate refusal before ledger
@@ -174,17 +174,17 @@ is introduced into offline validation. Complete-parent repeat/data retention
 acceptance is staged in the existing initial CI leg, with live proof post-merge.
 Bounded complete-parent first installation is staged in the initial CI leg;
 bounded SQL contention failure and fresh execution are staged under
-[ADR 0053](decisions/0053-exercise-schema-sql-contention.md). Bounded attempted-DDL
-rollback is staged under [ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md);
+[ADR 0053](adr/0053-exercise-schema-sql-contention.md). Bounded attempted-DDL
+rollback is staged under [ADR 0054](adr/0054-exercise-schema-ddl-rollback.md);
 ambiguous commits remain deferred.
-Bounded Job-create denial acceptance is staged under [ADR 0051](decisions/0051-exercise-schema-job-create-denial.md).
+Bounded Job-create denial acceptance is staged under [ADR 0051](adr/0051-exercise-schema-job-create-denial.md).
 All 13 host deployment entrypoints remain supported and no script is retired.
 
 ## Complete-parent repeat acceptance on disposable CI
 
 The existing trusted-main initial job now stages unchanged-parent repeat
 acceptance while the service is already paused, before its approved recovery
-([ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md)). It reuses
+([ADR 0050](adr/0050-exercise-paused-schema-migration-repeats.md)). It reuses
 the already-current schema from earlier image parity and the existing valid
 upgrade request. One extra none-intent request is published in the same owned
 commit/ref for semantic refusal. The original three files and other five
@@ -205,7 +205,7 @@ and retirement status are unchanged.
 
 ## Complete-parent Job-create denial
 
-[ADR 0051](decisions/0051-exercise-schema-job-create-denial.md) adds one case
+[ADR 0051](adr/0051-exercise-schema-job-create-denial.md) adds one case
 between none-intent refusal and successful repeats in the same paused window.
 Temporarily remove only Jobs create from the fixture migration Role, preserving
 get/watch and all observation rights. Verify effective access, run the unchanged
@@ -220,7 +220,7 @@ retirement credit or SQL failure/recovery claim.
 
 ## Complete-parent first installation
 
-[ADR 0052](decisions/0052-exercise-complete-schema-first-install.md) replaces only
+[ADR 0052](adr/0052-exercise-complete-schema-first-install.md) replaces only
 the initial scenario's first CI-only successful migrator with the unchanged
 complete parent. The database is naturally empty: no reset or deletion is used.
 The existing forward-only parent request passes real preflight, selection,
@@ -248,7 +248,7 @@ production multi-user security, cutover and measured retirement remain open.
 
 ## SQL contention before installation
 
-[ADR 0053](decisions/0053-exercise-schema-sql-contention.md) adds one complete
+[ADR 0053](adr/0053-exercise-schema-sql-contention.md) adds one complete
 parent failure before the existing first installation in the initial CI leg.
 An owned bounded psql session holds the selected migrator's exact advisory lock.
 Require the successful real parent prefix/quiescence, then the actual selected
@@ -267,7 +267,7 @@ pre-DDL contention failure/retry, not partial writes or ambiguous commits.
 
 ## Attempted-DDL rollback before installation
 
-[ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md) adds the selected
+[ADR 0054](adr/0054-exercise-schema-ddl-rollback.md) adds the selected
 component's existing artifacts-table collision after contention cleanup and
 before first installation in the initial CI leg. Create only a fixture-owned
 schema/table/sentinel, then require the unchanged parent's real successful
@@ -298,7 +298,7 @@ established, or staged grants as proof of migration-ledger qualification.
 ## Staged database-preparation composition
 
 [Database preparation](release-database-preparation.md) and
-[ADR 0068](decisions/0068-stage-database-preparation-composition.md) compose the
+[ADR 0068](adr/0068-stage-database-preparation-composition.md) compose the
 unchanged migration-v2 → qualification-v1 → grants-v2 entrypoints within one
 Workflow. The outer release-runtime-grants caller applies to every phase,
 including migration; each retains its own full admission and fresh quiescence.

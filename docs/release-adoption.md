@@ -10,7 +10,7 @@
 
 ## Scope and prerequisites
 
-[ADR 0017](decisions/0017-record-explicit-local-release-adoption.md) records the owner's ConfigMap choice. The [v1 schema](../deployments/release-adoption-v1.schema.json) defines the receipt payload; its `$defs.pointer` and `$defs.result` define the current reference and final output. The original release request and its exact-byte identity are unchanged.
+[ADR 0017](adr/0017-record-explicit-local-release-adoption.md) records the owner's ConfigMap choice. The [v1 schema](../deployments/release-adoption-v1.schema.json) defines the receipt payload; its `$defs.pointer` and `$defs.result` define the current reference and final output. The original release request and its exact-byte identity are unchanged.
 
 Adoption is an explicit trusted-operator action after review of current state, acceptance evidence and any missing/lost-ledger history. A schema field, request commit or successful readiness check does not prove that authorization. Do not submit this entrypoint as a first-install shortcut, automatic retry of promotion, migration step or lost-history repair.
 
@@ -29,7 +29,7 @@ fresh readiness/preflight -> exact root observation + existing ledger reads
   -> final pointer/receipt/root verification -> adopted-baseline result
 ```
 
-The parent retains the local release mutex and a 1,800-second deadline. Each native record operation has a 60-second Pod deadline; planner Pods have 180 seconds. The mutex does not exclude host operators or Argo CD. Submit a fresh Workflow for retry; do not reuse successful nodes with `argo retry` or memoize verification. Both root samples must pass the same ownership, identity, health, sync and selected-revision checks. Cross-sample comparison ignores only `metadata.generation`, `metadata.resourceVersion` and `status.reconciledAt`; every other field must remain equal. [ADR 0036](decisions/0036-tolerate-root-reconciliation-bookkeeping.md) records the owner-approved boundary. This permits ordinary controller refresh, not semantic drift, active operations or new syncs. Sampled checks cannot detect every intervening change that reverted before the next read.
+The parent retains the local release mutex and a 1,800-second deadline. Each native record operation has a 60-second Pod deadline; planner Pods have 180 seconds. The mutex does not exclude host operators or Argo CD. Submit a fresh Workflow for retry; do not reuse successful nodes with `argo retry` or memoize verification. Both root samples must pass the same ownership, identity, health, sync and selected-revision checks. Cross-sample comparison ignores only `metadata.generation`, `metadata.resourceVersion` and `status.reconciledAt`; every other field must remain equal. [ADR 0036](adr/0036-tolerate-root-reconciliation-bookkeeping.md) records the owner-approved boundary. This permits ordinary controller refresh, not semantic drift, active operations or new syncs. Sampled checks cannot detect every intervening change that reverted before the next read.
 
 ## Records and authority
 

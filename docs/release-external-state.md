@@ -9,7 +9,7 @@
 - The [trusted-main composition phase](release-workflows-integration.md#complete-external-state-parent-composition)
   exercises this unchanged parent with the actual disposable UID and exact Git
   request, shared transient providers and the owner-approved combined CI token
-  ([ADR 0021](decisions/0021-authorize-trusted-main-external-state-parity.md)).
+  ([ADR 0021](adr/0021-authorize-trusted-main-external-state-parity.md)).
   Live acceptance remains pending its post-merge main run.
 
 ## Inputs and ownership
@@ -29,7 +29,7 @@ This catches selection-promotion drift before disposable CI runs. Wrong environm
 wrong digest and byte-different equivalent JSON remain refused. The runtime approval
 pin stays a reviewed literal; it is never copied from a submitted preflight result.
 
-The parent keeps the mutex, deadline, sequential steps and v1 outputs (`preflight-result`, `bucket-job`, `database-job`, `registry-job`). Its preparation children keep their `-v1` names; preflight and task selection now use `-v3` names and the shared [verifier package](release-verifier-package.md). Argo CD applies the immutable `perfeng-external-state-scripts-v1` ConfigMap in `perf-platform` at sync wave `-2`, the child templates at `-1`, then the parent at `1`. The bucket and database Jobs mount scripts from that ConfigMap; they do not carry shell payloads in WorkflowTemplate YAML. A script or child-template change requires a new versioned name and a parent reference update. The preflight v3 identity verifier preserves v1 data contracts. The registry remains one Job with three pinned `crane` containers so `registry-job` stays a single Job name; a `withItems` conversion would change that output contract. [ADR 0016](decisions/0016-compose-versioned-release-templates.md) records this review boundary.
+The parent keeps the mutex, deadline, sequential steps and v1 outputs (`preflight-result`, `bucket-job`, `database-job`, `registry-job`). Its preparation children keep their `-v1` names; preflight and task selection now use `-v3` names and the shared [verifier package](release-verifier-package.md). Argo CD applies the immutable `perfeng-external-state-scripts-v1` ConfigMap in `perf-platform` at sync wave `-2`, the child templates at `-1`, then the parent at `1`. The bucket and database Jobs mount scripts from that ConfigMap; they do not carry shell payloads in WorkflowTemplate YAML. A script or child-template change requires a new versioned name and a parent reference update. The preflight v3 identity verifier preserves v1 data contracts. The registry remains one Job with three pinned `crane` containers so `registry-job` stays a single Job name; a `withItems` conversion would change that output contract. [ADR 0016](adr/0016-compose-versioned-release-templates.md) records this review boundary.
 
 Argo Workflows owns these finite Jobs. Argo CD owns the WorkflowTemplate and RBAC through the staged Application, and continues to own the persistent PostgreSQL and SeaweedFS workloads. The workflow does not apply those workloads, sync Argo CD, publish policies, migrate schema or activate the M04 release. A local Argo mutex serializes submissions of this template. It does not serialize against the still-supported host commands, so operators must not run both preparation paths concurrently.
 

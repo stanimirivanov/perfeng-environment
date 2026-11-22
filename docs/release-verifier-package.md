@@ -42,7 +42,7 @@ and 3,545 lines. None is deleted or counted as retired by this package change.
 
 ## Version and compatibility boundary
 
-[ADR 0036](decisions/0036-tolerate-root-reconciliation-bookkeeping.md) introduces
+[ADR 0036](adr/0036-tolerate-root-reconciliation-bookkeeping.md) introduces
 v3 after exact captured-input replay identified routine root status refresh as
 the cause of v2 adoption refusals. Only generation, resourceVersion and
 reconciledAt are excluded from root equality; both samples are validated and
@@ -60,7 +60,7 @@ the exact request/lock bytes and ledger meaning are unchanged. Container modes
 use explicit output parameters; callers must not depend on the former private
 script templates' implicit stdout result.
 
-[ADR 0018](decisions/0018-bound-and-retire-release-verifier-sources.md) defines
+[ADR 0018](adr/0018-bound-and-retire-release-verifier-sources.md) defines
 source retirement. `deployments/release-workflow-retirements.json` records each
 removed path, exact historical Git commit, SHA-256, old Kubernetes name where
 applicable and active replacement paths. CI compares published source to the

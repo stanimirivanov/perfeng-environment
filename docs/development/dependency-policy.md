@@ -54,7 +54,7 @@ Automated dependency review is not required. Dependabot updates GitHub Actions o
 
 ## Supply-chain response
 
-[ADR 0029](../decisions/0029-require-patched-native-gateway-toolchain.md) records
+[ADR 0029](../adr/0029-require-patched-native-gateway-toolchain.md) records
 the owner's Go 1.27.3 requirement following the reachable crypto/x509 finding
 [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). Build/audit modules, CI,
 recorded metadata, smoke fixtures and serving verification must agree. Retain
@@ -80,7 +80,7 @@ downloads only the Git-selected asset/checksum, verifies its actual metadata,
 and never edits PATH or certificate trust. A null serving release deliberately
 blocks installation until publication and review; the adaptation archive is
 not a fallback. Go exists only in this developer/CI boundary, not on operators'
-normal installation path. See [ADR 0010](../decisions/0010-manage-native-connectivity-workflow.md).
+normal installation path. See [ADR 0010](../adr/0010-manage-native-connectivity-workflow.md).
 
 
 `make supply-chain` verifies lock consistency and scans installed dependencies for known vulnerabilities. A finding is triaged for reachability, severity, available fixes, and operational exposure. Exceptions must be narrow, documented, time-bounded, and reviewed; a scanner outage or unavailable advisory source is reported as not run rather than passed.

@@ -392,7 +392,7 @@ StatefulSet claim template.
 
 Before merging the first adoption, record the non-secret StatefulSet, PVC, PV
 and Secret identities and create the persistence probe described in
-[ADR 0002](decisions/0002-stateful-gitops-ownership.md). After reconciliation,
+[ADR 0002](adr/0002-stateful-gitops-ownership.md). After reconciliation,
 require unchanged identities, PostgreSQL health and the original probe value.
 Then restart only the StatefulSet and verify that the same probe still exists.
 An Application reporting `Healthy` is not sufficient evidence if an identity
@@ -505,7 +505,7 @@ pre-stage that ConfigMap before merge; Argo CD then rolls out the new selection
 without mutating or deleting the previous one. Reverting the Git selection
 restores the prior chart and ConfigMap identity.
 
-[ADR 0002](decisions/0002-stateful-gitops-ownership.md) defines the required
+[ADR 0002](adr/0002-stateful-gitops-ownership.md) defines the required
 retention, unchanged-identity and rollback acceptance for stateful adoption.
 PostgreSQL and SeaweedFS completed adoption, rollback rehearsal, re-adoption and
 controlled stateful self-healing. Pruning remains disabled pending a separate
@@ -525,5 +525,5 @@ References:
 - [Argo CD installation](https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/)
 - [Argo CD declarative setup](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/)
 - [Argo CD private repositories](https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories/)
-- [ADR 0001](decisions/0001-gitops-environment-composition.md)
+- [ADR 0001](adr/0001-gitops-environment-composition.md)
 - [GitOps migration completion](gitops-migration-completion.md)

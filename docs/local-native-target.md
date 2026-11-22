@@ -23,7 +23,7 @@ The [Application](../gitops/environments/local/native-search-application.yaml)
 is included in the existing root composition. It syncs automatically without
 pruning or self-healing during initial acceptance. No new namespace, source
 authorization, worker identity, Secret, runtime bundle or control-plane selection
-is introduced. [ADR 0009](decisions/0009-select-image-backed-native-target.md)
+is introduced. [ADR 0009](adr/0009-select-image-backed-native-target.md)
 records the cutover and pull-identity reuse.
 
 Before adopting this new name, inspect any existing `native-search` resources;

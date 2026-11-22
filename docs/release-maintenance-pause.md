@@ -39,7 +39,7 @@ The parent deadline is 1,800 seconds. Native guards/patches have 60-second node 
 
 ## Authority, staging and rollout
 
-[ADR 0037](decisions/0037-stage-guarded-maintenance-pause.md) records the owner-approved authority. Separate `release-maintenance-pause` permissions allow:
+[ADR 0037](adr/0037-stage-guarded-maintenance-pause.md) records the owner-approved authority. Separate `release-maintenance-pause` permissions allow:
 
 | Boundary | Authority |
 |:--|:--|
@@ -58,7 +58,7 @@ After disposable acceptance and a separately selected operational rollout, use t
 ## Failure, recovery and remaining acceptance
 
 Deployment interruption extends the same initial-job acceptance after the
-root/child cases ([ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md)).
+root/child cases ([ADR 0041](adr/0041-exercise-deployment-pause-interruption.md)).
 A reversible copy stops after the real scale-to-zero patch and before its own
 checkpoint. Exact Stop evidence must precede bounded read-only settlement and
 paused retention. A separate unchanged read-only checkpoint must then succeed
@@ -82,10 +82,10 @@ configuration and data. No recovery or baseline advancement occurs. Applications
 are already disabled: this proves interruption ordering, not an enabled-to-disabled
 transition. Inspect `maintenance-partial-root` and `maintenance-partial-child`
 stages, sanitized barrier reports and validated outcomes; raw evidence stays
-private. [ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md) records
+private. [ADR 0040](adr/0040-exercise-maintenance-partial-pause.md) records
 the approved fault scope. Live proof remains post-merge main-only.
 
-The existing trusted-main `initial` job now exercises the complete unchanged parent after adoption retention, before receipt identity faults. It checks native worker identity/order, verified readiness and both original records before writes, successful checkpoint output, zero Deployment status/desired replicas and absence of server Pods. It preserves original evidence, ledger bytes/UIDs/provenance, foundation Pods, storage, database/S3 data, configuration and Secrets. Only after a successful pause and retention proof does the fixture explicitly sync the selected control-plane child, verify native/HTTP health and require exactly one replacement Pod under the same ReplicaSet. Its spec must match except the generated ServiceAccount projected-volume name and corresponding mount references. The fixture then establishes a checked recovery snapshot for the remaining tests; it never overwrites the original Pod evidence. Root auto-sync stays disabled and the other six children stay skipped. [ADR 0038](decisions/0038-exercise-maintenance-pause-and-checked-recovery.md) records this approved CI retention boundary; it does not introduce production resume behavior. The other five scenarios retain their original Pod baseline.
+The existing trusted-main `initial` job now exercises the complete unchanged parent after adoption retention, before receipt identity faults. It checks native worker identity/order, verified readiness and both original records before writes, successful checkpoint output, zero Deployment status/desired replicas and absence of server Pods. It preserves original evidence, ledger bytes/UIDs/provenance, foundation Pods, storage, database/S3 data, configuration and Secrets. Only after a successful pause and retention proof does the fixture explicitly sync the selected control-plane child, verify native/HTTP health and require exactly one replacement Pod under the same ReplicaSet. Its spec must match except the generated ServiceAccount projected-volume name and corresponding mount references. The fixture then establishes a checked recovery snapshot for the remaining tests; it never overwrites the original Pod evidence. Root auto-sync stays disabled and the other six children stay skipped. [ADR 0038](adr/0038-exercise-maintenance-pause-and-checked-recovery.md) records this approved CI retention boundary; it does not introduce production resume behavior. The other five scenarios retain their original Pod baseline.
 
 A refused baseline produces no workload write. A subsequent failure may leave only root paused, both Applications paused, or the Deployment stopped. Kubernetes does not provide a cross-resource transaction here. A failed request response also does not prove a write was absent. Retain the Workflow/node identities and inspect the three resources, ledger identities and independent live health with the existing owner diagnostics. No successful checkpoint result is emitted unless the final observation passes.
 
@@ -97,7 +97,7 @@ Do not use `argo retry`, reuse successful nodes, auto-resume, force-delete Pods,
 
 Offline acceptance exercises the actual jq predicates, the unchanged readiness/adoption/quiescence policy, kubectl's local JSON Patch engine, exact named write authority, immutable inventory, Kustomize rendering and pinned Argo lint. It does not prove API admission, ServiceAccount delivery, controller timing or Pod termination. Before host-script retirement, disposable kind acceptance must cover successful root/child pause and scale, data/Secret/ledger retention, missing/conflicting records, wrong ownership/source/cluster, pending sync, guard conflict after observation, partial failure after each write, missing write rights, lingering Pods, and fresh independent quiescence. No new live CI scenario, ref, credential right or local operation is introduced here. Existing host entrypoints remain supported until that evidence and operational cutover are separately reviewed.
 
-The existing initial job also runs three CI-only stale-guard cases after checked recovery/request refusal and before receipt faults ([ADR 0039](decisions/0039-exercise-maintenance-stale-guard-conflicts.md)). Each copy inserts one suspension between the real root, child or Deployment guard and its unchanged native patch; reversal and installed-spec checks bind it to the published parent. Two UID/resourceVersion/spec-guarded fixture writes add/remove a top-level Application annotation or Deployment label. The label avoids Deployment annotation generation increments and ReplicaSet propagation. Resume requires restored metadata/spec/UID/generation and a resourceVersion different from the guard. Require native Invalid refusal, sole patch exit 64, no later write/checkpoint/result, and strict recovered-state/data/ledger retention. Inspect `maintenance-stale-<resource>` stages, safe barrier reports and validated outcomes; raw API/log/Secret snapshots stay private. Setup, timeout, permission, retention or unrelated worker failures never satisfy acceptance. A failed setup stops without automatic repair/resume; any marker remains only in the disposable cluster until cluster cleanup. Production templates, scenarios, credentials, refs and budgets remain unchanged. Full live proof remains post-merge trusted-main; local execution stays deferred.
+The existing initial job also runs three CI-only stale-guard cases after checked recovery/request refusal and before receipt faults ([ADR 0039](adr/0039-exercise-maintenance-stale-guard-conflicts.md)). Each copy inserts one suspension between the real root, child or Deployment guard and its unchanged native patch; reversal and installed-spec checks bind it to the published parent. Two UID/resourceVersion/spec-guarded fixture writes add/remove a top-level Application annotation or Deployment label. The label avoids Deployment annotation generation increments and ReplicaSet propagation. Resume requires restored metadata/spec/UID/generation and a resourceVersion different from the guard. Require native Invalid refusal, sole patch exit 64, no later write/checkpoint/result, and strict recovered-state/data/ledger retention. Inspect `maintenance-stale-<resource>` stages, safe barrier reports and validated outcomes; raw API/log/Secret snapshots stay private. Setup, timeout, permission, retention or unrelated worker failures never satisfy acceptance. A failed setup stops without automatic repair/resume; any marker remains only in the disposable cluster until cluster cleanup. Production templates, scenarios, credentials, refs and budgets remain unchanged. Full live proof remains post-merge trusted-main; local execution stays deferred.
 
 Before the happy maintenance parent is submitted, the trusted-main initial job audits the unchanged maintenance identity through real API requests. The existing runner-admin impersonation pattern supplies its full ServiceAccount groups without obtaining or forwarding a token. The three named native JSON patches must pass server dry-run and return exactly the expected pause spec. Twenty negative patch/delete/create probes cover other names/namespaces, foundation resources, Git Secret mutation, ledger mutation and forbidden verbs; every mutating command remains server dry-run even if RBAC regresses. Filename handles prevent a preliminary GET denial from being mistaken for a PATCH refusal. Require the actual Forbidden wrapper, exit 1 and matching subject, verb, API group, resource, namespace and named/collection target. Pod exec is reviewed with `auth can-i` only, without a connection. An allowed dry-run can retry at most three fresh observations only when API Invalid plus unchanged UID/spec/ownership and a changed resourceVersion demonstrate a stale read; other errors and malformed successful responses fail immediately. Fresh retention and cluster identity checks must pass before `maintenance-authority.tsv` records `suite verified` and real maintenance starts. Raw responses/logs stay private. This reuses existing rights, job, scenarios, refs and budget, changes no production manifests, and remains a post-merge live gate. It audits these boundaries and does not add field-level RBAC or complete multi-user security.
 
@@ -105,7 +105,7 @@ Before the happy maintenance parent is submitted, the trusted-main initial job a
 
 The existing trusted-main initial job inserts one gated fixture Pod after the
 checked Deployment interruption and before its independent checkpoint
-([ADR 0042](decisions/0042-exercise-lingering-pod-checkpoint-refusal.md)). The Pod
+([ADR 0042](adr/0042-exercise-lingering-pod-checkpoint-refusal.md)). The Pod
 matches the checkpoint selector, remains unscheduled, and has a distinct
 ReplicaSet hash to prevent adoption. Real unchanged checkpoint policy refusal,
 worker exit 2, no result, and bracketed retained-state/policy counterfactuals must
@@ -117,7 +117,7 @@ This is bounded disposable CI acceptance, not a local cleanup or recovery comman
 ### Missing maintenance write permission
 
 The trusted-main initial job exercises root, child and Deployment PATCH denial
-([ADR 0043](decisions/0043-exercise-maintenance-write-denial.md)). Each case
+([ADR 0043](adr/0043-exercise-maintenance-write-denial.md)). Each case
 narrows only the existing disposable Role, preserving reads and other approved
 writes. The unchanged complete parent must pass real readiness and the selected
 guard, then fail only that native PATCH with exact Forbidden. Require no later
@@ -131,7 +131,7 @@ checks run on PR CI; live proof remains post-merge, without local execution.
 
 The existing trusted-main initial job adds a reversible parent/native transport
 copy and a separate scoped TLS PATCH proxy after checked interruption recovery
-([ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md)). The exact
+([ADR 0044](adr/0044-exercise-maintenance-patch-response-loss.md)). The exact
 guarded scale-to-zero PATCH must commit once before its response is dropped.
 Require native worker failure, no later checkpoint/result, fresh direct paused
 state/data/ledger retention and an independent unchanged checkpoint before any
@@ -145,7 +145,7 @@ transport/client checks run on PR CI; full live proof remains post-merge.
 ### Root/child no-op PATCH response loss
 
 The existing initial job also exercises each named Application before the
-Deployment interruption ([ADR 0045](decisions/0045-exercise-application-patch-response-loss.md)).
+Deployment interruption ([ADR 0045](adr/0045-exercise-application-patch-response-loss.md)).
 Both Applications are already auto-sync-disabled, so an accepted no-op PATCH may
 retain its resourceVersion. Each proxy instance forwards only its exact planned
 Application request and validates HTTP 200/unchanged state before dropping the
@@ -159,7 +159,7 @@ Heavy TLS/client checks run on PR CI; full live proof remains post-merge.
 ### Real child auto-sync transition
 
 The initial job also exercises the unchanged child guard and native PATCH against
-an actually enabled child ([ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md)).
+an actually enabled child ([ADR 0046](adr/0046-exercise-child-auto-sync-transition.md)).
 Guarded fixture setup enables only the healthy, pinned control-plane child,
 preserving prune/selfHeal false. The CI-only two-step composition must disable
 it, preserving every other spec field and all running Pods, ledger records and
@@ -175,7 +175,7 @@ CI; live proof remains post-merge and local execution stays deferred.
 
 Before the initial job's first adoption, the unchanged complete maintenance
 parent must refuse its healthy but unadopted baseline
-([ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md)).
+([ADR 0047](adr/0047-refuse-maintenance-before-initial-adoption.md)).
 The same staged resources/RBAC are installed earlier; both ledger records are
 naturally absent, without deletion or fault injection. Require real readiness,
 null native record observations and exact `finish`-phase baseline refusal with
@@ -189,7 +189,7 @@ stay on PR CI; full live proof remains post-merge and local execution deferred.
 
 The existing receipt-only CI leg also submits the unchanged maintenance parent
 before its quota increase and adoption retry
-([ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md)).
+([ADR 0048](adr/0048-refuse-maintenance-during-receipt-only-recovery.md)).
 The sole valid receipt must match the earlier verified partial-adoption snapshot
 in full and the pointer must remain absent. Require successful real readiness,
 exact finish inputs and refusal specifically for the missing stored pointer,

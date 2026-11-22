@@ -23,7 +23,7 @@
 
 ## Completion decision
 
-The migration selected by [ADR 0001](decisions/0001-gitops-environment-composition.md)
+The migration selected by [ADR 0001](adr/0001-gitops-environment-composition.md)
 is complete for the local environment. Reviewed Git state now selects all
 supported workload resources, Argo CD continuously reconciles them, and the
 Taskfile exposes the bounded operator workflow. The former sample-SUT and

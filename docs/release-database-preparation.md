@@ -10,7 +10,7 @@
 
 ## Scope and prerequisites
 
-[ADR 0068](decisions/0068-stage-database-preparation-composition.md) authorizes
+[ADR 0068](adr/0068-stage-database-preparation-composition.md) authorizes
 staging this database subphase. It does not replace the full kubernetes:prepare
 task, provision external state, pause workloads, select runtime packages or
 activate a release. The supported host path and three standalone parents remain.
@@ -92,7 +92,7 @@ and measured script retirement remain separate. No production Python is added.
 
 ## Complete-parent trusted-main acceptance
 
-[ADR 0069](decisions/0069-exercise-complete-database-preparation.md) preserves all
+[ADR 0069](adr/0069-exercise-complete-database-preparation.md) preserves all
 standalone coverage and adds initial-request refusal plus two complete parents
 in the existing initial adopted/paused window, before recovery. Each successful
 parent creates three retained Jobs; six additional native Jobs fit within the
@@ -121,7 +121,7 @@ upgrade safety and operational cutover remain separate.
 
 ## Complete-parent Job-create denial
 
-[ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md) adds one
+[ADR 0070](adr/0070-refuse-complete-preparation-job-create.md) adds one
 failed complete parent after null-current refusal and before existing first/
 repeat. Temporarily remove only Jobs create from the grants caller's fixture
 Role. Require real migration admission/quiescence and the exact native create
@@ -140,7 +140,7 @@ SQL Job creation, not recovery after partial or ambiguous SQL commits.
 
 ## Qualification-create denial after migration
 
-[ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md) extends
+[ADR 0071](adr/0071-refuse-preparation-qualification-job-create.md) extends
 only the trusted-main initial adopted/paused fixture. One reversible CI copy
 suspends after the unchanged migration phase. Prove its successful native Job,
 full admission and unchanged state before guarded create-only Role narrowing.

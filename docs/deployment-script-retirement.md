@@ -127,7 +127,7 @@ before the operator guide can be shortened:
 `infrastructure_runtime.py`. Those actions are deliberately outside the two
 task invocation total. They remain in the functional parity checklist for
 any file that is deleted. `postgres.py` and `object_store.py` also contain
-dormant Helm rollback actions protected by [ADR 0002](decisions/0002-stateful-gitops-ownership.md).
+dormant Helm rollback actions protected by [ADR 0002](adr/0002-stateful-gitops-ownership.md).
 
 PR 9 stages the read-only [M04 maintenance checkpoint](release-maintenance-checkpoint.md).
 `gitops/release-workflows/scripts/verify-quiescence.py` adds 266 physical Python
@@ -188,7 +188,7 @@ deleted file only after its old preview, failure and recovery behavior has an
 accepted owner. The final claim requires live disposable-kind evidence as well
 as `make verify`; this documentation PR has no live acceptance.
 
-The ownership rule is [ADR 0014](decisions/0014-separate-release-and-run-orchestration.md):
+The ownership rule is [ADR 0014](adr/0014-separate-release-and-run-orchestration.md):
 Argo CD reconciles workloads; Argo Workflows owns finite release steps; the
 Perfeng control plane owns Runs. Tekton or Dagger may produce immutable inputs
 upstream but do not participate in the local release path by default.
@@ -207,13 +207,13 @@ It changes no production verifier or supported host task and adds no retirement
 credit. Complete-parent first installation, failure/recovery, live cutover and
 measured deletion remain separate gates; two modules/708 lines remain unchanged.
 
-Bounded complete-parent Job-create denial ([ADR 0051](decisions/0051-exercise-schema-job-create-denial.md))
+Bounded complete-parent Job-create denial ([ADR 0051](adr/0051-exercise-schema-job-create-denial.md))
 adds CI-only Role guards and refusal/retention evidence. It changes no production
 Python or supported task, and retires no host entrypoint. Two modules/708 lines
 remain unchanged; operational cutover and measured deletion remain pending.
 
 
-Complete-parent first-install acceptance ([ADR 0052](decisions/0052-exercise-complete-schema-first-install.md))
+Complete-parent first-install acceptance ([ADR 0052](adr/0052-exercise-complete-schema-first-install.md))
 replaces only a CI migrator invocation and moves fixture credential creation.
 Its evidence helpers are CI-only; production definitions and supported host tasks
 remain unchanged. No retirement credit is claimed: 13 entrypoints remain, with
@@ -221,7 +221,7 @@ the same two-module/708-line production verifier budget. SQL failure/recovery,
 operational cutover and measured deletion remain separate gates.
 
 
-SQL contention acceptance ([ADR 0053](decisions/0053-exercise-schema-sql-contention.md))
+SQL contention acceptance ([ADR 0053](adr/0053-exercise-schema-sql-contention.md))
 adds only bounded CI fault/observation evidence around the unchanged schema parent.
 It retires no host entrypoint and changes no production verifier, command or
 manifest. The 13-entrypoint baseline and two-module/708-line verifier budget
@@ -229,7 +229,7 @@ remain unchanged; partial/ambiguous SQL recovery, cutover and measured deletion
 remain separate gates.
 
 
-Attempted-DDL rollback acceptance ([ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md))
+Attempted-DDL rollback acceptance ([ADR 0054](adr/0054-exercise-schema-ddl-rollback.md))
 adds only CI fixture SQL/evidence around the unchanged native schema parent.
 Guarded fixture cleanup does not retire a host command or authorize production
 recovery. The 13-entrypoint baseline and two-module/708-line production verifier
@@ -238,46 +238,46 @@ retirement remain separate gates.
 
 
 The [staged runtime-grants parent](release-runtime-grants.md)
-([ADR 0055](decisions/0055-stage-native-runtime-grants.md)) now declares the
+([ADR 0055](adr/0055-stage-native-runtime-grants.md)) now declares the
 remaining reviewed grant transaction through a fixed native owner-only Job.
 This staging adds no production Python and no retirement credit. The supported
 host migration/grant command remains until complete-parent live grant acceptance
 and operational cutover are approved. Initial bootstrap owner-parent first/repeat
-acceptance is wired by [ADR 0056](decisions/0056-exercise-owner-runtime-grants.md),
+acceptance is wired by [ADR 0056](adr/0056-exercise-owner-runtime-grants.md),
 with live proof post-merge; this CI evidence adds no retirement credit.
-The [Job-create denial slice](decisions/0057-refuse-runtime-grant-job-create.md)
+The [Job-create denial slice](adr/0057-refuse-runtime-grant-job-create.md)
 adds only disposable authority/refusal evidence and guarded restoration; no
 supported command or production verifier source is removed.
-The [grant SQL contention slice](decisions/0058-exercise-runtime-grant-sql-contention.md)
+The [grant SQL contention slice](adr/0058-exercise-runtime-grant-sql-contention.md)
 adds bounded refusal/owned-session evidence only, with live proof post-merge.
 It changes no host command and adds no retirement credit.
-The [attempted-GRANT rollback slice](decisions/0059-exercise-runtime-grant-rollback.md)
+The [attempted-GRANT rollback slice](adr/0059-exercise-runtime-grant-rollback.md)
 adds only CI fault/cleanup evidence and retains both failed SQL Jobs. Live proof
 remains post-merge; no host command or production verifier source is retired.
-The [owner-correction slice](decisions/0060-exercise-owner-grant-correction.md)
+The [owner-correction slice](adr/0060-exercise-owner-grant-correction.md)
 replaces only one initial CI administrator call with the existing parent. It
 adds no script, production definition or retirement credit; cutover stays separate.
-The [adopted/paused acceptance slice](decisions/0061-exercise-grants-on-adopted-paused-application.md)
+The [adopted/paused acceptance slice](adr/0061-exercise-grants-on-adopted-paused-application.md)
 adds only CI evidence around the same grant parent before existing recovery.
 No supported host command or production verifier source is retired; live proof
 and operational cutover remain separate gates.
-The [v2 schema admission slice](decisions/0062-stage-retained-schema-admission.md)
+The [v2 schema admission slice](adr/0062-stage-retained-schema-admission.md)
 adds native ledger predicates and bounded byte checks, with no production Python.
 It preserves bootstrap v1 and does not retire a host command. Live v2 acceptance,
 general upgrades, grant-parent admission and operational cutover remain separate.
-The [v2 acceptance slice](decisions/0063-exercise-retained-schema-admission.md)
+The [v2 acceptance slice](adr/0063-exercise-retained-schema-admission.md)
 reuses the existing two repeat Jobs and adds only CI evidence/null-current
 refusal. It changes no production source or supported command and claims no
 retirement credit; live proof remains post-merge main-only.
-The [staged grants-v2 admission slice](decisions/0064-stage-retained-runtime-grant-admission.md)
+The [staged grants-v2 admission slice](adr/0064-stage-retained-runtime-grant-admission.md)
 adds only declarative composition using existing admission leaves and a standalone
 get-only ledger grant. No production Python or supported command is added or
 retired; live grants-v2 acceptance and cutover remain separate.
-The [adopted grants-v2 acceptance slice](decisions/0065-exercise-adopted-runtime-grant-admission.md)
+The [adopted grants-v2 acceptance slice](adr/0065-exercise-adopted-runtime-grant-admission.md)
 replaces only the existing adopted parent invocation and adds one no-Job refusal,
 with CI-only evidence/authority checks. No production definition or host command
 is added or retired; live proof stays post-merge and cutover remains separate.
-The [staged read-only qualification slice](decisions/0066-stage-read-only-schema-qualification.md)
+The [staged read-only qualification slice](adr/0066-stage-read-only-schema-qualification.md)
 adds only native composition and immutable reviewed SQL/inventory, with no
 production Python or host command. Live proof and preparation composition remain
 separate; no retirement credit is claimed.
@@ -285,7 +285,7 @@ All 13 host entrypoints and the two-module/
 708-line production verifier budget remain unchanged.
 
 
-[ADR 0068](decisions/0068-stage-database-preparation-composition.md) stages a
+[ADR 0068](adr/0068-stage-database-preparation-composition.md) stages a
 single native database-preparation composition using the existing three parents.
 It adds no production Python and changes no supported host task. All 13 baseline
 entrypoints and the two-module/708-line production verifier budget remain;
@@ -294,7 +294,7 @@ must precede measured retirement. Composition staging alone earns no deletion
 credit and does not replace the full kubernetes:prepare task.
 
 
-[ADR 0069](decisions/0069-exercise-complete-database-preparation.md) adds only
+[ADR 0069](adr/0069-exercise-complete-database-preparation.md) adds only
 CI acceptance/evidence for complete preparation. Six additional native Jobs and
 strict cohort accounting change no supported host path or production Python.
 All 13 entrypoints and the two-module/708-line production verifier budget remain.
@@ -302,13 +302,13 @@ Live complete-parent proof, fault acceptance and operational cutover remain gate
 no retirement credit follows merely from wiring the fixture.
 
 
-[ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md) adds only
+[ADR 0070](adr/0070-refuse-complete-preparation-job-create.md) adds only
 CI refusal/guarded-restoration evidence around the unchanged complete parent.
 No production source, supported command or baseline entrypoint is retired.
 The 13-entrypoint baseline and two-module/708-line production verifier budget
 remain unchanged; live proof, SQL recovery and operational cutover stay separate.
 
-[ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md) adds only
+[ADR 0071](adr/0071-refuse-preparation-qualification-job-create.md) adds only
 CI qualification-create refusal after a retained successful migration, guarded
 Role restoration and seven-Job cohort evidence. No production Python, supported
 host command or baseline entrypoint changes. All 13 entrypoints and the two-module/

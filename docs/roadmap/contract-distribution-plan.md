@@ -24,7 +24,7 @@ verification. The supported path uses signed immutable distributions, independen
 tool/contract pins and offline consumer resources. Historical inputs, signature
 checks and rollback paths are not retired by this amendment.
 
-[ADR 0073](../decisions/0073-defer-schema-registry-admission.md) records the
+[ADR 0073](../adr/0073-defer-schema-registry-admission.md) records the
 approved Option C no-go/defer decision and its revision-bound source evidence.
 
 | Task | Disposition | Dependency and evidence |

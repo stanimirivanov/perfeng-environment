@@ -10,7 +10,7 @@
 
 ## Inputs and source identity
 
-[ADR 0066](decisions/0066-stage-read-only-schema-qualification.md) reuses the four
+[ADR 0066](adr/0066-stage-read-only-schema-qualification.md) reuses the four
 release parameters: request-revision, request-path, request-sha256 and
 selection-revision. The parent uses the same exact local deployment lock and
 manual/forward-only/0018 intent and shared admission leaves as grants v2. An
@@ -92,7 +92,7 @@ migration/grant composition. Host commands and retirement counts remain unchange
 
 ## Complete-parent first/repeat acceptance
 
-[ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md) authorizes
+[ADR 0067](adr/0067-exercise-read-only-schema-qualification.md) authorizes
 only the existing trusted-main initial job to install the three unchanged staged
 resources and submit the complete parent twice with the existing pinned upgrade
 request. Execution follows schema acceptance and grants ledger-read setup, while
@@ -120,7 +120,7 @@ full DDL equivalence, general upgrade safety or retirement from passing fixtures
 ## Staged database-preparation composition
 
 [Database preparation](release-database-preparation.md) and
-[ADR 0068](decisions/0068-stage-database-preparation-composition.md) compose the
+[ADR 0068](adr/0068-stage-database-preparation-composition.md) compose the
 unchanged migration-v2 → qualification-v1 → grants-v2 entrypoints within one
 Workflow. The outer release-runtime-grants caller applies to every phase,
 including migration; each retains its own full admission and fresh quiescence.

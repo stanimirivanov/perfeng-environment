@@ -11,7 +11,7 @@
 
 ## Inputs and flow
 
-[ADR 0055](decisions/0055-stage-native-runtime-grants.md) uses the existing
+[ADR 0055](adr/0055-stage-native-runtime-grants.md) uses the existing
 `request-revision`, `request-path`, `request-sha256` and `selection-revision` inputs.
 Only the reviewed perfeng-local deployment lock and manual forward-only/0018
 intent qualify. The intent step references the published schema-migration intent
@@ -86,7 +86,7 @@ non-root execution and a read-only root filesystem. Scratch output stays private
 
 ## Retained-baseline admission in v2
 
-[ADR 0064](decisions/0064-stage-retained-runtime-grant-admission.md) adds
+[ADR 0064](adr/0064-stage-retained-runtime-grant-admission.md) adds
 `perfeng-release-runtime-grants-v2` alongside unchanged v1. It references schema
 v2's published candidate, pointer, receipt, accepted-bytes, receipt-stable and
 admission leaves; it never invokes the schema migration entrypoint or Job.
@@ -120,7 +120,7 @@ Installation also extends v1's identity, and existing Job-create authority remai
 trusted-operator authority. The gate is not an atomic lease or multi-user boundary;
 independent schema qualification, backup/drain/operator exclusion still apply.
 
-V1 remains the bootstrap/fault/correction CI path. [ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md)
+V1 remains the bootstrap/fault/correction CI path. [ADR 0065](adr/0065-exercise-adopted-runtime-grant-admission.md)
 now wires unchanged v2 into only the existing adopted/paused initial window,
 after schema acceptance and before existing recovery. Explicitly install the
 reviewed ledger-get grant and v2 definition and check effective named reads using
@@ -155,7 +155,7 @@ Offline structure/policy/shell tests, Kustomize Project/ConfigMap validation and
 pinned Argo lint cover staging. Heavy full/cross-platform checks run on PR CI.
 The initial trusted-main job now submits the unchanged parent for first/repeat
 grants after schema installation, while the bootstrap Applications/Deployment
-stay paused ([ADR 0056](decisions/0056-exercise-owner-runtime-grants.md)). Existing
+stay paused ([ADR 0056](adr/0056-exercise-owner-runtime-grants.md)). Existing
 runtime TCP probes verify exact privileges; both distinct owner Jobs, their
 provenance and SQL/template identities remain retained through the scenario.
 Schema/ledger/OIDs/data, roles/passwords, Secrets and foundation/storage identities
@@ -165,12 +165,12 @@ is defined by ADR 0060 below; the other five scenarios keep administrator correc
 
 Heavy checks run on PR CI; complete-parent live proof first runs after merge on
 trusted main. The initial fixture now also removes only Jobs create from the
-grant Role before first success ([ADR 0057](decisions/0057-refuse-runtime-grant-job-create.md)).
+grant Role before first success ([ADR 0057](adr/0057-refuse-runtime-grant-job-create.md)).
 Require the real successful prefix, exact native Forbidden, absent Job/Pod/output
 and unchanged ACLs/schema/data/credentials/storage before guarded rule restoration.
 Retain that failed Workflow and recheck restored authority at final retention.
 After restoration, the same job now holds the exact advisory key in an owned,
-bounded session ([ADR 0058](decisions/0058-exercise-runtime-grant-sql-contention.md)).
+bounded session ([ADR 0058](adr/0058-exercise-runtime-grant-sql-contention.md)).
 Require actual owner backend/Pod/blocker attribution and the server's published
 lock-timeout error, with unchanged ACLs/schema/data/credentials/storage. Only
 proved failure permits normal holder disconnect; both sessions/locks must be
@@ -178,13 +178,13 @@ gone before fresh first/repeat grants. Retain the failed SQL Job and Workflow
 alongside the successes. Unverified outcomes stop without repair or continuation.
 After contention cleanup, a scoped fixture event trigger now raises only after
 observing the exact schema-USAGE GRANT's effect inside the transaction
-([ADR 0059](decisions/0059-exercise-runtime-grant-rollback.md)). Require the unique
+([ADR 0059](adr/0059-exercise-runtime-grant-rollback.md)). Require the unique
 error, unchanged committed ACLs and retained state before generating transactional
 OID/owner/definition-guarded DROP RESTRICT of only the trigger/function. Verify
 the original baseline before fresh first/repeat execution; retain both SQL-failed
 Jobs and all parent evidence through final gates. No automatic cleanup or repair.
 The initial job now also uses the unchanged owner parent to correct the existing
-excess-DELETE fault ([ADR 0060](decisions/0060-exercise-owner-grant-correction.md)).
+excess-DELETE fault ([ADR 0060](adr/0060-exercise-owner-grant-correction.md)).
 Keep the administrator's injection and exact runtime refusal; admit only that
 single added DELETE bit before a fresh parent. Require real ordered gates, the
 fixed successful Job, corrected runtime TCP success and ACL bytes identical to
@@ -192,7 +192,7 @@ first success. Retain five Jobs/six Workflows; other five scenarios keep
 administrator correction. No automatic repair or fallback is introduced.
 After real adoption and maintenance pause, the initial job now submits one more
 unchanged grant parent after schema-migration acceptance, before existing checked
-recovery ([ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)).
+recovery ([ADR 0061](adr/0061-exercise-grants-on-adopted-paused-application.md)).
 CI binds the pinned upgrade request's expectedCurrent to the original receipt/
 pointer, requires real ordered gates and a fresh native Job/runtime TCP probe,
 and preserves ACLs, SQL/S3 data, ledger and workload/storage identities. Recovery
@@ -207,7 +207,7 @@ commands and retirement counts remain unchanged.
 ## Staged database-preparation composition
 
 [Database preparation](release-database-preparation.md) and
-[ADR 0068](decisions/0068-stage-database-preparation-composition.md) compose the
+[ADR 0068](adr/0068-stage-database-preparation-composition.md) compose the
 unchanged migration-v2 → qualification-v1 → grants-v2 entrypoints within one
 Workflow. The outer release-runtime-grants caller applies to every phase,
 including migration; each retains its own full admission and fresh quiescence.
