@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-- [ADR 0015](decisions/0015-bind-releases-to-reviewed-inputs.md) and the
+- [ADR 0015](adr/0015-bind-releases-to-reviewed-inputs.md) and the
   [v1 JSON Schema](../deployments/release-request-v1.schema.json) define the
   request consumed by the staged [read-only preflight](release-preflight-workflow.md).
 - The request pins a reviewed environment Git commit and exact deployment-lock
@@ -65,7 +65,7 @@ cluster, or a successful release.
    environment policy. It then compares `expectedCurrent` to the durable prior
    receipt and to observed root/child Application state before a write.
 4. A finite Argo Workflow may prepare external state and record a result under
-   [ADR 0014](decisions/0014-separate-release-and-run-orchestration.md).
+   [ADR 0014](adr/0014-separate-release-and-run-orchestration.md).
    Argo CD alone reconciles workloads. For M04, the human pause, reviewed
    publication/merge and manual child Sync remain mandatory.
 5. A later receipt records the exact request bytes/digest, observed revisions,

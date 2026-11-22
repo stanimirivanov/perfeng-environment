@@ -10,7 +10,7 @@
   Kubernetes environment; it does not own component source code.
 - `Taskfile.yml` provides the supported high-level local operator commands while
   the preview-first Python tools remain the auditable safety boundaries.
-- [ADR 0001](docs/decisions/0001-gitops-environment-composition.md) selected the
+- [ADR 0001](docs/adr/0001-gitops-environment-composition.md) selected the
   Argo CD-centred architecture; its local migration is now complete.
 - The immutable `k8s-infrastructure` selection owns local kind and Argo CD;
   the [local GitOps environment](docs/local-gitops.md) reconciles Perfeng
@@ -18,9 +18,9 @@
 - The [migration completion record](docs/gitops-migration-completion.md) explains
   why the remaining imperative commands are bootstrap, external-state or
   acceptance boundaries rather than competing workload reconcilers.
-- [ADR 0004](docs/decisions/0004-separate-kubernetes-infrastructure.md)
+- [ADR 0004](docs/adr/0004-separate-kubernetes-infrastructure.md)
   selects a staged extraction of reusable Kubernetes substrate and Argo CD
-  bootstrap. [ADR 0005](docs/decisions/0005-adopt-k8s-infrastructure-name.md)
+  bootstrap. [ADR 0005](docs/adr/0005-adopt-k8s-infrastructure-name.md)
   records the created repository name, `k8s-infrastructure`; the
   [local infrastructure lock](docs/local-infrastructure-release.md) pins and
   executes the reviewed provider revision through a content-selected archive.
@@ -229,7 +229,7 @@ truth:
 - [Coding harness](docs/development/harness.md)
 - [Engineering standards](docs/development/engineering-standards.md)
 - [Dependency policy](docs/development/dependency-policy.md)
-- [Architecture decisions](docs/decisions/README.md)
+- [Architecture decisions](docs/adr/README.md)
 - [Cross-repository roadmap](docs/roadmap/milestones.md)
 - [Security policy](SECURITY.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)

@@ -97,11 +97,11 @@ Completed or active slices:
 
 Post-milestone decisions and follow-up:
 
-- [ADR 0004](../decisions/0004-separate-kubernetes-infrastructure.md)
+- [ADR 0004](../adr/0004-separate-kubernetes-infrastructure.md)
   selects a project-neutral Kubernetes infrastructure repository and retains
   Perfeng composition, roadmap and acceptance ownership here; extraction is
   follow-up work and does not reopen M02;
-- [ADR 0005](../decisions/0005-adopt-k8s-infrastructure-name.md) records the
+- [ADR 0005](../adr/0005-adopt-k8s-infrastructure-name.md) records the
   created `k8s-infrastructure` repository name, adds it to source-workspace
   composition and keeps workspace membership separate from GitOps deployment
   authorization;
@@ -178,7 +178,7 @@ define separate Linux cohorts. Neither establishes that this laptop qualifies;
 a fresh accepted live capture is still required. Do not treat a qualification-report
 hash as a browser-environment artifact.
 
-Managed native connectivity is prepared under [ADR 0010](../decisions/0010-manage-native-connectivity-workflow.md):
+Managed native connectivity is prepared under [ADR 0010](../adr/0010-manage-native-connectivity-workflow.md):
 setup, independent doctor checks and one supervised foreground session replace
 manual Go builds and four terminals. First serving release publication/selection
 and live acceptance remain explicit gates; this workflow does not promote the
@@ -248,7 +248,7 @@ first working decision loops.
 
 Option 0 remains the supported contract-distribution architecture, using signed
 immutable artifacts, independent tool/contract pins and offline consumer inputs.
-[ADR 0073](../decisions/0073-defer-schema-registry-admission.md) records Option C
+[ADR 0073](../adr/0073-defer-schema-registry-admission.md) records Option C
 as no-go/deferred following SR-29's `NOT_ADMITTED` result. The
 [SR plan amendment](contract-distribution-plan.md) defers SR-31 recovery
 qualification and lets SR-32 record failed admission. Neither issue closure nor
@@ -269,7 +269,7 @@ includes:
 - disaster-recovery exercises.
 
 Preparatory release-architecture work can proceed before non-local deployment
-is required; it does not mark M06 active or production-ready. [ADR 0014](../decisions/0014-separate-release-and-run-orchestration.md)
+is required; it does not mark M06 active or production-ready. [ADR 0014](../adr/0014-separate-release-and-run-orchestration.md)
 assigns finite release operations to Argo Workflows, keeps Argo CD as the sole
 workload reconciler, and leaves performance Runs with the control plane. The
 [deployment-script baseline](../deployment-script-retirement.md) measures the
@@ -348,7 +348,7 @@ prove production proxy/storage behavior. Registry and full-parent release
 acceptance, migration and operational cutover remain separate gates.
 
 The registry CI slice uses the owner-approved ephemeral repository identity
-and package-read permission ([ADR 0019](../decisions/0019-use-ci-identity-for-registry-parity.md)).
+and package-read permission ([ADR 0019](../adr/0019-use-ci-identity-for-registry-parity.md)).
 It checks all three manifest digests on first/repeat/corrected native Jobs and
 an invalid-credential refusal, retaining Job and Secret evidence. Package owners
 must grant repository Actions Read access for private packages. This does not
@@ -380,7 +380,7 @@ parameters. A native namespace read is checked separately; the complete
 production preflight must reject the same request for wrong cluster UID.
 
 The next full-preflight gate is implemented by a separate trusted-main CI
-workflow ([ADR 0020](../decisions/0020-publish-disposable-ci-release-requests.md)).
+workflow ([ADR 0020](../adr/0020-publish-disposable-ci-release-requests.md)).
 It publishes a run-owned request after kind assigns the actual UID, executes
 the unchanged parent twice and conditionally deletes its exact temporary ref.
 PR checks stay read-only. Live acceptance is pending the post-merge main run;
@@ -402,7 +402,7 @@ real-UID request must pass preflight/selection and bucket/database/registry Jobs
 First/repeat, zero-Job bad-digest refusal, denied-bucket and unsafe-role stopping
 boundaries, fresh correction and retained provider/credential identities are
 required. The owner approved package-read access in the existing write-capable
-main job ([ADR 0021](../decisions/0021-authorize-trusted-main-external-state-parity.md)).
+main job ([ADR 0021](../adr/0021-authorize-trusted-main-external-state-parity.md)).
 Live acceptance is pending its post-merge run. Providers remain transient;
 real readiness/adoption, migrations, promotion/recovery/export, full registry
 byte verification and the original 13-entrypoint retirement gate remain open.
@@ -428,7 +428,7 @@ alongside populated upgrades/recovery, promotion and measured script retirement.
 
 Selected server parity follows runtime grants in trusted-main CI. Render the
 actual pinned Helm chart and immutable Kustomize package using the owner-approved
-private checkout ([ADR 0022](../decisions/0022-use-pinned-source-for-server-parity.md)).
+private checkout ([ADR 0022](../adr/0022-use-pinned-source-for-server-parity.md)).
 Require original native Deployment/Service observations and production HTTP
 probes on the actual image, first/repeat success, stopped-server refusal and
 fresh correction with retained Deployment/Service/credential identities. Live
@@ -700,66 +700,66 @@ selected migrator Job under separate trusted authority. It adds no production
 Python or active-root selection. Complete-parent repeat acceptance now reuses
 the initial job's verified paused/current schema and gates its existing recovery;
 live proof remains post-merge. Bounded complete-parent Job-create denial is
-now staged with guarded Role restoration ([ADR 0051](../decisions/0051-exercise-schema-job-create-denial.md)); no SQL mutation occurs in that refusal case.
+now staged with guarded Role restoration ([ADR 0051](../adr/0051-exercise-schema-job-create-denial.md)); no SQL mutation occurs in that refusal case.
 Complete-parent first installation is now staged against the naturally empty
-initial fixture and explicit paused bootstrap placeholders ([ADR 0052](../decisions/0052-exercise-complete-schema-first-install.md)), with exact early pull-Secret reuse and retained install Job/Workflow gates.
+initial fixture and explicit paused bootstrap placeholders ([ADR 0052](../adr/0052-exercise-complete-schema-first-install.md)), with exact early pull-Secret reuse and retained install Job/Workflow gates.
 Bounded complete-parent SQL contention failure and fresh execution are now
-staged with owned-session release and failed Job/Workflow retention ([ADR 0053](../decisions/0053-exercise-schema-sql-contention.md)).
+staged with owned-session release and failed Job/Workflow retention ([ADR 0053](../adr/0053-exercise-schema-sql-contention.md)).
 Attempted-DDL rollback is now staged through the unchanged parent, with exact
 collision/retention evidence and guarded fixture-only cleanup before fresh
-installation ([ADR 0054](../decisions/0054-exercise-schema-ddl-rollback.md)).
+installation ([ADR 0054](../adr/0054-exercise-schema-ddl-rollback.md)).
 Live proof remains post-merge; ambiguous-commit proof, retained-release
 admission, operational cutover and measured retirement remain open; existing
 CI image parity is separate. A [staged runtime-grants parent](../release-runtime-grants.md)
 now applies the reviewed policy through a fixed owner-only Job behind pinned
-intent/quiescence, using separate trusted authority ([ADR 0055](../decisions/0055-stage-native-runtime-grants.md)).
+intent/quiescence, using separate trusted authority ([ADR 0055](../adr/0055-stage-native-runtime-grants.md)).
 Initial-scenario complete owner-parent first/repeat acceptance is now wired
-([ADR 0056](../decisions/0056-exercise-owner-runtime-grants.md)), retaining native
+([ADR 0056](../adr/0056-exercise-owner-runtime-grants.md)), retaining native
 Jobs, exact runtime privileges and surrounding state. Heavy PR checks stay on CI;
 live proof remains post-merge. Bounded grant Job-create denial now gates the
 same initial successes, with exact native Forbidden, unchanged state and guarded
-authority restoration ([ADR 0057](../decisions/0057-refuse-runtime-grant-job-create.md)).
+authority restoration ([ADR 0057](../adr/0057-refuse-runtime-grant-job-create.md)).
 Bounded grant SQL contention now precedes fresh first/repeat runs with exact
 backend/Pod/blocker and server timeout evidence, unchanged ACLs/state, owned
-disconnect and retained failed execution ([ADR 0058](../decisions/0058-exercise-runtime-grant-sql-contention.md)).
+disconnect and retained failed execution ([ADR 0058](../adr/0058-exercise-runtime-grant-sql-contention.md)).
 Attempted-GRANT rollback now uses a scoped fixture event trigger with unique
 error/ACL restoration proof and guarded fixture-only cleanup before fresh
-execution ([ADR 0059](../decisions/0059-exercise-runtime-grant-rollback.md)).
+execution ([ADR 0059](../adr/0059-exercise-runtime-grant-rollback.md)).
 The initial fixture's existing excess-DELETE correction now uses the unchanged
 owner parent, with strict drift admission, runtime TCP/ACL proof and retained
-execution ([ADR 0060](../decisions/0060-exercise-owner-grant-correction.md));
+execution ([ADR 0060](../adr/0060-exercise-owner-grant-correction.md));
 other scenarios keep administrator correction.
 The real adopted/paused window now includes an unchanged grant parent and runtime
 TCP probe after schema acceptance and before existing recovery, preserving
 expected-current identity, SQL/S3 data and workloads
-([ADR 0061](../decisions/0061-exercise-grants-on-adopted-paused-application.md)).
+([ADR 0061](../adr/0061-exercise-grants-on-adopted-paused-application.md)).
 Final retention requires this additional execution explicitly; live proof stays
 post-merge without new production admission or recovery.
 The staged schema-migration v2 now adds retained-baseline admission against the
 owned pointer/immutable receipt, exact accepted request byte hash and fresh
-quiescence root/child identities ([ADR 0062](../decisions/0062-stage-retained-schema-admission.md)).
+quiescence root/child identities ([ADR 0062](../adr/0062-stage-retained-schema-admission.md)).
 Bootstrap v1 remains unchanged; this supports only the fixed current selection.
 The initial trusted-main leg now wires v2 null-current refusal and replaces only
 the existing two paused repeat executions, with exact native gate/retention
-proof before grants/recovery ([ADR 0063](../decisions/0063-exercise-retained-schema-admission.md)).
+proof before grants/recovery ([ADR 0063](../adr/0063-exercise-retained-schema-admission.md)).
 Live schema-v2 proof remains post-merge. Staged runtime-grants v2 now reuses the
 same published admission leaves with explicit read-only ledger authority
-([ADR 0064](../decisions/0064-stage-retained-runtime-grant-admission.md)). V1 remains
+([ADR 0064](../adr/0064-stage-retained-runtime-grant-admission.md)). V1 remains
 the bootstrap/fault path. The initial adopted window now wires v2 null-current
 refusal and the existing grant Job/runtime probe, with fresh native/authority
-retention before recovery/final publication ([ADR 0065](../decisions/0065-exercise-adopted-runtime-grant-admission.md)).
+retention before recovery/final publication ([ADR 0065](../adr/0065-exercise-adopted-runtime-grant-admission.md)).
 Full grants-v2 live proof remains post-merge main-only.
 The [staged schema qualification parent](../release-schema-qualification.md)
 now reuses that admission chain and authority for a fixed read-only native Job,
 with eighteen expected ledger hashes derived from selected upstream Git bytes
-([ADR 0066](../decisions/0066-stage-read-only-schema-qualification.md)). Bounded
+([ADR 0066](../adr/0066-stage-read-only-schema-qualification.md)). Bounded
 complete-parent first/repeat acceptance is wired under ADR 0067 for post-merge CI;
 migration/grant composition and live SQL refusal faults remain separate;
 ledger/ownership qualification does not establish full DDL equivalence or cutover.
 Ambiguous commits, general upgrades and
 operational cutover/host migration-grant retirement remain open.
 
-[ADR 0067](../decisions/0067-exercise-read-only-schema-qualification.md) wires
+[ADR 0067](../adr/0067-exercise-read-only-schema-qualification.md) wires
 complete-parent read-only qualification first/repeat acceptance in the existing
 trusted-main initial adopted/paused window. Two retained native Jobs/Workflows,
 source/authority identity and unchanged SQL/data state must pass before recovery
@@ -768,13 +768,13 @@ preparation composition, general upgrade or SQL-fault acceptance credit.
 
 The [staged database-preparation parent](../release-database-preparation.md)
 now composes the unchanged migration-v2, qualification-v1 and grants-v2
-entrypoints ([ADR 0068](../decisions/0068-stage-database-preparation-composition.md)).
+entrypoints ([ADR 0068](../adr/0068-stage-database-preparation-composition.md)).
 One outer caller/mutex and 1,800-second deadline govern all three phases;
 each phase retains its own admission and fresh quiescence. Complete-parent live
 composition/failure/retention proof remains separately approved work. No host
 task, active root, CI execution selection or retirement count changes.
 
-[ADR 0069](../decisions/0069-exercise-complete-database-preparation.md) wires
+[ADR 0069](../adr/0069-exercise-complete-database-preparation.md) wires
 complete preparation null-current refusal and first/repeat in the initial
 adopted/paused window, preserving standalone coverage. Six additional native Jobs,
 nested boundary/order/output proof, existing runtime TCP success and unchanged
@@ -782,7 +782,7 @@ state must pass fresh retention before recovery/final publication. The existing
 job budget, inputs, credentials and authority remain unchanged. Live proof is
 post-merge main-only; failure/partial-state injection and host cutover stay open.
 
-[ADR 0070](../decisions/0070-refuse-complete-preparation-job-create.md) wires
+[ADR 0070](../adr/0070-refuse-complete-preparation-job-create.md) wires
 complete preparation Job-create denial before first/repeat, using only a guarded
 create-only reduction/restoration of existing grants authority. Exact native
 refusal, unchanged state and failed-parent/restored-authority retention gate
@@ -790,7 +790,7 @@ fresh runs and recovery. No additional SQL Job or CI budget; live proof remains
 post-merge main-only. Partial SQL/ambiguous commits and cutover stay separate.
 
 
-[ADR 0071](../decisions/0071-refuse-preparation-qualification-job-create.md) adds
+[ADR 0071](../adr/0071-refuse-preparation-qualification-job-create.md) adds
 qualification-create denial after a completed current-schema migration in a
 reversible CI-only suspended parent. Proved migration/state precede create-only
 Role narrowing; exact qualification refusal and retention gate guarded restoration

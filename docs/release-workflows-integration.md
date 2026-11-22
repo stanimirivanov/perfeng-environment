@@ -22,24 +22,24 @@
   the explicit credential exception described below.
 - A separate [trusted-main workflow](../.github/workflows/release-preflight-main.yml)
   accepts the complete production preflight using a generated Git request for
-  its real disposable cluster UID; see [ADR 0020](decisions/0020-publish-disposable-ci-release-requests.md).
+  its real disposable cluster UID; see [ADR 0020](adr/0020-publish-disposable-ci-release-requests.md).
 - The same trusted-main run then exercises complete maintenance-checkpoint
   composition with that exact request, manually paused fixture Applications
   and a zero-replica Deployment. No synthetic preflight result is substituted.
 - It also composes the complete external-state parent against the shared
   transient database/bucket fixtures and private registry with owner-approved
-  package-read authority ([ADR 0021](decisions/0021-authorize-trusted-main-external-state-parity.md)).
+  package-read authority ([ADR 0021](adr/0021-authorize-trusted-main-external-state-parity.md)).
 - A later CI-only phase runs the selected image's embedded migrator on the
   initially empty disposable schema, with fresh maintenance evidence before
   each attempt. It does not introduce a production migration entrypoint.
 - A later trusted-main phase installs actual Argo CD from the selected
   infrastructure bootstrap and manually syncs private control-plane sources,
   including real Service drift/correction. This separately approved phase uses
-  an ephemeral exact-URL source-token Secret; see [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md).
+  an ephemeral exact-URL source-token Secret; see [ADR 0023](adr/0023-authorize-disposable-argocd-source-access.md).
 - After foundation Application acceptance, a bounded phase manually reconciles
   the real root at the selected commit with auto-sync disabled and six children
   skipped. This proves root-owned object convergence, not full-tree health;
-  see [ADR 0025](decisions/0025-bound-disposable-root-reconciliation.md).
+  see [ADR 0025](adr/0025-bound-disposable-root-reconciliation.md).
 - Complete adoption then runs the unchanged production parent against that root,
   checking first/repeat persistence, a root-read refusal, fresh correction and
   ledger retention after deletion of the original disposable Workflow.
@@ -47,9 +47,9 @@
   `receipt-only` exercises quota-blocked pointer recovery; `response-loss` exercises
   a committed receipt with its response dropped, followed by unchanged-parent
   recovery; `pointer-response-loss` requires reuse of both committed records.
-  See [ADR 0026](decisions/0026-isolate-disposable-adoption-recovery-scenarios.md),
-  [ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md) and
-  [ADR 0032](decisions/0032-exercise-pointer-create-response-loss.md).
+  See [ADR 0026](adr/0026-isolate-disposable-adoption-recovery-scenarios.md),
+  [ADR 0031](adr/0031-exercise-complete-adoption-response-loss.md) and
+  [ADR 0032](adr/0032-exercise-pointer-create-response-loss.md).
 
 ## Invocation and isolation
 
@@ -257,7 +257,7 @@ See PostgreSQL's [environment-variable documentation](https://www.postgresql.org
 
 After external-state preparation, the main-only job runs the exact control-plane
 image selected by `deployments/local-control-plane.json`. The initial leg uses
-the unchanged complete schema parent for first installation ([ADR 0052](decisions/0052-exercise-complete-schema-first-install.md)); other invocations keep the CI resource wrapper.
+the unchanged complete schema parent for first installation ([ADR 0052](adr/0052-exercise-complete-schema-first-install.md)); other invocations keep the CI resource wrapper.
 Both execute `/usr/local/bin/migrate` directly; no rebuilt binary, mutable image tag
 or shell substitute is used. `migration-image.json` records the selected image,
 source commit and raw SHA-256 of the eighteen SQL files embedded by that source.
@@ -342,7 +342,7 @@ paused bootstrap Applications/Deployment. Real preflight/selection/intent/quiesc
 must precede the fixed grant Job. The other five scenarios retain administrator
 grants; all scenarios retain the existing administrator DELETE fault. The initial
 scenario now uses the unchanged owner parent for correction; the other five keep
-administrator correction ([ADR 0060](decisions/0060-exercise-owner-grant-correction.md)).
+administrator correction ([ADR 0060](adr/0060-exercise-owner-grant-correction.md)).
 
 A CI-only Argo resource wrapper creates PostgreSQL client Jobs pinned to the
 fixture server digest. Workers receive only the existing `runtime-url` Secret
@@ -386,11 +386,11 @@ both parent runs and the existing phase retention gates. Final scenario checks
 re-read retained Jobs/Workflows and sources. These artifacts are separate from
 the five existing runtime-probe artifacts. Failure never falls back to an
 administrator call, retries a parent or starts workloads. See
-[ADR 0056](decisions/0056-exercise-owner-runtime-grants.md); live proof remains
+[ADR 0056](adr/0056-exercise-owner-runtime-grants.md); live proof remains
 post-merge and bootstrap-specific, with no local execution or cutover claim.
 
 Before first success, the initial job now narrows only Jobs create on the grant
-Role ([ADR 0057](decisions/0057-refuse-runtime-grant-job-create.md)). Effective
+Role ([ADR 0057](adr/0057-refuse-runtime-grant-job-create.md)). Effective
 create/get/watch checks include the real identity's groups and reject transport
 errors/warnings. The unchanged parent must pass its real input/quiescence gates
 then fail at its exact native create, with no Job/Pod or parent output. The
@@ -403,7 +403,7 @@ its bounded `grant-parent-denied.outcome.json`. No scenario or budget is added;
 SQL failure and ambiguous commits remain outside this fault's proof.
 
 After permission restoration, the initial job additionally runs bounded SQL
-contention ([ADR 0058](decisions/0058-exercise-runtime-grant-sql-contention.md)).
+contention ([ADR 0058](adr/0058-exercise-runtime-grant-sql-contention.md)).
 One owned idle psql session holds the published advisory key. A read-only
 observer attributes the real owner backend and Pod to that holder; timestamped
 PostgreSQL evidence must prove the exact lock-timeout statement/error before
@@ -418,7 +418,7 @@ publishing bounded parent outcomes. Other scenarios and the DELETE fault stay
 unchanged; this proves contention/fresh retry, not partial writes or ambiguous commits.
 
 The next initial-job case proves rollback after the schema-USAGE GRANT actually
-takes effect inside its transaction ([ADR 0059](decisions/0059-exercise-runtime-grant-rollback.md)).
+takes effect inside its transaction ([ADR 0059](adr/0059-exercise-runtime-grant-rollback.md)).
 Create only the owned event trigger/function; target the exact migration owner,
 application and published statement, and raise the unique error only after
 observing schema USAGE. The unchanged parent must fail with unchanged committed
@@ -440,13 +440,13 @@ after correction; the existing corrected TCP probe still runs independently.
 There is no administrator fallback after failure. Phase/final retention now
 preserves five Jobs/six parent Workflows and replays correction evidence before
 publishing the additional bounded `grant-parent-corrected.outcome.json`.
-See [ADR 0060](decisions/0060-exercise-owner-grant-correction.md); live proof
+See [ADR 0060](adr/0060-exercise-owner-grant-correction.md); live proof
 remains post-merge, with no new fault or production change.
 
 The same initial job later exercises the unchanged grant parent against the real
 adopted/paused application, after schema-parent acceptance and before existing
-checked recovery ([ADR 0061](decisions/0061-exercise-grants-on-adopted-paused-application.md)).
-Only that invocation now uses unchanged v2 ([ADR 0065](decisions/0065-exercise-adopted-runtime-grant-admission.md));
+checked recovery ([ADR 0061](adr/0061-exercise-grants-on-adopted-paused-application.md)).
+Only that invocation now uses unchanged v2 ([ADR 0065](adr/0065-exercise-adopted-runtime-grant-admission.md));
 v1 bootstrap/fault/correction runs remain unchanged. Explicitly install the existing
 grants ledger-get grant/v2 definition and require bounded named-read prerequisites
 under the grants identity. First submit the existing initial request to v2 and
@@ -489,7 +489,7 @@ After runtime grants, the trusted-main job runs the actual selected server from
 its pinned Helm chart and immutable Kustomize runtime package. The owner approved
 the existing private-source token only for the pinned `perfeng-k8s` checkout,
 with unpersisted credentials and no token passed into the cluster
-([ADR 0022](decisions/0022-use-pinned-source-for-server-parity.md)). The job's
+([ADR 0022](adr/0022-use-pinned-source-for-server-parity.md)). The job's
 existing `GITHUB_TOKEN` authority remains unchanged. This source credential is
 not the Git/registry token already used inside the disposable fixture.
 
@@ -767,7 +767,7 @@ outcome, or run a complete adoption parent against a reviewed Git request.
 
 ### Native receipt response loss
 
-[ADR 0030](decisions/0030-inject-disposable-ledger-response-loss.md) records owner
+[ADR 0030](adr/0030-inject-disposable-ledger-response-loss.md) records owner
 approval for a separate CI-only TLS proxy in the existing boundary job. Generate
 a native resource fixture from the published receipt-create template, preserving
 manifest meaning and its 60-second deadline. A fixture kubeconfig routes this
@@ -931,7 +931,7 @@ job-owned cluster; private files disappear with the ephemeral host.
 
 ## Execution-registry manifest access
 
-[ADR 0019](decisions/0019-use-ci-identity-for-registry-parity.md) records the
+[ADR 0019](adr/0019-use-ci-identity-for-registry-parity.md) records the
 owner-selected identity. Only this isolated job adds `packages: read` beside
 `contents: read`. A package owner must grant the environment repository **Read**
 under each private package's **Manage Actions access**. Follow
@@ -1107,7 +1107,7 @@ remain open. Production verifier code remains two files/708 physical lines.
 ## Actual Argo CD convergence
 
 Trusted-main's six scenario jobs have an owner-approved 60-minute budget
-([ADR 0034](decisions/0034-bound-disposable-acceptance-fixture-lifetimes.md)). The
+([ADR 0034](adr/0034-bound-disposable-acceptance-fixture-lifetimes.md)). The
 shared credential-bearing S3 observer has the same bounded 3600-second deadline
 and sleep, and remains subject to owned cluster cleanup. Run 40191776524 reached
 later S3 retention checks after its former 900-second lifetime, causing exec into
@@ -1148,7 +1148,7 @@ infrastructure lock's Argo CD bootstrap from its validated clean pinned checkout
 Earlier phases retain the minimal CRD; this phase installs the actual
 controller and never writes Application status.
 
-The owner-approved [ADR 0023](decisions/0023-authorize-disposable-argocd-source-access.md)
+The owner-approved [ADR 0023](adr/0023-authorize-disposable-argocd-source-access.md)
 extends the existing contents-read credential to that checkout and one immutable
 repository Secret for the exact private `perfeng-k8s` URL. Its underlying rights
 are not attenuated. An exclusive private runner file transfers the token from a
@@ -1237,7 +1237,7 @@ remain unchanged.
 
 After complete readiness-parent acceptance, trusted-main CI adopts the prepared
 PostgreSQL chart through its real Application. The owner-approved
-[ADR 0024](decisions/0024-authorize-environment-source-for-foundation-parity.md)
+[ADR 0024](adr/0024-authorize-environment-source-for-foundation-parity.md)
 adds a second immutable repository Secret for the exact private environment Git
 URL using the existing read token. The same private staging file creates both
 approved repository Secrets before removal. Underlying token rights are not
@@ -1473,7 +1473,7 @@ pure recovery tests retain their existing separate, narrower claims.
 
 ### Adoption request boundary acceptance
 
-[ADR 0028](decisions/0028-publish-adoption-request-boundary-fixtures.md) records
+[ADR 0028](adr/0028-publish-adoption-request-boundary-fixtures.md) records
 owner approval to publish three deterministic requests in each existing temporary
 commit/ref. The original is byte-compatible. Changed-request adds one newline
 with identical parsed JSON; upgrade-request changes only expectedCurrent to the
@@ -1481,7 +1481,7 @@ original digest. All three pass the v1 schema before publication and bind
 distinct exact-byte identities/paths to the same delivery commit and reviewed
 selection. Ref journaling and conditional cleanup are unchanged.
 
-Those three fixtures remain unchanged. [ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md)
+Those three fixtures remain unchanged. [ADR 0050](adr/0050-exercise-paused-schema-migration-repeats.md)
 adds one none-intent fixture only to the initial leg's same commit/ref for schema
 parent acceptance; the other five scenarios still publish exactly three files.
 
@@ -1505,7 +1505,7 @@ does not implement promotion.
 
 ### Receipt identity refusal acceptance
 
-[ADR 0027](decisions/0027-inject-disposable-adoption-receipt-identity-faults.md)
+[ADR 0027](adr/0027-inject-disposable-adoption-receipt-identity-faults.md)
 records owner approval for destructive receipt fault injection only after the
 existing retention proof in both disposable scenarios. No new runner, scenario,
 request ref or credential permission is added. Including request-boundary cases,
@@ -1615,7 +1615,7 @@ before handoff when dispatch is authorized; offline tests alone are insufficient
 
 ### Complete-parent receipt response loss
 
-[ADR 0031](decisions/0031-exercise-complete-adoption-response-loss.md) records
+[ADR 0031](adr/0031-exercise-complete-adoption-response-loss.md) records
 owner approval for a third trusted-main `response-loss` scenario. Its temporary
 request ref and uploaded artifact use the same scenario-qualified ownership and
 cleanup checks as `receipt-only`. Job permissions, private source access and the
@@ -1676,7 +1676,7 @@ separate.
 
 ### Complete-parent pointer response loss
 
-[ADR 0032](decisions/0032-exercise-pointer-create-response-loss.md) authorizes the
+[ADR 0032](adr/0032-exercise-pointer-create-response-loss.md) authorizes the
 fourth isolated trusted-main `pointer-response-loss` leg, including its distinct
 temporary ref/artifact. It reuses the existing parent generator, token-free
 subshell, TLS proxy and ServiceAccount identity. Production templates and token
@@ -1736,7 +1736,7 @@ conflict live acceptance, promotion and retained recovery remain separate gates.
 
 ## Complete-parent initial pointer-create conflict
 
-[ADR 0035](decisions/0035-exercise-initial-pointer-create-conflict.md) adds the
+[ADR 0035](adr/0035-exercise-initial-pointer-create-conflict.md) adds the
 approved sixth `pointer-create-conflict` leg with its own temporary ref/artifact
 and unchanged 60-minute ceiling. The CI parent adds only a Suspend immediately
 before the original native pointer templateRef. Real readiness, receipt creation,
@@ -1779,7 +1779,7 @@ and `maintenance-partial-deployment-recovery` stages and their validated outcome
 Raw command/Workflow/worker/API/Secret evidence stays private. Original snapshots
 remain immutable; later receipt faults reference only the verified new Pod
 baseline. The existing happy and root/child cases remain intact. See
-[ADR 0041](decisions/0041-exercise-deployment-pause-interruption.md) for the approved
+[ADR 0041](adr/0041-exercise-deployment-pause-interruption.md) for the approved
 Deployment-only recovery exception. Heavy validation is delegated to existing PR
 CI at the owner's request; full parent proof remains post-merge trusted-main.
 
@@ -1795,10 +1795,10 @@ only `maintenance-partial-<resource>.barrier.json` and validated outcome JSON;
 raw evidence stays private. Setup, stop, timeout or retention failure stops the
 job without recovery or baseline advancement. This reuses the existing job,
 scenarios, refs, credentials and budget; production manifests are unchanged.
-See [ADR 0040](decisions/0040-exercise-maintenance-partial-pause.md). Main-only
+See [ADR 0040](adr/0040-exercise-maintenance-partial-pause.md). Main-only
 post-merge execution supplies live proof; offline tests do not.
 
-The trusted-main `initial` leg additionally runs the unchanged maintenance-pause parent after adoption retention and before receipt identity faults. `maintenance-pause.sh` installs only the staged pause templates/approved authority, checks native sequence and quiescence, then explicitly syncs the selected control-plane child for test-only recovery. Original snapshots remain immutable; only a verified same-ReplicaSet server Pod replacement can advance the later retention baseline. Ledger, storage, foundation Pods, Secrets, config, database and S3 data must remain intact. Root auto-sync stays disabled and six other children stay skipped. No other matrix leg changes. See [ADR 0038](decisions/0038-exercise-maintenance-pause-and-checked-recovery.md). Full live proof remains post-merge main-only; this fixture is not a local operator command.
+The trusted-main `initial` leg additionally runs the unchanged maintenance-pause parent after adoption retention and before receipt identity faults. `maintenance-pause.sh` installs only the staged pause templates/approved authority, checks native sequence and quiescence, then explicitly syncs the selected control-plane child for test-only recovery. Original snapshots remain immutable; only a verified same-ReplicaSet server Pod replacement can advance the later retention baseline. Ledger, storage, foundation Pods, Secrets, config, database and S3 data must remain intact. Root auto-sync stays disabled and six other children stay skipped. No other matrix leg changes. See [ADR 0038](adr/0038-exercise-maintenance-pause-and-checked-recovery.md). Full live proof remains post-merge main-only; this fixture is not a local operator command.
 
 Inspect `maintenance-pause` and `maintenance-recovery` in `stages.tsv`, `maintenance-pause.workflow.json`, the sanitized worker projection, validated checkpoint and fixed recovery outcome. Raw API/Secret/retention snapshots stay private. A failed pause or retention check must not trigger recovery; a failed recovery must not advance Pod/baseline references. The existing six scenarios, ref/artifact ownership, credentials, rights and 60-minute budget are unchanged.
 
@@ -1828,7 +1828,7 @@ kind release acceptance, prior-release/promotion guards, maintenance writes,
 backup/recovery, operational cutover and the original script-retirement gate
 remain open. Production Python stays at two files and 708 physical lines.
 
-The existing initial job also runs three CI-only stale-guard cases after checked recovery/request refusal and before receipt faults ([ADR 0039](decisions/0039-exercise-maintenance-stale-guard-conflicts.md)). Each copy inserts one suspension between the real root, child or Deployment guard and its unchanged native patch; reversal and installed-spec checks bind it to the published parent. Two UID/resourceVersion/spec-guarded fixture writes add/remove a top-level Application annotation or Deployment label. The label avoids Deployment annotation generation increments and ReplicaSet propagation. Resume requires restored metadata/spec/UID/generation and a resourceVersion different from the guard. Require native Invalid refusal, sole patch exit 64, no later write/checkpoint/result, and strict recovered-state/data/ledger retention. Inspect `maintenance-stale-<resource>` stages, safe barrier reports and validated outcomes; raw API/log/Secret snapshots stay private. Setup, timeout, permission, retention or unrelated worker failures never satisfy acceptance. A failed setup stops without automatic repair/resume; any marker remains only in the disposable cluster until cluster cleanup. Production templates, scenarios, credentials, refs and budgets remain unchanged. Full live proof remains post-merge trusted-main; local execution stays deferred.
+The existing initial job also runs three CI-only stale-guard cases after checked recovery/request refusal and before receipt faults ([ADR 0039](adr/0039-exercise-maintenance-stale-guard-conflicts.md)). Each copy inserts one suspension between the real root, child or Deployment guard and its unchanged native patch; reversal and installed-spec checks bind it to the published parent. Two UID/resourceVersion/spec-guarded fixture writes add/remove a top-level Application annotation or Deployment label. The label avoids Deployment annotation generation increments and ReplicaSet propagation. Resume requires restored metadata/spec/UID/generation and a resourceVersion different from the guard. Require native Invalid refusal, sole patch exit 64, no later write/checkpoint/result, and strict recovered-state/data/ledger retention. Inspect `maintenance-stale-<resource>` stages, safe barrier reports and validated outcomes; raw API/log/Secret snapshots stay private. Setup, timeout, permission, retention or unrelated worker failures never satisfy acceptance. A failed setup stops without automatic repair/resume; any marker remains only in the disposable cluster until cluster cleanup. Production templates, scenarios, credentials, refs and budgets remain unchanged. Full live proof remains post-merge trusted-main; local execution stays deferred.
 
 Before the happy maintenance parent is submitted, the trusted-main initial job audits the unchanged maintenance identity through real API requests. The existing runner-admin impersonation pattern supplies its full ServiceAccount groups without obtaining or forwarding a token. The three named native JSON patches must pass server dry-run and return exactly the expected pause spec. Twenty negative patch/delete/create probes cover other names/namespaces, foundation resources, Git Secret mutation, ledger mutation and forbidden verbs; every mutating command remains server dry-run even if RBAC regresses. Filename handles prevent a preliminary GET denial from being mistaken for a PATCH refusal. Require the actual Forbidden wrapper, exit 1 and matching subject, verb, API group, resource, namespace and named/collection target. Pod exec is reviewed with `auth can-i` only, without a connection. An allowed dry-run can retry at most three fresh observations only when API Invalid plus unchanged UID/spec/ownership and a changed resourceVersion demonstrate a stale read; other errors and malformed successful responses fail immediately. Fresh retention and cluster identity checks must pass before `maintenance-authority.tsv` records `suite verified` and real maintenance starts. Raw responses/logs stay private. This reuses existing rights, job, scenarios, refs and budget, changes no production manifests, and remains a post-merge live gate. It audits these boundaries and does not add field-level RBAC or complete multi-user security.
 
@@ -1841,7 +1841,7 @@ checkpoint refusal and paused retention, then conditionally deletes only that
 fixture identity. The Python evidence adapter replays the unchanged policy with
 and without that sole Pod in both captured samples; generic failure alone never
 passes. A fresh successful checkpoint must follow cleanup before recovery. See
-[ADR 0042](decisions/0042-exercise-lingering-pod-checkpoint-refusal.md). Existing
+[ADR 0042](adr/0042-exercise-lingering-pod-checkpoint-refusal.md). Existing
 job/scenario/ref counts, credentials, budget and production templates are unchanged.
 Heavy cross-platform tests run in PR CI; live acceptance remains post-merge.
 
@@ -1857,7 +1857,7 @@ failure; restored grants and exact Role identity/rules must pass before the next
 case. Both roots use the existing captured-root convergence validation. Workload,
 Pod, ledger, Secret and data retention permits no replacement or recovery.
 
-See [ADR 0043](decisions/0043-exercise-maintenance-write-denial.md). Raw evidence
+See [ADR 0043](adr/0043-exercise-maintenance-write-denial.md). Raw evidence
 stays private; validated `maintenance-write-denied-<target>.refusal.json` and
 `.outcome.json` describe native refusal and successful Role restoration. Existing
 jobs, scenarios, refs, credentials, production resources and budget are unchanged.
@@ -1881,7 +1881,7 @@ replicas/Pod absence and unchanged paused-state/data/ledger evidence. A fresh
 unchanged checkpoint must precede explicit recovery and one same-ReplicaSet Pod
 replacement. Verify adoption records/result against a candidate snapshot before
 advancing the checked baseline. See
-[ADR 0044](decisions/0044-exercise-maintenance-patch-response-loss.md).
+[ADR 0044](adr/0044-exercise-maintenance-patch-response-loss.md).
 
 Safe reports are `maintenance-response.barrier.json`, `.outcome.json`,
 `.checkpoint.json` and `.recovered.json`. Raw API/Workflow/worker/proxy evidence
@@ -1909,7 +1909,7 @@ workload recovery, Pod replacement or retention-baseline advancement. Inspect
 evidence. Raw API/Workflow/worker/proxy/Secret evidence stays private. Distinct
 create-only proxy assets and TLS directories preserve earlier evidence.
 
-See [ADR 0045](decisions/0045-exercise-application-patch-response-loss.md).
+See [ADR 0045](adr/0045-exercise-application-patch-response-loss.md).
 Applications are already disabled: unchanged resourceVersion is valid for these
 no-ops. Deployment version/generation/scale checks remain intact. No jobs,
 scenarios, refs, credentials, rights or budget changes; heavy checks remain on
@@ -1937,7 +1937,7 @@ stay private. Failed/ambiguous enablement or native disablement stops without
 write retries, manual sync or automatic repair. Existing job/scenarios/refs/
 rights/budget stay unchanged; heavy checks run on PR CI, full live proof stays
 post-merge and no local execution is authorized. See
-[ADR 0046](decisions/0046-exercise-child-auto-sync-transition.md).
+[ADR 0046](adr/0046-exercise-child-auto-sync-transition.md).
 
 ### Maintenance refusal before first adoption
 
@@ -1959,7 +1959,7 @@ Workflow, worker, API and refusal logs remain private. Unexpected success,
 unrelated failure, timeout, failed setup or retention stops before adoption.
 No jobs, scenarios, refs, credentials, rights or budget are added. Heavy suites
 stay on PR CI; live proof remains post-merge trusted-main. See
-[ADR 0047](decisions/0047-refuse-maintenance-before-initial-adoption.md).
+[ADR 0047](adr/0047-refuse-maintenance-before-initial-adoption.md).
 
 ### Maintenance refusal during receipt-only recovery
 
@@ -1979,18 +1979,18 @@ No deletion, fixture injection, repair, new recovery or baseline advancement
 occurs. Inspect stage `maintenance-receipt-only` and validated `.outcome.json`;
 raw observations/logs remain private. Same job/ref/rights/budget; heavy checks
 remain on PR CI and live proof is post-merge in the existing receipt-only job.
-See [ADR 0048](decisions/0048-refuse-maintenance-during-receipt-only-recovery.md).
+See [ADR 0048](adr/0048-refuse-maintenance-during-receipt-only-recovery.md).
 
 ### Complete schema-parent repeat acceptance
 
 The existing trusted-main initial job runs `schema-migration-parent.sh` after
 verified happy maintenance pause and before its approved manual recovery
-([ADR 0050](decisions/0050-exercise-paused-schema-migration-repeats.md)).
+([ADR 0050](adr/0050-exercise-paused-schema-migration-repeats.md)).
 Preflight/request/selection inputs, published definitions and the immutable intent
 policy are checked. The schema must already contain all 18 released migrations
 before any parent executes. None-intent must fail only its actual validator with
 semantic exit 2 before quiescence/Job creation. The two valid current-schema
-repeat runs now use unchanged v2 ([ADR 0063](decisions/0063-exercise-retained-schema-admission.md)).
+repeat runs now use unchanged v2 ([ADR 0063](adr/0063-exercise-retained-schema-admission.md)).
 Install its existing standalone ledger-get grant explicitly and verify source/
 authority identity plus bounded effective named-read rights. Preserve v1 for
 bootstrap, none-intent and Job-create denial. Before either v2 success, submit
@@ -2032,7 +2032,7 @@ not change the historical admission inputs. V2 wait/watch wrappers are bounded
 to 1,830/1,840 seconds around its published 1,800-second parent deadline; v1 and
 the existing 60-minute CI job budget are unchanged.
 
-The [Job-create denial case](decisions/0051-exercise-schema-job-create-denial.md)
+The [Job-create denial case](adr/0051-exercise-schema-job-create-denial.md)
 runs after none-intent and before either repeat. Capture the published migration
 Role, atomically remove only Jobs create with UID/resourceVersion/rules tests,
 and check effective create=no/get=yes/watch=yes using the fixture admin's
@@ -2049,7 +2049,7 @@ retention. No EXIT repair, new recovery or local operation is authorized.
 
 ### Complete schema-parent first-install acceptance
 
-[ADR 0052](decisions/0052-exercise-complete-schema-first-install.md) runs
+[ADR 0052](adr/0052-exercise-complete-schema-first-install.md) runs
 `schema-migration-install.sh` only instead of the initial leg's first CI-only
 successful migration invocation. Runtime-role denial and the independent
 checkpoint remain; other five scenarios retain their original migration path.
@@ -2084,7 +2084,7 @@ recovery path is added. Heavy checks stay on PR CI; live proof is post-merge.
 
 ### Complete schema-parent SQL contention acceptance
 
-[ADR 0053](decisions/0053-exercise-schema-sql-contention.md) adds
+[ADR 0053](adr/0053-exercise-schema-sql-contention.md) adds
 `schema-migration-contention.sh` between first-install setup and its successful
 native parent in the existing initial leg. The shared native coordinator submits
 the unchanged template/request for both executions. It keeps native transport
@@ -2122,7 +2122,7 @@ outcomes remain separate work.
 
 ### Complete schema-parent attempted-DDL rollback
 
-[ADR 0054](decisions/0054-exercise-schema-ddl-rollback.md) adds
+[ADR 0054](adr/0054-exercise-schema-ddl-rollback.md) adds
 `schema-migration-rollback.sh` after proved contention release and before fresh
 installation, only in the existing initial leg. Its fixture matches the selected
 component rollback test: a migration-owned schema, artifacts collision table,
@@ -2172,7 +2172,7 @@ only bounded `schema-qualification-{retained,final}.outcome.json` summaries beco
 public after verification. No new CI job/scenario, request/ref, credential, right
 or budget; the other five legs remain unchanged. Heavy PR CI verifies offline
 contracts; live proof remains post-merge main-only. SQL refusal fault injection,
-preparation composition and host cutover remain deferred. See [ADR 0067](decisions/0067-exercise-read-only-schema-qualification.md).
+preparation composition and host cutover remain deferred. See [ADR 0067](adr/0067-exercise-read-only-schema-qualification.md).
 
 
 ### Complete database-preparation parent
@@ -2199,7 +2199,7 @@ wildcard exclusion. Every failure stops without retry, repair or recovery.
 
 This stays within the existing initial job and 60-minute budget, with unchanged
 other five legs, requests/refs, credentials and permissions. Heavy checks stay on
-PR CI; live proof is post-merge main-only. See [ADR 0069](decisions/0069-exercise-complete-database-preparation.md).
+PR CI; live proof is post-merge main-only. See [ADR 0069](adr/0069-exercise-complete-database-preparation.md).
 Failure/partial-state injection, general upgrades and operational cutover remain
 separate; existing standalone passes do not establish the new complete parent.
 
@@ -2221,12 +2221,12 @@ Workflow and restored authority through existing recovery/final gates. No Job is
 added to the six-Job cohort; no wildcard inventory exception or old denial-file
 overwrite. Nothing repairs on EXIT. No new GitHub job/scenario/ref/credential/
 right/budget, production change or local action. Heavy checks remain on PR CI;
-full-parent live proof stays post-merge. See [ADR 0070](decisions/0070-refuse-complete-preparation-job-create.md).
+full-parent live proof stays post-merge. See [ADR 0070](adr/0070-refuse-complete-preparation-job-create.md).
 Partial SQL and ambiguous-commit outcomes remain outside this refusal case.
 
 ## Complete preparation qualification-create denial
 
-[ADR 0071](decisions/0071-refuse-preparation-qualification-job-create.md) adds one
+[ADR 0071](adr/0071-refuse-preparation-qualification-job-create.md) adds one
 initial-job CI copy with a reversible post-migration suspend barrier. Actual
 successful migration, complete admission and unchanged state must qualify before
 the existing grants Role loses only Jobs create. Effective denial/get-watch checks

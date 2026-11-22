@@ -35,7 +35,7 @@ silently create another normative level.
 | Coding harness and verification tiers | [docs/development/harness.md](docs/development/harness.md) |
 | Engineering and Python/GitOps standards | [docs/development/engineering-standards.md](docs/development/engineering-standards.md) |
 | Dependency admission and supply chain | [docs/development/dependency-policy.md](docs/development/dependency-policy.md) |
-| Architecture decisions | [docs/decisions](docs/decisions/README.md) |
+| Architecture decisions | [docs/adr](docs/adr/README.md) |
 | Cross-repository milestones and planned work | [docs/roadmap/milestones.md](docs/roadmap/milestones.md) |
 | Supported commands and layout | [README.md](README.md) |
 | Failure diagnosis and recovery | [docs/troubleshooting.md](docs/troubleshooting.md) |

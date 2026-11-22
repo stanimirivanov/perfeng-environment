@@ -38,7 +38,7 @@ RoleBinding, ClusterRole, ClusterRoleBinding and APIService. It grants no Namesp
 Secret authority. These are kind/namespace permissions, not restrictions on every RBAC
 verb or resource name: the immutable chart and exact rendered identity checks remain
 essential. The existing `perfeng-local` Project is unchanged and does not gain this source
-or any cluster-scoped permission. See [ADR 0012](decisions/0012-select-verified-resource-metrics.md).
+or any cluster-scoped permission. See [ADR 0012](adr/0012-select-verified-resource-metrics.md).
 
 Metrics Server runs on the Linux control-plane node with its explicit NoSchedule
 toleration, not the generator/SUT nodes. It verifies kubelet leaves using the cluster CA.

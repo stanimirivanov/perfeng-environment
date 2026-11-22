@@ -16,7 +16,7 @@ This workflow consumes `kubernetes-benchmark-evidence/v1` from contracts bundle
 Ordinary validation requires no sibling or network. The pinned integration tier
 checks the exact source Git revision separately. Environment composition owns
 policy/collection; `k8s-infrastructure` retains cluster lifecycle ownership.
-See [ADR 0011](decisions/0011-qualify-local-kubernetes-benchmarks.md).
+See [ADR 0011](adr/0011-qualify-local-kubernetes-benchmarks.md).
 
 `profiles/kubernetes/local-kind-integration.json` selects the existing named
 three-node kind cluster, Linux AMD64, Kubernetes v1.35.0 and the infrastructure

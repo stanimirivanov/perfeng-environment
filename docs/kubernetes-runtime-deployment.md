@@ -188,7 +188,7 @@ This controller can create Pods and namespaces across the **dedicated disposable
 cluster and manage per-Run RBAC. Ordinary RBAC cannot constrain creates by name
 prefix. Controller compromise can therefore compromise that cluster despite the
 absence of Secret access, bind/escalate verbs and namespace deletion. This selection
-must never be used on a shared/cloud cluster. See [ADR 0013](decisions/0013-select-local-benchmark-runtime.md).
+must never be used on a shared/cloud cluster. See [ADR 0013](adr/0013-select-local-benchmark-runtime.md).
 
 Pause again before investigating an unsafe rollout. Preserve the migration Job,
 database, old ConfigMaps, reservations and evidence. A Git revert alone is **not**

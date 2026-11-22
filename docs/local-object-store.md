@@ -150,7 +150,7 @@ external Secrets and generated PVC identity. It self-heals reviewed drift while
 pruning remains disabled. Do not run the Helm deployment command while
 `perfeng-local-seaweedfs` is active. Adoption, rollback and the bounded
 self-healing acceptance check follow
-[ADR 0002](decisions/0002-stateful-gitops-ownership.md) and the
+[ADR 0002](adr/0002-stateful-gitops-ownership.md) and the
 [local GitOps guide](local-gitops.md#seaweedfs-ownership-and-adoption).
 
 References: [SeaweedFS pinned source](https://github.com/seaweedfs/seaweedfs/tree/4.45),

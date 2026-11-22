@@ -268,7 +268,7 @@ def _template_violations(root: Path) -> list[Violation]:
 
 
 def _adr_violations(root: Path) -> list[Violation]:
-    decisions = root / "docs/decisions"
+    decisions = root / "docs/adr"
     if not decisions.is_dir():
         return []
     index_path = decisions / "README.md"
@@ -329,7 +329,7 @@ def _adr_violations(root: Path) -> list[Violation]:
     if numbers and numbers != list(range(1, max(numbers) + 1)):
         violations.append(
             Violation(
-                "docs/decisions/README.md",
+                "docs/adr/README.md",
                 1,
                 "adr.sequence",
                 f"ADR sequence is {numbers!r}",

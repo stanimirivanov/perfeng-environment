@@ -86,13 +86,13 @@ It is not Go-cache retirement, refresh-rate/freshness or outage qualification.
 The complete provider checklist changes the pending `real-key-rotation` gate to
 `control-plane-real-key-rotation`; partial observations do not. The control-plane
 must advance its pinned fixture and rerun its own qualification before claiming
-those cache semantics. See [ADR 0075](decisions/0075-qualify-disposable-keycloak-rotation.md).
+those cache semantics. See [ADR 0075](adr/0075-qualify-disposable-keycloak-rotation.md).
 
 Only non-secret check names, the image and proof limits reach the JSON receipt.
 No credentials, tokens, private keys or generated receipt are committed. This
 fixture does not activate public serving or complete control-plane #356. Real
 control-plane conformance/cache rotation and BFF browser/shared
-pilot gates remain explicit. See [ADR 0074](decisions/0074-qualify-disposable-keycloak.md).
+pilot gates remain explicit. See [ADR 0074](adr/0074-qualify-disposable-keycloak.md).
 
 The client attributes and subject mapper follow the pinned upstream sources:
 [exchange controls](https://github.com/keycloak/keycloak/blob/26.8.2/server-spi-private/src/main/java/org/keycloak/protocol/oidc/OIDCConfigAttributes.java)

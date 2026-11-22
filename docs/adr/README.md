@@ -172,3 +172,4 @@ How will the assumptions and consequences be verified?
 | [0073](0073-defer-schema-registry-admission.md) | Accepted | Retain Option 0 immutable distributions, record Option C no-go and defer SR-31 recovery qualification. |
 | [0074](0074-qualify-disposable-keycloak.md) | Proposed | Qualify a disposable real Keycloak machine profile without enabling provider serving. |
 | [0075](0075-qualify-disposable-keycloak-rotation.md) | Proposed | Qualify real signing-key overlap and retirement in the owned temporary realm, keeping Go cache admission separate. |
+| [0076](0076-route-configuration-proposals-to-source-owners.md) | Accepted | Keep authored configuration with its service or component owner and route proposals through reviewed Environment mappings. |

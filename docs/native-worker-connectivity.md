@@ -12,7 +12,7 @@
 
 ## Boundary and prerequisites
 
-This opt-in gateway implements [ADR 0006](decisions/0006-loopback-native-worker-connectivity.md).
+This opt-in gateway implements [ADR 0006](adr/0006-loopback-native-worker-connectivity.md).
 It uses existing ClusterIP Services; it does not install ingress, replace the
 cluster, expose NodePorts or compete with Argo CD. All listeners bind IPv4
 loopback. A worker on a different machine needs a separately reviewed topology.
@@ -45,8 +45,8 @@ not prove freedom from future advisories; security updates require release revie
 
 ## Managed setup
 
-[ADR 0010](decisions/0010-manage-native-connectivity-workflow.md) defines this
-workflow. [ADR 0029](decisions/0029-require-patched-native-gateway-toolchain.md)
+[ADR 0010](adr/0010-manage-native-connectivity-workflow.md) defines this
+workflow. [ADR 0029](adr/0029-require-patched-native-gateway-toolchain.md)
 requires Go 1.27.3 after GO-2026-6809. The existing selected asset was built with
 Go 1.26.9 and remains recorded truthfully, but new setup/start operations reject
 it with `RELEASE_TOOLCHAIN`. Publish and select a patched replacement through the
