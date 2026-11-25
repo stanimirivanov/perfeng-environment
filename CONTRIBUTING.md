@@ -231,7 +231,15 @@ environment. Narrow checks MAY provide interim feedback but MUST NOT be
 presented as equivalent to the required suite.
 
 Run `make verify` for the repository-local inner loop and `make validate` for
-complete non-live acceptance. Changes to immutable sibling selections also run
+complete non-live acceptance. Run `make command-routes-check` before opening a
+PR that changes command routes. Local Make scans the working tree, including
+non-ignored untracked files. The same target runs against a clean checkout in
+the Ubuntu PR validation job and fails that job on findings. Follow each
+`fix:` diagnostic and obtain explicit maintainer sign-off in the PR before
+merging changes to the baseline, guard, or gate wiring. See the
+[command-route review procedure](docs/development/harness.md#reviewing-command-routes).
+
+Changes to immutable sibling selections also run
 `make release-selection-check`. The exact commands and prerequisites are
 inventoried in the [harness guide](docs/development/harness.md).
 
