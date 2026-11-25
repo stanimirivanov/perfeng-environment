@@ -4,6 +4,7 @@
 
 - Use the [documentation map](../README.md) to load only task-relevant guidance.
 - Run `make bootstrap` once, `make verify` while editing, and `make validate` before handoff.
+- Run `uv run --locked --offline python -m harness offline` for repository policy feedback.
 - Helm rendering and immutable sibling-repository validation are explicit specialized tiers.
 - `task bootstrap`, `task status`, `task smoke`, and `task destroy` are live operator actions and never run from validation aggregates.
 - Turn recurring review findings into clearer guidance or an early deterministic check.
@@ -34,6 +35,24 @@ the offline `make verify` inner loop.
 
 Unavailable checks follow the constrained-environment protocol in
 [CONTRIBUTING.md](../../CONTRIBUTING.md#verification-and-constrained-environments).
+
+## Offline harness pilot
+
+After `make bootstrap`, run these commands from the repository root.
+
+```sh
+uv run --locked --offline python -m harness --help
+uv run --locked --offline python -m harness offline
+```
+
+The [check manifest](../../harness/checks.toml) registers repository policy.
+The stage runs the same [validator](../../scripts/repository_policy.py) as
+`make docs-check` and passes through its output and exit status. Follow the
+validator's `fix:` diagnostic on a policy failure. If a check exceeds the
+pilot's two-minute timeout, the pilot exits with status 124. Run
+`make docs-check` to investigate the validator directly. The pilot needs no
+network access, credentials, or Kubernetes context. Run `make verify` for the
+full repository-local checks and `make validate` for complete non-live acceptance.
 
 ## Harness principles
 
