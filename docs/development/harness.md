@@ -57,8 +57,9 @@ Follow the `fix:` diagnostic on a policy failure and use `make docs-check` to
 rerun that validator directly. To investigate a composition failure, run
 `uv run --locked --offline python scripts/gitops.py validate` directly.
 The pilot needs no network access, credentials, or Kubernetes context. Run
-`make verify` for all repository-local checks and `make validate` for complete
-non-live acceptance.
+`make verify` for the repository-local inner loop and `make validate` for
+complete non-live acceptance. Run `make command-routes-check` separately before
+opening a PR that changes command routes.
 
 ## Reviewing command routes
 
