@@ -117,7 +117,7 @@ or expanding variables, running functions, or invoking shell recipes.
 
 The supported forms cover the repository's conventional Makefiles. Includes,
 computed names, Make functions outside the documented condition, continued
-lines, repeated target or variable definitions, target-specific settings, and
+lines, escaped declarations, repeated target or variable definitions, target-specific settings, and
 special execution settings such as `.DEFAULT_GOAL` or `SHELL` produce an
 `unsupported-make` finding. Multiple conventional names in one directory also
 fail because GNU Make would choose one by filename precedence. Use a supported

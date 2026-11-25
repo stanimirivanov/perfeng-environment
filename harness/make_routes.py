@@ -13,6 +13,7 @@ MAKEFILES = ("GNUmakefile", "makefile", "Makefile")
 NAME = r"[A-Za-z0-9_][A-Za-z0-9_./-]*"
 VARIABLE = r"[A-Za-z_][A-Za-z0-9_]*"
 LITERAL_NAME = re.compile(NAME)
+CONTROL = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
 RULE = re.compile(rf"(?P<target>\.PHONY|{NAME})[ \t]*:[ \t]*(?P<prerequisites>.*)")
 ASSIGNMENT = re.compile(rf"(?P<name>{VARIABLE})[ \t]*(?P<operator>\?=|:=|=)[ \t]*(?P<value>.*)")
 CONDITION = re.compile(rf"ifneq \(\$\(strip \$\((?P<name>{VARIABLE})\)\),\)")
@@ -106,7 +107,12 @@ def referenced_definitions(
 
 
 def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, bytes]]:
-    lines = source.decode("utf-8").replace("\r\n", "\n").split("\n")
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError as error:
+        line = source.count(b"\n", 0, error.start) + 1
+        raise UnsupportedMake(path, line, "Makefile must be UTF-8") from error
+    lines = text.replace("\r\n", "\n").removesuffix("\n").split("\n")
     if len(lines) > MAX_LINES:
         raise UnsupportedMake(path, MAX_LINES + 1, f"Makefile exceeds {MAX_LINES} lines")
 
@@ -119,6 +125,8 @@ def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, byte
     condition: Condition | None = None
     recipe_context = len(lines) + 1
     for number, line in enumerate(lines, start=1):
+        if CONTROL.search(line):
+            raise UnsupportedMake(path, number, "unsupported control character in Makefile")
         if line.startswith("\t"):
             if target is None:
                 raise UnsupportedMake(path, number, "recipe has no literal target")
@@ -133,6 +141,8 @@ def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, byte
             if line.endswith("\\"):
                 raise UnsupportedMake(path, number, "continued Make declarations are unsupported")
             declaration = line.partition("#")[0].lstrip(" \t")
+            if "\\" in declaration:
+                raise UnsupportedMake(path, number, "escaped Make declarations are unsupported")
             if not declaration:
                 continue
             syntax = declaration.rstrip(" \t")
@@ -177,7 +187,9 @@ def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, byte
                     raise UnsupportedMake(
                         path, number, "expected a literal target rule or simple variable assignment"
                     )
-                prerequisites = rule["prerequisites"].split()
+                prerequisites = (
+                    re.split(r"[ \t]+", rule["prerequisites"]) if rule["prerequisites"] else []
+                )
                 if any(not LITERAL_NAME.fullmatch(name) for name in prerequisites):
                     raise UnsupportedMake(
                         path, number, "expected literal prerequisites without modifiers"

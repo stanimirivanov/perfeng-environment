@@ -112,6 +112,15 @@ definition = "sha256:a401a442a8a6b59119dcfb18f6f4f4c05648bc7114a22a411972ef3e8c4
                 )
                 self.assertFalse((self.checkout / "parse-marker").exists())
 
+    def test_rejects_a_make_assignment_with_an_escaped_comment(self) -> None:
+        self.write("Makefile", "RUN = echo \\#literal\nfixture:\n\t$(RUN)\n")
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "unsupported-make: Makefile:1: escaped Make declarations are unsupported",
+            result.stderr,
+        )
+
     def test_rejects_a_makefile_that_would_shadow_another(self) -> None:
         self.write("Makefile", "fixture:\n")
         self.write("GNUmakefile", "fixture:\n")
