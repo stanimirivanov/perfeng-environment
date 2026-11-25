@@ -1,0 +1,5 @@
+[[checks]]
+id = "repository-policy"
+stage = "offline"
+invocation = ["scripts/repository_policy.py"]
+guide = "docs/development/harness.md#offline-harness-pilot"
