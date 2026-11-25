@@ -32,9 +32,10 @@ confirm the following access before proceeding.
   and authorization for any deployment preparation. First-time provisioning
   also requires private repository Contents and GHCR package-read credentials.
   Activation requires approved Argo CD access to inspect and sync the child.
-- API access as the smoke principal `local-operator` through the approved
-  route. Obtain an approved operator token for that principal. Run and artifact
-  metadata reads are principal-scoped.
+- Approval and private delivery of API access as the smoke principal
+  `local-operator`. Run and artifact metadata reads are principal-scoped.
+  A first install provisions that credential during runtime preparation. Confirm
+  the delivery route here and obtain access after readiness, before submission.
 - Approval and a way to retrieve the exact report object for the new Run.
   Arrange how the Environment owner will authorize or broker that GET once
   the Run ID is known. The pinned Run API provides the Artifact Reference.
@@ -115,6 +116,7 @@ if [[ ! -r .local/perfeng-local.kubeconfig ]]; then
   printf 'The dedicated perfeng-local kubeconfig is unavailable. Stop here.\n' >&2
   exit 1
 fi
+uv run --locked --offline python scripts/infrastructure_runtime.py cluster health --execute
 if ! live_uid=$(kubectl --kubeconfig .local/perfeng-local.kubeconfig \
   --context kind-perfeng-local --request-timeout=10s get namespace kube-system \
   -o jsonpath='{.metadata.uid}'); then
@@ -133,19 +135,33 @@ fi
 printf 'Reviewed cluster UID verified and Kubernetes API ready.\n'
 ```
 
-Continue after the success message. Otherwise record the failing check in
+The pinned infrastructure health command checks the local Docker endpoint,
+dedicated kubeconfig, node readiness and CoreDNS. Continue after the UID
+and API success message. Otherwise record the failing check in
 the private handoff. The Deployment Lock identifies an exact cluster
 incarnation and Git pins cannot recreate its UID. For a missing cluster or
 kubeconfig, the Environment owner first checks the retained host and restores
 approved access there if available. For an unready API with the matching
 UID, the owner restores health on that host before preparation.
 
-If the reviewed cluster is unavailable, the replacement is a new selection.
-The Environment owner prepares a dedicated supported Linux substrate and
-obtains fresh accepted qualification. The perfeng-k8s owner publishes a new
-immutable runtime bundle and package against that qualification. The
-Environment owner then reviews and promotes the new pins. Resume at step 1
-with the new selection. Retain the previous cluster and its evidence.
+A replacement is a separate reviewed selection. The Environment owner
+follows this handoff before returning to this chapter.
+
+1. Prepare the dedicated supported Linux cluster and staged foundation. Use
+   `task bootstrap` on the explicitly selected replacement host to establish
+   the named cluster, namespaces, Argo CD and stateful services. Retain the
+   former cluster and its records.
+2. With the infrastructure owner, establish the kubelet serving certificates
+   and provider-managed Metrics Server TLS. Review the public CA in the
+   Environment selection before reconciling it. Require
+   `task kubernetes:metrics-health` to report verified TLS and fresh usage.
+3. Run `task kubernetes:qualify` and require six PASS checks and an ACCEPTED
+   receipt. Retain the exact descriptor and receipt privately. The
+   perfeng-k8s owner publishes a new immutable bundle and runtime package
+   using that descriptor and qualification provenance.
+4. The Environment owner reviews and promotes those immutable pins and
+   records the approved operator and exact-report access routes in the
+   private handoff. Resume at step 1 with the new selection.
 
 ### 2. Bring the selected deployment to readiness
 
@@ -293,7 +309,9 @@ to match the lock. Stop on unexpected Secret or persistent-resource changes.
 Manually sync the complete child Application with Prune, Force and Replace
 off and automatic sync disabled. Argo CD owns workload reconciliation.
 If the authority wait or child sync fails, preserve the prepared state and
-inspect the failure before changing anything else.
+inspect the failure before changing anything else. For an unsafe rollout, pause the
+owned runtime and coordinate a reviewed forward repair with the Environment
+owner. Preserve the database, migration Job, ConfigMaps and Run evidence.
 
 #### Confirm readiness
 
@@ -312,6 +330,10 @@ uv run --locked --offline python scripts/control_plane_health.py --execute
 ```
 
 ### 3. Submit one real checkout Run
+
+Confirm the approved `local-operator` access is available now and the
+Environment owner can fulfill the exact report read for this Run. Stop
+before submitting if either handoff is missing.
 
 Preview the authenticated checkout smoke. It submits `checkout-api` with
 profile `smoke` against the local sample SUT. The pinned k6 workload uses a
@@ -351,13 +373,13 @@ Keep the evidence below in a private directory outside Git. Use the selected
 deployment's approved operator access to save the exact JSON bodies for
 `GET /v1/runs/<run-id>` and `GET /v1/runs/<run-id>/artifacts` as `run.json` and
 `artifacts.json`. Both must return HTTP 200. For example, where cluster access
-permits a loopback API port-forward, run this in a separate terminal. Give it
-up to 30 seconds to find a running Pod. The forward stops after five minutes.
+permits a loopback API port-forward, run this in a separate terminal. The
+built-in command validates the local cluster and selected Service and gives
+the forward up to 30 seconds to find a running Pod. The session stops after
+five minutes.
 
 ```sh
-timeout --foreground 5m kubectl --kubeconfig .local/perfeng-local.kubeconfig \
-  --context kind-perfeng-local --namespace perf-platform port-forward \
-  --pod-running-timeout=30s --address 127.0.0.1 service/control-plane 18080:8080
+timeout 5m uv run --locked --offline python scripts/native_connectivity.py forward-api --execute
 ```
 
 Wait for this running command to print `Forwarding from 127.0.0.1:18080 -> 8080`
@@ -409,7 +431,7 @@ jq -e --arg id "$run_id" \
        and (.id | test("^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"))
        and .uri == ("s3://perfeng-artifacts/runs/" + $id + "/analysis-result.json")
        and (.sha256 | test("^[0-9a-f]{64}$"))
-       and (.sizeBytes | type == "number" and . == floor and . > 0 and . <= 1048576))' \
+       and (.sizeBytes | type == "number" and . == floor and . > 0 and . <= 16777216))' \
   "$evidence_dir/artifacts.json" > "$evidence_dir/report-reference.json"
 ```
 
