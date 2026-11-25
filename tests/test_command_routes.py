@@ -190,6 +190,7 @@ jobs:
             ("      - run: [echo, unexpected]\n", "6: expected a YAML scalar"),
             ("      - run: &commands echo unexpected\n", "6: YAML anchors"),
             ("      - uses: '${{ inputs.action }}'\n", "6: expected a literal nonempty uses"),
+            ("      - uses: './${{inputs.action}}'\n", "6: expected a literal nonempty uses"),
         ):
             with self.subTest(declaration=declaration):
                 self.write(path, source + declaration)

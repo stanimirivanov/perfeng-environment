@@ -265,7 +265,9 @@ class Workflow:
         kind = "run" if "run" in fields else "uses"
         key, node = fields[kind]
         value = self.scalar(node)
-        if not value.strip() or (kind == "uses" and not ACTION_REFERENCE.fullmatch(value)):
+        if not value.strip() or (
+            kind == "uses" and ("${{" in value or not ACTION_REFERENCE.fullmatch(value))
+        ):
             raise self.invalid(node, f"expected a literal nonempty {kind} declaration")
 
         settings = self.settings(fields, {"name", "env", "uses", "run", *RUN_DEFAULTS})
