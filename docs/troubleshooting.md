@@ -650,6 +650,15 @@ that completes with five verified artifacts proves API admission, PostgreSQL
 persistence, Kubernetes execution, SeaweedFS publication, normalization and
 reporting for the selected runtime bundle.
 
+### The checkout report cannot be verified
+
+Use the [operator book](local-checkout-operator-book.md#4-verify-the-exact-analysis-report)
+to check the Run and report registration, approved object access, registered
+byte count and digest, and reviewed policy linkage. Preserve the original Run
+and report. If access is unavailable or the evidence differs, give the
+Environment owner the Run ID, deployment selection and failing check through
+the approved reporting channel. Keep the object body and credentials private.
+
 ## Validate immutable selections offline
 
 Use these **read-only** checks before blaming live reconciliation:
