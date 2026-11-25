@@ -3,3 +3,9 @@ id = "repository-policy"
 stage = "offline"
 invocation = ["scripts/repository_policy.py"]
 guide = "docs/development/harness.md#offline-harness-pilot"
+
+[[checks]]
+id = "gitops-composition"
+stage = "offline"
+invocation = ["scripts/gitops.py", "validate"]
+guide = "docs/development/harness.md#offline-harness-pilot"

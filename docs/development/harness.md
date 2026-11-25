@@ -4,7 +4,7 @@
 
 - Use the [documentation map](../README.md) to load only task-relevant guidance.
 - Run `make bootstrap` once, `make verify` while editing, and `make validate` before handoff.
-- Run `uv run --locked --offline python -m harness offline` for repository policy feedback.
+- Run `uv run --locked --offline python -m harness offline` to check repository policy and GitOps composition.
 - Helm rendering and immutable sibling-repository validation are explicit specialized tiers.
 - `task bootstrap`, `task status`, `task smoke`, and `task destroy` are live operator actions and never run from validation aggregates.
 - Turn recurring review findings into clearer guidance or an early deterministic check.
@@ -45,15 +45,18 @@ uv run --locked --offline python -m harness --help
 uv run --locked --offline python -m harness offline
 ```
 
-The [check manifest](../../harness/checks.toml) registers repository policy.
-The stage runs the same [validator](../../scripts/repository_policy.py) as
-`make docs-check` and passes through its output and any exit status
-from normal completion. Follow the validator's `fix:` diagnostic on a policy
-failure. If a check exceeds the pilot's two-minute deadline, the harness
-identifies the timed-out check on stderr and returns status 124. Run
-`make docs-check` to investigate the validator directly. The pilot needs no
-network access, credentials, or Kubernetes context. Run `make verify` for the
-full repository-local checks and `make validate` for complete non-live acceptance.
+The stage runs repository policy first and then checks GitOps composition.
+It passes through each validator's output and stops at the first failure with
+that validator's exit status. If a check exceeds the two-minute deadline, the
+harness identifies it on stderr and returns status 124. The two checks are
+registered in the [check manifest](../../harness/checks.toml).
+
+Follow the `fix:` diagnostic on a policy failure and use `make docs-check` to
+rerun that validator directly. To investigate a composition failure, run
+`uv run --locked --offline python scripts/gitops.py validate` directly.
+The pilot needs no network access, credentials, or Kubernetes context. Run
+`make verify` for all repository-local checks and `make validate` for complete
+non-live acceptance.
 
 ## Harness principles
 
