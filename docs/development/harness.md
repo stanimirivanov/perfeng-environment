@@ -140,8 +140,14 @@ This covers working directories, environment and variable declarations,
 preconditions, prompts, and silent mode. The fingerprint covers the declared
 call and its settings. A called task has its own record. The guard preserves
 the order of declarations and sequences because Task variables can reference
-earlier definitions. Comments and task-level `desc` and `summary` are excluded.
-Only command text supplies interpreter invocation evidence.
+earlier definitions. Comments, task-level `desc` and `summary`, and precondition
+`msg` text are excluded. Precondition predicates and prompts remain part of the
+fingerprint. Only command text supplies interpreter invocation evidence.
+
+Use scalar output modes and literal option lists. Variable declarations support
+scalar values, flat scalar lists in `vars`, or a map with one scalar `sh`, `ref`,
+or `value` declaration and an optional boolean `secret`. Unsupported options
+and field shapes produce an `unsupported-task` finding.
 
 Scripts, conditions, shell variables, and templates such as `{{.CLI_ARGS}}`
 are retained as source text. The guard never invokes Task or a shell or

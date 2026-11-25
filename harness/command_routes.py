@@ -450,6 +450,8 @@ def load_baseline(root: Path) -> dict[str, str]:
 
 
 def finding(rule: str, location: str, reason: str, fix: str) -> None:
+    if len(reason) > 256:
+        reason = reason[:253] + "..."
     print(f"command-routes/{rule}: {location}: {reason}; fix: {fix}; see {GUIDE}", file=sys.stderr)
 
 

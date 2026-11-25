@@ -71,6 +71,9 @@ tasks:
       Preview the fixture.
     deps: [setup]
     prompt: Run the fixture?
+    preconditions:
+      - sh: test -d .
+        msg: Run from a directory
     silent: true
     cmds:
       - task: status
@@ -84,7 +87,7 @@ tasks:
 id = "task:Taskfile.yml#local:run"
 owner = "Fixture owner"
 purpose = "Exercise the reviewed operator task."
-definition = "sha256:e6f7f2566d4825d46d63ac1ab6e78124c1d47e71688df74554353b628db7c5e1"
+definition = "sha256:77e688deee38bc54dc25a855936f249759354b19c37775175d61e641994e9726"
 
 [[routes]]
 id = "task:Taskfile.yml#setup"
@@ -102,9 +105,9 @@ definition = "sha256:de67d44cc4fc550bc73aa3f47e3f33e06232354b59670a50d6c00d5a41b
         self.write("help_only.py", "def value():\n    return 42\n")
         self.write(
             "Taskfile.yml",
-            taskfile.replace("Run the fixture\n", "Run the updated fixture\n").replace(
-                "Preview the fixture.", "For context, see python help_only.py"
-            ),
+            taskfile.replace("Run the fixture\n", "Run the updated fixture\n")
+            .replace("Preview the fixture.", "For context, see python help_only.py")
+            .replace("Run from a directory", "Read python help_only.py"),
         )
         accepted = self.guard()
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
@@ -116,6 +119,7 @@ definition = "sha256:de67d44cc4fc550bc73aa3f47e3f33e06232354b59670a50d6c00d5a41b
             ("MODE: preview, summary: included", "MODE: apply, summary: included"),
             ("summary: included", "summary: changed"),
             ("prompt: Run the fixture?", "prompt: Continue?"),
+            ("sh: test -d .", "sh: test -f ."),
             ("silent: true", "silent: false"),
             ("  MODE: preview", "  MODE: apply"),
             ("    deps: [setup]", "    dir: elsewhere\n    deps: [setup]"),
@@ -145,12 +149,14 @@ vars:
 tasks:
   run:
     dir: run
-    cmds:
-      - cmd: python helper.py
+    cmd: {cmd: python helper.py}
+  call:
+    cmd: {task: run}
 """,
         )
         result = self.guard()
         self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("'task:ops/taskfile.yaml#call'", result.stderr)
         self.assertIn("'script:ops/run/helper.py'", result.stderr)
         self.assertIn("'script:ops/shared.py'", result.stderr)
         self.assertNotIn("'script:helper.py'", result.stderr)
@@ -167,6 +173,29 @@ tasks:
             ("tasks:\n  job: &anchor {cmds: [true]}\n", 3, "YAML anchors"),
             ("tasks:\n  job: {<<: {cmds: [true]}}\n", 3, "merge keys"),
             ("tasks: [\n", 3, "invalid Taskfile YAML"),
+            ("output: []\ntasks: {}\n", 2, "expected a YAML scalar"),
+            ("tasks:\n  job: {silent: []}\n", 3, "expected a YAML boolean"),
+            ("tasks:\n  job: {silent: 'true'}\n", 3, "expected a YAML boolean"),
+            (
+                "vars: {VAR: {sh: true, typo: ignored}}\ntasks: {}\n",
+                2,
+                "unsupported Task variable field 'typo'",
+            ),
+            (
+                "tasks:\n  job: {env: {VAR: {sh: true, typo: ignored}}}\n",
+                3,
+                "unsupported Task variable field 'typo'",
+            ),
+            (
+                "tasks:\n  job: {cmds: [{cmd: true, vars: {VAR: {typo: ignored}}}]}\n",
+                3,
+                "unsupported Task variable field 'typo'",
+            ),
+            (
+                "tasks:\n  job: {preconditions: [{sh: true, msg: []}]}\n",
+                3,
+                "expected a YAML scalar",
+            ),
             ("tasks: {}\n---\ntasks: {}\n", 3, "invalid Taskfile YAML"),
             ("includes: {ops: ops.yml}\ntasks: {}\n", 2, "unsupported Taskfile field 'includes'"),
             ("tasks:\n  'ops:*': true\n", 3, "unsupported Task name"),
@@ -191,6 +220,21 @@ tasks:
                 self.assertIn(reason, result.stderr)
                 self.assertNotIn("Traceback", result.stderr)
                 self.assertNotIn("unreviewed-route", result.stderr)
+
+    def test_bounds_task_diagnostic_previews(self) -> None:
+        field = "unsupported_" + "x" * 20_000
+        for declaration, preview in (
+            (f"? '{field}'\n: []\ntasks: {{}}\n", "unsupported Taskfile field"),
+            (f"tasks:\n  job: {{cmd: {{task: '{field}!'}}}}\n", "unsupported Task call"),
+        ):
+            with self.subTest(preview=preview):
+                self.write("Taskfile.yml", "version: '3'\n" + declaration)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(preview, result.stderr)
+                self.assertIn("unsupported_xxx", result.stderr)
+                self.assertIn("...", result.stderr)
+                self.assertLess(len(result.stderr), 600)
 
     def test_rejects_a_taskfile_that_would_shadow_another(self) -> None:
         self.write("taskfile.yml", "version: '3'\ntasks: {}\n")
