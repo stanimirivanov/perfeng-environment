@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,312 @@ class CommandRouteTests(unittest.TestCase):
             check=False,
             timeout=10,
         )
+
+    def test_reports_new_workflow_routes_without_running_them_or_scanning_display_names(
+        self,
+    ) -> None:
+        self.write("tools/check.py", "print('verification')\n")
+        self.write("tools/helper.py", "def value(): return 42\n")
+        self.write(
+            ".github/workflows/fixture.yaml",
+            """\
+name: "Instructions for python tools/helper.py"
+on: [pull_request]
+permissions: {contents: read}
+jobs:
+  verify:
+    name: "Instructions for python tools/helper.py"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - name: "Instructions for python tools/helper.py"
+        uses: actions/setup-python@0123456789012345678901234567890123456789
+        with:
+          python-version: "3.12"
+      - id: project-check
+        run: >-
+          python
+          check.py && touch shell-marker
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "unreviewed-route: .github/workflows/fixture.yaml:13: "
+            "'workflow:.github/workflows/fixture.yaml#verify/step-1'",
+            result.stderr,
+        )
+        self.assertIn(
+            "unreviewed-route: .github/workflows/fixture.yaml:17: "
+            "'workflow:.github/workflows/fixture.yaml#verify/id:project-check'",
+            result.stderr,
+        )
+        self.assertIn("unreviewed-route: tools/check.py:1", result.stderr)
+        self.assertNotIn("tools/helper.py", result.stderr)
+        self.assertFalse((self.checkout / "tools/shell-marker").exists())
+
+    def test_workflow_invocation_follows_literal_checkout_paths_per_job(self) -> None:
+        for path in (
+            "tools/check.py",
+            "tools/explicit.py",
+            "copy/tools/check.py",
+            "sibling/tools/foreign.py",
+            "tools/foreign.py",
+            "copy/tools/unplaced.py",
+            "tools/unplaced.py",
+        ):
+            self.write(path, "print('verification')\n")
+        self.write(
+            ".github/workflows/checkouts.yml",
+            """\
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: copy/tools
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: copy
+      - uses: actions/checkout@v7
+        with:
+          repository: example/sibling
+          path: sibling
+      - run: python check.py
+      - run: python copy/tools/explicit.py
+        working-directory: ${{ github.workspace }}
+      - run: python ../../sibling/tools/foreign.py
+      - run: python foreign.py
+        working-directory: sibling/tools
+  separate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python unplaced.py
+        working-directory: copy/tools
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        for path in ("tools/check.py", "tools/explicit.py", "copy/tools/unplaced.py"):
+            self.assertIn(f"unreviewed-route: {path}:1", result.stderr)
+        for path in ("copy/tools/check.py", "foreign.py", "script:tools/unplaced.py"):
+            self.assertNotIn(path, result.stderr)
+
+    def record_workflow_fixture(self, result: subprocess.CompletedProcess[str]) -> None:
+        records = []
+        for identity, definition in re.findall(
+            r"'(workflow:[^']+)' has no reviewed record[^\n]*(sha256:[a-f0-9]{64})",
+            result.stderr,
+        ):
+            records.append(
+                f'[[routes]]\nid = "{identity}"\nowner = "Fixture owner"\n'
+                f'purpose = "Review the exact workflow fixture declaration."\n'
+                f'definition = "{definition}"\n'
+            )
+        self.assertEqual(len(records), 3, result.stderr)
+        self.write("harness/command-routes.toml", "\n".join(records))
+
+    def test_reviewed_workflow_preserves_setup_trust_and_inherited_settings(self) -> None:
+        path = ".github/workflows/reviewed.yml"
+        workflow = """\
+name: Reviewed fixture
+run-name: Run description
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      fixture:
+        description: Which fixture to run
+        default: normal
+permissions: {contents: read}
+env: {MODE: preview}
+defaults:
+  run:
+    shell: bash
+jobs:
+  metadata:
+    name: Metadata display name
+    runs-on: ubuntu-latest
+    env: {LEVEL: safe}
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - name: Exact base checkout
+        uses: actions/checkout@0123456789012345678901234567890123456789 # checkout
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - id: verify
+        name: Run only the reviewed fixture
+        env: {OUTPUT: report, name: literal-input}
+        run: >-
+          touch
+          shell-marker
+      - uses: actions/upload-artifact@0123456789012345678901234567890123456789
+        with: {name: report, path: report.json}
+"""
+        self.write(path, workflow)
+        self.record_workflow_fixture(self.guard())
+        accepted = self.guard()
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.write(
+            path,
+            workflow.replace("Reviewed fixture", "Renamed fixture")
+            .replace("Run description", "New run description")
+            .replace("Which fixture to run", "Pick the fixture")
+            .replace("Metadata display name", "Metadata new name")
+            .replace("Run only the reviewed fixture", "New step title")
+            .replace("# checkout", "# revised comment")
+            .replace("run: >-\n          touch\n          shell-marker", "run: touch shell-marker"),
+        )
+        descriptive = self.guard()
+        self.assertEqual(descriptive.returncode, 0, descriptive.stderr)
+        for original, replacement, target in (
+            ("shell-marker", "shell-marker && touch second-marker", "id:verify"),
+            ("MODE: preview", "MODE: execute", "id:verify"),
+            ("LEVEL: safe", "LEVEL: elevated", "id:verify"),
+            ("shell: bash", "shell: sh", "id:verify"),
+            ("working-directory: tools", "working-directory: other", "id:verify"),
+            ("name: literal-input", "name: changed-input", "id:verify"),
+            ("contents: read", "contents: write", "step-1"),
+            ("pull_request_target:", "pull_request:", "step-1"),
+            ("pull_request.base.sha", "pull_request.head.sha", "step-1"),
+            ("persist-credentials: false", "persist-credentials: true", "step-1"),
+            ("@012345", "@abcdef", "step-1"),
+            ("name: report, path:", "name: changed, path:", "step-3"),
+        ):
+            with self.subTest(original=original):
+                self.write(path, workflow.replace(original, replacement, 1))
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertRegex(
+                    result.stderr,
+                    rf"changed-definition: {re.escape(path)}:[0-9]+: "
+                    rf"'workflow:{re.escape(path)}#metadata/{target}'",
+                )
+        self.assertFalse((self.checkout / "tools/shell-marker").exists())
+        self.assertFalse((self.checkout / "shell-marker").exists())
+
+    def test_reports_ambiguous_workflow_declarations_at_the_source(self) -> None:
+        path = ".github/workflows/ambiguous.yml"
+        source = "on: push\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n"
+        for declaration, expected in (
+            ("      - run: true\n        run: false\n", "7: duplicate YAML key 'run'"),
+            ("      - run: true\n        uses: vendor/tool@v1\n", "7: workflow step requires"),
+            ("      - run: [echo, unexpected]\n", "6: expected a YAML scalar"),
+            ("      - run: &commands echo unexpected\n", "6: YAML anchors"),
+            ("      - uses: '${{ inputs.action }}'\n", "6: expected a literal nonempty uses"),
+            ("      - uses: './${{inputs.action}}'\n", "6: expected a literal nonempty uses"),
+            ("      - uses: ./.github/actions/local\n", "6: repository-local Actions"),
+        ):
+            with self.subTest(declaration=declaration):
+                self.write(path, source + declaration)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(f"unsupported-workflow: {path}:{expected}", result.stderr)
+                self.assertIn("fix: use a supported literal workflow declaration", result.stderr)
+
+    def test_validates_workflow_permissions_even_when_every_job_overrides_them(self) -> None:
+        path = ".github/workflows/permissions.yml"
+        self.write(
+            path,
+            """\
+on: push
+permissions:
+  contents: read
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: echo verify
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            f"unsupported-workflow: {path}:4: duplicate YAML key 'contents'", result.stderr
+        )
+
+    def test_workflow_name_is_reviewed_when_a_shell_command_reads_it(self) -> None:
+        path = ".github/workflows/reads-name.yml"
+        workflow = """\
+name: Original name
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "$GITHUB_WORKFLOW"
+      - run: echo "${GITHUB_WORKFLOW}"
+      - run: echo "$GITHUB_WORKFLOW_OTHER"
+"""
+        self.write(path, workflow)
+        self.record_workflow_fixture(self.guard())
+        self.write(path, workflow.replace("Original name", "Updated name"))
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(f"changed-definition: {path}:7:", result.stderr)
+        self.assertIn(f"changed-definition: {path}:8:", result.stderr)
+        self.assertNotIn(f"changed-definition: {path}:9:", result.stderr)
+
+    def test_reviews_versioned_hook_bytes_and_mode_without_executing_hooks(self) -> None:
+        hook = self.write(".githooks/pre-commit", "touch unexpected-marker\n")
+        self.write(".githooks/pre-push.sample", "touch sample-marker\n")
+        local_hook = self.write(".git/hooks/pre-push", "#!/bin/sh\ntouch local-marker\n")
+        local_hook.chmod(0o755)
+        subprocess.run(["git", "add", ".githooks"], cwd=self.checkout, check=True, timeout=10)
+        subprocess.run(
+            ["git", "config", "core.fsmonitor", str(local_hook)],
+            cwd=self.checkout,
+            check=True,
+            timeout=10,
+        )
+        denied = self.guard()
+        self.assertEqual(denied.returncode, 1, denied.stderr)
+        self.assertIn(
+            "unreviewed-route: .githooks/pre-commit:1: 'hook:.githooks/pre-commit'",
+            denied.stderr,
+        )
+        self.assertNotIn("script:.githooks/pre-commit", denied.stderr)
+        self.assertNotIn("pre-push", denied.stderr)
+        self.write(
+            "harness/command-routes.toml",
+            """\
+[[routes]]
+id = "hook:.githooks/pre-commit"
+owner = "Fixture owner"
+purpose = "Exercise a versioned hook without running it."
+definition = "sha256:eaeb415f1a8bc8658a6074ed4d5fce06fd87f43b325d518f51a8925920c1e8bc"
+""",
+        )
+        accepted = self.guard()
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        hook.chmod(0o755)
+        changed_mode = self.guard()
+        self.assertEqual(changed_mode.returncode, 1, changed_mode.stderr)
+        self.assertIn("changed-definition: .githooks/pre-commit:1:", changed_mode.stderr)
+        self.assertNotIn("script:.githooks/pre-commit", changed_mode.stderr)
+        executable_definition = re.search(r"sha256:[a-f0-9]{64}", changed_mode.stderr)
+        assert executable_definition is not None
+        hook.chmod(0o644)
+        self.write(".githooks/pre-commit", "executable\0touch unexpected-marker\n")
+        collision_attempt = self.guard()
+        self.assertNotIn(executable_definition[0], collision_attempt.stderr)
+        self.write(".githooks/pre-commit", "touch changed-marker\n")
+        changed_body = self.guard()
+        self.assertEqual(changed_body.returncode, 1, changed_body.stderr)
+        self.assertIn("changed-definition: .githooks/pre-commit:1:", changed_body.stderr)
+        self.assertFalse((self.checkout / "unexpected-marker").exists())
+        self.assertFalse((self.checkout / "changed-marker").exists())
+        self.assertFalse((self.checkout / "local-marker").exists())
 
     def test_reports_a_new_task_route_without_starting_task_or_its_commands(self) -> None:
         with tempfile.TemporaryDirectory() as tools:

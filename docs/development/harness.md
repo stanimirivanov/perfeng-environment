@@ -62,8 +62,8 @@ non-live acceptance.
 
 A command route is a repository-owned way to invoke work independently. The
 [reviewed baseline](../../harness/command-routes.toml) records each supported
-script, module, Make target, or Task route with an exact ID, owner, purpose, and
-SHA-256 digest of its callable definition. A baseline record grants review coverage. Dispatch
+script, module, Make target, Task route, workflow step, or versioned hook with
+an exact ID, owner, purpose, and SHA-256 digest of its callable definition. A baseline record grants review coverage. Dispatch
 authority comes from the separate [check manifest](../../harness/checks.toml).
 Application, fixture, and live-operation routes keep their owners and invocation.
 Imported helpers and sourced-only shell phases stay with their callers.
@@ -80,7 +80,7 @@ and inspects source without importing or executing it.
 | Route | Supported evidence and definition |
 |:--|:--|
 | Script or module | The exact repository path identifies each entry source. A file's owner execute bit, shebang, shell suffix, Python `__main__.py` or top-level `if __name__ == "__main__"`, and the observed Node ESM direct-run guard can establish callability. A sole `unittest.main()` guard in a `tests/test_*.py` module remains ordinary test discovery unless there is independent invocation evidence. |
-| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. Shell sources, Make recipes, workflow and Dockerfile locations can use repository-relative references or the integration harness's same-directory `$source_dir` convention. Task references come from parsed command text and use the Taskfile directory or the task's literal working directory. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
+| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. Shell sources, Make recipes, and Dockerfiles can use repository-relative references or the integration harness's same-directory `$source_dir` convention. Workflow references come from parsed `run` values and use the runner workspace or a recognized literal working directory. Task references come from parsed command text and use the Taskfile directory or the task's literal working directory. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
 | Separately invoked payload | An exact Python caller path and named payload identify code handed to another interpreter. Supported `-c` arguments include module-level string constants, including a literal `.strip()`, and `Path(imported_module.__file__).read_text(...)` for a direct absolute from-import of a local Python file. The guard recognizes the Python `sys.executable` forms with no option before `-c`, `-I`, or `-IB`. The artifact uploader has specific rules for the Pod source-staging command and the `upload_script(source.reference)` program and its builder. The definition covers the recognized interpreter expression and the payload text, source bytes, or builder syntax. |
 
 The script fingerprint covers the entry source and its owner execute bit.
@@ -91,7 +91,7 @@ directives can affect execution.
 
 The interpreter scan recognizes the documented literal forms without resolving
 arbitrary variables, templates, generated code, or dynamic dispatch. Literal
-references in Make recipes, Task commands, and workflow files are evidence for
+references in Make recipes, Task commands, and workflow `run` steps are evidence for
 file routes. For opaque script invocations, prefer an explicit file
 or named payload the guard can verify. For a necessary new opaque form, add a narrow rule tied to the exact
 declaration and a fixture before recording its definition.
@@ -161,6 +161,59 @@ documents, and competing conventional filenames in one directory produce an
 Environment operations owns the operator routes. Use their native Task
 entry points and existing prompts and preflights.
 
+### Workflow steps
+
+The guard accounts for each `run` and `uses` step in a root
+`.github/workflows/*.yml` or `.github/workflows/*.yaml` declaration. An ID
+combines the workflow path, job ID, and the step's explicit ID or one-based
+position. For example, `workflow:.github/workflows/validate.yml#validate/step-12`
+identifies the repository verification step. Explicit IDs survive renaming a
+display label or moving the step, and position changes still require review.
+
+Fingerprints cover the parsed command text and exact Action reference, ordered
+job and step positions, Action inputs, job and step conditions, runner and
+matrix selection, environment declarations at all three scopes, effective
+`shell` and `working-directory` for `run` steps, and the trigger and permission
+context. Ordinary and folded YAML scalars supply their decoded text. Comments,
+workflow and step display names, job display names, `run-name`, and manual
+input descriptions can change independently of definitions. A workflow name
+enters the definition when an execution declaration refers to
+`github.workflow` or a run step refers to `$GITHUB_WORKFLOW` or
+`${GITHUB_WORKFLOW}`.
+
+Runner setup, tool installation, checkout and credential setup, and artifact
+transfer keep their workflow ownership. Project verification steps retain the
+project checks they invoke. For example, the installation of checksum-verified
+Argo Workflows tooling in `validate.yml` is native runner setup, and the
+subsequent maintenance lint loop is project verification. The standalone PR
+metadata workflow keeps its `pull_request_target` trigger, read-only contents
+permission, exact base-SHA checkout, and disabled credential persistence.
+
+For script and module discovery, the guard maps literal workspace-relative
+paths through preceding `actions/checkout` steps in the same job. A checkout
+with an omitted `repository` or explicit `${{ github.repository }}` denotes
+the current repository. Separate checkout paths can identify sibling
+repositories. The mapping uses declared paths and does not evaluate step
+conditions or dynamic checkout paths.
+
+The guard reads declared values and expressions as data. It supports literal
+job IDs, step IDs, and external Action references with a plain job containing a
+steps sequence. Repository-local Actions, reusable-workflow calls, duplicate
+keys, anchors, aliases, merge keys, explicit tags, multiple documents,
+nonliteral Action selectors, and unsupported fields produce an
+`unsupported-workflow` finding. Add narrowly scoped static coverage and a
+fixture for any necessary new form. No Action or shell command runs during
+review.
+
+### Versioned Git hooks
+
+A regular file with a native [Git hook name](https://git-scm.com/docs/githooks)
+directly under the root `.githooks/` directory has a record such as
+`hook:.githooks/pre-commit`. The guard includes its working-tree source bytes
+and owner execute bit, including files before the executable bit is set.
+Clone-local hook files, hook configuration, and sample hook filenames are
+outside this convention. The guard reads the source without starting the hook.
+
 For a finding, use the reported declaration and `fix:` line. Reuse an existing
 route when it has the same owner and purpose. For a deliberate addition or
 definition change, review the callable source, then record the proposed digest
@@ -171,7 +224,7 @@ The scan accepts up to 8,192 Git path records and 1 MiB of path data. It reads
 up to 2 MiB per candidate source and 32 MiB of candidate source overall. The
 baseline has its own 2 MiB limit. Each Makefile can have up to 4,096 lines,
 256 target names, 256 variable declarations, and 256 referenced variable names.
-Each Taskfile can have up to 8,192 YAML nodes and 32 levels of nesting.
+Each Taskfile and workflow can have up to 8,192 YAML nodes and 32 levels of nesting.
 For checkout and runtime failures, use the
 [offline troubleshooting steps](../troubleshooting.md#offline-command-route-check).
 

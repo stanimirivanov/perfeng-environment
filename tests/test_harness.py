@@ -26,6 +26,8 @@ HARNESS_INPUTS = (
     GUARD,
     Path("harness/make_routes.py"),
     Path("harness/task_routes.py"),
+    Path("harness/route_yaml.py"),
+    Path("harness/workflow_routes.py"),
 )
 OFFLINE_INPUTS = (
     *HARNESS_INPUTS,

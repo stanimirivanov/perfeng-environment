@@ -9,10 +9,12 @@ from collections.abc import Iterator, Set
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-from yaml.events import AliasEvent, NodeEvent
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
-from yaml.reader import ReaderError
+
+if __package__:
+    from .route_yaml import UnsupportedYamlRoute, read_document
+else:
+    from route_yaml import UnsupportedYamlRoute, read_document
 
 TASKFILES = (
     "Taskfile.yml",
@@ -25,8 +27,6 @@ TASKFILES = (
     "taskfile.dist.yaml",
 )
 TASK_NAME = re.compile(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]*(?::[a-zA-Z0-9_][a-zA-Z0-9_.-]*)*")
-MAX_YAML_DEPTH = 32
-MAX_YAML_NODES = 8192
 COMMON_SCALARS = {"method", "run"}
 COMMON_BOOLEANS = {"silent", "use_gitignore"}
 COMMON_LISTS = {"dotenv", "set", "shopt"}
@@ -63,39 +63,8 @@ class TaskfileDefinitions:
     shared_commands: tuple[str, ...]
 
 
-class UnsupportedTask(ValueError):
-    def __init__(self, path: Path, line: int, reason: str) -> None:
-        super().__init__(reason)
-        self.location = f"{path.as_posix()}:{line}"
-
-
-class TaskLoader(yaml.BaseLoader):
-    def __init__(self, path: Path, text: str) -> None:
-        super().__init__(text)
-        self.path = path
-        self.depth = 0
-        self.nodes = 0
-
-    def compose_node(self, parent: Node | None, index: int) -> Node | None:
-        event = self.peek_event()
-        self.nodes += 1
-        if self.depth == MAX_YAML_DEPTH or self.nodes > MAX_YAML_NODES:
-            raise UnsupportedTask(
-                self.path, event.start_mark.line + 1, "Taskfile YAML exceeds scan limits"
-            )
-        if isinstance(event, AliasEvent) or (
-            isinstance(event, NodeEvent) and (event.anchor is not None or event.tag is not None)
-        ):
-            raise UnsupportedTask(
-                self.path,
-                event.start_mark.line + 1,
-                "YAML anchors, aliases and tags are unsupported",
-            )
-        self.depth += 1
-        try:
-            return super().compose_node(parent, index)
-        finally:
-            self.depth -= 1
+class UnsupportedTask(UnsupportedYamlRoute):
+    pass
 
 
 def invalid(path: Path, node: Node, reason: str) -> UnsupportedTask:
@@ -133,32 +102,6 @@ def mapping_data(path: Path, fields: Fields) -> object:
             for name, (key, value) in fields.items()
         ],
     ]
-
-
-def read_document(path: Path, source: bytes) -> Node:
-    try:
-        text = source.decode("utf-8")
-    except UnicodeDecodeError as error:
-        line = source.count(b"\n", 0, error.start) + 1
-        raise UnsupportedTask(path, line, "Taskfile must be UTF-8") from error
-
-    try:
-        loader = TaskLoader(path, text)
-        try:
-            document = loader.get_single_node()
-        finally:
-            loader.dispose()
-    except ReaderError as error:
-        line = text.count("\n", 0, error.position) + 1
-        raise UnsupportedTask(path, line, "invalid Taskfile YAML") from error
-    except yaml.YAMLError as error:
-        mark = getattr(error, "problem_mark", None)
-        raise UnsupportedTask(
-            path, mark.line + 1 if mark else 1, "invalid Taskfile YAML"
-        ) from error
-    if document is None:
-        raise UnsupportedTask(path, 1, "expected a Taskfile mapping")
-    return document
 
 
 type Fields = dict[str, tuple[ScalarNode, Node]]
@@ -335,7 +278,7 @@ def fingerprint_data(path: Path, fields: Fields) -> bytes:
 
 
 def taskfile_definitions(path: Path, source: bytes) -> TaskfileDefinitions:
-    document = read_document(path, source)
+    document = read_document(path, source, "Taskfile", UnsupportedTask)
     root = mapping(path, document)
     check_fields(path, root, ROOT_FIELDS, "Taskfile")
     check_shapes(path, root, scalars=ROOT_SCALARS, booleans=COMMON_BOOLEANS, lists=COMMON_LISTS)
