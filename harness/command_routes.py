@@ -11,13 +11,16 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass
+from itertools import chain
 from pathlib import Path
 from threading import Timer
 
 if __package__:
     from .make_routes import MAKEFILES, UnsupportedMake, make_definitions
+    from .task_routes import TASKFILES, TaskfileDefinitions, UnsupportedTask, taskfile_definitions
 else:
     from make_routes import MAKEFILES, UnsupportedMake, make_definitions
+    from task_routes import TASKFILES, TaskfileDefinitions, UnsupportedTask, taskfile_definitions
 
 BASELINE = "harness/command-routes.toml"
 GUIDE = "docs/development/harness.md#reviewing-command-routes"
@@ -45,7 +48,7 @@ INTERPRETER_SUFFIXES = {
     "fish": SHELL_SUFFIXES,
     "node": {".js", ".cjs", ".mjs"},
 }
-INVOCATION_FILES = set(MAKEFILES) | {"Taskfile.yml", "Taskfile.yaml", "Dockerfile"}
+INVOCATION_FILES = set(MAKEFILES) | set(TASKFILES) | {"Dockerfile"}
 SOURCE_SUFFIXES = {".py", ".jq"} | INTERPRETER_SUFFIXES["node"]
 MAX_GIT_PATH_BYTES = 1024 * 1024
 MAX_GIT_PATHS = 8192
@@ -86,6 +89,10 @@ def working_files(root: Path) -> list[Path]:
             raise UnsupportedMake(
                 path.relative_to(root), 1, "Makefiles must be regular repository files"
             )
+        if path.name in TASKFILES and (path.is_symlink() or path.resolve() != path):
+            raise UnsupportedTask(
+                path.relative_to(root), 1, "Taskfiles must be regular repository files"
+            )
         if path.is_file() and path.resolve() == path:
             regular.append(path)
     return regular
@@ -95,10 +102,12 @@ def digest(definition: bytes) -> str:
     return "sha256:" + hashlib.sha256(definition).hexdigest()
 
 
-def literal_path(caller: Path, target: str) -> Path:
+def literal_path(caller: Path, target: str, directory: Path | None) -> Path:
     for prefix in ("$source_dir/", "${source_dir}/"):
         if target.startswith(prefix):
             return caller.parent / target.removeprefix(prefix)
+    if directory is not None:
+        return Path(os.path.normpath(directory / target))
     return Path(target)
 
 
@@ -110,29 +119,46 @@ def invocation_scope(path: Path) -> bool:
     )
 
 
-def invocation_evidence(sources: dict[Path, bytes]) -> tuple[set[Path], set[Path]]:
+def invocation_evidence(
+    sources: dict[Path, bytes], taskfiles: dict[Path, TaskfileDefinitions]
+) -> tuple[set[Path], set[Path]]:
     invoked: set[Path] = set()
     sourced: set[Path] = set()
     for path, source in sources.items():
         shell = path.suffix in SHELL_SUFFIXES
-        if not invocation_scope(path):
-            continue
-        text = source.decode("utf-8", errors="replace")
-        if path.name in MAKEFILES:
-            lines = (
-                line for line in text.replace("\r\n", "\n").split("\n") if line.startswith("\t")
+        if path.name in TASKFILES:
+            taskfile = taskfiles[path]
+            commands = chain(
+                ((path.parent, text) for text in taskfile.shared_commands),
+                chain.from_iterable(task.commands for task in taskfile.tasks),
             )
+            lines = (
+                (directory, line) for directory, text in commands for line in text.splitlines()
+            )
+        elif not invocation_scope(path):
+            continue
         else:
-            lines = iter(text.splitlines())
-        for line in lines:
+            text = source.decode("utf-8", errors="replace")
+            lines = (
+                (None, line)
+                for line in (
+                    text.replace("\r\n", "\n").split("\n")
+                    if path.name in MAKEFILES
+                    else text.splitlines()
+                )
+                if path.name not in MAKEFILES or line.startswith("\t")
+            )
+        for directory, line in lines:
             if line.lstrip().startswith("#") or LITERAL_OUTPUT.fullmatch(line):
                 continue
             for command in INTERPRETER_CALL.finditer(line):
-                target = literal_path(path, command["target"])
+                target = literal_path(path, command["target"], directory)
                 program, flags = command["program"], command["flags"].split()
                 if program.startswith("python"):
                     if "-m" in flags and re.fullmatch(r"\w+(?:\.\w+)*", command["target"]):
                         module = Path(*command["target"].split("."))
+                        if directory is not None:
+                            module = Path(os.path.normpath(directory / module))
                         invoked.update((module.with_suffix(".py"), module / "__main__.py"))
                     elif "-c" not in flags and target.suffix == ".py":
                         invoked.add(target)
@@ -141,13 +167,13 @@ def invocation_evidence(sources: dict[Path, bytes]) -> tuple[set[Path], set[Path
                 elif target.suffix in INTERPRETER_SUFFIXES[program]:
                     invoked.add(target)
             for command in JQ_FILTER.finditer(line):
-                target = literal_path(path, command["target"])
+                target = literal_path(path, command["target"], directory)
                 if target.suffix == ".jq":
                     invoked.add(target)
             if shell:
                 for reference in SHELL_SOURCE.finditer(line):
                     target = reference["target"]
-                    sourced.add(literal_path(path, target))
+                    sourced.add(literal_path(path, target, directory))
                     # Fragments may source a path relative to their own directory.
                     sourced.add(path.parent / target)
     return invoked, sourced
@@ -348,13 +374,27 @@ def discover(root: Path) -> dict[str, Route]:
         if len(makefiles) > 1:
             raise UnsupportedMake(makefiles[0], 1, f"takes precedence over {makefiles[1]}")
 
-    invoked, sourced = invocation_evidence(sources)
+    taskfiles = {}
+    for directory in sorted({path.parent for path in sources if path.name in TASKFILES}):
+        candidates = [directory / name for name in TASKFILES if directory / name in sources]
+        if len(candidates) > 1:
+            raise UnsupportedTask(candidates[0], 1, f"takes precedence over {candidates[1]}")
+        path = candidates[0]
+        taskfiles[path] = taskfile_definitions(path, sources[path])
+
+    invoked, sourced = invocation_evidence(sources, taskfiles)
     routes = {}
     for path, source in sources.items():
         if path.name in MAKEFILES:
             for name, line, definition in make_definitions(path, source):
                 relative = path.as_posix()
                 routes[f"make:{relative}#{name}"] = Route(f"{relative}:{line}", digest(definition))
+        if path.name in TASKFILES:
+            for task in taskfiles[path].tasks:
+                relative = path.as_posix()
+                routes[f"task:{relative}#{task.name}"] = Route(
+                    f"{relative}:{task.line}", digest(task.definition)
+                )
         line = 1
         definition = source
         direct = path in invoked or path in executable
@@ -410,6 +450,8 @@ def load_baseline(root: Path) -> dict[str, str]:
 
 
 def finding(rule: str, location: str, reason: str, fix: str) -> None:
+    if len(reason) > 256:
+        reason = reason[:253] + "..."
     print(f"command-routes/{rule}: {location}: {reason}; fix: {fix}; see {GUIDE}", file=sys.stderr)
 
 
@@ -436,6 +478,14 @@ def main() -> int:
             error.location,
             str(error),
             "use a supported literal Make declaration or add narrow reviewed coverage",
+        )
+        return 1
+    except UnsupportedTask as error:
+        finding(
+            "unsupported-task",
+            error.location,
+            str(error),
+            "use a supported literal Task declaration or add narrow reviewed coverage",
         )
         return 1
     except (OSError, ValueError, SyntaxError, subprocess.SubprocessError) as error:

@@ -62,8 +62,8 @@ non-live acceptance.
 
 A command route is a repository-owned way to invoke work independently. The
 [reviewed baseline](../../harness/command-routes.toml) records each supported
-script, module, or Make target with an exact ID, owner, purpose, and SHA-256 digest of
-its callable definition. A baseline record grants review coverage. Dispatch
+script, module, Make target, or Task route with an exact ID, owner, purpose, and
+SHA-256 digest of its callable definition. A baseline record grants review coverage. Dispatch
 authority comes from the separate [check manifest](../../harness/checks.toml).
 Application, fixture, and live-operation routes keep their owners and invocation.
 Imported helpers and sourced-only shell phases stay with their callers.
@@ -80,7 +80,7 @@ and inspects source without importing or executing it.
 | Route | Supported evidence and definition |
 |:--|:--|
 | Script or module | The exact repository path identifies each entry source. A file's owner execute bit, shebang, shell suffix, Python `__main__.py` or top-level `if __name__ == "__main__"`, and the observed Node ESM direct-run guard can establish callability. A sole `unittest.main()` guard in a `tests/test_*.py` module remains ordinary test discovery unless there is independent invocation evidence. |
-| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. In shell sources, Make recipes, and known Taskfile, workflow, or Dockerfile locations, references can be repository-relative or use the integration harness's same-directory `$source_dir` convention. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
+| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. Shell sources, Make recipes, workflow and Dockerfile locations can use repository-relative references or the integration harness's same-directory `$source_dir` convention. Task references come from parsed command text and use the Taskfile directory or the task's literal working directory. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
 | Separately invoked payload | An exact Python caller path and named payload identify code handed to another interpreter. Supported `-c` arguments include module-level string constants, including a literal `.strip()`, and `Path(imported_module.__file__).read_text(...)` for a direct absolute from-import of a local Python file. The guard recognizes the Python `sys.executable` forms with no option before `-c`, `-I`, or `-IB`. The artifact uploader has specific rules for the Pod source-staging command and the `upload_script(source.reference)` program and its builder. The definition covers the recognized interpreter expression and the payload text, source bytes, or builder syntax. |
 
 The script fingerprint covers the entry source and its owner execute bit.
@@ -91,9 +91,8 @@ directives can affect execution.
 
 The interpreter scan recognizes the documented literal forms without resolving
 arbitrary variables, templates, generated code, or dynamic dispatch. Literal
-references in Make recipes, Taskfiles, and workflow files are evidence for
-file routes. Task targets, workflow steps, and hooks have separate review
-coverage boundaries. For opaque script invocations, prefer an explicit file
+references in Make recipes, Task commands, and workflow files are evidence for
+file routes. For opaque script invocations, prefer an explicit file
 or named payload the guard can verify. For a necessary new opaque form, add a narrow rule tied to the exact
 declaration and a fixture before recording its definition.
 
@@ -131,6 +130,37 @@ would choose one by filename precedence. Use a supported
 literal declaration, or add focused static coverage with a fixture and
 maintainer review when a new construct is required.
 
+### Task routes
+
+Each literal name in a conventional Taskfile has an ID such as
+`task:Taskfile.yml#native:api`. The guard reads version 3 YAML and records the
+ordered commands and dependencies, named calls including `task: status`,
+command and call settings, and task-level and shared execution settings.
+This covers working directories, environment and variable declarations,
+preconditions, prompts, and silent mode. The fingerprint covers the declared
+call and its settings. A called task has its own record. The guard preserves
+the order of declarations and sequences because Task variables can reference
+earlier definitions. Comments, task-level `desc` and `summary`, and precondition
+`msg` text are excluded. Precondition predicates and prompts remain part of the
+fingerprint. Only command text supplies interpreter invocation evidence.
+
+Use scalar output modes and literal option lists. Variable declarations support
+scalar values, flat scalar lists in `vars`, or a map with one scalar `sh`, `ref`,
+or `value` declaration and an optional boolean `secret`. Unsupported options
+and field shapes produce an `unsupported-task` finding.
+
+Scripts, conditions, shell variables, and templates such as `{{.CLI_ARGS}}`
+are retained as source text. The guard never invokes Task or a shell or
+expands templates. Includes, aliases, wildcard or computed route names,
+computed task calls, and loops require focused static coverage before they
+can be reviewed. Calls and dependencies must name tasks in the same file.
+Duplicate YAML keys, anchors, aliases, merge keys, explicit tags, multiple
+documents, and competing conventional filenames in one directory produce an
+`unsupported-task` finding.
+
+Environment operations owns the operator routes. Use their native Task
+entry points and existing prompts and preflights.
+
 For a finding, use the reported declaration and `fix:` line. Reuse an existing
 route when it has the same owner and purpose. For a deliberate addition or
 definition change, review the callable source, then record the proposed digest
@@ -141,6 +171,7 @@ The scan accepts up to 8,192 Git path records and 1 MiB of path data. It reads
 up to 2 MiB per candidate source and 32 MiB of candidate source overall. The
 baseline has its own 2 MiB limit. Each Makefile can have up to 4,096 lines,
 256 target names, 256 variable declarations, and 256 referenced variable names.
+Each Taskfile can have up to 8,192 YAML nodes and 32 levels of nesting.
 For checkout and runtime failures, use the
 [offline troubleshooting steps](../troubleshooting.md#offline-command-route-check).
 

@@ -94,6 +94,13 @@ scanner rule and fixture with the maintainer. A Make fingerprint covers the
 recipe, prerequisites, and referenced variable definitions. Check those inputs
 when the finding names a target whose declaration line looks unchanged.
 
+An `unsupported-task` finding points to ambiguous YAML or a Task declaration
+outside the supported static forms. Check the indicated declaration and the
+[Task route coverage](development/harness.md#task-routes). If a Task definition
+changed, review its commands, dependency and call settings, prompts, and shared
+Taskfile settings. Rerun the offline stage to verify the review record. Running
+the operator task can affect the local environment.
+
 ## Contract cold recovery
 
 A failing `contracts-restore-check` with retained assets indicates a missing,

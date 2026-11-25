@@ -6,7 +6,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from os import environ
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "harness/command_routes.py"
@@ -35,6 +37,221 @@ class CommandRouteTests(unittest.TestCase):
             check=False,
             timeout=10,
         )
+
+    def test_reports_a_new_task_route_without_starting_task_or_its_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as tools:
+            fake_task = Path(tools) / "task"
+            fake_task.write_text("#!/bin/sh\ntouch task-marker\n", encoding="utf-8")
+            fake_task.chmod(0o755)
+            with patch.dict(environ, {"PATH": tools + ":" + environ["PATH"]}):
+                self.write(
+                    "Taskfile.yml",
+                    'version: "3"\ntasks:\n  local:fixture:\n    cmds: [touch shell-marker]\n',
+                )
+                result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "unreviewed-route: Taskfile.yml:3: 'task:Taskfile.yml#local:fixture'", result.stderr
+        )
+        self.assertIn("harness.md#reviewing-command-routes", result.stderr)
+        self.assertFalse((self.checkout / "task-marker").exists())
+        self.assertFalse((self.checkout / "shell-marker").exists())
+
+    def test_reviews_task_commands_calls_prerequisites_and_execution_settings(self) -> None:
+        taskfile = """\
+version: '3'
+env:
+  MODE: preview
+tasks:
+  setup: {cmds: [touch setup-marker]}
+  status: {cmds: [touch status-marker]}
+  local:run:
+    desc: Run the fixture
+    summary: |
+      Preview the fixture.
+    deps: [setup]
+    prompt: Run the fixture?
+    preconditions:
+      - sh: test -d .
+        msg: Run from a directory
+    silent: true
+    cmds:
+      - task: status
+        vars: {MODE: preview, summary: included}
+      - touch shell-marker {{.CLI_ARGS}}
+"""
+        self.write(
+            "harness/command-routes.toml",
+            """\
+[[routes]]
+id = "task:Taskfile.yml#local:run"
+owner = "Fixture owner"
+purpose = "Exercise the reviewed operator task."
+definition = "sha256:77e688deee38bc54dc25a855936f249759354b19c37775175d61e641994e9726"
+
+[[routes]]
+id = "task:Taskfile.yml#setup"
+owner = "Fixture owner"
+purpose = "Exercise a reviewed prerequisite task."
+definition = "sha256:5582388e19874f7a5f9bdee5a73ff581e153f1dc8a6eef2a280b189aaeb48e26"
+
+[[routes]]
+id = "task:Taskfile.yml#status"
+owner = "Fixture owner"
+purpose = "Exercise a reviewed nested task."
+definition = "sha256:de67d44cc4fc550bc73aa3f47e3f33e06232354b59670a50d6c00d5a41b76a32"
+""",
+        )
+        self.write("help_only.py", "def value():\n    return 42\n")
+        self.write(
+            "Taskfile.yml",
+            taskfile.replace("Run the fixture\n", "Run the updated fixture\n")
+            .replace("Preview the fixture.", "For context, see python help_only.py")
+            .replace("Run from a directory", "Read python help_only.py"),
+        )
+        accepted = self.guard()
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        for original, updated in (
+            ("touch shell-marker {{.CLI_ARGS}}", "touch another-marker"),
+            ("deps: [setup]", "deps: [status]"),
+            ("task: status", "task: setup"),
+            ("MODE: preview, summary: included", "MODE: apply, summary: included"),
+            ("summary: included", "summary: changed"),
+            ("prompt: Run the fixture?", "prompt: Continue?"),
+            ("sh: test -d .", "sh: test -f ."),
+            ("silent: true", "silent: false"),
+            ("  MODE: preview", "  MODE: apply"),
+            ("    deps: [setup]", "    dir: elsewhere\n    deps: [setup]"),
+            ("    deps: [setup]", "    deps: [{task: setup, vars: {MODE: changed}}]"),
+        ):
+            with self.subTest(updated=updated):
+                self.write("Taskfile.yml", taskfile.replace(original, updated))
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(
+                    "changed-definition: Taskfile.yml:7: 'task:Taskfile.yml#local:run'",
+                    result.stderr,
+                )
+        for marker in ("setup-marker", "status-marker", "shell-marker", "another-marker"):
+            self.assertFalse((self.checkout / marker).exists())
+
+    def test_task_command_evidence_uses_the_declared_working_directory(self) -> None:
+        for path in ("helper.py", "ops/helper.py", "ops/run/helper.py", "ops/shared.py"):
+            self.write(path, "raise SystemExit('the guard must not invoke this file')\n")
+        self.write(
+            "ops/taskfile.yaml",
+            """\
+version: '3'
+vars:
+  SHARED:
+    sh: python shared.py
+tasks:
+  run:
+    dir: run
+    cmd: {cmd: python helper.py}
+  call:
+    cmd: {task: run}
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("'task:ops/taskfile.yaml#call'", result.stderr)
+        self.assertIn("'script:ops/run/helper.py'", result.stderr)
+        self.assertIn("'script:ops/shared.py'", result.stderr)
+        self.assertNotIn("'script:helper.py'", result.stderr)
+        self.assertNotIn("'script:ops/helper.py'", result.stderr)
+
+    def test_rejects_ambiguous_or_unmodeled_task_declarations(self) -> None:
+        for declaration, line, reason in (
+            ("tasks:\n  job: true\n  job: false\n", 4, "duplicate YAML key 'job'"),
+            (
+                "tasks:\n  job:\n    cmds: [true]\n    cmds: [false]\n",
+                5,
+                "duplicate YAML key 'cmds'",
+            ),
+            ("tasks:\n  job: &anchor {cmds: [true]}\n", 3, "YAML anchors"),
+            ("tasks:\n  job: {<<: {cmds: [true]}}\n", 3, "merge keys"),
+            ("tasks: [\n", 3, "invalid Taskfile YAML"),
+            ("output: []\ntasks: {}\n", 2, "expected a YAML scalar"),
+            ("tasks:\n  job: {silent: []}\n", 3, "expected a YAML boolean"),
+            ("tasks:\n  job: {silent: 'true'}\n", 3, "expected a YAML boolean"),
+            (
+                "vars: {VAR: {sh: true, typo: ignored}}\ntasks: {}\n",
+                2,
+                "unsupported Task variable field 'typo'",
+            ),
+            (
+                "tasks:\n  job: {env: {VAR: {sh: true, typo: ignored}}}\n",
+                3,
+                "unsupported Task variable field 'typo'",
+            ),
+            (
+                "tasks:\n  job: {cmds: [{cmd: true, vars: {VAR: {typo: ignored}}}]}\n",
+                3,
+                "unsupported Task variable field 'typo'",
+            ),
+            (
+                "tasks:\n  job: {preconditions: [{sh: true, msg: []}]}\n",
+                3,
+                "expected a YAML scalar",
+            ),
+            ("tasks: {}\n---\ntasks: {}\n", 3, "invalid Taskfile YAML"),
+            ("includes: {ops: ops.yml}\ntasks: {}\n", 2, "unsupported Taskfile field 'includes'"),
+            ("tasks:\n  'ops:*': true\n", 3, "unsupported Task name"),
+            (
+                "tasks:\n  job: {aliases: [alias], cmds: [true]}\n",
+                3,
+                "unsupported Task field 'aliases'",
+            ),
+            (
+                "tasks:\n  job: {cmds: [{task: '{{.TARGET}}'}]}\n",
+                3,
+                "expected a literal name",
+            ),
+            ("tasks:\n  job: {deps: [missing]}\n", 3, "is undeclared in this Taskfile"),
+            ("tasks:\n  job: " + "[" * 33 + "]" * 33 + "\n", 3, "YAML exceeds scan limits"),
+        ):
+            with self.subTest(declaration=declaration):
+                self.write("Taskfile.yaml", "version: '3'\n" + declaration)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(f"unsupported-task: Taskfile.yaml:{line}:", result.stderr)
+                self.assertIn(reason, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertNotIn("unreviewed-route", result.stderr)
+
+    def test_bounds_task_diagnostic_previews(self) -> None:
+        field = "unsupported_" + "x" * 20_000
+        for declaration, preview in (
+            (f"? '{field}'\n: []\ntasks: {{}}\n", "unsupported Taskfile field"),
+            (f"tasks:\n  job: {{cmd: {{task: '{field}!'}}}}\n", "unsupported Task call"),
+        ):
+            with self.subTest(preview=preview):
+                self.write("Taskfile.yml", "version: '3'\n" + declaration)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(preview, result.stderr)
+                self.assertIn("unsupported_xxx", result.stderr)
+                self.assertIn("...", result.stderr)
+                self.assertLess(len(result.stderr), 600)
+
+    def test_rejects_a_taskfile_that_would_shadow_another(self) -> None:
+        self.write("taskfile.yml", "version: '3'\ntasks: {}\n")
+        self.write("Taskfile.dist.yml", "version: '3'\ntasks: {}\n")
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "unsupported-task: taskfile.yml:1: takes precedence over Taskfile.dist.yml",
+            result.stderr,
+        )
+
+    def test_reports_the_location_of_nonprintable_task_yaml(self) -> None:
+        self.write("Taskfile.yml", "version: '3'\ntasks: {}\n\x00\n")
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("unsupported-task: Taskfile.yml:3: invalid Taskfile YAML", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_reports_a_new_make_target_without_running_the_recipe(self) -> None:
         self.write("Makefile", "# Test command surface.\nfixture:\n\ttouch unexpected-marker\n")
