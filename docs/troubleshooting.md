@@ -901,6 +901,11 @@ any record already created. If a push fails, preserve the local commit and
 resolve the reported failure before retrying the same branch. Preserve
 published history and branch protection.
 
+The Ubuntu validation and native gateway verification jobs use the default
+workflow token for pinned public sibling checkouts. If a dependency-update
+PR stops at one of those steps, check the checkout inputs and confirm the
+repository and locked commit are still publicly accessible.
+
 ## What to include in a defect report
 
 Include:

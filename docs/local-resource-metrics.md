@@ -90,7 +90,8 @@ preparation Task supports first installation; preparation and manual activation 
 
 The existing Argo CD owner-prefix Git credential can be reused only if its fine-grained
 Contents token permits read access to `k8s-infrastructure` as well as the existing workload
-sources. CI uses `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` for that exact checkout.
+sources. CI uses the default read-only workflow token for its exact checkout
+of the public infrastructure repository.
 Package-only GHCR credentials are not Git source credentials. Missing permission needs
 explicit credential recovery; no token is silently rotated or added to Git.
 

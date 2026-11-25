@@ -117,14 +117,11 @@ class ControlPlaneReleaseTests(unittest.TestCase):
         workflow = yaml.safe_load((root / ".github/workflows/validate.yml").read_text())
         steps = workflow["jobs"]["validate"]["steps"]
         checkouts = {step.get("name"): step.get("with") for step in steps if "name" in step}
-        token = "${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}"
-
         self.assertEqual(
             checkouts["Check out pinned control-plane deployment source"],
             {
                 "repository": "stanimirivanov/perfeng-k8s",
                 "ref": lock.deployment_revision,
-                "token": token,
                 "path": "perfeng-k8s",
                 "persist-credentials": False,
             },
@@ -134,7 +131,6 @@ class ControlPlaneReleaseTests(unittest.TestCase):
             {
                 "repository": "stanimirivanov/perfeng-control-plane",
                 "ref": lock.source_revision,
-                "token": token,
                 "path": "perfeng-control-plane",
                 "persist-credentials": False,
             },

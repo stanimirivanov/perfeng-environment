@@ -48,7 +48,6 @@ class InfrastructureReleaseTests(unittest.TestCase):
             {
                 "repository": "stanimirivanov/k8s-infrastructure",
                 "ref": lock.revision,
-                "token": "${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}",
                 "path": "k8s-infrastructure",
                 "persist-credentials": False,
             },

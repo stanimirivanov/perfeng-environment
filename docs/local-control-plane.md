@@ -34,9 +34,9 @@ uv run --locked python scripts/control_plane_release.py validate
 
 Validation reads tracked files directly from the locked Git commits. Newer or
 dirty sibling working trees therefore cannot silently change the selected
-source, chart or bundle. CI checks out the exact private revisions using the
-read-only `PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN` secret and performs the
-same validation.
+source, chart or bundle. CI checks out the exact revisions from the public
+repositories with the workflow's default read-only token and performs the same
+validation.
 
 This lock is deployment input, not proof that an image is registry-addressable
 or that a cluster is healthy. It contains no credentials and does not create
