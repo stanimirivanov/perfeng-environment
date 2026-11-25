@@ -4,7 +4,8 @@
 
 - Use the [documentation map](../README.md) to load only task-relevant guidance.
 - Run `make bootstrap` once, `make verify` while editing, and `make validate` before handoff.
-- Run `uv run --locked --offline python -m harness offline` to check repository policy, GitOps composition, and reviewed script and Make routes.
+- Run `make command-routes-check` to check reviewed command routes offline.
+- Run `uv run --locked --offline python -m harness offline` to check repository policy, GitOps composition, and reviewed command routes.
 - Helm rendering and immutable sibling-repository validation are explicit specialized tiers.
 - `task bootstrap`, `task status`, `task smoke`, and `task destroy` are live operator actions and never run from validation aggregates.
 - Turn recurring review findings into clearer guidance or an early deterministic check.
@@ -15,6 +16,7 @@
 |:--|:--|:--|
 | Setup | `make bootstrap` | Resolve the locked Python environment; network may be required. |
 | Inner loop | `make verify` | Run repository-local formatting, policy, static, configuration, and unit checks without cluster access. |
+| Command-route review | `make command-routes-check` | Check the working tree against the reviewed baseline offline. The Ubuntu PR validation job runs the same command. |
 | Render acceptance | `make render-check` | Lint and render charts offline; requires Helm. |
 | Native gateway configuration | `make native-gateway-check` | Adapt the real Caddyfile offline using reviewed Caddy 2.11.7; no server, CA or trust provisioning. CI verifies archive checksums on Linux. |
 | Supply chain | `make supply-chain` | Check the lock and known vulnerabilities; vulnerability data may require network access. |
@@ -70,12 +72,14 @@ Imported helpers and sourced-only shell phases stay with their callers.
 [ADR 0077](../adr/0077-separate-harness-execution-from-command-route-review.md)
 records the ownership decision.
 
-The guard reads regular Git-tracked and non-ignored untracked files from the
-working tree. Run it from the repository root with the Python version in
-[.python-version](../../.python-version). The route fingerprints require
-Python 3.12 so the same parsed sources produce the same fingerprints. A clean
-checkout supplies the same inputs in CI. The guard uses Git for file names
-and inspects source without importing or executing it.
+Run `make command-routes-check` from the repository root with the Python
+version in [.python-version](../../.python-version). The route fingerprints
+require Python 3.12 so the same parsed sources produce the same fingerprints.
+Locally the guard reads regular Git-tracked and non-ignored untracked files
+from the working tree. The Ubuntu job in `Validate workspace tooling` runs
+the same Make target in its clean PR checkout. A finding fails the target and
+blocks that job from passing. The guard uses Git for file names and inspects
+source without importing or executing it.
 
 | Route | Supported evidence and definition |
 |:--|:--|
@@ -228,9 +232,10 @@ Each Taskfile and workflow can have up to 8,192 YAML nodes and 32 levels of nest
 For checkout and runtime failures, use the
 [offline troubleshooting steps](../troubleshooting.md#offline-command-route-check).
 
-Request explicit maintainer sign-off in the PR for changes to the manifest,
-baseline, guard, fixture expectations, or gate wiring. The maintainer approves
-the route and its ownership even when the updated digest passes locally.
+Obtain explicit maintainer sign-off in the PR before merging changes to the
+manifest, baseline, guard, fixture expectations, or gate wiring. The
+maintainer approves the route and its ownership even when the updated digest
+passes locally.
 The metadata-only PR check retains its exact-base and read-only boundary.
 
 ## Harness principles

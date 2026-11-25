@@ -26,6 +26,12 @@ purpose = "Run static and repository-local configuration checks."
 definition = "sha256:742d58179af70403b6df4919671682c895bdcbaef26b0d49f945d4d9b500391d"
 
 [[routes]]
+id = "make:Makefile#command-routes-check"
+owner = "Environment engineering"
+purpose = "Check the reviewed command routes offline."
+definition = "sha256:5c288ff90ae0d0581c0969a5b393c402e8ca82a3eaf234c67225e3656722a91b"
+
+[[routes]]
 id = "make:Makefile#contracts-campaign-check"
 owner = "Contract distribution"
 purpose = "Verify offline campaign logic and optionally inspect an explicit campaign manifest."
@@ -101,7 +107,7 @@ definition = "sha256:eab84a3ce59d7e39ae515bd69b7721ebcec98a25433fa2c9f73b765907e
 id = "make:Makefile#help"
 owner = "Environment engineering"
 purpose = "Display the engineering command surface."
-definition = "sha256:12c4aea4a0b96a7c7d4d9028f4ee03fcdef15f550dfd9494f6f70754210b192a"
+definition = "sha256:d6d85cd948a4663cd1e5ba2d7c4ecee17120ea5e98083b3de6f0d3c63bff7e8f"
 
 [[routes]]
 id = "make:Makefile#keycloak-qualification"
@@ -1470,6 +1476,12 @@ id = "workflow:.github/workflows/validate.yml#validate/step-20"
 owner = "Environment project verification"
 purpose = "Validate the exact adjacent release selections."
 definition = "sha256:00aec6f8763eb55ff0687b3158512d5c9d8c2b68e6ceacda1b01e5cc5bdde641"
+
+[[routes]]
+id = "workflow:.github/workflows/validate.yml#validate/id:command-routes"
+owner = "Environment project verification"
+purpose = "Check reviewed command routes in the Ubuntu validation checkout."
+definition = "sha256:70282fa9e14db2a389b5e996a84e82b5ca93d9f7fdfcd2e3078c08d8829be508"
 
 [[routes]]
 id = "workflow:.github/workflows/validate.yml#supply-chain/step-1"

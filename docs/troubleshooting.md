@@ -76,10 +76,10 @@
 
 ## Offline command-route check
 
-From the repository root, run `uv run --locked --offline python -m harness offline`
-with the Python 3.12 toolchain. An `unsupported-python` finding means the
+From the repository root, run `make command-routes-check` with the Python 3.12
+toolchain. An `unsupported-python` finding means the
 interpreter cannot reproduce the reviewed fingerprints. Select the version in
-[`.python-version`](../.python-version) and rerun the stage.
+[`.python-version`](../.python-version) and rerun the target.
 
 For `scan-failed`, inspect the reported input. If the scan reached a checkout
 limit, move unrelated generated outputs outside the checkout or use their
@@ -98,7 +98,7 @@ An `unsupported-task` finding points to ambiguous YAML or a Task declaration
 outside the supported static forms. Check the indicated declaration and the
 [Task route coverage](development/harness.md#task-routes). If a Task definition
 changed, review its commands, dependency and call settings, prompts, and shared
-Taskfile settings. Rerun the offline stage to verify the review record. Running
+Taskfile settings. Rerun the Make target to verify the review record. Running
 the operator task can affect the local environment.
 
 

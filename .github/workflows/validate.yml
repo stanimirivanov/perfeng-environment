@@ -164,6 +164,10 @@ jobs:
         env:
           NATIVE_TARGET_K8S_ROOT: ../perfeng-native-target-k8s
         working-directory: perfeng-environment
+      - name: Check reviewed command routes
+        id: command-routes
+        run: make command-routes-check
+        working-directory: perfeng-environment
 
   supply-chain:
     runs-on: ubuntu-latest
