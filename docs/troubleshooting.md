@@ -74,6 +74,20 @@
 - Never paste Secret YAML, credential environment variables, decoded tokens or
   unreviewed logs into an issue.
 
+## Offline command-route check
+
+From the repository root, run `uv run --locked --offline python -m harness offline`
+with the Python 3.12 toolchain. An `unsupported-python` finding means the
+interpreter cannot reproduce the reviewed fingerprints. Select the version in
+[`.python-version`](../.python-version) and rerun the stage.
+
+For `scan-failed`, inspect the reported input. If the scan reached a checkout
+limit, move unrelated generated outputs outside the checkout or use their
+existing ignored output directory. Keep repository-owned callable sources in
+the inventory. For an invalid baseline or a new, changed, or missing route,
+follow the reported correction and the
+[command-route review procedure](development/harness.md#reviewing-command-routes).
+
 ## Contract cold recovery
 
 A failing `contracts-restore-check` with retained assets indicates a missing,
