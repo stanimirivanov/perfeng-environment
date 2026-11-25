@@ -74,6 +74,42 @@
 - Never paste Secret YAML, credential environment variables, decoded tokens or
   unreviewed logs into an issue.
 
+## Offline command-route check
+
+From the repository root, run `make command-routes-check` with the Python 3.12
+toolchain. An `unsupported-python` finding means the
+interpreter cannot reproduce the reviewed fingerprints. Select the version in
+[`.python-version`](../.python-version) and rerun the target.
+
+For `scan-failed`, inspect the reported input. If the scan reached a checkout
+limit, move unrelated generated outputs outside the checkout or use their
+existing ignored output directory. Keep repository-owned callable sources in
+the inventory. For an invalid baseline or a new, changed, or missing route,
+follow the reported correction and the
+[command-route review procedure](development/harness.md#reviewing-command-routes).
+
+An `unsupported-make` finding points to a Make declaration the guard cannot
+inspect statically. Use a supported literal form or review a narrowly scoped
+scanner rule and fixture with the maintainer. A Make fingerprint covers the
+recipe, prerequisites, and referenced variable definitions. Check those inputs
+when the finding names a target whose declaration line looks unchanged.
+
+An `unsupported-task` finding points to ambiguous YAML or a Task declaration
+outside the supported static forms. Check the indicated declaration and the
+[Task route coverage](development/harness.md#task-routes). If a Task definition
+changed, review its commands, dependency and call settings, prompts, and shared
+Taskfile settings. Rerun the Make target to verify the review record. Running
+the operator task can affect the local environment.
+
+
+An `unsupported-workflow` finding points to the field or declaration the guard
+could not inspect. Review an existing step's `run` text or `uses` reference and
+inputs, plus inherited defaults, environment, event, and permissions when a
+fingerprint changes. For PR metadata, verify that the checkout still selects
+the exact PR base revision and keeps credential persistence disabled. A hook
+finding under `.githooks/` can reflect either source bytes or a changed execute
+bit. Review the hook in place without installing or invoking it.
+
 ## Contract cold recovery
 
 A failing `contracts-restore-check` with retained assets indicates a missing,
@@ -675,6 +711,11 @@ rather than changing the lock to the current branch. Never repair an identity
 mismatch by editing or deleting an immutable ConfigMap in place. Create the new
 reviewed identity, select it in Git and retain the previous identity for
 rollback.
+
+Use the [offline harness](development/harness.md#offline-harness-pilot) to run
+repository policy and GitOps composition validation together. A repository
+policy failure stops the harness before GitOps validation. Follow the policy
+diagnostic, then rerun the harness.
 
 ## M04 runtime cutover
 

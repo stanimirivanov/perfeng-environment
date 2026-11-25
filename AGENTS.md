@@ -70,7 +70,11 @@ Follow the engineering standards and applicable operational or migration ADR.
 
 ## Verification
 
-Run `make verify` and the applicable additional checks documented in
+Use `uv run --locked --offline python -m harness offline` to check repository
+policy and GitOps composition through the
+[offline harness pilot](docs/development/harness.md#offline-harness-pilot).
+Run `make verify` and `make validate` for full verification. Run the applicable
+additional checks in
 [CONTRIBUTING.md](CONTRIBUTING.md#verification-and-constrained-environments).
 Use the [documentation map](docs/README.md) to find affected standards, operational
 guides and decisions. Report checks as passed, failed or unavailable.
