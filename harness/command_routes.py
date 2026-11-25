@@ -117,7 +117,14 @@ def invocation_evidence(sources: dict[Path, bytes]) -> tuple[set[Path], set[Path
         shell = path.suffix in SHELL_SUFFIXES
         if not invocation_scope(path):
             continue
-        for line in source.decode("utf-8", errors="replace").splitlines():
+        text = source.decode("utf-8", errors="replace")
+        if path.name in MAKEFILES:
+            lines = (
+                line for line in text.replace("\r\n", "\n").split("\n") if line.startswith("\t")
+            )
+        else:
+            lines = iter(text.splitlines())
+        for line in lines:
             if line.lstrip().startswith("#") or LITERAL_OUTPUT.fullmatch(line):
                 continue
             for command in INTERPRETER_CALL.finditer(line):

@@ -17,7 +17,7 @@ CONTROL = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
 RULE = re.compile(rf"(?P<target>\.PHONY|{NAME})[ \t]*:[ \t]*(?P<prerequisites>.*)")
 ASSIGNMENT = re.compile(rf"(?P<name>{VARIABLE})[ \t]*(?P<operator>\?=|:=|=)[ \t]*(?P<value>.*)")
 CONDITION = re.compile(rf"ifneq \(\$\(strip \$\((?P<name>{VARIABLE})\)\),\)")
-REFERENCE = re.compile(rf"\$\(({VARIABLE})\)|\$\{{({VARIABLE})\}}|\$\$")
+REFERENCE = re.compile(rf"\$\(({VARIABLE})\)|\$\{{({VARIABLE})\}}")
 DISALLOWED_SETTINGS = {
     "GNUMAKEFLAGS",
     "GPATH",
@@ -39,6 +39,8 @@ MAX_NAMES = 256
 
 
 class UnsupportedMake(ValueError):
+    """A Makefile construct the guard cannot review at the reported location."""
+
     def __init__(self, path: Path, line: int, reason: str) -> None:
         self.location = f"{path.as_posix()}:{line}"
         super().__init__(reason)
@@ -66,28 +68,28 @@ class MakeTarget:
     references: set[str] = field(default_factory=set)
 
 
-def variable_references(source: str, path: Path, line: int) -> set[str]:
+def _variable_references(source: str, path: Path, line: int) -> set[str]:
     names = set()
     offset = source.find("$")
     while offset != -1:
+        if source.startswith("$$", offset):
+            raise UnsupportedMake(path, line, "escaped Make dollars are unsupported")
         reference = REFERENCE.match(source, offset)
         if reference is None:
             raise UnsupportedMake(
                 path, line, "unsupported Make expansion; use a plain named variable reference"
             )
-        name = reference[1] or reference[2]
-        if name:
-            names.add(name)
+        names.add(reference[1] or reference[2])
         offset = source.find("$", reference.end())
     return names
 
 
-def referenced_definitions(
-    references: set[str], variables: dict[str, Variable], before: int
+def _referenced_definitions(
+    references: set[str], variables: dict[str, Variable], visible_before: int
 ) -> list[tuple[str, str, str]]:
     definitions: set[tuple[str, str, str]] = set()
     visited: set[tuple[str, str]] = set()
-    pending = [(name, "", before) for name in references]
+    pending = [(name, "", visible_before) for name in references]
     while pending:
         name, scope, bound = pending.pop()
         if (name, scope) in visited:
@@ -107,6 +109,7 @@ def referenced_definitions(
 
 
 def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, bytes]]:
+    """Yield literal target names, source lines, and normalized review definitions."""
     try:
         text = source.decode("utf-8")
     except UnicodeDecodeError as error:
@@ -123,17 +126,18 @@ def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, byte
     target: MakeTarget | None = None
     default_goal = None
     condition: Condition | None = None
-    recipe_context = len(lines) + 1
+    recipe_visibility_limit = len(lines) + 1
     for number, line in enumerate(lines, start=1):
         if CONTROL.search(line):
             raise UnsupportedMake(path, number, "unsupported control character in Makefile")
-        if line.startswith("\t"):
+        declaration_comment = target is None and line.lstrip(" \t").startswith("#")
+        if line.startswith("\t") and not declaration_comment:
             if target is None:
                 raise UnsupportedMake(path, number, "recipe has no literal target")
             recipe = line[1:]
             if recipe.endswith("\\"):
                 raise UnsupportedMake(path, number, "continued Make recipes are unsupported")
-            references = variable_references(recipe, path, number)
+            references = _variable_references(recipe, path, number)
             referenced_names.update(references)
             target.references.update(references)
             target.recipes.append((recipe, condition))
@@ -167,7 +171,7 @@ def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, byte
                         path, number, f"unsupported global or repeated setting {name!r}"
                     )
                 value = assignment["value"]
-                references = variable_references(value, path, number)
+                references = _variable_references(value, path, number)
                 referenced_names.update(references)
                 signature = json.dumps([assignment["operator"], value]).encode()
                 variables[name] = Variable(
@@ -220,22 +224,54 @@ def make_definitions(path: Path, source: bytes) -> Iterator[tuple[str, int, byte
 
     for name, line in phony.items():
         targets.setdefault(name, MakeTarget(line, []))
+    for name, target in targets.items():
+        # An undeclared prerequisite can select a built-in rule even if a file
+        # by that name already exists in the working tree.
+        for prerequisite in target.prerequisites:
+            if prerequisite not in targets:
+                raise UnsupportedMake(
+                    path,
+                    target.line,
+                    f"implicit Make recipes are unsupported for undeclared prerequisite {prerequisite!r}",
+                )
+        if name not in phony and not any(guard is None for _, guard in target.recipes):
+            raise UnsupportedMake(
+                path,
+                target.line,
+                f"implicit Make recipes are unsupported for {name!r} without an unconditional"
+                " recipe or .PHONY declaration",
+            )
+
     condition_definitions: dict[Condition, tuple[str, str]] = {}
+    bound_variables: set[str] = set()
     for name, target in targets.items():
         recipes = []
         for recipe, guard in target.recipes:
             if guard is not None and guard not in condition_definitions:
-                bindings = referenced_definitions({guard.name}, variables, guard.line)
+                bindings = _referenced_definitions({guard.name}, variables, guard.line)
+                bound_variables.update(variable for _, variable, digest in bindings if digest)
                 condition_definitions[guard] = (
                     guard.name,
                     hashlib.sha256(json.dumps(bindings).encode()).hexdigest(),
                 )
             recipes.append((recipe, condition_definitions[guard] if guard is not None else None))
+        bindings = _referenced_definitions(target.references, variables, recipe_visibility_limit)
+        bound_variables.update(variable for _, variable, digest in bindings if digest)
         definition = {
             "default": name == default_goal,
             "phony": name in phony,
             "prerequisites": target.prerequisites,
             "recipes": recipes,
-            "variables": referenced_definitions(target.references, variables, recipe_context),
+            "variables": bindings,
         }
         yield name, target.line, json.dumps(definition).encode()
+
+    # A declaration can also affect a subprocess that inherits the variable.
+    # Every local assignment needs coverage in at least one route definition.
+    for variable_name, variable in variables.items():
+        if variable_name not in bound_variables:
+            raise UnsupportedMake(
+                path,
+                variable.line,
+                f"assignment {variable_name!r} has no reviewed Make target binding",
+            )

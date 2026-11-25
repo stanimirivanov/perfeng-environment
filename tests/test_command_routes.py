@@ -83,7 +83,7 @@ definition = "sha256:a401a442a8a6b59119dcfb18f6f4f4c05648bc7114a22a411972ef3e8c4
 
         for before, after, location in (
             ("touch unexpected-marker", "touch another-marker", "5: 'make:Makefile#fixture'"),
-            ("aggregate: fixture", "aggregate: fixture file", "3: 'make:Makefile#aggregate'"),
+            ("aggregate: fixture", "aggregate:", "3: 'make:Makefile#aggregate'"),
             ("ROOT ?= local", "ROOT ?= remote", "5: 'make:Makefile#fixture'"),
             ("strip $(EXTRA)", "strip $(OTHER)", "5: 'make:Makefile#fixture'"),
             (".PHONY: aggregate fixture", ".PHONY: aggregate", "5: 'make:Makefile#fixture'"),
@@ -95,6 +95,28 @@ definition = "sha256:a401a442a8a6b59119dcfb18f6f4f4c05648bc7114a22a411972ef3e8c4
                 self.assertIn(f"changed-definition: Makefile:{location}", result.stderr)
         self.assertFalse((self.checkout / "unexpected-marker").exists())
         self.assertFalse((self.checkout / "conditional-marker").exists())
+
+    def test_rejects_potential_implicit_recipes_without_running_make(self) -> None:
+        self.write("fixture.c", "int fixture(void) { return 0; }\n")
+        for declaration, location in (
+            (".PHONY: aggregate\naggregate: fixture.o\nfixture.o:\n", 4),
+            (".PHONY: aggregate\naggregate: fixture.o\n", 3),
+            (
+                "fixture.o:\nifneq ($(strip $(ENABLE)),)\n\t$(CC) fixture.c\nendif\n",
+                2,
+            ),
+        ):
+            with self.subTest(declaration=declaration):
+                self.write("Makefile", "CC = touch implicit-marker\n" + declaration)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(
+                    f"unsupported-make: Makefile:{location}: ",
+                    result.stderr,
+                )
+                self.assertIn("implicit Make recipes are unsupported", result.stderr)
+                self.assertFalse((self.checkout / "implicit-marker").exists())
+                self.assertFalse((self.checkout / "fixture.o").exists())
 
     def test_rejects_opaque_make_expansions_without_evaluating_them(self) -> None:
         for declaration, location in (
@@ -120,6 +142,73 @@ definition = "sha256:a401a442a8a6b59119dcfb18f6f4f4c05648bc7114a22a411972ef3e8c4
             "unsupported-make: Makefile:1: escaped Make declarations are unsupported",
             result.stderr,
         )
+
+    def test_disregards_make_declaration_comments_for_script_invocation(self) -> None:
+        self.write("helper.py", "def value():\n    return 42\n")
+        self.write(
+            "GNUmakefile",
+            "FIXTURE = python helper.py\n"
+            "fixture: # See python helper.py for an example.\n"
+            "\t@echo $(FIXTURE)\n",
+        )
+        result = self.guard()
+        self.assertIn("unreviewed-route: GNUmakefile:2:", result.stderr)
+        self.assertNotIn("helper.py", result.stderr)
+
+        self.write("GNUmakefile", "fixture:\n\tpython helper.py\n")
+        result = self.guard()
+        self.assertIn("unreviewed-route: helper.py:1", result.stderr)
+
+    def test_rejects_make_dollar_passthrough_and_unbound_assignments(self) -> None:
+        for source, line, reason in (
+            (
+                'FLAG = changed\nfixture:\n\t@echo "$$FLAG"\n',
+                3,
+                "escaped Make dollars are unsupported",
+            ),
+            (
+                "FLAG = changed\nCOPY = $$FLAG\nfixture:\n\t@echo $(COPY)\n",
+                2,
+                "escaped Make dollars are unsupported",
+            ),
+            (
+                "FLAG = changed\nfixture:\n\tprintenv FLAG\n",
+                1,
+                "assignment 'FLAG' has no reviewed Make target binding",
+            ),
+            (
+                "COPY := $(FLAG)\nFLAG = changed\nfixture:\n\t@echo $(COPY)\n",
+                2,
+                "assignment 'FLAG' has no reviewed Make target binding",
+            ),
+        ):
+            with self.subTest(source=source):
+                self.write("Makefile", source)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(f"unsupported-make: Makefile:{line}: {reason}", result.stderr)
+
+    def test_accepts_tab_indented_comments_before_a_make_target(self) -> None:
+        self.write("Makefile", "\t# Building the fixture.\nfixture:\n\ttrue\n")
+        result = self.guard()
+        self.assertIn("unreviewed-route: Makefile:2:", result.stderr)
+        self.assertNotIn("unsupported-make", result.stderr)
+
+    def test_counts_make_physical_lines_with_a_final_newline(self) -> None:
+        makefile = ".PHONY: fixture\n" + "# Comment\n" * 4095
+        self.write("Makefile", makefile)
+        result = self.guard()
+        self.assertIn("unreviewed-route: Makefile:1:", result.stderr)
+        self.assertNotIn("unsupported-make", result.stderr)
+
+        self.write("Makefile", makefile + "# Extra line\n")
+        result = self.guard()
+        self.assertIn("unsupported-make: Makefile:4097: Makefile exceeds 4096 lines", result.stderr)
+
+    def test_reports_the_line_of_invalid_make_utf8(self) -> None:
+        self.write("makefile", "").write_bytes(b"# Comment\nfixture:\n\t\xff\n")
+        result = self.guard()
+        self.assertIn("unsupported-make: makefile:3: Makefile must be UTF-8", result.stderr)
 
     def test_rejects_a_makefile_that_would_shadow_another(self) -> None:
         self.write("Makefile", "fixture:\n")
