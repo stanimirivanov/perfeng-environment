@@ -302,6 +302,18 @@ purpose = "Opt-in functional check against sibling k6 sources; loopback only, no
 definition = "sha256:34e4f580e976eeefe05581f45497f05d9a38ade8db7cc744eb4bed7ca805d9aa"
 
 [[routes]]
+id = "script:scripts/checkout_operator.py"
+owner = "Local deployment operation"
+purpose = "Verify the retained deployment and checkpoint one authenticated checkout Run and its report."
+definition = "sha256:fb4d2a09480ecb033f9cbb3057a02746953f7735667a9ec049d071367bb45784"
+
+[[routes]]
+id = "script:scripts/checkout_policies.py"
+owner = "Local deployment operation"
+purpose = "Confirm both selected policies before the owner activates the retained runtime."
+definition = "sha256:9e05768cd78abf7bc6b93bc9843004de9d30c258fdfd5c129eadcde5882254ae"
+
+[[routes]]
 id = "script:scripts/cluster.py"
 owner = "Local infrastructure operations"
 purpose = "Bootstrap Perfeng namespaces on the selected Kubernetes substrate."
@@ -1373,7 +1385,7 @@ definition = "sha256:bd8084871f8d09ad257e9cd815b7e9f607d965b22168cf73dea019f3d83
 id = "workflow:.github/workflows/validate.yml#validate/step-3"
 owner = "CI checkout and trust"
 purpose = "Check out the reviewed perfeng-contracts source."
-definition = "sha256:3a9d0397ccaa1bc53ee5449c9f692ca2c7f6c89d78d942cbe887d782e0ba926f"
+definition = "sha256:b425830103810af482a77cedb5b58bc1d073e568ed172a42246631107e4c9194"
 
 [[routes]]
 id = "workflow:.github/workflows/validate.yml#validate/step-4"
@@ -1427,7 +1439,7 @@ definition = "sha256:64b78bf244da124ecb6c95ba2839514c4bd98592bd2fdbfcddde757ed32
 id = "workflow:.github/workflows/validate.yml#validate/step-12"
 owner = "Environment project verification"
 purpose = "Run repository-local verification on the runner matrix."
-definition = "sha256:632304880b803c7cb8dfb414a7bbc2a19bdddd1a4b189bd1bbd0e1856f6c492a"
+definition = "sha256:12566584d53282ca839cf6396bc05909a753e6f0d77e5e91590717781705e571"
 
 [[routes]]
 id = "workflow:.github/workflows/validate.yml#validate/step-13"

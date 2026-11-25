@@ -689,14 +689,17 @@ reporting for the selected runtime bundle.
 ### The checkout report cannot be verified
 
 Use the [operator book](local-checkout-operator-book.md#4-verify-the-exact-analysis-report)
-to check the Run and report registration, approved object access, registered
-byte count and digest, and reviewed policy linkage. Preserve the original Run
-and report. If access is unavailable or the evidence differs, give the
-Environment owner the Run ID, deployment selection and failing check through
-the approved reporting channel. For denied exact-object access, identify the
-missing GET approval for the registered key. If the object verifies but the
-verdict is inconclusive, record the unresolved decision using the book's
-return checkpoint. Keep the object body and credentials private.
+and resume the durable checkpoint for the original attempt. Recheck the approved
+lock, cluster UID and operator principal. If submission acknowledgement was
+lost, retain the checkpoint and attach only an independently identified Run.
+A new submission cannot recover the original evidence.
+
+On a denied report read, give the storage owner the exact registered reference
+through the private handoff. After access is restored, resume and verify the
+original bytes. A changed digest, malformed report, foreign candidate or policy
+mismatch produces no SLO decision. A verified report with insufficient data
+can record an unresolved observation. Keep the Run, checkpoint and bytes for
+the return visit and retain private evidence outside Git.
 
 ## Validate immutable selections offline
 
