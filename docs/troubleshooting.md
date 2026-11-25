@@ -88,6 +88,12 @@ the inventory. For an invalid baseline or a new, changed, or missing route,
 follow the reported correction and the
 [command-route review procedure](development/harness.md#reviewing-command-routes).
 
+An `unsupported-make` finding points to a Make declaration the guard cannot
+inspect statically. Use a supported literal form or review a narrowly scoped
+scanner rule and fixture with the maintainer. A Make fingerprint covers the
+recipe, prerequisites, and referenced variable definitions. Check those inputs
+when the finding names a target whose declaration line looks unchanged.
+
 ## Contract cold recovery
 
 A failing `contracts-restore-check` with retained assets indicates a missing,

@@ -4,7 +4,7 @@
 
 - Use the [documentation map](../README.md) to load only task-relevant guidance.
 - Run `make bootstrap` once, `make verify` while editing, and `make validate` before handoff.
-- Run `uv run --locked --offline python -m harness offline` to check repository policy, GitOps composition, and callable script routes.
+- Run `uv run --locked --offline python -m harness offline` to check repository policy, GitOps composition, and reviewed script and Make routes.
 - Helm rendering and immutable sibling-repository validation are explicit specialized tiers.
 - `task bootstrap`, `task status`, `task smoke`, and `task destroy` are live operator actions and never run from validation aggregates.
 - Turn recurring review findings into clearer guidance or an early deterministic check.
@@ -62,7 +62,7 @@ non-live acceptance.
 
 A command route is a repository-owned way to invoke work independently. The
 [reviewed baseline](../../harness/command-routes.toml) records each supported
-script or module route with an exact ID, owner, purpose, and SHA-256 digest of
+script, module, or Make target with an exact ID, owner, purpose, and SHA-256 digest of
 its callable definition. A baseline record grants review coverage. Dispatch
 authority comes from the separate [check manifest](../../harness/checks.toml).
 Application, fixture, and live-operation routes keep their owners and invocation.
@@ -80,7 +80,7 @@ and inspects source without importing or executing it.
 | Route | Supported evidence and definition |
 |:--|:--|
 | Script or module | The exact repository path identifies each entry source. A file's owner execute bit, shebang, shell suffix, Python `__main__.py` or top-level `if __name__ == "__main__"`, and the observed Node ESM direct-run guard can establish callability. A sole `unittest.main()` guard in a `tests/test_*.py` module remains ordinary test discovery unless there is independent invocation evidence. |
-| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. In shell sources and known Makefile, Taskfile, workflow, or Dockerfile locations, references can be repository-relative or use the integration harness's same-directory `$source_dir` convention. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
+| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. In shell sources, Make recipes, and known Taskfile, workflow, or Dockerfile locations, references can be repository-relative or use the integration harness's same-directory `$source_dir` convention. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
 | Separately invoked payload | An exact Python caller path and named payload identify code handed to another interpreter. Supported `-c` arguments include module-level string constants, including a literal `.strip()`, and `Path(imported_module.__file__).read_text(...)` for a direct absolute from-import of a local Python file. The guard recognizes the Python `sys.executable` forms with no option before `-c`, `-I`, or `-IB`. The artifact uploader has specific rules for the Pod source-staging command and the `upload_script(source.reference)` program and its builder. The definition covers the recognized interpreter expression and the payload text, source bytes, or builder syntax. |
 
 The script fingerprint covers the entry source and its owner execute bit.
@@ -90,12 +90,46 @@ source bytes since whitespace, comment-like lines in heredocs, and interpreter
 directives can affect execution.
 
 The interpreter scan recognizes the documented literal forms without resolving
-arbitrary variables, templates, generated code, or dynamic dispatch. References
-in Make, Task, and workflow files are evidence for file routes. Recipe, target,
-workflow step, and hook definitions have their own coverage boundary. When a
-route uses an opaque expression, prefer an explicit file or named payload the
-guard can verify. For a necessary new opaque form, add a narrow rule tied to
-the exact declaration and a fixture before recording its definition.
+arbitrary variables, templates, generated code, or dynamic dispatch. Literal
+references in Make recipes, Taskfiles, and workflow files are evidence for
+file routes. Task targets, workflow steps, and hooks have separate review
+coverage boundaries. For opaque script invocations, prefer an explicit file
+or named payload the guard can verify. For a necessary new opaque form, add a narrow rule tied to the exact
+declaration and a fixture before recording its definition.
+
+### Make targets
+
+Each literal target in a conventional `GNUmakefile`, `makefile`, or `Makefile`
+has an ID such as `make:Makefile#verify`. The guard checks target names, the
+first ordinary target used as the default, `.PHONY` membership, the ordered
+literal prerequisite list, and exact tab-prefixed recipe text. This covers
+phony aggregation targets such as `verify` and `validate`, which have
+prerequisites without recipes. Each prerequisite must be declared in the same
+Makefile, and a non-phony target must have an unconditional explicit recipe.
+These requirements keep implicit rule selection outside the supported syntax.
+Non-recipe comments and baseline purpose text can change independently of
+execution definitions.
+
+The guard traces plain `$(NAME)` and `${NAME}` recipe references and their
+transitive repository definitions through simple `=`, `:=`, and `?=`
+assignments. It also records which recipes are guarded by
+`ifneq ($(strip $(NAME)),)` and captures the condition's variable definitions
+at the point where Make would test it. Each assignment must be tracked through
+at least one recipe or condition so its value has a reviewed definition even
+when a subprocess reads it from the environment. External variable values
+remain inputs to each native Make invocation. The guard reads source without
+starting Make or expanding variables, running functions, or invoking shell
+recipes.
+
+The supported forms cover the repository's conventional Makefiles. Includes,
+computed names, Make functions outside the documented condition, continued
+lines, escaped declarations, escaped dollars (`$$`), repeated target or
+variable definitions, target-specific settings, and special execution settings
+such as `.DEFAULT_GOAL` or `SHELL` produce an `unsupported-make` finding.
+Multiple conventional names in one directory also fail because GNU Make
+would choose one by filename precedence. Use a supported
+literal declaration, or add focused static coverage with a fixture and
+maintainer review when a new construct is required.
 
 For a finding, use the reported declaration and `fix:` line. Reuse an existing
 route when it has the same owner and purpose. For a deliberate addition or
@@ -105,7 +139,9 @@ retiring a route. The guard leaves baseline editing to the contributor.
 
 The scan accepts up to 8,192 Git path records and 1 MiB of path data. It reads
 up to 2 MiB per candidate source and 32 MiB of candidate source overall. The
-baseline has its own 2 MiB limit. For checkout and runtime failures, use the
+baseline has its own 2 MiB limit. Each Makefile can have up to 4,096 lines,
+256 target names, 256 variable declarations, and 256 referenced variable names.
+For checkout and runtime failures, use the
 [offline troubleshooting steps](../troubleshooting.md#offline-command-route-check).
 
 Request explicit maintainer sign-off in the PR for changes to the manifest,

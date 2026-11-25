@@ -21,7 +21,7 @@ GUARD = Path("harness/command_routes.py")
 UNREVIEWED_SCRIPT = Path("unreviewed.sh")
 ROOT_APPLICATION = Path("gitops/bootstrap/local-root-application.yaml")
 PR_FIX_FORM = Path(".github/PR_FIX_COMMENT_TEMPLATE.md")
-HARNESS_INPUTS = (Path("harness/__main__.py"), GUARD)
+HARNESS_INPUTS = (Path("harness/__main__.py"), GUARD, Path("harness/make_routes.py"))
 OFFLINE_INPUTS = (
     *HARNESS_INPUTS,
     Path("harness/checks.toml"),

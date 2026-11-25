@@ -1,5 +1,179 @@
-# Reviewed script and module route inventory.
+# Reviewed repository command route inventory.
 # Request maintainer sign-off for changes. See docs/development/harness.md#reviewing-command-routes.
+
+[[routes]]
+id = "make:Makefile#argus-campaign-check"
+owner = "Joint Argus integration"
+purpose = "Verify offline shadow campaign aggregation."
+definition = "sha256:95e29c25114b2a36c9e40253360dcacb7539da07e5841d888c68ebd9b7708ba9"
+
+[[routes]]
+id = "make:Makefile#argus-perfeng-fixture-check"
+owner = "Joint Argus integration"
+purpose = "Validate disposable joint inputs and safety offline."
+definition = "sha256:8aaa87c0ee506dd6e14cb9a09e43758f4512ef3d1b3d1fddca055536cb8d8083"
+
+[[routes]]
+id = "make:Makefile#bootstrap"
+owner = "Environment engineering"
+purpose = "Resolve the locked Python environment."
+definition = "sha256:bb743d2c2d244d1972accd67957b5369287e7c6473cd2938ea52a2864b8f977e"
+
+[[routes]]
+id = "make:Makefile#check"
+owner = "Environment engineering"
+purpose = "Run static and repository-local configuration checks."
+definition = "sha256:742d58179af70403b6df4919671682c895bdcbaef26b0d49f945d4d9b500391d"
+
+[[routes]]
+id = "make:Makefile#contracts-campaign-check"
+owner = "Contract distribution"
+purpose = "Verify offline campaign logic and optionally inspect an explicit campaign manifest."
+definition = "sha256:d1d525c25644d99a5bf2b36376629a1922ae4150762f15192876084dbfc1c471"
+
+[[routes]]
+id = "make:Makefile#contracts-inspect-check"
+owner = "Contract distribution"
+purpose = "Verify offline contract artifact inspection."
+definition = "sha256:c24d13b621ba026984b5c6784c25807d3c251cce612ae41d3659048911a18af3"
+
+[[routes]]
+id = "make:Makefile#contracts-materializer-check"
+owner = "Contract distribution"
+purpose = "Verify atomic local projection activation."
+definition = "sha256:ab5be98ce4e088efc93806d9dc834d0e29cdb611a0d97173f3d03b0d45c3853f"
+
+[[routes]]
+id = "make:Makefile#contracts-restore-check"
+owner = "Contract distribution"
+purpose = "Test cold restoration and optionally inspect explicit retained assets."
+definition = "sha256:ad159ceaea2ae129b82d3242c44c459affbb1d402585c25464548ffb12976a72"
+
+[[routes]]
+id = "make:Makefile#contracts-shadow"
+owner = "Contract distribution"
+purpose = "Compare the signed tracer with the local contract offline."
+definition = "sha256:3291212e8d92fc76947c0f9e9037040a22b80222a9ab76aee7dd1fa8f5a9a846"
+
+[[routes]]
+id = "make:Makefile#contracts-tool-release-check"
+owner = "Contract distribution"
+purpose = "Verify materializer release boundaries."
+definition = "sha256:218906dcfe238c61eb991f269716dc698ca18c72bab0cc952982912dd1b4f03f"
+
+[[routes]]
+id = "make:Makefile#contracts-tools-check"
+owner = "Contract distribution"
+purpose = "Verify separately prepared contract distribution tools."
+definition = "sha256:91c50b207e00e33b4ef46ca1806799f9ad5c6853d6fc5a14c9348b54570fba00"
+
+[[routes]]
+id = "make:Makefile#contracts-update-check"
+owner = "Contract distribution"
+purpose = "Verify the signed benchmark schema update path."
+definition = "sha256:17bd5d1e02ccf9c8064c3f6ed079aabc267086373ef3c75e9c86df005b1ffb0d"
+
+[[routes]]
+id = "make:Makefile#docs-check"
+owner = "Environment engineering"
+purpose = "Verify repository-local documentation and policy."
+definition = "sha256:d7ab544781c281b7a10f8006620bac29a66547c13b312687ce6469c2fadbad48"
+
+[[routes]]
+id = "make:Makefile#doctor"
+owner = "Environment engineering"
+purpose = "Report the effective engineering toolchain."
+definition = "sha256:c54d21d4129c3cfa140bd80e4fdd6ce09dd9d0aad61b87741d4968ace35dce94"
+
+[[routes]]
+id = "make:Makefile#fmt"
+owner = "Environment engineering"
+purpose = "Format Python sources."
+definition = "sha256:d42098be98ae7ff9bfabf5df576d28192a613d30c694cf006778c4e65286769c"
+
+[[routes]]
+id = "make:Makefile#fmt-check"
+owner = "Environment engineering"
+purpose = "Verify Python formatting."
+definition = "sha256:eab84a3ce59d7e39ae515bd69b7721ebcec98a25433fa2c9f73b765907e49f69"
+
+[[routes]]
+id = "make:Makefile#help"
+owner = "Environment engineering"
+purpose = "Display the engineering command surface."
+definition = "sha256:12c4aea4a0b96a7c7d4d9028f4ee03fcdef15f550dfd9494f6f70754210b192a"
+
+[[routes]]
+id = "make:Makefile#keycloak-qualification"
+owner = "Keycloak qualification"
+purpose = "Run the opt-in disposable Keycloak identity fixture."
+definition = "sha256:c6f6d29f7058d34ab88f432eaaa2fff05dbc50192717c1983b4f48e50f01c4c2"
+
+[[routes]]
+id = "make:Makefile#native-gateway-check"
+owner = "Native HTTPS gateway"
+purpose = "Adapt the native HTTPS gateway with reviewed Caddy."
+definition = "sha256:9eed410f7b07dddacae946efd73ed95cdba826aa7ff48f863cfbb328e7f36987"
+
+[[routes]]
+id = "make:Makefile#native-target-image-check"
+owner = "Native target"
+purpose = "Build and verify an isolated development candidate."
+definition = "sha256:698782fc00e17c2ebaabd161874db24140d781245aab5c87c8ca9ab536777150"
+
+[[routes]]
+id = "make:Makefile#openbao-qualification"
+owner = "OpenBao qualification"
+purpose = "Qualify pinned OpenBao with synthetic identities."
+definition = "sha256:32e4893236f6daae4badffa60ae128f4e5e3d7a302ec9c48b0ec8650ede6ba1e"
+
+[[routes]]
+id = "make:Makefile#release-selection-check"
+owner = "Environment release composition"
+purpose = "Validate exact adjacent release selections."
+definition = "sha256:9c40996629f1e0f8813abc8fbab25beea46cb77df03695c04d3b3820090d5e28"
+
+[[routes]]
+id = "make:Makefile#release-workflows-integration"
+owner = "Release workflow integration"
+purpose = "Exercise release boundaries on isolated GitHub-hosted kind."
+definition = "sha256:58695d9b768fcd1f6aeb8fe0e2fae29fd971a1f033c64b97bfcf5b507cbc894b"
+
+[[routes]]
+id = "make:Makefile#render-check"
+owner = "Environment GitOps"
+purpose = "Validate Helm charts offline."
+definition = "sha256:c883b68e31df3fbeb49829b8a0afa076785fe23d9ef0a0f3f79085fa8a869d7f"
+
+[[routes]]
+id = "make:Makefile#supply-chain"
+owner = "Environment engineering"
+purpose = "Verify the lock and audit dependencies."
+definition = "sha256:e97db832b12c883d5950f4fa4043373bbb2751065f78e208341f5113728dfb86"
+
+[[routes]]
+id = "make:Makefile#test"
+owner = "Environment engineering"
+purpose = "Run the unit-test suite."
+definition = "sha256:033b50deaf6ca4227797e5e83ad047b4a2848cf8698a960b3e73fa4b5605f894"
+
+[[routes]]
+id = "make:Makefile#validate"
+owner = "Environment engineering"
+purpose = "Run complete non-live acceptance."
+definition = "sha256:0e1c3769b061d2ff913622d6020c67285cb98a74a8b070205acbac702e83636a"
+
+[[routes]]
+id = "make:Makefile#verify"
+owner = "Environment engineering"
+purpose = "Run the network-independent inner loop."
+definition = "sha256:b0e5f07c66fc603b300af2233f7a404bd581ba29bd24548ef18d20b03e482423"
+
+[[routes]]
+id = "make:Makefile#workflow-lint"
+owner = "Release GitOps"
+purpose = "Lint the staged release WorkflowTemplate offline with pinned Argo."
+definition = "sha256:26e383554137be1259ae736a58c70c05721562d07f3b35a21bbd0fb94db73db8"
 
 [[routes]]
 id = "payload:scripts/artifact_upload.py#stage_source"
@@ -76,8 +250,8 @@ definition = "sha256:6bcb77e68d01c5b726641af24e78eb016f4d1939a62e4390cb2bc015b8e
 [[routes]]
 id = "script:harness/command_routes.py"
 owner = "Environment engineering"
-purpose = "Check script and module routes against the separate reviewed inventory."
-definition = "sha256:591627d2557b52d5ed5125d6c05c9ffb99330c6b28eb13be6a74cde85f782693"
+purpose = "Check repository command routes against the separate reviewed inventory."
+definition = "sha256:db6fa3542d60064ba9f1e42e36d32ad9e60c8603aa4086260f14322116685cd5"
 
 [[routes]]
 id = "script:scripts/argus_campaign.py"
