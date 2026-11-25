@@ -1,0 +1,644 @@
+# Reviewed script and module route inventory.
+# Request maintainer sign-off for changes. See docs/development/harness.md#reviewing-command-routes.
+
+[[routes]]
+id = "payload:scripts/control_plane_smoke.py#CLIENT_PROGRAM"
+owner = "Control-plane smoke"
+purpose = "Run the authenticated smoke client inside the dedicated Pod."
+definition = "sha256:b51c15dbfd0864069d3e773ee04082ef92cb29450a2b2773dd620ac22e4214d4"
+
+[[routes]]
+id = "payload:scripts/kubernetes_acceptance/transport.py#READ_OBJECT"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Read one verified evidence object in the Pod's separately scoped storage container."
+definition = "sha256:0777c1ae5e8dffe9021269319d7a1af56218564dc1fc1787ee137157a7e466e8"
+
+[[routes]]
+id = "payload:scripts/kubernetes_acceptance/transport.py#scripts.kubernetes_acceptance.api_client"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Send one classified API operation from the Pod's API client container."
+definition = "sha256:5fb404e0e907684d339da6820a17c5e111298e187977e2e40fd7564213369171"
+
+[[routes]]
+id = "script:charts/sample-sut/files/server.py"
+owner = "Sample SUT fixture"
+purpose = "Serve deterministic functional test responses in the sample workload."
+definition = "sha256:face84ad6649bfa1241bb463e2042176c045690d1279d7035c3615392ca2dfdc"
+
+[[routes]]
+id = "script:gitops/release-workflows/scripts/bucket.sh"
+owner = "Release GitOps"
+purpose = "Prepare the selected evidence bucket through the versioned external-state Job."
+definition = "sha256:ea1d6508e56187f090adfeb242965636d6d8d7314a640fec615367e480816250"
+
+[[routes]]
+id = "script:gitops/release-workflows/scripts/database-roles.sh"
+owner = "Release GitOps"
+purpose = "Reconcile checked database identities through the versioned external-state Job."
+definition = "sha256:633936994c551be00a2b8ea9f11dcce3be001a0f3929e913fa862d2f5eeca2f5"
+
+[[routes]]
+id = "script:gitops/release-workflows/verifiers-v3/release_runtime_v3.py"
+owner = "Release GitOps"
+purpose = "Run mounted verifier commands for release admission, quiescence and readiness."
+definition = "sha256:2d51bcca08a3f2d8aef29b0ea91eb75ef3132b1b091ae0ef6426b760d5ab3eff"
+
+[[routes]]
+id = "script:harness/__main__.py"
+owner = "Environment engineering"
+purpose = "Dispatch the engineering checks registered in the offline stage."
+definition = "sha256:6bcb77e68d01c5b726641af24e78eb016f4d1939a62e4390cb2bc015b8e9dd0e"
+
+[[routes]]
+id = "script:harness/command_routes.py"
+owner = "Environment engineering"
+purpose = "Check script and module routes against the separate reviewed inventory."
+definition = "sha256:2ee66a78903cf660e15f4e008bb9274cf2af8548193ca27127ba27602284ead9"
+
+[[routes]]
+id = "script:scripts/argus_campaign.py"
+owner = "Joint Argus integration"
+purpose = "Aggregate explicitly inventoried hosted shadow artifacts without network access."
+definition = "sha256:a119bd80073caa8ed98d01f1d5d3b6078722f89495b74f8c55cf645fcb38ecf3"
+
+[[routes]]
+id = "script:scripts/browser_diagnostics.py"
+owner = "Browser evidence"
+purpose = "Assemble browser-diagnostics/v1 from verified browser capture evidence."
+definition = "sha256:a22e35e5b8ed85064cfb233d6e8a0e68e5d27562ae120c12d50b45ec3fb0f065"
+
+[[routes]]
+id = "script:scripts/browser_environment.py"
+owner = "Browser evidence"
+purpose = "Assemble a qualified browser-environment/v1 artifact."
+definition = "sha256:10e2c567e027fca8a0f0d2f6f947e2f40b3c30b13b6f3e18860dbd2d818d7dbb"
+
+[[routes]]
+id = "script:scripts/browser_host.py"
+owner = "Browser evidence"
+purpose = "Validate and evaluate the native Linux browser execution profile."
+definition = "sha256:5a6291146328feff6832d46c95c2b72d6b60768277f85491a143d7ceb96cbc41"
+
+[[routes]]
+id = "script:scripts/browser_raw_result.py"
+owner = "Browser evidence"
+purpose = "Assemble raw-result/v2 from verified native browser publication receipts."
+definition = "sha256:a8b06c2ff0e10cc724b264485d19a0a670a1d22a4677542191ae8571934b3c85"
+
+[[routes]]
+id = "script:scripts/browser_upload.py"
+owner = "Browser evidence"
+purpose = "Publish native browser artifacts through the restricted local S3 identity."
+definition = "sha256:a37cd31a283f1d1feaeac7031d84b5b4c6574efb5d237a307ee665fbb3a66d40"
+
+[[routes]]
+id = "script:scripts/check_sample_api.py"
+owner = "Environment engineering"
+purpose = "Opt-in functional check against sibling k6 sources; loopback only, not a benchmark."
+definition = "sha256:34e4f580e976eeefe05581f45497f05d9a38ade8db7cc744eb4bed7ca805d9aa"
+
+[[routes]]
+id = "script:scripts/cluster.py"
+owner = "Local infrastructure operations"
+purpose = "Bootstrap Perfeng namespaces on the selected Kubernetes substrate."
+definition = "sha256:9f8b95a55280b775129d8f8b933ce92e116d96fdd1f74f00fe1989ea2fb8825e"
+
+[[routes]]
+id = "script:scripts/contracts_campaign.py"
+owner = "Contract distribution"
+purpose = "Re-run the seven reviewed cutover gates with primary-service networking unavailable."
+definition = "sha256:3435decf28ae5ab9dff6dd273928a1b95d3eaebabe63c532bf2ef998c8313020"
+
+[[routes]]
+id = "script:scripts/contracts_distribution_tools.py"
+owner = "Contract distribution"
+purpose = "Qualify a locally prepared verifier against independent bootstrap pins."
+definition = "sha256:84d26c718f9b63134b41a6409920ee235024e55944dfa999cc429bd316f6b215"
+
+[[routes]]
+id = "script:scripts/contracts_inspect.py"
+owner = "Contract distribution"
+purpose = "Inspect an approved contract distribution entirely from local inputs."
+definition = "sha256:b3bd15f75418a3ede1c4a36f3569c6fead0e75ac78996b2dcf2b14066c8e7e8b"
+
+[[routes]]
+id = "script:scripts/contracts_materialize.py"
+owner = "Contract distribution"
+purpose = "Activate an independently selected contract projection in a dedicated local store."
+definition = "sha256:34b3b9156764fc471d31306162b588e459fe61e9af665c686d784dedfd926b86"
+
+[[routes]]
+id = "script:scripts/contracts_restore.py"
+owner = "Contract distribution"
+purpose = "Rehearse historical restoration from local signed release assets."
+definition = "sha256:2ce2eb30995501dd037cda21205fccacca99a787d432caf6156552755be56f11"
+
+[[routes]]
+id = "script:scripts/contracts_shadow.py"
+owner = "Contract distribution"
+purpose = "Exercise the exact published tracer against the existing offline consumer."
+definition = "sha256:4da225d34340cc823003cdbd1cb91f79f4e4b7e705a2452dff855a86c934b86e"
+
+[[routes]]
+id = "script:scripts/contracts_tool_release.py"
+owner = "Contract distribution"
+purpose = "Build and restore a pinned Linux materializer execution closure."
+definition = "sha256:2fc48cf62e192aeff5ed2e09e846c6e0af7bb4d0ff0162f42656b8a3999c6754"
+
+[[routes]]
+id = "script:scripts/contracts_update.py"
+owner = "Contract distribution"
+purpose = "Prepare the benchmark schema from the reviewed signed distribution offline."
+definition = "sha256:37d778703348787c79dafe9fe08cb8592225b55306def33a8278e432b840baa0"
+
+[[routes]]
+id = "script:scripts/control_plane_database.py"
+owner = "Control-plane operations"
+purpose = "Provision isolated local control-plane PostgreSQL identities."
+definition = "sha256:0b940400b25edaa610309ab357b3234bbf0517ed7ff1c010e5da28ed1575e8aa"
+
+[[routes]]
+id = "script:scripts/control_plane_health.py"
+owner = "Control-plane operations"
+purpose = "Verify the GitOps-managed local control-plane workload."
+definition = "sha256:cee61b945bcec8c90a8809af0bb99cdb37c43a5a45828ab706b4d7b499684921"
+
+[[routes]]
+id = "script:scripts/control_plane_maintenance.py"
+owner = "Control-plane operations"
+purpose = "Pause owned GitOps reconcilers and quiesce the control plane before migrations."
+definition = "sha256:bdaa924cb7bafd9dbaf8449cd27d8dae3a123cd8ca1742acc4d444105319628e"
+
+[[routes]]
+id = "script:scripts/control_plane_migration.py"
+owner = "Control-plane operations"
+purpose = "Run and verify pinned control-plane PostgreSQL migrations locally."
+definition = "sha256:cca099861628ec594175874b805e9398d26a4d531b394a86f881bdc73a42ec18"
+
+[[routes]]
+id = "script:scripts/control_plane_registry.py"
+owner = "Control-plane operations"
+purpose = "Provision and verify local control-plane image-pull credentials."
+definition = "sha256:9a51a30028a2301a9fee18044da8cdcd95768fd1422358a3c6f4a3eb82d95ede"
+
+[[routes]]
+id = "script:scripts/control_plane_release.py"
+owner = "Control-plane operations"
+purpose = "Validate the immutable local control-plane deployment selection."
+definition = "sha256:5c06ef7f336423494d678f26a59ec568434732d203b1940691def44b8941ae22"
+
+[[routes]]
+id = "script:scripts/control_plane_runtime.py"
+owner = "Control-plane operations"
+purpose = "Assemble immutable local control-plane runtime inputs."
+definition = "sha256:2a8e1b8be72ff7da71b5fdfeef6d02a6f1aa3e81879f8cdcd89141f00170fc01"
+
+[[routes]]
+id = "script:scripts/control_plane_smoke.py"
+owner = "Control-plane operations"
+purpose = "Run one authenticated k6-to-analysis control-plane smoke test."
+definition = "sha256:114638a5ca80962779c91639d6bb55f4a02c8f681cf2c65fca7f6cf6be9b52a1"
+
+[[routes]]
+id = "script:scripts/execution_registry.py"
+owner = "Control-plane operations"
+purpose = "Explicitly provision or verify pull access for the selected execution images."
+definition = "sha256:bade719f6d0b86109ad5bbd7ec1889f15c7927bae5a1eea1ccb92c710f17e52f"
+
+[[routes]]
+id = "script:scripts/gitops.py"
+owner = "Control-plane operations"
+purpose = "Validate, bootstrap and inspect the local Argo CD GitOps control plane."
+definition = "sha256:63e192b9cec8de332fbd25b59918e5423c343eee732405f84fd4897d169917fa"
+
+[[routes]]
+id = "script:scripts/infrastructure_release.py"
+owner = "Local infrastructure operations"
+purpose = "Validate the immutable local Kubernetes infrastructure selection."
+definition = "sha256:944ad01f65bb6544a64134e4a5b3e4f5bee9bb2db8b37c95c2b4028b77589e1c"
+
+[[routes]]
+id = "script:scripts/infrastructure_runtime.py"
+owner = "Local infrastructure operations"
+purpose = "Run the immutable Kubernetes infrastructure selection."
+definition = "sha256:b092b52e31e9465868b10117ef6f5ff21b45d359c854ecf9f79e897bfd953880"
+
+[[routes]]
+id = "script:scripts/k6_run.py"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Preview-first checkout smoke Job and verified raw-artifact upload to local SeaweedFS."
+definition = "sha256:f07bb7018cc680958c9e658f61aeb998a2f6c1e096103ce7781862923fd15955"
+
+[[routes]]
+id = "script:scripts/keycloak_qualification.py"
+owner = "Keycloak qualification"
+purpose = "Opt-in, disposable Keycloak identity qualification; never enable serving."
+definition = "sha256:35ab603ae6dc900bba06342e8e81ea206810bfa7ab2d5ebee67ed266c052896f"
+
+[[routes]]
+id = "script:scripts/kube_burner_upload.py"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Publish a completed kube-burner capture to local artifact storage."
+definition = "sha256:842cd61e06966c0502113dde0829af1d6bcd2f49b3aa18c5335c73a0adb2b4e8"
+
+[[routes]]
+id = "script:scripts/kubernetes_acceptance/__main__.py"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Preview or explicitly run M04 integration acceptance."
+definition = "sha256:2607ba01932e8e5c6222e6d04ababda0dfee8234c67f35c6cf0d07d3d00044b8"
+
+[[routes]]
+id = "script:scripts/kubernetes_acceptance/api_client.py"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Handle the API client's bounded stdin command and emit its classified response."
+definition = "sha256:446de9d4c42bbe300cad40c55bb3d5ed1083b2a1d3299c5c8afd200a894f2a35"
+
+[[routes]]
+id = "script:scripts/kubernetes_benchmark.py"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Preview or explicitly collect read-only local Kubernetes benchmark qualification."
+definition = "sha256:928ee2aaf1e58bbd503a6dac20e9a0b0425e8f2bb3688a607f7efeb63404595c"
+
+[[routes]]
+id = "script:scripts/native_connectivity.py"
+owner = "Native connectivity"
+purpose = "Operate the loopback-only Linux gateway without changing cluster workloads."
+definition = "sha256:7064fb011227606ca674baf76b2a837084cfc43a10a5064f2e96ed2dab515a21"
+
+[[routes]]
+id = "script:scripts/native_gateway.py"
+owner = "Native connectivity"
+purpose = "Manage verified setup, read-only diagnosis and one bounded foreground native session."
+definition = "sha256:bc9b06e2c8ca7a3395d92eee118a830a29b15d7a175c72f50d84b84701492f95"
+
+[[routes]]
+id = "script:scripts/native_gateway_release.py"
+owner = "Native connectivity"
+purpose = "Build/audit the serving package or explicitly select its reviewed publication record."
+definition = "sha256:97db9340c0f5f7492818d16c95f2abf51a20a71771a14bd73d0f3de3fe645f6c"
+
+[[routes]]
+id = "script:scripts/native_gateway_smoke.py"
+owner = "Native connectivity"
+purpose = "Explicit isolated Linux Caddy TLS smoke; no cluster, publication or trust-store mutation."
+definition = "sha256:2c0f020af9627d8458af54b6cdc8f25a16ed83944e674af9723e8950fc7496a4"
+
+[[routes]]
+id = "script:scripts/native_target.py"
+owner = "Native connectivity"
+purpose = "Build and verify the isolated controlled browser candidate; never deploy or publish."
+definition = "sha256:df6a1781e80ef7c9be515c86dc322cb0e43369cc51f72a21bbb1f5aa6e28061a"
+
+[[routes]]
+id = "script:scripts/native_target_health.py"
+owner = "Native connectivity"
+purpose = "Verify the owned image-backed target before opening tunnels or accepting HTTPS content."
+definition = "sha256:7d5300d0f34e18fa86929b08fe65b0baaf50f993648d4fdc3d6c62b6ca40bc7e"
+
+[[routes]]
+id = "script:scripts/native_target_release.py"
+owner = "Native connectivity"
+purpose = "Validate the immutable image-backed target selection without reconciling workloads."
+definition = "sha256:9f1043085850e73236dd9a6d142ddd02dee4257f9c1539eba6fa85bf8335f31f"
+
+[[routes]]
+id = "script:scripts/object_store.py"
+owner = "Local infrastructure operations"
+purpose = "Preview-first SeaweedFS credential bootstrap, rollback deployment and S3 checks."
+definition = "sha256:c83ee008ccfc26d4b6fa410c9c779675547771d157952674ff36a145969909ac"
+
+[[routes]]
+id = "script:scripts/openbao_qualification.py"
+owner = "OpenBao qualification"
+purpose = "Qualify a pinned, loopback-only OpenBao instance with synthetic JWT identities."
+definition = "sha256:d940689140f5704b6e51d5c1b6efc417783897161cd91c7d0e0e49e5edcf2395"
+
+[[routes]]
+id = "script:scripts/policy_publish.py"
+owner = "Control-plane operations"
+purpose = "Preview and publish exact reviewed policy bytes to local SeaweedFS."
+definition = "sha256:f5d893f76413d5e6209b606aa2f67515c30871d96065d023e9cdf897e68d618d"
+
+[[routes]]
+id = "script:scripts/postgres.py"
+owner = "Local infrastructure operations"
+purpose = "Preview-first PostgreSQL credential bootstrap, rollback deployment and health."
+definition = "sha256:87bb6f143cd29b5e7f9b2b3334f1f67e3ca44b620c64017f8398c7d20ff75f87"
+
+[[routes]]
+id = "script:scripts/raw_result_upload.py"
+owner = "Kubernetes benchmark acceptance"
+purpose = "Publish a completed raw-result/v2 manifest at its stable discovery key."
+definition = "sha256:b2d5e0e52f4235854ce7bb8ccfcc89d13b6d649d29c5e7534949855438dbd2d0"
+
+[[routes]]
+id = "script:scripts/repository_policy.py"
+owner = "Environment engineering"
+purpose = "Validate repository-local documentation and harness policy without network access."
+definition = "sha256:3542de6bb017f0e7e723d7743fa5dea71169ff61db21d1b9e6c0e995b68a3239"
+
+[[routes]]
+id = "script:scripts/resource_metrics_health.py"
+owner = "Local infrastructure operations"
+purpose = "Check the selected metrics owner and TLS binding, then delegate generic health."
+definition = "sha256:10fe7c0f33dd7dab6f73310aab8ef40792b00ea82b8aff069ae11477093be405"
+
+[[routes]]
+id = "script:scripts/resource_metrics_release.py"
+owner = "Local infrastructure operations"
+purpose = "Validate the consumer's immutable Metrics Server selection without cluster access."
+definition = "sha256:ff8f699ab17edc6a39d3070dd6141ae98e9e475935d35370db6a20b4981443ce"
+
+[[routes]]
+id = "script:scripts/storage_access.py"
+owner = "Local infrastructure operations"
+purpose = "Immutable local uploader credentials and live S3 authorization checks."
+definition = "sha256:ea34967f646b544c6cd88b3816dbe14d19c8316fec76c96eb72980313cce0f34"
+
+[[routes]]
+id = "script:scripts/validate_cluster.py"
+owner = "Environment engineering"
+purpose = "Offline local chart/config checks; does not contact Kubernetes."
+definition = "sha256:7a2c6048e7342ab55e35875d21b613931074e34420f01913c93638e8a5e05700"
+
+[[routes]]
+id = "script:scripts/workspace.py"
+owner = "Environment engineering"
+purpose = "Safe sibling checkout discovery and missing-only bootstrap."
+definition = "sha256:6a3f7c305595e778dbcda68f386dfa50da794522d0fa190225bb2ae415751e2c"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/acceptance.py"
+owner = "Joint Argus integration"
+purpose = "Qualify a disposable checkout baseline and verify reviewed joint evidence."
+definition = "sha256:8e3aef77a2a8a5c750257cbdc2eb424860dbd38999b556b0a14ba808a91bb159"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/fixture.py"
+owner = "Joint Argus integration"
+purpose = "Disposable pinned artifact/database preparation; no running-product acceptance."
+definition = "sha256:406cbc321be1544ccb01ae50d7f06e548e87941f938e93bc5aeca18efe2c7bba"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/flow.py"
+owner = "Joint Argus integration"
+purpose = "Verify signed Argus change ingress and the checkout smoke Run."
+definition = "sha256:6a84b7be0cbfa9d61054e79f35d6ae361095a5bcfd9440ab6f282fbdc3e4aa18"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/github_provider.py"
+owner = "Joint Argus integration"
+purpose = "Private GitHub API fixture serving exact revisions of one controlled change."
+definition = "sha256:725219186686293e086b4cbef7a06ba331c2d06bfb1a512fc6f2117e34ec42ed"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/provider_relay.py"
+owner = "Joint Argus integration"
+purpose = "Forward the Argus pod's loopback HTTP connection to the fixture provider."
+definition = "sha256:556a42d1f53ae9aef3136a0622c0ab7b1eac8bd00cad97f47a225989eff51729"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/recovery.py"
+owner = "Joint Argus integration"
+purpose = "Prove post-deadline evidence recovery across real Argus pod replacement."
+definition = "sha256:3b2bc68842b452a474517e87f706a4493f14bbb254c9bc72ee0bb9bbb2f1cf45"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/serving.py"
+owner = "Joint Argus integration"
+purpose = "Start and verify the disposable serving tier for the joint checkout flow."
+definition = "sha256:9116b1138d6cbb4cf4885599a75e6f65318e7ab3eb215402a9e2f23436c77769"
+
+[[routes]]
+id = "script:tests/integration/argus-perfeng/shadow.py"
+owner = "Joint Argus integration"
+purpose = "Emit a bounded advisory receipt without uploading private fixture files."
+definition = "sha256:f01c80bb5f05c4a1988a1ec45fd8488e7ffb6168bac0b009e301501eb18ee714"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/adoption_identity_evidence.py"
+owner = "Release workflow integration"
+purpose = "Guard disposable receipt faults and verify complete-parent identity refusals."
+definition = "sha256:f8406ef98f2045813b68993912581d45b011d25a4080fcd70e6cda6a40c9f0fc"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/adoption_parent_evidence.py"
+owner = "Release workflow integration"
+purpose = "Bind complete adoption-parent evidence to native observations and stored bytes."
+definition = "sha256:ad21728c7f04fd695233d51f51d0fba21b536c811e863ce6331432c52ae6fead"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/adoption_response.py"
+owner = "Release workflow integration"
+purpose = "Generate and verify bounded complete-parent create-fault fixtures."
+definition = "sha256:2621f413d9999b902bd250222b3b58f1c15050fc852045993cf3df11f9055cef"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/argocd_inputs.py"
+owner = "Release workflow integration"
+purpose = "Offline boundaries for the disposable Argo CD acceptance phase."
+definition = "sha256:6ad269fa0371499a32ec7b71ba4f002d907e60bf65b2b796fb39acf87e918d9c"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/database_preparation.py"
+owner = "Release workflow integration"
+purpose = "CI-only complete-parent evidence; no SQL policy or deployment orchestration."
+definition = "sha256:c6781ed213fca37de97b477118fd5a5168862982915fa46e2465521aab5c14b9"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/external_parent_evidence.py"
+owner = "Release workflow integration"
+purpose = "Offline-checkable CI evidence; no client, orchestration or production helper."
+definition = "sha256:e6bf49fbdd906e3f196e3971785f6777e7b563501366b67458a4303b3d028ded"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/ledger_response_proxy.py"
+owner = "Release workflow integration"
+purpose = "Disposable CI transport fault: commit one exact ledger record, drop its response."
+definition = "sha256:9d7ec8f51b9f58695b0d85a7566352ea699cb928c19ab7ad41e770cb0708f262"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance-parent-refusal.jq"
+owner = "Release workflow integration"
+purpose = "Classify the complete maintenance parent's expected refusal in hosted acceptance."
+definition = "sha256:a977f2d0c91681db170d19d5e926fb25f5463e28768b6fb011a8a746ccc884f3"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_application_response.py"
+owner = "Release workflow integration"
+purpose = "Bind root/child no-op PATCH response loss to unchanged running-state retention."
+definition = "sha256:ed9d99030218724c9a2a4214c346ff4bb5a7cf721ca1abe5131d95597ff50877"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_authority_evidence.py"
+owner = "Release workflow integration"
+purpose = "Prepare exact native dry-run patches and classify maintenance API authority."
+definition = "sha256:3902207f940d725dd269c5cfe1e0cd5cb84f489019a0c06a5cd7a9e9e83f9838"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_child_transition.py"
+owner = "Release workflow integration"
+purpose = "Prove one native child enable-to-disable transition in owned disposable CI."
+definition = "sha256:a96c4fe747279794337ce006457abb067f5b9f4f52fd8c4da526905755f37e9c"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_guard_conflict.py"
+owner = "Release workflow integration"
+purpose = "Owned CI barriers and evidence for stale native maintenance JSON Patch tests."
+definition = "sha256:c85d10e7fb16a127f2b0af94e96f5eae38f98fe99b4375d7c97e13ae57b510f7"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_lingering_pod.py"
+owner = "Release workflow integration"
+purpose = "Bind a disposable gated Pod to real checkpoint refusal and conditional cleanup."
+definition = "sha256:1433bd9574d98963dd0703ea7de389c91857018242da801e17048838d4cda388"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_partial_pause.py"
+owner = "Release workflow integration"
+purpose = "Validate approved CI maintenance interruption and explicit Deployment recovery."
+definition = "sha256:7ff9c1a02e3462c0fa77966318df531511aa7bc2536eadf460d1b4553a0470ea"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_patch_proxy.py"
+owner = "Release workflow integration"
+purpose = "Disposable TLS fault for one configured, named maintenance PATCH."
+definition = "sha256:14f747cfdc881113bcb73221c56c75e98eb5dec94091cbccd264cee9f070ea6c"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_patch_response.py"
+owner = "Release workflow integration"
+purpose = "Prepare a reversible parent and validate committed PATCH loss before recovery."
+definition = "sha256:ecfd59aa20481812567d2b57c9fb8f8ef982d082a96a4c41b1675d7a69954961"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_pause_evidence.py"
+owner = "Release workflow integration"
+purpose = "Offline evidence checks for the owned CI pause and explicit manual recovery."
+definition = "sha256:6c45931d462fb6005688727c63143df3a5eb83e41c966833e36a611aa10db5e2"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_unadopted.py"
+owner = "Release workflow integration"
+purpose = "Bind complete-parent refusal to an empty or receipt-only adoption ledger."
+definition = "sha256:630f284344bead1a44c79c6cc63767a006e456d1aca514badc32714f6dd99625"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/maintenance_write_denial.py"
+owner = "Release workflow integration"
+purpose = "Guard disposable Role narrowing and prove unchanged-parent PATCH refusal."
+definition = "sha256:55305685fda673e11a6c247519a39b4d6af5b0c0c486c3f822b5850d48fda689"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/migration_image_evidence.py"
+owner = "Release workflow integration"
+purpose = "Verify migration evidence and project private native-watch startup observations."
+definition = "sha256:f38b6c1e52f94af31f3f937a21cae57f87c449abc9737b4ce208b408bcd2c422"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/readiness_parent_evidence.py"
+owner = "Release workflow integration"
+purpose = "Check complete readiness-parent evidence without cluster or network access."
+definition = "sha256:3893cb653dc292017004eac8d4fe0d39366b8e1e2fe60d57cbcc5a368b86b796"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/readiness_server.py"
+owner = "Release workflow integration"
+purpose = "Synthetic HTTP peer for the unchanged readiness verifier in disposable CI."
+definition = "sha256:e06db6d1a2c44fe7154d56abb8b3b54234e061fb44b050ff87ae060be45f8e0b"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/request_ref.py"
+owner = "Release workflow integration"
+purpose = "CI-only request publication and compare-and-delete of one run-owned Git ref."
+definition = "sha256:103a6c39a802d2c6202fa60913553b1cdcae286f716e7f7edf9320f751d52daf"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/root_inputs.py"
+owner = "Release workflow integration"
+purpose = "Bounded root evidence for disposable CI; never a deployment entrypoint."
+definition = "sha256:c461ec67536bcf2502b08707ed673509d89755a5fbc1cbc83c8487e80242d2cd"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/run.sh"
+owner = "Release workflow integration"
+purpose = "Orchestrate the explicitly dispatched hosted disposable-kind acceptance fixture."
+definition = "sha256:0604623f5578dc50e4c456b0cf09ead2ced046b8ddd077d028161fd19c6f56eb"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/runtime_grants_adopted.py"
+owner = "Release workflow integration"
+purpose = "Accept unchanged owner grants on real adopted resources while recovery is blocked."
+definition = "sha256:b42a05cb7c2bc6ef6aeab08b4da48f176b5a814b7c2c5e843cfda7f3f558b478"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/runtime_grants_contention.py"
+owner = "Release workflow integration"
+purpose = "Causal SQL-lock evidence for the fixed grant Job and normal holder disconnect."
+definition = "sha256:90be761c0d9b3498aff2cbb88302e6ad55b9def30a0c7b9f5679b10e6c584a5a"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/runtime_grants_denial.py"
+owner = "Release workflow integration"
+purpose = "Reuse the guarded Role fault for the separately approved grant authority."
+definition = "sha256:5852d18963b05bd5f8a24e16aa24bff5e30d093393a742ffbe15d4321a4eed62"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/runtime_grants_parent.py"
+owner = "Release workflow integration"
+purpose = "CI evidence for unchanged owner-only grants on paused bootstrap resources."
+definition = "sha256:146a7e20e1612a467f45b9a8aae980e9a2bd01740d248f19c5c5d784cf36811c"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/runtime_grants_rollback.py"
+owner = "Release workflow integration"
+purpose = "Prove attempted schema GRANT rollback before fixture-only guarded deletion."
+definition = "sha256:6973f9b3e0216a96f8b3a1111214e9b6b68aa01829c8131804a0632941a5a33a"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/schema_migration_contention.py"
+owner = "Release workflow integration"
+purpose = "Typed SQL-lock evidence for failure, owned release and retained native execution."
+definition = "sha256:7feb6ea708d73d428e5e78127487ffeb647cabd43fdf87e26dbbda2cfb3c315e"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/schema_migration_denial.py"
+owner = "Release workflow integration"
+purpose = "Guard create-only denial/restoration for the reviewed disposable Job Roles."
+definition = "sha256:624e102dbfec88d3298fdaab283e8ea2a3220942ec4cb118278d9b57fd2d398c"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/schema_migration_install.py"
+owner = "Release workflow integration"
+purpose = "Prove the complete parent's first install on explicit paused bootstrap objects."
+definition = "sha256:aef4468a564611e50371a843669bd2d218fac762360defdab175e3a00919f842"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/schema_migration_parent.py"
+owner = "Release workflow integration"
+purpose = "Evidence for repeat execution of the unchanged parent on the paused CI baseline."
+definition = "sha256:dbdbb99b9b2d87d3c7c604e479d6943957bcfb75815809c8e6c22153992c69ee"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/schema_migration_rollback.py"
+owner = "Release workflow integration"
+purpose = "Validate native DDL rollback before generating fixture-only guarded cleanup."
+definition = "sha256:a2323a522523af3de004bff0729527b82b37d2475ebd031eb2d7c830d0166565"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/schema_qualification_parent.py"
+owner = "Release workflow integration"
+purpose = "CI-only retained evidence for independent, read-only schema qualification."
+definition = "sha256:43c43c714e228489934cf3d3773754a3a74b0613126be15db02b7e91e167951c"
+
+[[routes]]
+id = "script:tests/integration/release-workflows/server_inputs.py"
+owner = "Release workflow integration"
+purpose = "Offline CI composition of the selected chart/package and ephemeral inputs."
+definition = "sha256:7af98d0807cfe04c27412b351bdc04b66ceb2ad32ad2320df8544b4339ffb8a8"
+
+[[routes]]
+id = "script:tests/qualification/keycloak/bff-consumer.mjs"
+owner = "Keycloak qualification"
+purpose = "Exercise the pinned Console BFF API through a bounded Node child protocol."
+definition = "sha256:1fb07457fcb991a76f12c38ce1853436092b739f9790819efa5248a195f4ceab"

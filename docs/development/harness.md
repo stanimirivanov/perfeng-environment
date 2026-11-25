@@ -4,7 +4,7 @@
 
 - Use the [documentation map](../README.md) to load only task-relevant guidance.
 - Run `make bootstrap` once, `make verify` while editing, and `make validate` before handoff.
-- Run `uv run --locked --offline python -m harness offline` to check repository policy and GitOps composition.
+- Run `uv run --locked --offline python -m harness offline` to check repository policy, GitOps composition, and callable script routes.
 - Helm rendering and immutable sibling-repository validation are explicit specialized tiers.
 - `task bootstrap`, `task status`, `task smoke`, and `task destroy` are live operator actions and never run from validation aggregates.
 - Turn recurring review findings into clearer guidance or an early deterministic check.
@@ -45,11 +45,11 @@ uv run --locked --offline python -m harness --help
 uv run --locked --offline python -m harness offline
 ```
 
-The stage runs repository policy first and then checks GitOps composition.
-It passes through each validator's output and stops at the first failure with
-that validator's exit status. If a check exceeds the two-minute deadline, the
-harness identifies it on stderr and returns status 124. The two checks are
-registered in the [check manifest](../../harness/checks.toml).
+The stage runs repository policy, GitOps composition, and the command-route
+guard in that order. It passes through each validator's output and stops at the
+first failure with that validator's exit status. If a check exceeds the two-minute
+deadline, the harness identifies it on stderr and returns status 124. The
+[check manifest](../../harness/checks.toml) controls execution.
 
 Follow the `fix:` diagnostic on a policy failure and use `make docs-check` to
 rerun that validator directly. To investigate a composition failure, run
@@ -57,6 +57,55 @@ rerun that validator directly. To investigate a composition failure, run
 The pilot needs no network access, credentials, or Kubernetes context. Run
 `make verify` for all repository-local checks and `make validate` for complete
 non-live acceptance.
+
+## Reviewing command routes
+
+A command route is a repository-owned way to invoke work independently. The
+[reviewed baseline](../../harness/command-routes.toml) records each supported
+script or module route with an exact ID, owner, purpose, and SHA-256 digest of
+its callable definition. A baseline record grants review coverage. Dispatch
+authority comes from the separate [check manifest](../../harness/checks.toml).
+Application, fixture, and live-operation routes keep their owners and invocation.
+Imported helpers and sourced-only shell phases stay with their callers.
+[ADR 0077](../adr/0077-separate-harness-execution-from-command-route-review.md)
+records the ownership decision.
+
+The guard reads regular Git-tracked and non-ignored untracked files from the
+working tree. Run it from the repository root with the Python version in
+[.python-version](../../.python-version). A clean checkout supplies the same
+inputs in CI. The guard uses Git for file names and inspects source without
+importing or executing it.
+
+| Route | Supported evidence and definition |
+|:--|:--|
+| Script or module | The exact repository path identifies each entry source. A file's owner execute bit, shebang, shell suffix, Python `__main__.py` or top-level `if __name__ == "__main__"`, and the observed Node ESM direct-run guard can establish callability. A sole `unittest.main()` guard in a `tests/test_*.py` module remains ordinary test discovery unless there is independent invocation evidence. |
+| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. In shell sources and known Makefile, Taskfile, workflow, or Dockerfile locations, references can be repository-relative or use the integration harness's same-directory `$source_dir` convention. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
+| Separately invoked payload | An exact Python caller path and named payload identify code handed to another interpreter. Supported `-c` arguments are module-level string constants, including a literal `.strip()`, or `Path(imported_module.__file__).read_text(...)` for a direct absolute from-import of a local Python file. The definition covers both the recognized interpreter expression and the payload text or source bytes. The control-plane smoke client and M04 API and evidence clients have their own records. |
+
+The script fingerprint covers the entry source and its owner execute bit.
+For Python it also includes any applicable shebang and uses parsed syntax so
+comments and source formatting can change independently. Other scripts use
+source bytes since whitespace, comment-like lines in heredocs, and interpreter
+directives can affect execution.
+
+The interpreter scan recognizes the documented literal forms without resolving
+arbitrary variables, templates, generated code, or dynamic dispatch. References
+in Make, Task, and workflow files are evidence for file routes. Recipe, target,
+workflow step, and hook definitions have their own coverage boundary. When a
+route uses an opaque expression, prefer an explicit file or named payload the
+guard can verify. For a necessary new opaque form, add a narrow rule tied to
+the exact declaration and a fixture before recording its definition.
+
+For a finding, use the reported declaration and `fix:` line. Reuse an existing
+route when it has the same owner and purpose. For a deliberate addition or
+definition change, review the callable source, then record the proposed digest
+alongside the exact identity and purpose. Remove the corresponding record when
+retiring a route. The guard leaves baseline editing to the contributor.
+
+Request explicit maintainer sign-off in the PR for changes to the manifest,
+baseline, guard, fixture expectations, or gate wiring. The maintainer approves
+the route and its ownership even when the updated digest passes locally.
+The metadata-only PR check retains its exact-base and read-only boundary.
 
 ## Harness principles
 
