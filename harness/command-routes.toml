@@ -251,7 +251,7 @@ definition = "sha256:6bcb77e68d01c5b726641af24e78eb016f4d1939a62e4390cb2bc015b8e
 id = "script:harness/command_routes.py"
 owner = "Environment engineering"
 purpose = "Check repository command routes against the separate reviewed inventory."
-definition = "sha256:b77877160022b6b86ed574db1f71a169b8838c3e5794dab7d907f296fd03bef2"
+definition = "sha256:9c3d141d6454de9f0b199dcdb4710ebfcc532cc882239846b243e8471064a7ad"
 
 [[routes]]
 id = "script:scripts/argus_campaign.py"

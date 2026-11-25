@@ -84,6 +84,55 @@ jobs:
         self.assertNotIn("tools/helper.py", result.stderr)
         self.assertFalse((self.checkout / "tools/shell-marker").exists())
 
+    def test_workflow_invocation_follows_literal_checkout_paths_per_job(self) -> None:
+        for path in (
+            "tools/check.py",
+            "tools/explicit.py",
+            "copy/tools/check.py",
+            "sibling/tools/foreign.py",
+            "tools/foreign.py",
+            "copy/tools/unplaced.py",
+            "tools/unplaced.py",
+        ):
+            self.write(path, "print('verification')\n")
+        self.write(
+            ".github/workflows/checkouts.yml",
+            """\
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: copy/tools
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: copy
+      - uses: actions/checkout@v7
+        with:
+          repository: example/sibling
+          path: sibling
+      - run: python check.py
+      - run: python copy/tools/explicit.py
+        working-directory: ${{ github.workspace }}
+      - run: python ../../sibling/tools/foreign.py
+      - run: python foreign.py
+        working-directory: sibling/tools
+  separate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python unplaced.py
+        working-directory: copy/tools
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        for path in ("tools/check.py", "tools/explicit.py", "copy/tools/unplaced.py"):
+            self.assertIn(f"unreviewed-route: {path}:1", result.stderr)
+        for path in ("copy/tools/check.py", "foreign.py", "script:tools/unplaced.py"):
+            self.assertNotIn(path, result.stderr)
+
     def record_workflow_fixture(self, result: subprocess.CompletedProcess[str]) -> None:
         records = []
         for identity, definition in re.findall(
@@ -191,6 +240,7 @@ jobs:
             ("      - run: &commands echo unexpected\n", "6: YAML anchors"),
             ("      - uses: '${{ inputs.action }}'\n", "6: expected a literal nonempty uses"),
             ("      - uses: './${{inputs.action}}'\n", "6: expected a literal nonempty uses"),
+            ("      - uses: ./.github/actions/local\n", "6: repository-local Actions"),
         ):
             with self.subTest(declaration=declaration):
                 self.write(path, source + declaration)
@@ -198,6 +248,51 @@ jobs:
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn(f"unsupported-workflow: {path}:{expected}", result.stderr)
                 self.assertIn("fix: use a supported literal workflow declaration", result.stderr)
+
+    def test_validates_workflow_permissions_even_when_every_job_overrides_them(self) -> None:
+        path = ".github/workflows/permissions.yml"
+        self.write(
+            path,
+            """\
+on: push
+permissions:
+  contents: read
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: echo verify
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            f"unsupported-workflow: {path}:4: duplicate YAML key 'contents'", result.stderr
+        )
+
+    def test_workflow_name_is_reviewed_when_a_shell_command_reads_it(self) -> None:
+        path = ".github/workflows/reads-name.yml"
+        workflow = """\
+name: Original name
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "$GITHUB_WORKFLOW"
+      - run: echo "${GITHUB_WORKFLOW}"
+      - run: echo "$GITHUB_WORKFLOW_OTHER"
+"""
+        self.write(path, workflow)
+        self.record_workflow_fixture(self.guard())
+        self.write(path, workflow.replace("Original name", "Updated name"))
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(f"changed-definition: {path}:7:", result.stderr)
+        self.assertIn(f"changed-definition: {path}:8:", result.stderr)
+        self.assertNotIn(f"changed-definition: {path}:9:", result.stderr)
 
     def test_reviews_versioned_hook_bytes_and_mode_without_executing_hooks(self) -> None:
         hook = self.write(".githooks/pre-commit", "touch unexpected-marker\n")
@@ -226,7 +321,7 @@ jobs:
 id = "hook:.githooks/pre-commit"
 owner = "Fixture owner"
 purpose = "Exercise a versioned hook without running it."
-definition = "sha256:0705999b86cf5187492f0c7c70e4dcf4ecbb38d72d83e5aa503907277bdda284"
+definition = "sha256:eaeb415f1a8bc8658a6074ed4d5fce06fd87f43b325d518f51a8925920c1e8bc"
 """,
         )
         accepted = self.guard()
@@ -236,7 +331,12 @@ definition = "sha256:0705999b86cf5187492f0c7c70e4dcf4ecbb38d72d83e5aa503907277bd
         self.assertEqual(changed_mode.returncode, 1, changed_mode.stderr)
         self.assertIn("changed-definition: .githooks/pre-commit:1:", changed_mode.stderr)
         self.assertNotIn("script:.githooks/pre-commit", changed_mode.stderr)
+        executable_definition = re.search(r"sha256:[a-f0-9]{64}", changed_mode.stderr)
+        assert executable_definition is not None
         hook.chmod(0o644)
+        self.write(".githooks/pre-commit", "executable\0touch unexpected-marker\n")
+        collision_attempt = self.guard()
+        self.assertNotIn(executable_definition[0], collision_attempt.stderr)
         self.write(".githooks/pre-commit", "touch changed-marker\n")
         changed_body = self.guard()
         self.assertEqual(changed_body.returncode, 1, changed_body.stderr)

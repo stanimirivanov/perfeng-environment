@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections.abc import Set
 from dataclasses import dataclass
@@ -62,11 +63,28 @@ IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 WORKFLOW_NAME_REFERENCE = re.compile(
     r"""\bgithub\s*(?:\.\s*workflow\b|\[\s*['"]workflow['"]\s*\])""", re.I
 )
+SHELL_WORKFLOW_NAME_REFERENCE = re.compile(r"\$(?:GITHUB_WORKFLOW\b|\{GITHUB_WORKFLOW\})")
 ACTION_REFERENCE = re.compile(r"(?:\./\S+|docker://\S+|[\w.-]+/[\w./-]+@[^@\s]+)")
 WORKSPACE_DIRECTORY = re.compile(r"\$\{\{\s*github\.workspace\s*\}\}(?:/(.*))?")
+CURRENT_REPOSITORY = re.compile(r"\$\{\{\s*github\.repository\s*\}\}")
 LITERAL_DIRECTORY = re.compile(r"[\w./ -]+")
 
 type Fields = dict[str, tuple[ScalarNode, Node]]
+
+
+@dataclass(frozen=True)
+class WorkflowCommand:
+    directory: Path
+    text: str
+    checkouts: dict[Path, bool]
+
+    def repository_path(self, target: Path) -> Path | None:
+        if not self.checkouts:
+            return target
+        for checkout in (target, *target.parents):
+            if checkout in self.checkouts:
+                return target.relative_to(checkout) if self.checkouts[checkout] else None
+        return None
 
 
 @dataclass(frozen=True)
@@ -74,7 +92,7 @@ class WorkflowStep:
     identity: str
     line: int
     definition: bytes
-    command: tuple[Path, str] | None
+    command: WorkflowCommand | None
 
 
 @dataclass(frozen=True)
@@ -186,6 +204,21 @@ class Workflow:
             name: self.scalar(node) for name, (_, node) in self.fields(fields["env"][1]).items()
         }
 
+    def checkout(self, fields: Fields) -> dict[Path, bool]:
+        if "uses" not in fields or not self.scalar(fields["uses"][1]).casefold().startswith(
+            "actions/checkout@"
+        ):
+            return {}
+        inputs = self.fields(fields["with"][1]) if "with" in fields else {}
+        directory = self.scalar(inputs["path"][1]) if "path" in inputs else "."
+        path = Path(os.path.normpath(directory))
+        if not LITERAL_DIRECTORY.fullmatch(directory) or path.is_absolute() or ".." in path.parts:
+            return {}
+        current_repository = "repository" not in inputs or bool(
+            CURRENT_REPOSITORY.fullmatch(self.scalar(inputs["repository"][1]))
+        )
+        return {path: current_repository}
+
     def steps(self, document: Node, workflow: Fields, jobs: Fields) -> tuple[WorkflowStep, ...]:
         if "on" not in workflow:
             raise self.invalid(document, "workflow requires a trigger declaration")
@@ -196,6 +229,9 @@ class Workflow:
         workflow_context["env"] = self.environment(workflow)
         workflow_context = ExecutionContext.from_settings(workflow_context)
         workflow_defaults = self.defaults(workflow)
+        workflow_permissions = (
+            self.data(workflow["permissions"][1]) if "permissions" in workflow else None
+        )
         display_name = self.scalar(workflow["name"][1]) if "name" in workflow else None
         routes = []
         for job_position, (job_id, (key, job)) in enumerate(jobs.items(), start=1):
@@ -208,9 +244,7 @@ class Workflow:
             permissions = (
                 self.data(job_fields["permissions"][1])
                 if "permissions" in job_fields
-                else self.data(workflow["permissions"][1])
-                if "permissions" in workflow
-                else None
+                else workflow_permissions
             )
             job_context = ExecutionContext.from_settings(
                 {
@@ -224,6 +258,7 @@ class Workflow:
             )
             job_defaults = workflow_defaults | self.defaults(job_fields)
             seen_ids = set()
+            checkouts: dict[Path, bool] = {}
             for position, step in enumerate(steps.value, start=1):
                 fields = self.fields(step, STEP_FIELDS)
                 step_id = f"step-{position}"
@@ -244,8 +279,11 @@ class Workflow:
                         job_context,
                         job_defaults,
                         display_name,
+                        checkouts,
                     )
                 )
+                if checkout := self.checkout(fields):
+                    checkouts = checkouts | checkout
         return tuple(routes)
 
     def step(
@@ -258,6 +296,7 @@ class Workflow:
         job_context: ExecutionContext,
         job_defaults: dict[str, str],
         display_name: str | None,
+        checkouts: dict[Path, bool],
     ) -> WorkflowStep:
         if ("run" in fields) == ("uses" in fields):
             node = fields["uses"][0] if "uses" in fields else step
@@ -269,6 +308,8 @@ class Workflow:
             kind == "uses" and ("${{" in value or not ACTION_REFERENCE.fullmatch(value))
         ):
             raise self.invalid(node, f"expected a literal nonempty {kind} declaration")
+        if kind == "uses" and value.startswith("./"):
+            raise self.invalid(node, "repository-local Actions require review of their source")
 
         settings = self.settings(fields, {"name", "env", "uses", "run", *RUN_DEFAULTS})
         definition: dict[str, object] = {
@@ -280,6 +321,7 @@ class Workflow:
             kind: value,
         }
         command = None
+        reads_shell_workflow_name = False
         if kind == "run":
             if "with" in fields:
                 raise self.invalid(fields["with"][0], "with applies to uses steps")
@@ -291,9 +333,10 @@ class Workflow:
             workspace = WORKSPACE_DIRECTORY.fullmatch(directory)
             if workspace is not None:
                 directory = workspace[1] or "."
-            if LITERAL_DIRECTORY.fullmatch(directory) and not Path(directory).is_absolute():
-                if defaults.get("shell") != "python":
-                    command = Path(directory), value
+            if defaults.get("shell") != "python":
+                reads_shell_workflow_name = bool(SHELL_WORKFLOW_NAME_REFERENCE.search(value))
+                if LITERAL_DIRECTORY.fullmatch(directory) and not Path(directory).is_absolute():
+                    command = WorkflowCommand(Path(directory), value, checkouts)
         else:
             for name in sorted(RUN_DEFAULTS & fields.keys()):
                 raise self.invalid(fields[name][0], f"{name} applies to run steps")
@@ -304,6 +347,7 @@ class Workflow:
         if (
             workflow_context.reads_workflow_name
             or job_context.reads_workflow_name
+            or reads_shell_workflow_name
             or WORKFLOW_NAME_REFERENCE.search(encoded.replace(r"\"", '"'))
         ):
             definition["referenced-workflow-name"] = display_name

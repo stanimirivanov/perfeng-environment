@@ -178,7 +178,8 @@ context. Ordinary and folded YAML scalars supply their decoded text. Comments,
 workflow and step display names, job display names, `run-name`, and manual
 input descriptions can change independently of definitions. A workflow name
 enters the definition when an execution declaration refers to
-`github.workflow`.
+`github.workflow` or a run step refers to `$GITHUB_WORKFLOW` or
+`${GITHUB_WORKFLOW}`.
 
 Runner setup, tool installation, checkout and credential setup, and artifact
 transfer keep their workflow ownership. Project verification steps retain the
@@ -188,13 +189,21 @@ subsequent maintenance lint loop is project verification. The standalone PR
 metadata workflow keeps its `pull_request_target` trigger, read-only contents
 permission, exact base-SHA checkout, and disabled credential persistence.
 
+For script and module discovery, the guard maps literal workspace-relative
+paths through preceding `actions/checkout` steps in the same job. A checkout
+with an omitted `repository` or explicit `${{ github.repository }}` denotes
+the current repository. Separate checkout paths can identify sibling
+repositories. The mapping uses declared paths and does not evaluate step
+conditions or dynamic checkout paths.
+
 The guard reads declared values and expressions as data. It supports literal
-job IDs, step IDs, and Action references with a plain job containing a steps
-sequence. Reusable-workflow calls, duplicate keys, anchors, aliases, merge keys,
-explicit tags, multiple documents, nonliteral Action selectors, and unsupported
-fields produce an `unsupported-workflow` finding. Add narrowly scoped static
-coverage and a fixture for any necessary new form. No Action or shell command
-runs during review.
+job IDs, step IDs, and external Action references with a plain job containing a
+steps sequence. Repository-local Actions, reusable-workflow calls, duplicate
+keys, anchors, aliases, merge keys, explicit tags, multiple documents,
+nonliteral Action selectors, and unsupported fields produce an
+`unsupported-workflow` finding. Add narrowly scoped static coverage and a
+fixture for any necessary new form. No Action or shell command runs during
+review.
 
 ### Versioned Git hooks
 

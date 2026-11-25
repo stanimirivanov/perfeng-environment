@@ -191,22 +191,23 @@ def invocation_evidence(
                 chain.from_iterable(task.commands for task in taskfile.tasks),
             )
             lines = (
-                (directory, line) for directory, text in commands for line in text.splitlines()
+                (directory, line, None)
+                for directory, text in commands
+                for line in text.splitlines()
             )
         elif path in workflows:
             lines = (
-                (directory, line)
+                (step.command.directory, line, step.command)
                 for step in workflows[path]
                 if step.command is not None
-                for directory, text in (step.command,)
-                for line in text.splitlines()
+                for line in step.command.text.splitlines()
             )
         elif not invocation_scope(path):
             continue
         else:
             text = source.decode("utf-8", errors="replace")
             lines = (
-                (None, line)
+                (None, line, None)
                 for line in (
                     text.replace("\r\n", "\n").split("\n")
                     if path.name in MAKEFILES
@@ -214,9 +215,10 @@ def invocation_evidence(
                 )
                 if path.name not in MAKEFILES or line.startswith("\t")
             )
-        for directory, line in lines:
+        for directory, line, workflow_command in lines:
             if line.lstrip().startswith("#") or LITERAL_OUTPUT.fullmatch(line):
                 continue
+            targets = set()
             for command in INTERPRETER_CALL.finditer(line):
                 target = literal_path(path, command["target"], directory)
                 program, flags = command["program"], command["flags"].split()
@@ -225,17 +227,25 @@ def invocation_evidence(
                         module = Path(*command["target"].split("."))
                         if directory is not None:
                             module = Path(os.path.normpath(directory / module))
-                        invoked.update((module.with_suffix(".py"), module / "__main__.py"))
+                        targets.update((module.with_suffix(".py"), module / "__main__.py"))
                     elif "-c" not in flags and target.suffix == ".py":
-                        invoked.add(target)
+                        targets.add(target)
                 elif program == "node" and {"--check", "--test", "-e"} & set(flags):
                     continue
                 elif target.suffix in INTERPRETER_SUFFIXES[program]:
-                    invoked.add(target)
+                    targets.add(target)
             for command in JQ_FILTER.finditer(line):
                 target = literal_path(path, command["target"], directory)
                 if target.suffix == ".jq":
-                    invoked.add(target)
+                    targets.add(target)
+            if workflow_command is None:
+                invoked.update(targets)
+            else:
+                invoked.update(
+                    relative
+                    for target in targets
+                    if (relative := workflow_command.repository_path(target)) is not None
+                )
             if shell:
                 for reference in SHELL_SOURCE.finditer(line):
                     target = reference["target"]
@@ -473,7 +483,7 @@ def discover(root: Path) -> dict[str, Route]:
             continue
         if is_hook(path):
             relative = path.as_posix()
-            definition = b"executable\0" + source if path in executable else source
+            definition = (b"\x01" if path in executable else b"\x00") + source
             routes[f"hook:{relative}"] = Route(f"{relative}:1", digest(definition))
             continue
         line = 1
