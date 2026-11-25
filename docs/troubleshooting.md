@@ -686,6 +686,21 @@ that completes with five verified artifacts proves API admission, PostgreSQL
 persistence, Kubernetes execution, SeaweedFS publication, normalization and
 reporting for the selected runtime bundle.
 
+### The checkout report cannot be verified
+
+Use the [operator book](local-checkout-operator-book.md#4-verify-the-exact-analysis-report)
+and resume the durable checkpoint for the original attempt. Recheck the approved
+lock, cluster UID and operator principal. If submission acknowledgement was
+lost, retain the checkpoint and attach only an independently identified Run.
+A new submission cannot recover the original evidence.
+
+On a denied report read, give the storage owner the exact registered reference
+through the private handoff. After access is restored, resume and verify the
+original bytes. A changed digest, malformed report, foreign candidate or policy
+mismatch produces no SLO decision. A verified report with insufficient data
+can record an unresolved observation. Keep the Run, checkpoint and bytes for
+the return visit and retain private evidence outside Git.
+
 ## Validate immutable selections offline
 
 Use these **read-only** checks before blaming live reconciliation:

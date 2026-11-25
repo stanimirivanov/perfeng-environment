@@ -36,6 +36,7 @@ jobs:
           ref: 3b86afa18b468d831c7c2c176618180db18b2764
           token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-contracts
+          fetch-depth: 0
           persist-credentials: false
       - name: Check out pinned control-plane deployment source
         if: runner.os == 'Linux'
@@ -88,6 +89,8 @@ jobs:
         run: make doctor
         working-directory: perfeng-environment
       - name: Run repository-local verification
+        env:
+          PERFENG_TEST_CHECKOUT_CONTRACTS: "1"
         run: make verify
         working-directory: perfeng-environment
       - name: Install checksum-verified Caddy for offline gateway adaptation
