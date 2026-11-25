@@ -23,7 +23,10 @@ checkout before the offline checks. This setup can fetch dependencies.
 uv sync --locked
 ```
 
-Confirm the following access with the deployment owner before proceeding.
+Before opening the book to a second operator, the Environment owner records
+the reviewed Deployment Lock digest and cluster UID alongside the operating
+host and access routes in the team's private handoff. Use that handoff to
+confirm the following access before proceeding.
 
 - The intended Docker host, the dedicated kubeconfig for `kind-perfeng-local`
   and authorization for any deployment preparation. First-time provisioning
@@ -37,7 +40,11 @@ Confirm the following access with the deployment owner before proceeding.
   the Run ID is known. The pinned Run API provides the Artifact Reference.
   The body requires a separately approved storage read. The AWS CLI v2 example
   below uses an approved S3 endpoint and a read-only profile scoped to the
-  exact key.
+  exact key. Local bootstrap provisions a storage administrator and workload
+  uploader. Operator report access needs its own approval and delivery. For a
+  first Run, confirm who will fulfill the exact-key read before submitting.
+  If there is already a retained report for the same principal, rehearse the
+  approved read on that report.
 
 Start a dedicated Bash session. Run each block in order and stop on errors.
 A failed command exits this shell. Use the printed evidence directory when
@@ -96,22 +103,49 @@ docker context show
 ```
 
 ```sh
-timeout 15s kind get clusters | grep -Fx perfeng-local
-test -r .local/perfeng-local.kubeconfig
-live_uid=$(kubectl --kubeconfig .local/perfeng-local.kubeconfig --context kind-perfeng-local \
-  --request-timeout=10s get namespace kube-system -o jsonpath='{.metadata.uid}')
+if ! clusters=$(timeout 15s kind get clusters); then
+  printf 'Cannot inspect the selected Docker host with kind. Stop here.\n' >&2
+  exit 1
+fi
+if ! grep -Fxq perfeng-local <<< "$clusters"; then
+  printf 'The selected Docker host has no perfeng-local cluster. Stop here.\n' >&2
+  exit 1
+fi
+if [[ ! -r .local/perfeng-local.kubeconfig ]]; then
+  printf 'The dedicated perfeng-local kubeconfig is unavailable. Stop here.\n' >&2
+  exit 1
+fi
+if ! live_uid=$(kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local --request-timeout=10s get namespace kube-system \
+  -o jsonpath='{.metadata.uid}'); then
+  printf 'Cannot verify the dedicated Kubernetes API and cluster UID. Stop here.\n' >&2
+  exit 1
+fi
 [[ "$live_uid" == "$reviewed_uid" ]] || {
   printf 'Cluster UID differs from the reviewed selection. Stop here.\n' >&2
   exit 1
 }
+if ! kubectl --kubeconfig .local/perfeng-local.kubeconfig \
+  --context kind-perfeng-local --request-timeout=10s get --raw=/readyz > /dev/null; then
+  printf 'The selected Kubernetes API is unready. Stop here.\n' >&2
+  exit 1
+fi
+printf 'Reviewed cluster UID verified and Kubernetes API ready.\n'
 ```
 
-Expect the named cluster and an exact UID match. If Docker is on a different
-host, the cluster or kubeconfig is missing, or the UID differs, stop and
-preserve the state. Ask the Environment owner for access to the original host
-and its dedicated kubeconfig or a replacement selected through
-[reviewed qualification and promotion](kubernetes-runtime-deployment.md#fresh-cluster-recovery).
-Restart this chapter from the newly reviewed pins after any promotion.
+Continue after the success message. Otherwise record the failing check in
+the private handoff. The Deployment Lock identifies an exact cluster
+incarnation and Git pins cannot recreate its UID. For a missing cluster or
+kubeconfig, the Environment owner first checks the retained host and restores
+approved access there if available. For an unready API with the matching
+UID, the owner restores health on that host before preparation.
+
+If the reviewed cluster is unavailable, the replacement is a new selection.
+The Environment owner prepares a dedicated supported Linux substrate and
+obtains fresh accepted qualification. The perfeng-k8s owner publishes a new
+immutable runtime bundle and package against that qualification. The
+Environment owner then reviews and promotes the new pins. Resume at step 1
+with the new selection. Retain the previous cluster and its evidence.
 
 ### 2. Bring the selected deployment to readiness
 
