@@ -70,7 +70,8 @@ Follow the engineering standards and applicable operational or migration ADR.
 
 ## Verification
 
-Use `uv run --locked --offline python -m harness offline` for the
+Use `uv run --locked --offline python -m harness offline` to check repository
+policy and GitOps composition through the
 [offline harness pilot](docs/development/harness.md#offline-harness-pilot).
 Run `make verify` and `make validate` for full verification. Run the applicable
 additional checks in
