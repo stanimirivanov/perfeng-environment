@@ -17,9 +17,71 @@ import harness.__main__ as harness_cli
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = Path("scripts/repository_policy.py")
 GITOPS = Path("scripts/gitops.py")
+GUARD = Path("harness/command_routes.py")
 UNREVIEWED_SCRIPT = Path("unreviewed.sh")
 ROOT_APPLICATION = Path("gitops/bootstrap/local-root-application.yaml")
 PR_FIX_FORM = Path(".github/PR_FIX_COMMENT_TEMPLATE.md")
+HARNESS_INPUTS = (Path("harness/__main__.py"), GUARD)
+OFFLINE_INPUTS = (
+    *HARNESS_INPUTS,
+    Path("harness/checks.toml"),
+    POLICY,
+    GITOPS,
+    ROOT_APPLICATION,
+    PR_FIX_FORM,
+    *map(
+        Path,
+        (
+            ".github/ISSUE_TEMPLATE/work-item.md",
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            "deployments/local-control-plane.json",
+            "deployments/local-infrastructure.json",
+            "deployments/local-native-target.json",
+            "gitops/benchmark-authority/kustomization.yaml",
+            "gitops/benchmark-authority/rbac.yaml",
+            "gitops/environments/local/benchmark-authority-application.yaml",
+            "gitops/environments/local/benchmark-authority-project.yaml",
+            "gitops/environments/local/control-plane-application.yaml",
+            "gitops/environments/local/kustomization.yaml",
+            "gitops/environments/local/native-search-application.yaml",
+            "gitops/environments/local/postgres-application.yaml",
+            "gitops/environments/local/project.yaml",
+            "gitops/environments/local/resource-metrics-application.yaml",
+            "gitops/environments/local/resource-metrics-project.yaml",
+            "gitops/environments/local/sample-sut-application.yaml",
+            "gitops/environments/local/seaweedfs-application.yaml",
+            "native-gateway/search/index.html",
+            "native-gateway/search/search.js",
+            "scripts/benchmark_authority.py",
+            "scripts/cluster.py",
+            "scripts/control_plane_database.py",
+            "scripts/control_plane_health.py",
+            "scripts/control_plane_maintenance.py",
+            "scripts/control_plane_migration.py",
+            "scripts/control_plane_registry.py",
+            "scripts/control_plane_release.py",
+            "scripts/control_plane_runtime.py",
+            "scripts/execution_registry.py",
+            "scripts/gitops_status.py",
+            "scripts/infrastructure_lock.py",
+            "scripts/infrastructure_release.py",
+            "scripts/infrastructure_runtime.py",
+            "scripts/native_target_release.py",
+            "scripts/object_store.py",
+            "scripts/postgres.py",
+            "scripts/resource_metrics_health.py",
+            "scripts/resource_metrics_release.py",
+            "scripts/storage_access.py",
+            "scripts/workspace.py",
+        ),
+    ),
+)
+
+
+def copy_inputs(checkout: Path, paths: tuple[Path, ...]) -> None:
+    for path in paths:
+        (checkout / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / path, checkout / path)
 
 
 class HarnessTests(unittest.TestCase):
@@ -43,11 +105,7 @@ guide = "docs/development/harness.md"
         ):
             with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as directory:
                 checkout = Path(directory)
-                shutil.copytree(
-                    ROOT / "harness",
-                    checkout / "harness",
-                    ignore=shutil.ignore_patterns("__pycache__"),
-                )
+                copy_inputs(checkout, HARNESS_INPUTS)
                 (checkout / "harness/checks.toml").write_text(manifest, encoding="utf-8")
                 result = subprocess.run(
                     [sys.executable, "-m", "harness", "offline"],
@@ -82,18 +140,22 @@ guide = "docs/development/harness.md"
                 tempfile.TemporaryDirectory() as directory,
             ):
                 checkout = Path(directory)
-                # The script inventory compares the full checkout with the reviewed baseline.
-                tracked = subprocess.check_output(
-                    ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                    cwd=ROOT,
-                    timeout=15,
+                copy_inputs(checkout, OFFLINE_INPUTS)
+                # The three real check programs run against a fixture-owned review inventory.
+                (checkout / ".gitignore").write_text(
+                    "/harness/*.py\n/scripts/\n__pycache__/\n", encoding="utf-8"
                 )
-                for entry in filter(None, tracked.split(b"\0")):
-                    path = Path(entry.decode())
-                    if not (ROOT / path).is_file():
-                        continue
-                    (checkout / path).parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(ROOT / path, checkout / path)
+                (checkout / "reviewed.sh").write_text("touch unexpected-marker\n", encoding="utf-8")
+                (checkout / "harness/command-routes.toml").write_text(
+                    """
+[[routes]]
+id = "script:reviewed.sh"
+owner = "Fixture owner"
+purpose = "Exercise the reviewed route through the offline stage."
+definition = "sha256:0705999b86cf5187492f0c7c70e4dcf4ecbb38d72d83e5aa503907277bdda284"
+""",
+                    encoding="utf-8",
+                )
                 subprocess.run(["git", "init", "--quiet"], cwd=checkout, check=True, timeout=15)
 
                 policy_status = 0
@@ -133,6 +195,13 @@ guide = "docs/development/harness.md"
                     check=False,
                     timeout=15,
                 )
+                guard = subprocess.run(
+                    [sys.executable, "-m", "harness.command_routes"],
+                    cwd=checkout,
+                    capture_output=True,
+                    check=False,
+                    timeout=15,
+                )
                 harness = subprocess.run(
                     [sys.executable, "-m", "harness", "offline"],
                     cwd=checkout,
@@ -144,20 +213,19 @@ guide = "docs/development/harness.md"
                 self.assertIn(policy_message, policy.stdout)
                 self.assertEqual(gitops.returncode, gitops_status, gitops.stdout + gitops.stderr)
                 self.assertIn(gitops_message, gitops.stdout)
-                expected_status = policy.returncode or gitops.returncode or guard_status
+                self.assertEqual(guard.returncode, guard_status, guard.stdout + guard.stderr)
+                if guard_status:
+                    self.assertIn(b"command-routes/unreviewed-route: unreviewed.sh:1", guard.stderr)
+                else:
+                    self.assertIn(b"command-routes: reviewed command routes match", guard.stdout)
+                expected_status = policy.returncode or gitops.returncode or guard.returncode
                 expected_stdout = policy.stdout + (b"" if policy.returncode else gitops.stdout)
                 expected_stderr = policy.stderr + (b"" if policy.returncode else gitops.stderr)
+                if not (policy.returncode or gitops.returncode):
+                    expected_stdout += guard.stdout
+                    expected_stderr += guard.stderr
                 self.assertEqual(
                     harness.returncode, expected_status, harness.stdout + harness.stderr
                 )
-                if not expected_status:
-                    self.assertTrue(harness.stdout.startswith(expected_stdout), harness.stdout)
-                    self.assertIn(b"command-routes: reviewed command routes match", harness.stdout)
-                else:
-                    self.assertEqual(harness.stdout, expected_stdout)
-                if guard_status:
-                    self.assertIn(
-                        b"command-routes/unreviewed-route: unreviewed.sh:1", harness.stderr
-                    )
-                else:
-                    self.assertEqual(harness.stderr, expected_stderr)
+                self.assertEqual(harness.stdout, expected_stdout)
+                self.assertEqual(harness.stderr, expected_stderr)

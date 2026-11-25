@@ -2,10 +2,34 @@
 # Request maintainer sign-off for changes. See docs/development/harness.md#reviewing-command-routes.
 
 [[routes]]
+id = "payload:scripts/artifact_upload.py#stage_source"
+owner = "Artifact publication"
+purpose = "Stage source bytes with private permissions inside the dedicated upload Pod."
+definition = "sha256:f2c729df028429d86cd79d59a5f8fa2ba6a78f0a709139e9f61f5f525f1c3c52"
+
+[[routes]]
+id = "payload:scripts/artifact_upload.py#upload_script"
+owner = "Artifact publication"
+purpose = "Upload an artifact through the dedicated Pod and verify its bytes and metadata by read-back."
+definition = "sha256:499b69935e378cfa7d673002106e95d512f9073a1749c89cd72c1061f8942ff5"
+
+[[routes]]
+id = "payload:scripts/contracts_campaign.py#OFFLINE"
+owner = "Contract distribution"
+purpose = "Verify the loopback-only outage namespace and capture the selected cutover gate receipt."
+definition = "sha256:a55cf43592ac2d47d373b6c27e0776b8e1d9b14c68ec941a88b9e0c61cb86ed6"
+
+[[routes]]
 id = "payload:scripts/control_plane_smoke.py#CLIENT_PROGRAM"
 owner = "Control-plane smoke"
 purpose = "Run the authenticated smoke client inside the dedicated Pod."
 definition = "sha256:b51c15dbfd0864069d3e773ee04082ef92cb29450a2b2773dd620ac22e4214d4"
+
+[[routes]]
+id = "payload:scripts/infrastructure_runtime.py#RUN_MODULE"
+owner = "Local infrastructure operations"
+purpose = "Run one selected provider module from the pinned infrastructure archive in isolated Python."
+definition = "sha256:069dd69225dce04be4348b723091b3b7957b3694cf5989bb20748459311fe575"
 
 [[routes]]
 id = "payload:scripts/kubernetes_acceptance/transport.py#READ_OBJECT"
@@ -53,7 +77,7 @@ definition = "sha256:6bcb77e68d01c5b726641af24e78eb016f4d1939a62e4390cb2bc015b8e
 id = "script:harness/command_routes.py"
 owner = "Environment engineering"
 purpose = "Check script and module routes against the separate reviewed inventory."
-definition = "sha256:2ee66a78903cf660e15f4e008bb9274cf2af8548193ca27127ba27602284ead9"
+definition = "sha256:591627d2557b52d5ed5125d6c05c9ffb99330c6b28eb13be6a74cde85f782693"
 
 [[routes]]
 id = "script:scripts/argus_campaign.py"

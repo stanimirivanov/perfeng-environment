@@ -72,15 +72,16 @@ records the ownership decision.
 
 The guard reads regular Git-tracked and non-ignored untracked files from the
 working tree. Run it from the repository root with the Python version in
-[.python-version](../../.python-version). A clean checkout supplies the same
-inputs in CI. The guard uses Git for file names and inspects source without
-importing or executing it.
+[.python-version](../../.python-version). The route fingerprints require
+Python 3.12 so the same parsed sources produce the same fingerprints. A clean
+checkout supplies the same inputs in CI. The guard uses Git for file names
+and inspects source without importing or executing it.
 
 | Route | Supported evidence and definition |
 |:--|:--|
 | Script or module | The exact repository path identifies each entry source. A file's owner execute bit, shebang, shell suffix, Python `__main__.py` or top-level `if __name__ == "__main__"`, and the observed Node ESM direct-run guard can establish callability. A sole `unittest.main()` guard in a `tests/test_*.py` module remains ordinary test discovery unless there is independent invocation evidence. |
-| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. In shell sources and known Makefile, Taskfile, workflow, or Dockerfile locations, references can be repository-relative or use the integration harness's same-directory `$source_dir` convention. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
-| Separately invoked payload | An exact Python caller path and named payload identify code handed to another interpreter. Supported `-c` arguments are module-level string constants, including a literal `.strip()`, or `Path(imported_module.__file__).read_text(...)` for a direct absolute from-import of a local Python file. The definition covers both the recognized interpreter expression and the payload text or source bytes. The control-plane smoke client and M04 API and evidence clients have their own records. |
+| Interpreter call | Simple literal file references for Python, shell, Node, and `jq -f`, plus Python `-m` names, establish routes regardless of file mode. In shell sources and known Makefile, Taskfile, workflow, or Dockerfile locations, references can be repository-relative or use the integration harness's same-directory `$source_dir` convention. Literal-only `echo` and `printf` lines are help or status output. A shell file with observed `source` or `.` use remains a shell fragment unless its execute bit or a recognized independent invocation establishes callability. |
+| Separately invoked payload | An exact Python caller path and named payload identify code handed to another interpreter. Supported `-c` arguments include module-level string constants, including a literal `.strip()`, and `Path(imported_module.__file__).read_text(...)` for a direct absolute from-import of a local Python file. The guard recognizes the Python `sys.executable` forms with no option before `-c`, `-I`, or `-IB`. The artifact uploader has specific rules for the Pod source-staging command and the `upload_script(source.reference)` program and its builder. The definition covers the recognized interpreter expression and the payload text, source bytes, or builder syntax. |
 
 The script fingerprint covers the entry source and its owner execute bit.
 For Python it also includes any applicable shebang and uses parsed syntax so
@@ -101,6 +102,11 @@ route when it has the same owner and purpose. For a deliberate addition or
 definition change, review the callable source, then record the proposed digest
 alongside the exact identity and purpose. Remove the corresponding record when
 retiring a route. The guard leaves baseline editing to the contributor.
+
+The scan accepts up to 8,192 Git path records and 1 MiB of path data. It reads
+up to 2 MiB per candidate source and 32 MiB of candidate source overall. The
+baseline has its own 2 MiB limit. For checkout and runtime failures, use the
+[offline troubleshooting steps](../troubleshooting.md#offline-command-route-check).
 
 Request explicit maintainer sign-off in the PR for changes to the manifest,
 baseline, guard, fixture expectations, or gate wiring. The maintainer approves

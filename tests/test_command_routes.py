@@ -139,6 +139,93 @@ def run_in_pod():
         self.assertIn("unreviewed-route: package/transport.py:8", result.stderr)
         self.assertIn("'payload:package/transport.py#package.client'", result.stderr)
 
+    def test_discovers_named_payloads_passed_to_the_running_python_executable(self) -> None:
+        self.write(
+            "runner.py",
+            """import sys
+
+RUN_MODULE = "import runpy; " "runpy.run_module('provider')"
+OFFLINE = "print('offline check')"
+
+def commands():
+    return (
+        [sys.executable, "-I", "-c", RUN_MODULE],
+        ["unshare", "-Urn", sys.executable, "-IB", "-c", OFFLINE],
+    )
+""",
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(
+            "unreviewed-route: runner.py:8: 'payload:runner.py#RUN_MODULE'", result.stderr
+        )
+        self.assertIn("unreviewed-route: runner.py:9: 'payload:runner.py#OFFLINE'", result.stderr)
+
+    def test_detects_changes_to_the_reviewed_artifact_upload_pod_programs(self) -> None:
+        source = """def upload_script(reference):
+    return f"printf '%s' '{reference}'"
+
+def publish(kube, pod_name, source):
+    cluster.run([*kube, "exec", "-i", pod_name, "--", "sh", "-c", "cat > /tmp/source"],
+                input_data=source.content)
+    cluster.run([*kube, "exec", pod_name, "--", "sh", "-c", upload_script(source.reference)])
+"""
+        self.write("scripts/artifact_upload.py", source)
+        self.write(
+            "harness/command-routes.toml",
+            """
+[[routes]]
+id = "payload:scripts/artifact_upload.py#stage_source"
+owner = "Fixture owner"
+purpose = "Stage the fixture source."
+definition = "sha256:2d20c7f8f60786cb258c0d91a8e50fcdacf5d9b0155e83b1f1ff6b05cda481a4"
+
+[[routes]]
+id = "payload:scripts/artifact_upload.py#upload_script"
+owner = "Fixture owner"
+purpose = "Build the fixture program."
+definition = "sha256:8a29d638a866ceb2f5a2bf619154915082f9fb7c011b371fe10635f5c35ea1cc"
+""",
+        )
+        accepted = self.guard()
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        for original, replacement, line, name in (
+            ("cat > /tmp/source", "cat > /tmp/other", 5, "stage_source"),
+            ("printf '%s' '{reference}'", "echo '{reference}'", 7, "upload_script"),
+        ):
+            with self.subTest(name=name):
+                self.write("scripts/artifact_upload.py", source.replace(original, replacement))
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(
+                    f"changed-definition: scripts/artifact_upload.py:{line}: "
+                    f"'payload:scripts/artifact_upload.py#{name}'",
+                    result.stderr,
+                )
+
+    def test_output_only_recipes_do_not_make_import_helpers_callable(self) -> None:
+        self.write("helper.py", "def value():\n    return 42\n")
+        self.write(
+            "Makefile",
+            "help:\n"
+            "\t@echo 'For development, python helper.py prints its value.'\n"
+            '\t@printf "%s\\n" "Try python helper.py for details."\n',
+        )
+        result = self.guard()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.write("Makefile", "run:\n\t@echo 'Starting'; python helper.py\n")
+        result = self.guard()
+        self.assertIn("unreviewed-route: helper.py:1", result.stderr)
+
+    def test_oversized_source_fails_with_its_path_and_no_route_proposal(self) -> None:
+        checkout_file = self.write("oversized.py", "pass\n")
+        with checkout_file.open("ab") as stream:
+            stream.truncate(2 * 1024 * 1024 + 1)
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("scan-failed: .: oversized.py exceeds the 2 MiB source limit", result.stderr)
+        self.assertNotIn("unreviewed-route", result.stderr)
+
     def test_source_only_shell_fragment_stays_with_its_caller(self) -> None:
         self.write("shell/caller.sh", '#!/bin/sh\n. "./shell/library.sh"\n')
         self.write("shell/library.sh", "#!/bin/sh\nhello() { echo hello; }\n")
