@@ -251,7 +251,7 @@ definition = "sha256:6bcb77e68d01c5b726641af24e78eb016f4d1939a62e4390cb2bc015b8e
 id = "script:harness/command_routes.py"
 owner = "Environment engineering"
 purpose = "Check repository command routes against the separate reviewed inventory."
-definition = "sha256:db6fa3542d60064ba9f1e42e36d32ad9e60c8603aa4086260f14322116685cd5"
+definition = "sha256:b54fb5124e9033f5d72d9d42b94b7833891544aed6742efccf967a3c1f7f14ea"
 
 [[routes]]
 id = "script:scripts/argus_campaign.py"
@@ -840,3 +840,117 @@ id = "script:tests/qualification/keycloak/bff-consumer.mjs"
 owner = "Keycloak qualification"
 purpose = "Exercise the pinned Console BFF API through a bounded Node child protocol."
 definition = "sha256:1fb07457fcb991a76f12c38ce1853436092b739f9790819efa5248a195f4ceab"
+
+[[routes]]
+id = "task:Taskfile.yml#bootstrap"
+owner = "Environment operations"
+purpose = "Bootstrap the local cluster and stateful GitOps foundation."
+definition = "sha256:f2ee562d78cde3103f4e6654fa9195c918e2f2770562caab8c232414b8032ded"
+
+[[routes]]
+id = "task:Taskfile.yml#default"
+owner = "Environment operations"
+purpose = "List the supported local operator tasks."
+definition = "sha256:815d859ce25c26c4d14d767f27d8cda9047ecd095b71d4c955fb3bf87fa9b8ae"
+
+[[routes]]
+id = "task:Taskfile.yml#destroy"
+owner = "Environment operations"
+purpose = "Prompt before deleting the named local cluster and cluster-local data."
+definition = "sha256:1ea237fcbd71efe76f9b1e36444571c779a13c1bceaab3d5eb918c9076744bcb"
+
+[[routes]]
+id = "task:Taskfile.yml#kubernetes:acceptance"
+owner = "Environment operations"
+purpose = "Preview benchmark acceptance and pass explicit execution arguments to its native CLI."
+definition = "sha256:c76b05a56a530e04db258fce634635ae8dd5e3e0ba5ba7f8e11e146fb5a331ca"
+
+[[routes]]
+id = "task:Taskfile.yml#kubernetes:metrics-health"
+owner = "Environment operations"
+purpose = "Verify the selected metrics owner, TLS binding, and node usage."
+definition = "sha256:db4d4f73bda6070f301c38717b485d752c73912ba34272974a59e984ab1b8d8c"
+
+[[routes]]
+id = "task:Taskfile.yml#kubernetes:prepare"
+owner = "Environment operations"
+purpose = "Pause the control plane and prepare the selected migration and external inputs."
+definition = "sha256:e996839569e72d9ed9845663b9e51598fc261252724f8129fa4313a569e9d91f"
+
+[[routes]]
+id = "task:Taskfile.yml#kubernetes:qualify"
+owner = "Environment operations"
+purpose = "Verify benchmark prerequisites and retain a qualification receipt."
+definition = "sha256:c01b8e3819f9b38bd459182a765e88f445af2ceaf622a7efec35fe2631a4f14c"
+
+[[routes]]
+id = "task:Taskfile.yml#native:api"
+owner = "Environment operations"
+purpose = "Forward the reviewed control-plane Service to loopback."
+definition = "sha256:cfc8b743119a8530cba444339d1f487666ef6c6a0272e82e8edd602609f5487c"
+
+[[routes]]
+id = "task:Taskfile.yml#native:check"
+owner = "Environment operations"
+purpose = "Check local HTTPS, readiness, target bytes, and storage access boundaries."
+definition = "sha256:cab02dcda1c29ed1fbad9f6d72f539aab32374f18b400264700d8c838ae68618"
+
+[[routes]]
+id = "task:Taskfile.yml#native:doctor"
+owner = "Environment operations"
+purpose = "Report native connectivity prerequisites."
+definition = "sha256:b37e05255fca13026e4a6ac97f249f3ded816d7e0ba73fd433ef9b42141a02f8"
+
+[[routes]]
+id = "task:Taskfile.yml#native:gateway"
+owner = "Environment operations"
+purpose = "Serve local HTTPS endpoints and the controlled search target."
+definition = "sha256:019b91ff0f8bf73dbfed3e75442976824314985640a01a4ddf3561a556968c0e"
+
+[[routes]]
+id = "task:Taskfile.yml#native:permissions"
+owner = "Environment operations"
+purpose = "Prompt before restricting native gateway state permissions."
+definition = "sha256:9c5a23925d9588b171de4548183ddc81871b81d155e1a4d042b4ad768d2fb359"
+
+[[routes]]
+id = "task:Taskfile.yml#native:s3"
+owner = "Environment operations"
+purpose = "Forward the reviewed SeaweedFS Service to loopback."
+definition = "sha256:a947a0cae8f79ea0e1ac05e5cfa3196f4bf2b1efe0959d2373a7c98e235d75e5"
+
+[[routes]]
+id = "task:Taskfile.yml#native:setup"
+owner = "Environment operations"
+purpose = "Install the checksum-selected native gateway."
+definition = "sha256:a0f0bda071bd77a1b9a4a7201f7f4a35cfbcdcb20c9f1a967f8c77a681355216"
+
+[[routes]]
+id = "task:Taskfile.yml#native:target"
+owner = "Environment operations"
+purpose = "Verify the selected target and forward its exact Pod to loopback."
+definition = "sha256:663108ca23770bbf236bc7faeb80ce433b568f61b7a4fa32d90695575ddc15d3"
+
+[[routes]]
+id = "task:Taskfile.yml#native:target-health"
+owner = "Environment operations"
+purpose = "Verify candidate registry access and owned ready target resources."
+definition = "sha256:1c967b01448e92d5e1469a76d0a1dc2f961356b5ae145de56fe38049192d61bd"
+
+[[routes]]
+id = "task:Taskfile.yml#native:up"
+owner = "Environment operations"
+purpose = "Preflight and supervise the local tunnels and HTTPS gateway."
+definition = "sha256:6ee6d36f1b33a27b224fc74dc0e58aa6f1586f7b905201e814362e1219d50e1c"
+
+[[routes]]
+id = "task:Taskfile.yml#smoke"
+owner = "Environment operations"
+purpose = "Check platform status and run a retained end-to-end smoke Run."
+definition = "sha256:5d3f2850c128c55356ccbb08da1ea23b42144125ab392bca918f94cda951c5bd"
+
+[[routes]]
+id = "task:Taskfile.yml#status"
+owner = "Environment operations"
+purpose = "Check the current local platform and GitOps health."
+definition = "sha256:4fcd82acd13991e169dbe1771e775fc3fcd8f0f39fd46557869926ad991ebeb0"
