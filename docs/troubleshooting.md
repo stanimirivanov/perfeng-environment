@@ -676,6 +676,11 @@ mismatch by editing or deleting an immutable ConfigMap in place. Create the new
 reviewed identity, select it in Git and retain the previous identity for
 rollback.
 
+Use the [offline harness](development/harness.md#offline-harness-pilot) to run
+repository policy and GitOps composition validation together. A repository
+policy failure stops the harness before GitOps validation. Follow the policy
+diagnostic, then rerun the harness.
+
 ## M04 runtime cutover
 
 Follow the [runtime deployment guide](kubernetes-runtime-deployment.md).

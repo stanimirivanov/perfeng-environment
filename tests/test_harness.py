@@ -77,29 +77,7 @@ guide = "docs/development/harness.md"
         )
 
     def test_offline_stage_preserves_standalone_validation_results(self) -> None:
-        for invalid_input, policy_status, policy_message, gitops_status, gitops_message in (
-            (
-                None,
-                0,
-                b"repo-policy: repository policy checks passed",
-                0,
-                b"Validated local GitOps Applications and composition.",
-            ),
-            (
-                ROOT_APPLICATION,
-                0,
-                b"repo-policy: repository policy checks passed",
-                1,
-                b"Local GitOps error: Invalid local root Application",
-            ),
-            (
-                PR_FIX_FORM,
-                1,
-                b"include Issue, Resolution and Verification fields",
-                0,
-                b"Validated local GitOps Applications and composition.",
-            ),
-        ):
+        for invalid_input in (None, ROOT_APPLICATION, PR_FIX_FORM):
             with (
                 self.subTest(invalid_input=invalid_input),
                 tempfile.TemporaryDirectory() as directory,
@@ -121,6 +99,11 @@ guide = "docs/development/harness.md"
                 for path in (ISSUE_FORM, PR_FORM, PR_FIX_FORM):
                     (checkout / path).parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(ROOT / path, checkout / path)
+
+                policy_status = 0
+                policy_message = b"repo-policy: repository policy checks passed"
+                gitops_status = 0
+                gitops_message = b"Validated local GitOps Applications and composition."
                 if invalid_input == ROOT_APPLICATION:
                     manifest = checkout / ROOT_APPLICATION
                     manifest.write_text(
@@ -129,8 +112,12 @@ guide = "docs/development/harness.md"
                         ),
                         encoding="utf-8",
                     )
+                    gitops_status = 1
+                    gitops_message = b"Local GitOps error: Invalid local root Application"
                 elif invalid_input == PR_FIX_FORM:
                     (checkout / PR_FIX_FORM).unlink()
+                    policy_status = 1
+                    policy_message = b"include Issue, Resolution and Verification fields"
 
                 policy = subprocess.run(
                     [sys.executable, str(POLICY)],
