@@ -36,6 +36,90 @@ class CommandRouteTests(unittest.TestCase):
             timeout=10,
         )
 
+    def test_reports_a_new_make_target_without_running_the_recipe(self) -> None:
+        self.write("Makefile", "# Test command surface.\nfixture:\n\ttouch unexpected-marker\n")
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("unreviewed-route: Makefile:2: 'make:Makefile#fixture'", result.stderr)
+        self.assertFalse((self.checkout / "unexpected-marker").exists())
+
+    def test_reviews_make_recipe_prerequisites_and_referenced_variable_defaults(self) -> None:
+        makefile = (
+            "ROOT ?= local\n"
+            "RUN = run --root $(ROOT)\n"
+            "aggregate: fixture\n"
+            ".PHONY: aggregate fixture\n"
+            "fixture:\n"
+            "\t$(RUN) touch unexpected-marker\n"
+            "ifneq ($(strip $(EXTRA)),)\n"
+            "\ttouch conditional-marker\n"
+            "endif\n"
+        )
+        baseline = """\
+[[routes]]
+id = "make:Makefile#aggregate"
+owner = "Fixture owner"
+purpose = "Run the fixture aggregate."
+definition = "sha256:12a611fc5768919845790c04e208d716c214991d79bc421bd87c6a88799cb69e"
+
+[[routes]]
+id = "make:Makefile#fixture"
+owner = "Fixture owner"
+purpose = "Exercise the reviewed variable and conditional recipe."
+definition = "sha256:a401a442a8a6b59119dcfb18f6f4f4c05648bc7114a22a411972ef3e8c47df32"
+"""
+        self.write("harness/command-routes.toml", baseline)
+        self.write("Makefile", makefile)
+        accepted = self.guard()
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        self.write("Makefile", "# Updated route description.\n" + makefile)
+        self.write(
+            "harness/command-routes.toml",
+            baseline.replace("Run the fixture aggregate.", "Run the local fixture."),
+        )
+        described = self.guard()
+        self.assertEqual(described.returncode, 0, described.stderr)
+
+        for before, after, location in (
+            ("touch unexpected-marker", "touch another-marker", "5: 'make:Makefile#fixture'"),
+            ("aggregate: fixture", "aggregate: fixture file", "3: 'make:Makefile#aggregate'"),
+            ("ROOT ?= local", "ROOT ?= remote", "5: 'make:Makefile#fixture'"),
+            ("strip $(EXTRA)", "strip $(OTHER)", "5: 'make:Makefile#fixture'"),
+            (".PHONY: aggregate fixture", ".PHONY: aggregate", "5: 'make:Makefile#fixture'"),
+        ):
+            with self.subTest(after=after):
+                self.write("Makefile", makefile.replace(before, after))
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(f"changed-definition: Makefile:{location}", result.stderr)
+        self.assertFalse((self.checkout / "unexpected-marker").exists())
+        self.assertFalse((self.checkout / "conditional-marker").exists())
+
+    def test_rejects_opaque_make_expansions_without_evaluating_them(self) -> None:
+        for declaration, location in (
+            ("FLAG := $(shell touch parse-marker)\nfixture:\n", 1),
+            ("fixture:\n\t@echo '$(shell touch parse-marker)'\n", 2),
+            ("$(shell touch parse-marker):\n", 1),
+        ):
+            with self.subTest(declaration=declaration):
+                self.write("Makefile", declaration)
+                result = self.guard()
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(
+                    f"unsupported-make: Makefile:{location}: unsupported Make expansion",
+                    result.stderr,
+                )
+                self.assertFalse((self.checkout / "parse-marker").exists())
+
+    def test_rejects_a_makefile_that_would_shadow_another(self) -> None:
+        self.write("Makefile", "fixture:\n")
+        self.write("GNUmakefile", "fixture:\n")
+        result = self.guard()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("unsupported-make: GNUmakefile:1:", result.stderr)
+        self.assertIn("takes precedence over Makefile", result.stderr)
+
     def test_accepts_reviewed_non_executable_shell_script_without_running_it(self) -> None:
         self.write("launch.sh", "touch unexpected-marker\n").chmod(0o644)
         self.write("Makefile", "fixture:\n\tbash launch.sh\n")
@@ -47,6 +131,12 @@ id = "script:launch.sh"
 owner = "Fixture owner"
 purpose = "Exercise a non-executable shell entrypoint."
 definition = "sha256:0705999b86cf5187492f0c7c70e4dcf4ecbb38d72d83e5aa503907277bdda284"
+
+[[routes]]
+id = "make:Makefile#fixture"
+owner = "Fixture owner"
+purpose = "Call the reviewed shell fixture."
+definition = "sha256:cec90692693b7115564f530437ead65437c03bcede1911cd5c899be870ce88c8"
 """,
         )
         result = self.guard()
@@ -210,6 +300,16 @@ definition = "sha256:8a29d638a866ceb2f5a2bf619154915082f9fb7c011b371fe10635f5c35
             "help:\n"
             "\t@echo 'For development, python helper.py prints its value.'\n"
             '\t@printf "%s\\n" "Try python helper.py for details."\n',
+        )
+        self.write(
+            "harness/command-routes.toml",
+            """\
+[[routes]]
+id = "make:Makefile#help"
+owner = "Fixture owner"
+purpose = "Display the help text."
+definition = "sha256:9fe8cb4f229fc3892dd22c8d09ae6c225c528f54ebca1dba4c4d0b08eb160302"
+""",
         )
         result = self.guard()
         self.assertEqual(result.returncode, 0, result.stderr)

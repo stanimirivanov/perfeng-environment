@@ -1,4 +1,4 @@
-"""Check the reviewed inventory of callable repository scripts without running them."""
+"""Check reviewed repository command routes without running them."""
 
 from __future__ import annotations
 
@@ -13,6 +13,11 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Timer
+
+if __package__:
+    from .make_routes import MAKEFILES, UnsupportedMake, make_definitions
+else:
+    from make_routes import MAKEFILES, UnsupportedMake, make_definitions
 
 BASELINE = "harness/command-routes.toml"
 GUIDE = "docs/development/harness.md#reviewing-command-routes"
@@ -40,7 +45,7 @@ INTERPRETER_SUFFIXES = {
     "fish": SHELL_SUFFIXES,
     "node": {".js", ".cjs", ".mjs"},
 }
-INVOCATION_FILES = {"Makefile", "Taskfile.yml", "Taskfile.yaml", "Dockerfile"}
+INVOCATION_FILES = set(MAKEFILES) | {"Taskfile.yml", "Taskfile.yaml", "Dockerfile"}
 SOURCE_SUFFIXES = {".py", ".jq"} | INTERPRETER_SUFFIXES["node"]
 MAX_GIT_PATH_BYTES = 1024 * 1024
 MAX_GIT_PATHS = 8192
@@ -75,7 +80,15 @@ def working_files(root: Path) -> list[Path]:
             if process.poll() is None:
                 process.kill()
     paths = {root / os.fsdecode(name) for name in output.split(b"\0") if name}
-    return sorted(path for path in paths if path.is_file() and path.resolve() == path)
+    regular = []
+    for path in sorted(paths):
+        if path.name in MAKEFILES and (path.is_symlink() or path.resolve() != path):
+            raise UnsupportedMake(
+                path.relative_to(root), 1, "Makefiles must be regular repository files"
+            )
+        if path.is_file() and path.resolve() == path:
+            regular.append(path)
+    return regular
 
 
 def digest(definition: bytes) -> str:
@@ -323,10 +336,18 @@ def discover(root: Path) -> dict[str, Route]:
         total += len(source)
         if is_executable:
             executable.add(relative)
-    invoked, sourced = invocation_evidence(sources)
+    for directory in sorted({path.parent for path in sources if path.name in MAKEFILES}):
+        makefiles = [directory / name for name in MAKEFILES if directory / name in sources]
+        if len(makefiles) > 1:
+            raise UnsupportedMake(makefiles[0], 1, f"takes precedence over {makefiles[1]}")
 
+    invoked, sourced = invocation_evidence(sources)
     routes = {}
     for path, source in sources.items():
+        if path.name in MAKEFILES:
+            for name, line, definition in make_definitions(path, source):
+                relative = path.as_posix()
+                routes[f"make:{relative}#{name}"] = Route(f"{relative}:{line}", digest(definition))
         line = 1
         definition = source
         direct = path in invoked or path in executable
@@ -402,6 +423,14 @@ def main() -> int:
         return 1
     try:
         discovered = discover(root)
+    except UnsupportedMake as error:
+        finding(
+            "unsupported-make",
+            error.location,
+            str(error),
+            "use a supported literal Make declaration or add narrow reviewed coverage",
+        )
+        return 1
     except (OSError, ValueError, SyntaxError, subprocess.SubprocessError) as error:
         finding("scan-failed", ".", str(error), "check the reported input and the checkout limits")
         return 1
