@@ -21,6 +21,7 @@ For supported contract distribution and the deferred registry track, see the
 | Task or changed area | Read first | Verify or consult as needed |
 |:--|:--|:--|
 | Contributor workflow, ambiguity, or issue preparation | [Contributor guide](../CONTRIBUTING.md) | [Working agreement](../AGENTS.md) |
+| Callable script or module route | [Command route review](development/harness.md#reviewing-command-routes) | [ADR 0077](adr/0077-separate-harness-execution-from-command-route-review.md), offline harness |
 | Build, CI, repository policy, dependency, or local setup | [Harness guide](development/harness.md), [dependency policy](development/dependency-policy.md) | [Engineering standards](development/engineering-standards.md), `make verify` |
 | Workspace composition or sibling checkouts | [Joint development](joint-development.md), [repository README](../README.md) | `scripts/workspace.py`, `workspace.json` |
 | Local Kubernetes substrate or Argo CD bootstrap | [Local infrastructure release](local-infrastructure-release.md), [local Kubernetes](local-kubernetes.md) | [ADR index](adr/README.md), specialized release-selection checks |
