@@ -25,7 +25,6 @@ jobs:
         with:
           repository: stanimirivanov/k8s-infrastructure
           ref: 59b175492aad9d4b0900d03fe04dd0b2ff60c8eb
-          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: k8s-infrastructure
           persist-credentials: false
       - name: Check out pinned Kubernetes benchmark contracts
@@ -34,7 +33,6 @@ jobs:
         with:
           repository: stanimirivanov/perfeng-contracts
           ref: 3b86afa18b468d831c7c2c176618180db18b2764
-          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-contracts
           persist-credentials: false
       - name: Check out pinned control-plane deployment source
@@ -43,7 +41,6 @@ jobs:
         with:
           repository: stanimirivanov/perfeng-k8s
           ref: 4c762262422420a1a223e1d56c2c469ab1c38c89
-          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-k8s
           persist-credentials: false
       - name: Check out pinned native target chart
@@ -52,7 +49,6 @@ jobs:
         with:
           repository: stanimirivanov/perfeng-k8s
           ref: a20633e150db4e940aba4355a32a7931b9a7f45a
-          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-native-target-k8s
           persist-credentials: false
       - name: Check out pinned control-plane source
@@ -61,13 +57,12 @@ jobs:
         with:
           repository: stanimirivanov/perfeng-control-plane
           ref: 2a74a20f69773fd9d43072e41668087612cdbf9e
-          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-control-plane
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version-file: perfeng-environment/.python-version
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       - run: uv sync --locked
         working-directory: perfeng-environment
       - name: Install checksum-verified kubectl
@@ -179,7 +174,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version-file: .python-version
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       - name: Audit locked dependencies
         run: make supply-chain
 
@@ -195,7 +190,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version-file: .python-version
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       - run: uv sync --locked
       - name: Build and verify candidate without publishing or deploying
         run: uv run --locked --offline python scripts/native_target.py build --image "perfeng-native-search:ci-${{ github.sha }}" --revision "${{ github.sha }}" --execute

@@ -32,13 +32,12 @@ jobs:
         with:
           repository: stanimirivanov/perfeng-control-plane
           ref: 2a74a20f69773fd9d43072e41668087612cdbf9e
-          token: ${{ secrets.PERFENG_REPOSITORIES_CONTENTS_READ_TOKEN }}
           path: perfeng-control-plane
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version-file: perfeng-environment/.python-version
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       - uses: actions/setup-go@v7
         with:
           go-version-file: perfeng-environment/native-gateway/build/go.mod
