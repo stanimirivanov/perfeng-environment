@@ -174,3 +174,4 @@ How will the assumptions and consequences be verified?
 | [0075](0075-qualify-disposable-keycloak-rotation.md) | Proposed | Qualify real signing-key overlap and retirement in the owned temporary realm, keeping Go cache admission separate. |
 | [0076](0076-route-configuration-proposals-to-source-owners.md) | Accepted | Keep authored configuration with its service or component owner and route proposals through reviewed Environment mappings. |
 | [0077](0077-separate-harness-execution-from-command-route-review.md) | Accepted | Keep harness dispatch authority separate from review of callable command routes. |
+| [0078](0078-patch-native-gateway-serving-dependencies.md) | Proposed | Require Go 1.27.4 and patched dependencies for audited gateway serving builds. |

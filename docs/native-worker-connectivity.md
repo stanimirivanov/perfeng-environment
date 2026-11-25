@@ -37,7 +37,7 @@ security fix does not inherit the control-plane dependency update.
 The official adaptation archive reports Go 1.26.8 and is not a serving fallback.
 Serving has a separate reviewed asset/checksum/source selection in
 `native-gateway/serving-release.json`. The publisher builds the standard entry
-point as a dependency using locked modules, Go 1.27.3 and x/net >=v0.62.0,
+point as a dependency using locked modules, Go 1.27.4 and x/net >=v0.62.0,
 without replacements. It checks real version/build output, audits the resulting
 executable and exercises isolated Linux TLS startup/shutdown. Local setup
 checks the selected bytes and metadata again. Build minima and a past audit do
@@ -46,8 +46,8 @@ not prove freedom from future advisories; security updates require release revie
 ## Managed setup
 
 [ADR 0010](adr/0010-manage-native-connectivity-workflow.md) defines this
-workflow. [ADR 0029](adr/0029-require-patched-native-gateway-toolchain.md)
-requires Go 1.27.3 after GO-2026-6809. The existing selected asset was built with
+workflow. [ADR 0078](adr/0078-patch-native-gateway-serving-dependencies.md)
+sets the current required Go 1.27.4 profile. The existing selected asset was built with
 Go 1.26.9 and remains recorded truthfully, but new setup/start operations reject
 it with `RELEASE_TOOLCHAIN`. Publish and select a patched replacement through the
 handoff below. Do not relabel the old checksum/asset or downgrade the gate.

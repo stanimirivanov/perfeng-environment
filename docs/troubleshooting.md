@@ -304,10 +304,10 @@ build may print `unknown`. Do not recompile by hand or change PATH: use the
 `PORT_CONFLICT` requires inspection of the exact listener, not killing every
 Caddy/kubectl process. Stop your old independent sessions before `native:up`.
 `RELEASE_TOOLCHAIN` means the selected gateway asset predates the reviewed
-Go 1.27.3 serving profile. Its recorded checksum/compiler provenance must stay
+Go 1.27.4 serving profile. Its recorded checksum/compiler provenance must stay
 truthful. Publish and select a patched release through the existing explicit
 handoff; do not relabel the asset, downgrade the gate or delete installed/CA
-state. See [ADR 0029](adr/0029-require-patched-native-gateway-toolchain.md).
+state. See [ADR 0078](adr/0078-patch-native-gateway-serving-dependencies.md).
 
 Linux host-probe failures retain existing state. Missing `glxinfo`, `xrandr`,
 `powerprofilesctl`, clock or power-source evidence is an unqualified host, not

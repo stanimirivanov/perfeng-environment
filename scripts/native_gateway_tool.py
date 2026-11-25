@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "stanimirivanov/perfeng-environment"
 MAX_BINARY_BYTES = 128 * 1024 * 1024
-GO_VERSION = "go1.27.3"
+GO_VERSION = "go1.27.4"
 
 
 def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
