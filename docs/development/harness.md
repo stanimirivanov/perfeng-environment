@@ -47,9 +47,10 @@ uv run --locked --offline python -m harness offline
 
 The [check manifest](../../harness/checks.toml) registers repository policy.
 The stage runs the same [validator](../../scripts/repository_policy.py) as
-`make docs-check` and passes through its output and exit status. Follow the
-validator's `fix:` diagnostic on a policy failure. If a check exceeds the
-pilot's two-minute timeout, the pilot exits with status 124. Run
+`make docs-check` and passes through its output and any exit status
+from normal completion. Follow the validator's `fix:` diagnostic on a policy
+failure. If a check exceeds the pilot's two-minute deadline, the harness
+identifies the timed-out check on stderr and returns status 124. Run
 `make docs-check` to investigate the validator directly. The pilot needs no
 network access, credentials, or Kubernetes context. Run `make verify` for the
 full repository-local checks and `make validate` for complete non-live acceptance.
