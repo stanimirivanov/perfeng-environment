@@ -101,6 +101,15 @@ changed, review its commands, dependency and call settings, prompts, and shared
 Taskfile settings. Rerun the offline stage to verify the review record. Running
 the operator task can affect the local environment.
 
+
+An `unsupported-workflow` finding points to the field or declaration the guard
+could not inspect. Review an existing step's `run` text or `uses` reference and
+inputs, plus inherited defaults, environment, event, and permissions when a
+fingerprint changes. For PR metadata, verify that the checkout still selects
+the exact PR base revision and keeps credential persistence disabled. A hook
+finding under `.githooks/` can reflect either source bytes or a changed execute
+bit. Review the hook in place without installing or invoking it.
+
 ## Contract cold recovery
 
 A failing `contracts-restore-check` with retained assets indicates a missing,

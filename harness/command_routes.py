@@ -18,9 +18,11 @@ from threading import Timer
 if __package__:
     from .make_routes import MAKEFILES, UnsupportedMake, make_definitions
     from .task_routes import TASKFILES, TaskfileDefinitions, UnsupportedTask, taskfile_definitions
+    from .workflow_routes import UnsupportedWorkflow, WorkflowStep, is_workflow, workflow_steps
 else:
     from make_routes import MAKEFILES, UnsupportedMake, make_definitions
     from task_routes import TASKFILES, TaskfileDefinitions, UnsupportedTask, taskfile_definitions
+    from workflow_routes import UnsupportedWorkflow, WorkflowStep, is_workflow, workflow_steps
 
 BASELINE = "harness/command-routes.toml"
 GUIDE = "docs/development/harness.md#reviewing-command-routes"
@@ -50,6 +52,39 @@ INTERPRETER_SUFFIXES = {
 }
 INVOCATION_FILES = set(MAKEFILES) | set(TASKFILES) | {"Dockerfile"}
 SOURCE_SUFFIXES = {".py", ".jq"} | INTERPRETER_SUFFIXES["node"]
+GIT_HOOKS = frozenset(
+    {
+        "applypatch-msg",
+        "commit-msg",
+        "fsmonitor-watchman",
+        "fsmonitor-watchmanv2",
+        "p4-changelist",
+        "p4-post-changelist",
+        "p4-pre-submit",
+        "p4-prepare-changelist",
+        "post-applypatch",
+        "post-checkout",
+        "post-commit",
+        "post-index-change",
+        "post-merge",
+        "post-receive",
+        "post-rewrite",
+        "post-update",
+        "pre-applypatch",
+        "pre-auto-gc",
+        "pre-commit",
+        "pre-merge-commit",
+        "pre-push",
+        "pre-rebase",
+        "pre-receive",
+        "prepare-commit-msg",
+        "proc-receive",
+        "push-to-checkout",
+        "reference-transaction",
+        "sendemail-validate",
+        "update",
+    }
+)
 MAX_GIT_PATH_BYTES = 1024 * 1024
 MAX_GIT_PATHS = 8192
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
@@ -62,9 +97,22 @@ class Route:
     definition: str
 
 
+def is_hook(path: Path) -> bool:
+    return path.parent == Path(".githooks") and path.name in GIT_HOOKS
+
+
 def working_files(root: Path) -> list[Path]:
     with subprocess.Popen(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        [
+            "git",
+            "-c",
+            "core.fsmonitor=false",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -85,6 +133,13 @@ def working_files(root: Path) -> list[Path]:
     paths = {root / os.fsdecode(name) for name in output.split(b"\0") if name}
     regular = []
     for path in sorted(paths):
+        relative = path.relative_to(root)
+        if (is_workflow(relative) or is_hook(relative)) and (
+            path.is_symlink() or path.resolve() != path
+        ):
+            if is_workflow(relative):
+                raise UnsupportedWorkflow(relative, 1, "workflows must be regular repository files")
+            raise ValueError(f"{relative}:1: hooks must be regular repository files")
         if path.name in MAKEFILES and (path.is_symlink() or path.resolve() != path):
             raise UnsupportedMake(
                 path.relative_to(root), 1, "Makefiles must be regular repository files"
@@ -115,12 +170,15 @@ def invocation_scope(path: Path) -> bool:
     return (
         path.suffix in SHELL_SUFFIXES
         or path.name in INVOCATION_FILES
-        or path.parts[:2] == (".github", "workflows")
+        or is_workflow(path)
+        or is_hook(path)
     )
 
 
 def invocation_evidence(
-    sources: dict[Path, bytes], taskfiles: dict[Path, TaskfileDefinitions]
+    sources: dict[Path, bytes],
+    taskfiles: dict[Path, TaskfileDefinitions],
+    workflows: dict[Path, tuple[WorkflowStep, ...]],
 ) -> tuple[set[Path], set[Path]]:
     invoked: set[Path] = set()
     sourced: set[Path] = set()
@@ -134,6 +192,14 @@ def invocation_evidence(
             )
             lines = (
                 (directory, line) for directory, text in commands for line in text.splitlines()
+            )
+        elif path in workflows:
+            lines = (
+                (directory, line)
+                for step in workflows[path]
+                if step.command is not None
+                for directory, text in (step.command,)
+                for line in text.splitlines()
             )
         elif not invocation_scope(path):
             continue
@@ -382,7 +448,10 @@ def discover(root: Path) -> dict[str, Route]:
         path = candidates[0]
         taskfiles[path] = taskfile_definitions(path, sources[path])
 
-    invoked, sourced = invocation_evidence(sources, taskfiles)
+    workflows = {
+        path: workflow_steps(path, source) for path, source in sources.items() if is_workflow(path)
+    }
+    invoked, sourced = invocation_evidence(sources, taskfiles, workflows)
     routes = {}
     for path, source in sources.items():
         if path.name in MAKEFILES:
@@ -395,6 +464,18 @@ def discover(root: Path) -> dict[str, Route]:
                 routes[f"task:{relative}#{task.name}"] = Route(
                     f"{relative}:{task.line}", digest(task.definition)
                 )
+        if path in workflows:
+            relative = path.as_posix()
+            for step in workflows[path]:
+                routes[f"workflow:{relative}#{step.identity}"] = Route(
+                    f"{relative}:{step.line}", digest(step.definition)
+                )
+            continue
+        if is_hook(path):
+            relative = path.as_posix()
+            definition = b"executable\0" + source if path in executable else source
+            routes[f"hook:{relative}"] = Route(f"{relative}:1", digest(definition))
+            continue
         line = 1
         definition = source
         direct = path in invoked or path in executable
@@ -486,6 +567,14 @@ def main() -> int:
             error.location,
             str(error),
             "use a supported literal Task declaration or add narrow reviewed coverage",
+        )
+        return 1
+    except UnsupportedWorkflow as error:
+        finding(
+            "unsupported-workflow",
+            error.location,
+            str(error),
+            "use a supported literal workflow declaration or add narrow reviewed coverage",
         )
         return 1
     except (OSError, ValueError, SyntaxError, subprocess.SubprocessError) as error:
