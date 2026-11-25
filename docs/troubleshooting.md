@@ -693,7 +693,10 @@ to check the Run and report registration, approved object access, registered
 byte count and digest, and reviewed policy linkage. Preserve the original Run
 and report. If access is unavailable or the evidence differs, give the
 Environment owner the Run ID, deployment selection and failing check through
-the approved reporting channel. Keep the object body and credentials private.
+the approved reporting channel. For denied exact-object access, identify the
+missing GET approval for the registered key. If the object verifies but the
+verdict is inconclusive, record the unresolved decision using the book's
+return checkpoint. Keep the object body and credentials private.
 
 ## Validate immutable selections offline
 
